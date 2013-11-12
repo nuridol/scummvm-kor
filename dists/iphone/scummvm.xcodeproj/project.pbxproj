@@ -11567,9 +11567,6 @@
 			isa = PBXProject;
 			attributes = {
 				TargetAttributes = {
-					1D6058900D05DD3D006BFB54 = {
-						DevelopmentTeam = HRS8AEB46M;
-					};
 					DF093E730F63CB26002D821E = {
 						DevelopmentTeam = HRS8AEB46M;
 					};
@@ -15191,7 +15188,6 @@
 				LIBRARY_SEARCH_PATHS = (
 					"$(SRCROOT)/lib",
 					"$(inherited)",
-					"/Users/NuRi/Development/scummvm-1.7.0/scummvm/dists/iphone/lib",
 				);
 				ONLY_ACTIVE_ARCH = NO;
 				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
@@ -15290,7 +15286,6 @@
 				LIBRARY_SEARCH_PATHS = (
 					"$(SRCROOT)/lib",
 					"$(inherited)",
-					"/Users/NuRi/Development/scummvm-1.7.0/scummvm/dists/iphone/lib",
 				);
 				ONLY_ACTIVE_ARCH = NO;
 				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
