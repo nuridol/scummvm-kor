@@ -1,0 +1,279 @@
+Configure run on Sat Nov 2 00:34:48 JST 2013
+testing compiler: g++
+success testing compiler: g++
+
+int main(void) {
+	#ifndef __INTEL_COMPILER
+	syntax error
+	#endif
+	return 0;
+}
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g ./scummvm-conf.cpp -o ./scummvm-conf -c
+./scummvm-conf.cpp:3:2: error: unknown type name 'syntax'
+        syntax error
+        ^
+./scummvm-conf.cpp:3:14: error: expected ';' at end of declaration
+        syntax error
+                    ^
+                    ;
+2 errors generated.
+return code: 1
+
+
+int main(void) {
+	#ifndef __GNUC__
+	syntax error
+	#endif
+	return 0;
+}
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g ./scummvm-conf.cpp -o ./scummvm-conf -c
+return code: 0
+
+
+int main(int argc, char *argv[]) { if (argv == nullptr) return -1; else return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g ./scummvm-conf.cpp -o ./scummvm-conf -std=c++11
+return code: 0
+
+
+int main() { return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long ./scummvm-conf.cpp -o ./scummvm-conf -Wglobal-constructors
+return code: 0
+
+
+int main(void) { return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -lm
+return code: 0
+
+
+#include <vorbis/codec.h>
+int main(void) { vorbis_packet_blocksize(0,0); return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -I/opt/local/include -L/opt/local/lib -I/opt/local/include -L/opt/local/lib -lvorbisfile -lvorbis -logg
+return code: 0
+
+
+#include <tremor/ivorbiscodec.h>
+int main(void) { vorbis_info_init(0); return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -lvorbisidec
+./scummvm-conf.cpp:1:10: fatal error: 'tremor/ivorbiscodec.h' file not found
+#include <tremor/ivorbiscodec.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <FLAC/format.h>
+int main(void) { return FLAC__STREAM_SYNC_LEN >> 30; /* guaranteed to be 0 */ }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -I/usr/local/include -L/usr/local/lib -I/opt/local/include -L/opt/local/lib -lFLAC -logg
+return code: 0
+
+
+#include <mad.h>
+int main(void) { return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -I/opt/local/include -L/opt/local/lib -lmad
+return code: 0
+
+
+#include <alsa/asoundlib.h>
+int main(void) { return (!(SND_LIB_MAJOR==0 && SND_LIB_MINOR==9)); }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -lasound
+./scummvm-conf.cpp:1:10: fatal error: 'alsa/asoundlib.h' file not found
+#include <alsa/asoundlib.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <stdio.h>
+#include <jpeglib.h>
+int main(void) {
+#if JPEG_LIB_VERSION >= 62
+#else
+  syntax error
+#endif
+  return 0;
+}
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -ljpeg
+./scummvm-conf.cpp:2:10: fatal error: 'jpeglib.h' file not found
+#include <jpeglib.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <png.h>
+int main(void) {
+#if PNG_LIBPNG_VER >= 10208
+#else
+  syntax error
+#endif
+  return 0;
+}
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -lpng -lz
+./scummvm-conf.cpp:1:10: fatal error: 'png.h' file not found
+#include <png.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <theora/theoradec.h>
+#include <vorbis/codec.h>
+int main(void) { th_ycbcr_buffer yuv; th_decode_ycbcr_out(NULL, yuv);  }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -ltheoradec
+./scummvm-conf.cpp:1:10: fatal error: 'theora/theoradec.h' file not found
+#include <theora/theoradec.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <neaacdec.h>
+int main(void) { NeAACDecGetCapabilities(); return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -lfaad
+./scummvm-conf.cpp:1:10: fatal error: 'neaacdec.h' file not found
+#include <neaacdec.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <sndio.h>
+int main(void) { struct sio_par par; sio_initpar(&par); return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -lsndio
+./scummvm-conf.cpp:1:10: fatal error: 'sndio.h' file not found
+#include <sndio.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <string.h>
+#include <zlib.h>
+int main(void) { return strcmp(ZLIB_VERSION, zlibVersion()); }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -lz
+return code: 0
+
+
+typedef signed char int8_t;
+typedef signed short int16_t;
+typedef signed int int32_t;
+
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+
+extern "C" {
+#include <mpeg2dec/mpeg2.h>
+}
+
+int main(void) {
+	#if MPEG2_RELEASE < MPEG2_VERSION(0, 4, 0)
+	#error libmpeg2 version too low
+	#endif
+
+	/* mpeg2_state_t first appears in 0.4.0 */
+	mpeg2_state_t state;
+
+	return 0;
+}
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -lmpeg2
+./scummvm-conf.cpp:10:10: fatal error: 'mpeg2dec/mpeg2.h' file not found
+#include <mpeg2dec/mpeg2.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <fluidsynth.h>
+int main(void) { return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -lfluidsynth
+./scummvm-conf.cpp:1:10: fatal error: 'fluidsynth.h' file not found
+#include <fluidsynth.h>
+         ^
+1 error generated.
+return code: 1
+
+Package unity was not found in the pkg-config search path.
+Perhaps you should add the directory containing `unity.pc'
+to the PKG_CONFIG_PATH environment variable
+No package 'unity' found
+Package unity was not found in the pkg-config search path.
+Perhaps you should add the directory containing `unity.pc'
+to the PKG_CONFIG_PATH environment variable
+No package 'unity' found
+
+#include <unity.h>
+int main(void) {
+	unity_launcher_entry_get_for_desktop_id("scummvm.desktop");
+	return 0;
+}
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf 
+./scummvm-conf.cpp:1:10: fatal error: 'unity.h' file not found
+#include <unity.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <GL/gl.h>
+#include <stdio.h>
+int main(void) { printf("ANTIVIRUS FALSE POSITIVE WORKAROUND"); return GL_VERSION_1_1; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -DRELEASE_BUILD -DSCUMMVMKOR -DMACOSX -DSDL_BACKEND -DPOSIX
+./scummvm-conf.cpp:1:10: fatal error: 'GL/gl.h' file not found
+#include <GL/gl.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <GL/gl.h>
+int main(void) { return GL_OES_VERSION_1_1; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -DRELEASE_BUILD -DSCUMMVMKOR -DMACOSX -DSDL_BACKEND -DPOSIX
+./scummvm-conf.cpp:1:10: fatal error: 'GL/gl.h' file not found
+#include <GL/gl.h>
+         ^
+1 error generated.
+return code: 1
+
+
+#include <OpenGL/gl.h>
+#include <stdio.h>
+int main(void) { printf("ANTIVIRUS FALSE POSITIVE WORKAROUND"); return GL_VERSION_1_1; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -DRELEASE_BUILD -DSCUMMVMKOR -DMACOSX -DSDL_BACKEND -DPOSIX
+return code: 0
+
+
+int main(void) { return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -DRELEASE_BUILD -DSCUMMVMKOR -DMACOSX -DSDL_BACKEND -DPOSIX -framework OpenGL
+return code: 0
+
+
+#include <locale.h>
+int main(void) { setlocale(LC_ALL, ""); return 0; }
+
+g++ -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized ./scummvm-conf.cpp -o ./scummvm-conf -arch x86_64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/ -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks -g -ansi -W -Wno-unused-parameter -Wconversion -pedantic -Wno-long-long -Wglobal-constructors -O3 -Wuninitialized
+return code: 0
+
