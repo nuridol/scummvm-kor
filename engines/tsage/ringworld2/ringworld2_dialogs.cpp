@@ -85,7 +85,7 @@ RightClickDialog::~RightClickDialog() {
 
 void RightClickDialog::draw() {
 	// Save the covered background area
-	_savedArea = Surface_getArea(g_globals->_gfxManagerInstance.getSurface(), _bounds);
+	_savedArea = surfaceGetArea(g_globals->_gfxManagerInstance.getSurface(), _bounds);
 
 	// Draw the dialog image
 	g_globals->gfxManager().copyFrom(_surface, _bounds.left, _bounds.top);
@@ -165,7 +165,7 @@ void RightClickDialog::execute() {
 		break;
 	case 1:
 		// Walk action
-		cursorNum = CURSOR_WALK;
+		cursorNum = R2_GLOBALS._player._canWalk ? CURSOR_WALK : CURSOR_USE;
 		break;
 	case 2:
 		// Use action
@@ -234,9 +234,9 @@ void CharacterDialog::show() {
 		SceneExt *scene = (SceneExt *)R2_GLOBALS._sceneManager._scene;
 		scene->saveCharacter(oldCharacter);
 
-		// Play a transition sound as the character is changed
-		if (R2_GLOBALS._player._characterScene[0] != 300) {
-			switch (R2_GLOBALS._v565F1[R2_GLOBALS._player._characterIndex]) {
+		// Play the correctfrequency, if any, of the character being switched to's scanner device 
+		if (R2_GLOBALS._player._characterScene[R2_NONE] != 300) {
+			switch (R2_GLOBALS._scannerFrequencies[R2_GLOBALS._player._characterIndex] - 1) {
 			case 0:
 				R2_GLOBALS._sound4.stop();
 				break;
@@ -255,8 +255,8 @@ void CharacterDialog::show() {
 			default:
 				break;
 			}
-		} else if (R2_GLOBALS._v565F1[R2_GLOBALS._player._characterIndex] > 1) {
-			switch (R2_GLOBALS._v565F1[R2_GLOBALS._player._characterIndex]) {
+		} else if (R2_GLOBALS._scannerFrequencies[R2_GLOBALS._player._characterIndex] > 1) {
+			switch (R2_GLOBALS._scannerFrequencies[R2_GLOBALS._player._characterIndex] - 1) {
 			case 2:
 				R2_GLOBALS._sound4.play(45);
 				break;
@@ -272,8 +272,8 @@ void CharacterDialog::show() {
 			default:
 				break;
 			}
-		} else if ((R2_GLOBALS._player._characterScene[1] == 300) && (R2_GLOBALS._v565F1[1] != 1)) {
-			switch (R2_GLOBALS._v565F1[1]) {
+		} else if ((R2_GLOBALS._player._characterScene[R2_QUINN] == 300) && (R2_GLOBALS._scannerFrequencies[1] != 1)) {
+			switch (R2_GLOBALS._scannerFrequencies[1] - 1) {
 			case 2:
 				R2_GLOBALS._sound4.play(45);
 				break;
@@ -289,12 +289,12 @@ void CharacterDialog::show() {
 			default:
 				break;
 			}
-		} else if (R2_GLOBALS._player._characterScene[2] != 300) {
+		} else if (R2_GLOBALS._player._characterScene[R2_SEEKER] != 300) {
 			R2_GLOBALS._sound4.stop();
-		} else if (R2_GLOBALS._v565F1[2] == 1) {
+		} else if (R2_GLOBALS._scannerFrequencies[2] == 1) {
 			R2_GLOBALS._sound4.stop();
 		} else {
-			switch (R2_GLOBALS._v565F1[1]) {
+			switch (R2_GLOBALS._scannerFrequencies[1] - 1) {
 			case 2:
 				R2_GLOBALS._sound4.play(45);
 				break;
@@ -389,7 +389,7 @@ HelpDialog::HelpDialog() {
 	_msgTitle._bounds.moveTo(5, 0);
 	_msgVersion.set(GAME_VERSION, 172, ALIGN_CENTER);
 	_msgVersion._bounds.moveTo(5, _msgTitle._bounds.bottom + 3);
-	addElements(&_msgTitle, &_msgVersion, NULL);	
+	addElements(&_msgTitle, &_msgVersion, NULL);
 
 	// Set buttons
 	_btnList[0].setText(F2);

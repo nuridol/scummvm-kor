@@ -33,6 +33,9 @@ namespace CreateProjectTool {
 //////////////////////////////////////////////////////////////////////////
 MSVCProvider::MSVCProvider(StringList &global_warnings, std::map<std::string, StringList> &project_warnings, const int version)
 	: ProjectProvider(global_warnings, project_warnings, version) {
+
+	_enableLanguageExtensions = tokenize(ENABLE_LANGUAGE_EXTENSIONS, ',');
+	_disableEditAndContinue   = tokenize(DISABLE_EDIT_AND_CONTINUE, ',');
 }
 
 void MSVCProvider::createWorkspace(const BuildSetup &setup) {
@@ -75,10 +78,12 @@ void MSVCProvider::createWorkspace(const BuildSetup &setup) {
 	solution << "Global\n"
 	            "\tGlobalSection(SolutionConfigurationPlatforms) = preSolution\n"
 	            "\t\tDebug|Win32 = Debug|Win32\n"
-				"\t\tAnalysis|Win32 = Analysis|Win32\n"
+	            "\t\tAnalysis|Win32 = Analysis|Win32\n"
+	            "\t\tLLVM|Win32 = LLVM|Win32\n"
 	            "\t\tRelease|Win32 = Release|Win32\n"
 	            "\t\tDebug|x64 = Debug|x64\n"
-				"\t\tAnalysis|x64 = Analysis|x64\n"
+	            "\t\tAnalysis|x64 = Analysis|x64\n"
+	            "\t\tLLVM|x64 = LLVM|x64\n"
 	            "\t\tRelease|x64 = Release|x64\n"
 	            "\tEndGlobalSection\n"
 	            "\tGlobalSection(ProjectConfigurationPlatforms) = postSolution\n";
@@ -86,14 +91,18 @@ void MSVCProvider::createWorkspace(const BuildSetup &setup) {
 	for (UUIDMap::const_iterator i = _uuidMap.begin(); i != _uuidMap.end(); ++i) {
 		solution << "\t\t{" << i->second << "}.Debug|Win32.ActiveCfg = Debug|Win32\n"
 		            "\t\t{" << i->second << "}.Debug|Win32.Build.0 = Debug|Win32\n"
-					"\t\t{" << i->second << "}.Analysis|Win32.ActiveCfg = Analysis|Win32\n"
-					"\t\t{" << i->second << "}.Analysis|Win32.Build.0 = Analysis|Win32\n"
+		            "\t\t{" << i->second << "}.Analysis|Win32.ActiveCfg = Analysis|Win32\n"
+		            "\t\t{" << i->second << "}.Analysis|Win32.Build.0 = Analysis|Win32\n"
+		            "\t\t{" << i->second << "}.LLVM|Win32.ActiveCfg = LLVM|Win32\n"
+		            "\t\t{" << i->second << "}.LLVM|Win32.Build.0 = LLVM|Win32\n"
 		            "\t\t{" << i->second << "}.Release|Win32.ActiveCfg = Release|Win32\n"
 		            "\t\t{" << i->second << "}.Release|Win32.Build.0 = Release|Win32\n"
 		            "\t\t{" << i->second << "}.Debug|x64.ActiveCfg = Debug|x64\n"
 		            "\t\t{" << i->second << "}.Debug|x64.Build.0 = Debug|x64\n"
-					"\t\t{" << i->second << "}.Analysis|x64.ActiveCfg = Analysis|x64\n"
-					"\t\t{" << i->second << "}.Analysis|x64.Build.0 = Analysis|x64\n"
+		            "\t\t{" << i->second << "}.Analysis|x64.ActiveCfg = Analysis|x64\n"
+		            "\t\t{" << i->second << "}.Analysis|x64.Build.0 = Analysis|x64\n"
+		            "\t\t{" << i->second << "}.LLVM|x64.ActiveCfg = LLVM|x64\n"
+		            "\t\t{" << i->second << "}.LLVM|x64.Build.0 = LLVM|x64\n"
 		            "\t\t{" << i->second << "}.Release|x64.ActiveCfg = Release|x64\n"
 		            "\t\t{" << i->second << "}.Release|x64.Build.0 = Release|x64\n";
 	}
@@ -111,12 +120,14 @@ void MSVCProvider::createOtherBuildFiles(const BuildSetup &setup) {
 
 	// Create the configuration property files (for Debug and Release with 32 and 64bits versions)
 	// Note: we use the debug properties for the analysis configuration
-	createBuildProp(setup, true, false, false);
-	createBuildProp(setup, true, true, false);
-	createBuildProp(setup, false, false, false);
-	createBuildProp(setup, false, false, true);
-	createBuildProp(setup, false, true, false);
-	createBuildProp(setup, false, true, true);
+	createBuildProp(setup, true, false, "Release");
+	createBuildProp(setup, true, true, "Release");
+	createBuildProp(setup, false, false, "Debug");
+	createBuildProp(setup, false, true, "Debug");
+	createBuildProp(setup, false, false, "Analysis");
+	createBuildProp(setup, false, true, "Analysis");
+	createBuildProp(setup, false, false, "LLVM");
+	createBuildProp(setup, false, true, "LLVM");
 }
 
 void MSVCProvider::createGlobalProp(const BuildSetup &setup) {
@@ -139,7 +150,7 @@ void MSVCProvider::createGlobalProp(const BuildSetup &setup) {
 	StringList x64EngineDefines = getEngineDefines(setup.engines);
 	x64Defines.splice(x64Defines.end(), x64EngineDefines);
 
-	// HACK: This definitly should not be here, but otherwise we would not define SDL_BACKEND for x64.
+	// HACK: This definitely should not be here, but otherwise we would not define SDL_BACKEND for x64.
 	x64Defines.push_back("WIN32");
 	x64Defines.push_back("SDL_BACKEND");
 
@@ -158,6 +169,16 @@ std::string MSVCProvider::getPreBuildEvent() const {
 	return cmdLine;
 }
 
+std::string MSVCProvider::getTestPreBuildEvent(const BuildSetup &setup) const {
+	// Build list of folders containing tests
+	std::string target = "";
+
+	for (StringList::const_iterator it = setup.testDirs.begin(); it != setup.testDirs.end(); ++it)
+		target += " $(SolutionDir)" + *it + "*.h";
+
+	return "&quot;$(SolutionDir)../../test/cxxtest/cxxtestgen.py&quot; --runner=ParenPrinter --no-std --no-eh -o $(SolutionDir)test_runner.cpp" + target;
+}
+
 std::string MSVCProvider::getPostBuildEvent(bool isWin32, bool createInstaller) const {
 	std::string cmdLine = "";
 
@@ -168,7 +189,7 @@ std::string MSVCProvider::getPostBuildEvent(bool isWin32, bool createInstaller) 
 
 	cmdLine += (isWin32) ? "x86" : "x64";
 
-	cmdLine += " %SCUMMVM_LIBS% ";
+	cmdLine += " %" LIBS_DEFINE "% ";
 
 	// Specify if installer needs to be built or not
 	cmdLine += (createInstaller ? "1" : "0");

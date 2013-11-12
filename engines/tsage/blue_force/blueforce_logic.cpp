@@ -454,9 +454,10 @@ void Timer::dispatch() {
 
 	if (_endFrame) {
 		uint32 frameNumber = BF_GLOBALS._events.getFrameNumber();
-		if (frameNumber > _endFrame)
+		if (frameNumber > _endFrame) {
 			// Timer has expired
 			signal();
+		}
 	}
 }
 
@@ -472,7 +473,8 @@ void Timer::set(uint32 delay, EventHandler *endHandler) {
 /*--------------------------------------------------------------------------*/
 
 TimerExt::TimerExt(): Timer() {
-	_action = NULL;
+	_action = nullptr;
+	_newAction = nullptr;
 }
 
 void TimerExt::set(uint32 delay, EventHandler *endHandler, Action *newAction) {
@@ -678,7 +680,7 @@ void FocusObject::process(Event &event) {
 			BF_GLOBALS._events.setCursor(BF_GLOBALS._events.getCursor());
 
 			if ((event.eventType == EVENT_BUTTON_DOWN) && (BF_GLOBALS._events.getCursor() == CURSOR_WALK) &&
-					(event.btnState == 3)) {
+					(event.btnState == BTNSHIFT_RIGHT)) {
 				BF_GLOBALS._events.setCursor(CURSOR_USE);
 				event.handled = true;
 			}
@@ -733,7 +735,7 @@ void SceneExt::remove() {
 			_action->_endHandler = NULL;
 		_action->remove();
 	}
-	
+
 	_focusObject = NULL;
 }
 
@@ -909,6 +911,7 @@ void PalettedScene::add2Faders(const byte *arrBufferRGB, int step, int paletteNu
 
 void PalettedScene::transition(const byte *arrBufferRGB, int percent, int paletteNum, Action *action, int fromColor1, int fromColor2, int toColor1, int toColor2, bool flag) {
 	byte tmpPalette[768];
+	memset(tmpPalette, 0, 768);
 
 	_palette.loadPalette(paletteNum);
 	_palette.loadPalette(2);
@@ -1326,7 +1329,7 @@ bool BlueForceInvObjectList::SelectItem(int objectNumber) {
 		AmmoBeltDialog *dlg = new AmmoBeltDialog();
 		dlg->execute();
 		delete dlg;
-	
+
 		return true;
 	}
 
@@ -1408,7 +1411,7 @@ void SceneMessage::signal() {
 }
 
 void SceneMessage::process(Event &event) {
-	if ((event.eventType == EVENT_BUTTON_DOWN) || 
+	if ((event.eventType == EVENT_BUTTON_DOWN) ||
 		((event.eventType == EVENT_KEYPRESS) && (event.kbd.keycode == Common::KEYCODE_RETURN))) {
 		signal();
 	}
@@ -1439,7 +1442,7 @@ void SceneMessage::draw() {
 
 void SceneMessage::clear() {
 	// Fade out the text display
-	static const uint32 black = 0;	
+	static const uint32 black = 0;
 	BF_GLOBALS._scenePalette.fade((const byte *)&black, false, 100);
 
 	// Refresh the background

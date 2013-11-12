@@ -22,7 +22,7 @@
 
 #include "kyra/kyra_mr.h"
 #include "kyra/screen_mr.h"
-#include "kyra/sound.h"
+#include "kyra/sound_digital.h"
 #include "kyra/resource.h"
 
 #include "common/system.h"
@@ -577,6 +577,7 @@ void KyraEngine_MR::initSceneScreen(int unk1) {
 	}
 
 	updateCharPal(0);
+	_screen->updateScreen();
 
 	if (!_menuDirectlyToLoad) {
 		_emc->start(&_sceneScriptState, 3);

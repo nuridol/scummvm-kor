@@ -23,6 +23,7 @@
 #include "dreamweb/dreamweb.h"
 #include "engines/util.h"
 #include "graphics/surface.h"
+#include "graphics/decoders/pcx.h"
 
 namespace DreamWeb {
 
@@ -30,14 +31,16 @@ const uint16 kZoomx = 8;
 const uint16 kZoomy = 132;
 
 void DreamWebEngine::multiGet(uint8 *dst, uint16 x, uint16 y, uint8 w, uint8 h) {
-	assert(x < 320);
-	assert(y < 200);
+	assert(x < kScreenwidth);
+	assert(y < kScreenheight);
+
 	const uint8 *src = workspace() + x + y * kScreenwidth;
-	if (y + h > 200)
-		h = 200 - y;
-	if (x + w > 320)
-		w = 320 - x;
-	//debug(1, "multiGet %u,%u %ux%u -> segment: %04x->%04x", x, y, w, h, (uint16)ds, (uint16)es);
+
+	if (y + h > kScreenheight)
+		h = kScreenheight - y;
+	if (x + w > kScreenwidth)
+		w = kScreenwidth - x;
+
 	for (unsigned l = 0; l < h; ++l) {
 		const uint8 *src_p = src + kScreenwidth * l;
 		uint8 *dst_p = dst + w * l;
@@ -46,14 +49,16 @@ void DreamWebEngine::multiGet(uint8 *dst, uint16 x, uint16 y, uint8 w, uint8 h) 
 }
 
 void DreamWebEngine::multiPut(const uint8 *src, uint16 x, uint16 y, uint8 w, uint8 h) {
-	assert(x < 320);
-	assert(y < 200);
+	assert(x < kScreenwidth);
+	assert(y < kScreenheight);
+
 	uint8 *dst = workspace() + x + y * kScreenwidth;
-	if (y + h > 200)
-		h = 200 - y;
-	if (x + w > 320)
-		w = 320 - x;
-	//debug(1, "multiPut %ux%u -> segment: %04x->%04x", w, h, (uint16)ds, (uint16)es);
+
+	if (y + h > kScreenheight)
+		h = kScreenheight - y;
+	if (x + w > kScreenwidth)
+		w = kScreenwidth - x;
+
 	for (unsigned l = 0; l < h; ++l) {
 		const uint8 *src_p = src + w * l;
 		uint8 *dst_p = dst + kScreenwidth * l;
@@ -63,12 +68,11 @@ void DreamWebEngine::multiPut(const uint8 *src, uint16 x, uint16 y, uint8 w, uin
 
 void DreamWebEngine::multiDump(uint16 x, uint16 y, uint8 width, uint8 height) {
 	unsigned offset = x + y * kScreenwidth;
-	//debug(1, "multiDump %ux%u(segment: %04x) -> %d,%d(address: %d)", w, h, (uint16)ds, x, y, offset);
 	blit(workspace() + offset, kScreenwidth, x, y, width, height);
 }
 
 void DreamWebEngine::workToScreen() {
-	blit(workspace(), 320, 0, 0, 320, 200);
+	blit(workspace(), kScreenwidth, 0, 0, kScreenwidth, kScreenheight);
 }
 
 void DreamWebEngine::frameOutNm(uint8 *dst, const uint8 *src, uint16 pitch, uint16 width, uint16 height, uint16 x, uint16 y) {
@@ -144,87 +148,47 @@ void DreamWebEngine::doShake() {
 	setShakePos(offset >= 0 ? offset : -offset);
 }
 
-void DreamWebEngine::vSync() {
-	waitForVSync();
-}
-
 void DreamWebEngine::setMode() {
 	waitForVSync();
-	initGraphics(320, 200, false);
+	initGraphics(kScreenwidth, kScreenheight, false);
 }
 
-void DreamWebEngine::showPCX(const Common::String &name) {
+void DreamWebEngine::showPCX(const Common::String &suffix) {
+	Common::String name = getDatafilePrefix() + suffix;
 	Common::File pcxFile;
-
 	if (!pcxFile.open(name)) {
 		warning("showpcx: Could not open '%s'", name.c_str());
 		return;
 	}
 
-	uint8 *mainGamePal;
-	int i, j;
+	Graphics::PCXDecoder pcx;
+	if (!pcx.loadStream(pcxFile)) {
+		warning("showpcx: Could not process '%s'", name.c_str());
+		return;
+	}
 
 	// Read the 16-color palette into the 'maingamepal' buffer. Note that
 	// the color components have to be adjusted from 8 to 6 bits.
-
-	pcxFile.seek(16, SEEK_SET);
-	mainGamePal = _mainPal;
-	pcxFile.read(mainGamePal, 48);
-
-	memset(mainGamePal + 48, 0xff, 720);
-	for (i = 0; i < 48; i++) {
-		mainGamePal[i] >>= 2;
+	memset(_mainPal, 0xff, 256 * 3);
+	memcpy(_mainPal, pcx.getPalette(), 48);
+	for (int i = 0; i < 48; i++) {
+		_mainPal[i] >>= 2;
 	}
-
-	// Decode the image data.
 
 	Graphics::Surface *s = g_system->lockScreen();
-	Common::Rect rect(640, 480);
-
-	s->fillRect(rect, 0);
-	pcxFile.seek(128, SEEK_SET);
-
-	for (int y = 0; y < 480; y++) {
-		byte *dst = (byte *)s->getBasePtr(0, y);
-		int decoded = 0;
-
-		while (decoded < 320) {
-			byte col = pcxFile.readByte();
-			byte len;
-
-			if ((col & 0xc0) == 0xc0) {
-				len = col & 0x3f;
-				col = pcxFile.readByte();
-			} else {
-				len = 1;
-			}
-
-			// The image uses 16 colors and is stored as four bit
-			// planes, one for each bit of the color, least
-			// significant bit plane first.
-
-			for (i = 0; i < len; i++) {
-				int plane = decoded / 80;
-				int pos = decoded % 80;
-
-				for (j = 0; j < 8; j++) {
-					byte bit = (col >> (7 - j)) & 1;
-					dst[8 * pos + j] |= (bit << plane);
-				}
-
-				decoded++;
-			}
-		}
-	}
-
+	s->fillRect(Common::Rect(640, 480), 0);
+	const Graphics::Surface *pcxSurface = pcx.getSurface();
+	if (pcxSurface->format.bytesPerPixel != 1)
+		error("Invalid bytes per pixel in PCX surface (%d)", pcxSurface->format.bytesPerPixel);
+	for (uint16 y = 0; y < pcxSurface->h; y++)
+		memcpy((byte *)s->getBasePtr(0, y), pcxSurface->getBasePtr(0, y), pcxSurface->w);
 	g_system->unlockScreen();
-	pcxFile.close();
 }
 
 void DreamWebEngine::frameOutV(uint8 *dst, const uint8 *src, uint16 pitch, uint16 width, uint16 height, int16 x, int16 y) {
 	// NB : These resilience checks were not in the original engine, but did they result in undefined behaviour
 	// or was something broken during porting to C++?
-	assert(pitch == 320);
+	assert(pitch == kScreenwidth);
 
 	if (x < 0) {
 		assert(width >= -x);
@@ -238,15 +202,16 @@ void DreamWebEngine::frameOutV(uint8 *dst, const uint8 *src, uint16 pitch, uint1
 		src += (-y) * width;
 		y = 0;
 	}
-	if (x >= 320)
+
+	if ((uint16)x >= kScreenwidth)
 		return;
-	if (y >= 200)
+	if ((uint16)y >= kScreenheight)
 		return;
-	if (x + width > 320) {
-		width = 320 - x;
+	if ((uint16)x + width > kScreenwidth) {
+		width = kScreenwidth - x;
 	}
-	if (y + height > 200) {
-		height = 200 - y;
+	if ((uint16)y + height > kScreenheight) {
+		height = kScreenheight - y;
 	}
 
 	uint16 stride = pitch - width;
@@ -285,20 +250,20 @@ void DreamWebEngine::showFrameInternal(const uint8 *pSrc, uint16 x, uint16 y, ui
 			//addToPrintList(x - _mapAdX, y - _mapAdY); // NB: Commented in the original asm
 		}
 		if (effectsFlag & 4) { // flippedX
-			frameOutFx(workspace(), pSrc, 320, width, height, x, y);
+			frameOutFx(workspace(), pSrc, kScreenwidth, width, height, x, y);
 			return;
 		}
 		if (effectsFlag & 2) { // noMask
-			frameOutNm(workspace(), pSrc, 320, width, height, x, y);
+			frameOutNm(workspace(), pSrc, kScreenwidth, width, height, x, y);
 			return;
 		}
 		if (effectsFlag & 32) {
-			frameOutBh(workspace(), pSrc, 320, width, height, x, y);
+			frameOutBh(workspace(), pSrc, kScreenwidth, width, height, x, y);
 			return;
 		}
 	}
 	// "noEffects"
-	frameOutV(workspace(), pSrc, 320, width, height, x, y);
+	frameOutV(workspace(), pSrc, kScreenwidth, width, height, x, y);
 }
 
 void DreamWebEngine::showFrame(const GraphicsFile &frameData, uint16 x, uint16 y, uint16 frameNumber, uint8 effectsFlag, uint8 *width, uint8 *height) {
@@ -324,7 +289,7 @@ void DreamWebEngine::showFrame(const GraphicsFile &frameData, uint16 x, uint16 y
 }
 
 void DreamWebEngine::clearWork() {
-	memset(workspace(), 0, 320*200);
+	memset(workspace(), 0, kScreenwidth*kScreenheight);
 }
 
 void DreamWebEngine::dumpZoom() {
@@ -365,20 +330,20 @@ void DreamWebEngine::zoom() {
 		putUnderZoom();
 		return;
 	}
-	uint16 srcOffset = (_oldPointerY - 9) * 320 + (_oldPointerX - 11);
-	uint16 dstOffset = (kZoomy + 4) * 320 + (kZoomx + 5);
+	uint16 srcOffset = (_oldPointerY - 9) * kScreenwidth + (_oldPointerX - 11);
+	uint16 dstOffset = (kZoomy + 4) * kScreenwidth + (kZoomx + 5);
 	const uint8 *src = workspace() + srcOffset;
 	uint8 *dst = workspace() + dstOffset;
-	for (size_t i = 0; i < 20; ++i) {
-		for (size_t j = 0; j < 23; ++j) {
+	for (uint i = 0; i < 20; ++i) {
+		for (uint j = 0; j < 23; ++j) {
 			uint8 v = src[j];
 			dst[2*j+0] = v;
-			dst[2*j+1] = v; 
-			dst[2*j+320] = v;
-			dst[2*j+321] = v; 
+			dst[2*j+1] = v;
+			dst[2*j+kScreenwidth] = v;
+			dst[2*j+kScreenwidth+1] = v;
 		}
-		src += 320;
-		dst += 320*2;
+		src += kScreenwidth;
+		dst += kScreenwidth*2;
 	}
 	crosshair();
 	_didZoom = 1;
@@ -408,15 +373,15 @@ bool DreamWebEngine::pixelCheckSet(const ObjPos *pos, uint8 x, uint8 y) {
 void DreamWebEngine::loadPalFromIFF() {
 	Common::File palFile;
 	uint8* buf = new uint8[2000];
-	palFile.open("DREAMWEB.PAL");
+	palFile.open(getDatafilePrefix() + "PAL");
 	palFile.read(buf, 2000);
 	palFile.close();
 
 	const uint8 *src = buf + 0x30;
 	uint8 *dst = _mainPal;
-	for (size_t i = 0; i < 256*3; ++i) {
+	for (uint i = 0; i < 256*3; ++i) {
 		uint8 c = src[i] / 4;
-		if (_brightness == 1) {
+		if (_brightPalette) {
 			if (c) {
 				c = c + c / 2 + c / 4;
 				if (c > 63)

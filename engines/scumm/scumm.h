@@ -24,6 +24,7 @@
 #define SCUMM_H
 
 #include "engines/engine.h"
+
 #include "common/endian.h"
 #include "common/events.h"
 #include "common/file.h"
@@ -31,6 +32,7 @@
 #include "common/keyboard.h"
 #include "common/random.h"
 #include "common/rect.h"
+#include "common/rendermode.h"
 #include "common/str.h"
 #include "common/textconsole.h"
 #include "graphics/surface.h"
@@ -148,7 +150,13 @@ enum GameFeatures {
 	GF_HE_985             = 1 << 14,
 
 	/** HE games with 16 bit color */
-	GF_16BIT_COLOR         = 1 << 15
+	GF_16BIT_COLOR         = 1 << 15,
+
+	/**
+	 * SCUMM v5-v7 Mac games stored in a container file
+	 * Used to differentiate between m68k and PPC versions of Indy4
+	 */
+	GF_MAC_CONTAINER       = 1 << 16
 };
 
 /* SCUMM Debug Channels */
@@ -232,6 +240,7 @@ enum ScummGameId {
 	GID_FBEAR,
 	GID_PUTTMOON,
 	GID_FUNPACK,
+	GID_PUTTZOO,
 	GID_FREDDI3,
 	GID_BIRTHDAYRED,
 	GID_BIRTHDAYYELLOW,
@@ -239,10 +248,12 @@ enum ScummGameId {
 	GID_PUTTRACE,
 	GID_FUNSHOP,	// Used for all three funshops
 	GID_FOOTBALL,
+	GID_FOOTBALL2002,
 	GID_SOCCER,
 	GID_SOCCERMLS,
 	GID_SOCCER2004,
 	GID_BASEBALL2001,
+	GID_BASEBALL2003,
 	GID_BASKETBALL,
 	GID_MOONBASE,
 	GID_HECUP		// CUP demos
@@ -708,6 +719,9 @@ public:
 	Common::String _containerFile;
 
 	bool openFile(BaseScummFile &file, const Common::String &filename, bool resourceFile = false);
+
+	/** Is this game a Mac m68k v5 game with iMuse? */
+	bool isMacM68kIMuse() const;
 
 protected:
 	int _resourceHeaderSize;
@@ -1212,6 +1226,7 @@ public:
 	int _2byteWidth;
 	byte _newLineCharacter;
 	byte *get2byteCharPtr(int idx);
+
 #ifdef SCUMMVMKOR
 	byte *_2byteFontPtr;
 	byte *_2byteMultiFontPtr[20];
@@ -1378,7 +1393,7 @@ public:
 public:
 	bool towns_isRectInStringBox(int x1, int y1, int x2, int y2);
 	byte _townsPaletteFlags;
-	byte _townsCharsetColorMap[16];	
+	byte _townsCharsetColorMap[16];
 
 protected:
 	void towns_drawStripToScreen(VirtScreen *vs, int dstX, int dstY, int srcX, int srcY, int w, int h);

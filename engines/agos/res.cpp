@@ -23,6 +23,8 @@
 // Resource file routines for Simon1/Simon2
 
 
+#include "common/archive.h"
+#include "common/installshield_cab.h"
 #include "common/file.h"
 #include "common/memstream.h"
 #include "common/textconsole.h"
@@ -31,7 +33,6 @@
 #include "agos/agos.h"
 #include "agos/intern.h"
 #include "agos/sound.h"
-#include "agos/installshield_cab.h"
 
 #include "common/zlib.h"
 
@@ -43,7 +44,10 @@ ArchiveMan::ArchiveMan() {
 
 #ifdef ENABLE_AGOS2
 void ArchiveMan::registerArchive(const Common::String &filename, int priority) {
-	add(filename, makeInstallShieldArchive(filename), priority);
+	Common::SeekableReadStream *stream = SearchMan.createReadStreamForMember(filename);
+
+	if (stream)
+		add(filename, makeInstallShieldArchive(stream, DisposeAfterUse::YES), priority);
 }
 #endif
 
@@ -928,7 +932,7 @@ void AGOSEngine::loadVGAVideoFile(uint16 id, uint8 type, bool useError) {
 		}
 
 		dstSize = srcSize = in->size();
-		if (getGameType() == GType_PN && getPlatform() == Common::kPlatformPC && id == 17 && type == 2) {
+		if (getGameType() == GType_PN && getPlatform() == Common::kPlatformDOS && id == 17 && type == 2) {
 			// The A2.out file isn't compressed in PC version of Personal Nightmare
 			dst = allocBlock(dstSize + extraBuffer);
 			if (in->read(dst, dstSize) != dstSize)

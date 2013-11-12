@@ -86,8 +86,12 @@ void EoBCoreEngine::loadLevel(int level, int sub) {
 		pos += 2;
 	}
 
-	loadVcnData(gfxFile.c_str(), 0);
-	_screen->loadEoBBitmap("INVENT", 0, 5, 3, 2);
+	// WORKAROUND for bug #3596547 (EOB1: Door Buttons Don't Work)
+	if (_flags.gameID == GI_EOB1 && level == 7 && _levelBlockProperties[0x035C].assignedObjects == 0x0E89)
+		_levelBlockProperties[0x035C].assignedObjects = 0x0E8D;
+
+	loadVcnData(gfxFile.c_str(), (_flags.gameID == GI_EOB1) ? _cgaMappingLevel[_cgaLevelMappingIndex[level - 1]] : 0);
+	_screen->loadEoBBitmap("INVENT", _cgaMappingInv, 5, 3, 2);
 	delayUntil(end);
 	snd_stopSound();
 
@@ -100,7 +104,7 @@ void EoBCoreEngine::loadLevel(int level, int sub) {
 void EoBCoreEngine::readLevelFileData(int level) {
 	Common::String file;
 	Common::SeekableReadStream *s = 0;
-	static const char *suffix[] = { "INF", "DRO", "ELO", 0 };
+	static const char *const suffix[] = { "INF", "DRO", "ELO", 0 };
 
 	for (const char *const *sf = suffix; *sf && !s; sf++) {
 		file = Common::String::format("LEVEL%d.%s", level, *sf);
@@ -142,7 +146,8 @@ Common::String EoBCoreEngine::initLevelData(int sub) {
 		loadBlockProperties((const char *)pos);
 		pos += slen;
 
-		Common::SeekableReadStream *s = _res->createReadStream(Common::String::format("%s.VMP", (const char *)pos));
+		const char *vmpPattern = (_flags.gameID == GI_EOB1 && (_configRenderMode == Common::kRenderEGA || _configRenderMode == Common::kRenderCGA)) ? "%s.EMP" : "%s.VMP";
+		Common::SeekableReadStream *s = _res->createReadStream(Common::String::format(vmpPattern, (const char *)pos));
 		uint16 size = s->readUint16LE();
 		delete[] _vmpPtr;
 		_vmpPtr = new uint16[size];
@@ -150,12 +155,14 @@ Common::String EoBCoreEngine::initLevelData(int sub) {
 			_vmpPtr[i] = s->readUint16LE();
 		delete s;
 
-		Common::String tmpStr = Common::String::format("%s.PAL", (const char *)pos);
+		const char *paletteFilePattern = (_flags.gameID == GI_EOB2 && _configRenderMode == Common::kRenderEGA) ? "%s.EGA" : "%s.PAL";
+
+		Common::String tmpStr = Common::String::format(paletteFilePattern, (const char *)pos);
 		_curGfxFile = (const char *)pos;
 		pos += slen;
 
-		if (*pos++ != 0xff && _flags.gameID == GI_EOB2) {
-			tmpStr = Common::String::format("%s.PAL", (const char *)pos);
+		if (*pos++ != 0xFF && _flags.gameID == GI_EOB2) {
+			tmpStr = Common::String::format(paletteFilePattern, (const char *)pos);
 			pos += 13;
 		}
 
@@ -165,21 +172,26 @@ Common::String EoBCoreEngine::initLevelData(int sub) {
 			_screen->setShapeFadeMode(1, false);
 		}
 
-		_screen->loadPalette(tmpStr.c_str(), _screen->getPalette(0));
+		if (_flags.gameID == GI_EOB2 || _configRenderMode != Common::kRenderEGA)
+			_screen->loadPalette(tmpStr.c_str(), _screen->getPalette(0));
 
-		Palette backupPal(256);
-		backupPal.copy(_screen->getPalette(0), 224, 32, 224);
-		_screen->getPalette(0).fill(224, 32, 0x3f);
-		uint8 *src = _screen->getPalette(0).getData();
+		if (_configRenderMode != Common::kRenderCGA) {
+			Palette backupPal(256);
+			backupPal.copy(_screen->getPalette(0), 224, 32, 224);
+			_screen->getPalette(0).fill(224, 32, 0x3F);
+			uint8 *src = _screen->getPalette(0).getData();
 
-		_screen->createFadeTable(src, _screen->getFadeTable(0), 4, 75);     // green
-		_screen->createFadeTable(src, _screen->getFadeTable(1), 12, 200);   // black
-		_screen->createFadeTable(src, _screen->getFadeTable(2), 10, 85);    // blue
-		_screen->createFadeTable(src, _screen->getFadeTable(3), 11, 125);   // light blue
+			_screen->createFadeTable(src, _screen->getFadeTable(0), 4, 75);     // green
+			_screen->createFadeTable(src, _screen->getFadeTable(1), 12, 200);   // black
+			_screen->createFadeTable(src, _screen->getFadeTable(2), 10, 85);    // blue
+			_screen->createFadeTable(src, _screen->getFadeTable(3), 11, 125);   // light blue
 
-		_screen->getPalette(0).copy(backupPal, 224, 32, 224);
-		_screen->createFadeTable(src, _screen->getFadeTable(4), 12, 85);    // grey (shadow)
-		_screen->setFadeTableIndex(4);
+			_screen->getPalette(0).copy(backupPal, 224, 32, 224);
+			_screen->createFadeTable(src, _screen->getFadeTable(4), 12, 85);    // grey (shadow)
+			_screen->setFadeTableIndex(4);
+			if (_flags.gameID == GI_EOB2 && _configRenderMode == Common::kRenderEGA)
+				_screen->setScreenPalette(_screen->getPalette(0));
+		}
 	}
 
 	if (_flags.gameID == GI_EOB2) {
@@ -251,7 +263,7 @@ Common::String EoBCoreEngine::initLevelData(int sub) {
 	}
 
 	if (_flags.gameID == GI_EOB2)
-		pos = initScriptTimers(pos);
+		initScriptTimers(pos);
 
 	return _curGfxFile;
 }
@@ -263,23 +275,52 @@ void EoBCoreEngine::addLevelItems() {
 	for (int i = 0; i < 600; i++) {
 		if (_items[i].level != _currentLevel || _items[i].block <= 0)
 			continue;
-		setItemPosition((Item *)&_levelBlockProperties[_items[i].block & 0x3ff].drawObjects, _items[i].block, i, _items[i].pos);
+		setItemPosition((Item *)&_levelBlockProperties[_items[i].block & 0x3FF].drawObjects, _items[i].block, i, _items[i].pos);
 	}
 }
 
-void EoBCoreEngine::loadVcnData(const char *file, const char * /*nextFile*/) {
+void EoBCoreEngine::loadVcnData(const char *file, const uint8 *cgaMapping) {
 	if (file)
 		strcpy(_lastBlockDataFile, file);
 
-	_screen->loadBitmap(Common::String::format("%s.VCN", _lastBlockDataFile).c_str(), 3, 3, 0);
-	const uint8 *v = _screen->getCPagePtr(2);
-	uint32 tlen = READ_LE_UINT16(v) << 5;
-	v += 2;
-	memcpy(_vcnExpTable, v, 32);
-	v += 32;
+	const char *filePattern = (_flags.gameID == GI_EOB1 && (_configRenderMode == Common::kRenderEGA || _configRenderMode == Common::kRenderCGA)) ? "%s.ECN" : "%s.VCN";
+	_screen->loadBitmap(Common::String::format(filePattern, _lastBlockDataFile).c_str(), 3, 3, 0);
+	const uint8 *pos = _screen->getCPagePtr(3);
+
+	uint32 vcnSize = READ_LE_UINT16(pos) << 5;
+	pos += 2;
+
+	const uint8 *colMap = pos;
+	pos += 32;
+
 	delete[] _vcnBlocks;
-	_vcnBlocks = new uint8[tlen];
-	memcpy(_vcnBlocks, v, tlen);
+	_vcnBlocks = new uint8[vcnSize];
+
+	if (_configRenderMode == Common::kRenderCGA) {
+		uint8 *tmp = _screen->encodeShape(0, 0, 1, 8, false, cgaMapping);
+		delete[] tmp;
+
+		delete[] _vcnTransitionMask;
+		_vcnTransitionMask = new uint8[vcnSize];
+		uint8 tblSwitch = 1;
+		uint8 *dst = _vcnBlocks;
+		uint8 *dst2 = _vcnTransitionMask;
+
+		while (dst < _vcnBlocks + vcnSize) {
+			const uint16 *table = _screen->getCGADitheringTable((tblSwitch++) & 1);
+			for (int ii = 0; ii < 2; ii++) {
+				*dst++ = (table[pos[0]] & 0x000F) | ((table[pos[0]] & 0x0F00) >> 4);
+				*dst++ = (table[pos[1]] & 0x000F) | ((table[pos[1]] & 0x0F00) >> 4);
+				*dst2++ = ((pos[0] & 0xF0 ? 0x30 : 0) | (pos[0] & 0x0F ? 0x03 : 0)) ^ 0x33;
+				*dst2++ = ((pos[1] & 0xF0 ? 0x30 : 0) | (pos[1] & 0x0F ? 0x03 : 0)) ^ 0x33;
+				pos += 2;
+			}
+		}
+	} else {
+		if (!(_flags.gameID == GI_EOB1 && _configRenderMode == Common::kRenderEGA))
+			memcpy(_vcnColTable, colMap, 32);
+		memcpy(_vcnBlocks, pos, vcnSize);
+	}
 }
 
 void EoBCoreEngine::loadBlockProperties(const char *mazFile) {
@@ -301,7 +342,7 @@ const uint8 *EoBCoreEngine::getBlockFileData(int) {
 	Common::SeekableReadStream *s = _res->createReadStream(_curBlockFile);
 	_screen->loadFileDataToPage(s, 15, s->size());
 	delete s;
-	return _screen->getCPagePtr(14);
+	return _screen->getCPagePtr(15);
 }
 
 Common::String EoBCoreEngine::getBlockFileName(int levelIndex, int sub) {
@@ -330,7 +371,7 @@ const uint8 *EoBCoreEngine::getBlockFileData(const char *mazFile) {
 }
 
 void EoBCoreEngine::loadDecorations(const char *cpsFile, const char *decFile) {
-	_screen->loadShapeSetBitmap(cpsFile, 3, 3);
+	_screen->loadShapeSetBitmap(cpsFile, 5, 3);
 	Common::SeekableReadStream *s = _res->createReadStream(decFile);
 
 	_levelDecorationDataSize = s->readUint16LE();
@@ -342,8 +383,8 @@ void EoBCoreEngine::loadDecorations(const char *cpsFile, const char *decFile) {
 		LevelDecorationProperty *l = &_levelDecorationData[i];
 		for (int ii = 0; ii < 10; ii++) {
 			l->shapeIndex[ii] = s->readByte();
-			if (l->shapeIndex[ii] == 0xff)
-				l->shapeIndex[ii] = 0xffff;
+			if (l->shapeIndex[ii] == 0xFF)
+				l->shapeIndex[ii] = 0xFFFF;
 		}
 		l->next = s->readByte();
 		l->flags = s->readByte();
@@ -390,7 +431,7 @@ void EoBCoreEngine::assignWallsAndDecorations(int wallIndex, int vmpIndex, int d
 
 		for (int i = 0; i < 10; i++) {
 			uint16 t = _levelDecorationProperties[_mappedDecorationsCount].shapeIndex[i];
-			if (t == 0xffff)
+			if (t == 0xFFFF)
 				continue;
 
 			if (_levelDecorationShapes[t])
@@ -400,7 +441,7 @@ void EoBCoreEngine::assignWallsAndDecorations(int wallIndex, int vmpIndex, int d
 			if (r->w == 0 || r->h == 0)
 				error("Error trying to make decoration %d (x: %d, y: %d, w: %d, h: %d)", decIndex, r->x, r->y, r->w, r->h);
 
-			_levelDecorationShapes[t] = _screen->encodeShape(r->x, r->y, r->w, r->h);
+			_levelDecorationShapes[t] = _screen->encodeShape(r->x, r->y, r->w, r->h, false, (_flags.gameID == GI_EOB1) ? _cgaMappingLevel[_cgaLevelMappingIndex[_currentLevel - 1]] : 0);
 		}
 
 		decIndex = _levelDecorationProperties[_mappedDecorationsCount++].next;
@@ -442,7 +483,7 @@ void EoBCoreEngine::toggleWallState(int wall, int toggle) {
 		if (toggle)
 			_wllWallFlags[wall + i] |= 2;
 		else
-			_wllWallFlags[wall + i] &= 0xfd;
+			_wllWallFlags[wall + i] &= 0xFD;
 	}
 }
 
@@ -556,7 +597,7 @@ void EoBCoreEngine::drawDecorations(int index) {
 				if ((i == 0) && (flg & 1 || ((flg & 2) && _wllProcessFlag)))
 					ix = -ix;
 
-				if (_levelDecorationProperties[l].shapeIndex[shpIx] == 0xffff) {
+				if (_levelDecorationProperties[l].shapeIndex[shpIx] == 0xFFFF) {
 					l = _levelDecorationProperties[l].next;
 					continue;
 				}
@@ -671,7 +712,7 @@ int EoBCoreEngine::clickedNiche(uint16 block, uint16 direction) {
 		if (_dscItemShapeMap[_items[_itemInHand].icon] <= 14) {
 			_txt->printMessage(_pryDoorStrings[5]);
 		} else {
-			setItemPosition((Item *)&_levelBlockProperties[block & 0x3ff].drawObjects, block, _itemInHand, 8);
+			setItemPosition((Item *)&_levelBlockProperties[block & 0x3FF].drawObjects, block, _itemInHand, 8);
 			runLevelScript(block, 4);
 			setHandItem(0);
 			_sceneUpdateRequired = true;
@@ -694,7 +735,7 @@ int EoBCoreEngine::clickedDoorPry(uint16 block, uint16 direction) {
 
 	int d = -1;
 	for (int i = 0; i < 6; i++)  {
-		if (!testCharacter(i, 0x0d))
+		if (!testCharacter(i, 0x0D))
 			continue;
 		if (d >= 0) {
 			int s1 = _characters[i].strengthCur + _characters[i].strengthExtCur;
@@ -739,7 +780,7 @@ int EoBCoreEngine::clickedDoorNoPry(uint16 block, uint16 direction) {
 int EoBCoreEngine::specialWallAction(int block, int direction) {
 	direction ^= 2;
 	uint8 type = _specialWallTypes[_levelBlockProperties[block].walls[direction]];
-	if (!type || !(_clickedSpecialFlag & (((_levelBlockProperties[block].flags & 0xf8) >> 3) | 0xe0)))
+	if (!type || !(_clickedSpecialFlag & (((_levelBlockProperties[block].flags & 0xF8) >> 3) | 0xE0)))
 		return 0;
 
 	int res = 0;

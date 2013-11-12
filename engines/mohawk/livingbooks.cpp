@@ -40,6 +40,8 @@
 
 #include "gui/message.h"
 
+#include "graphics/cursorman.h"
+
 namespace Mohawk {
 
 // read a null-terminated string from a stream
@@ -146,16 +148,10 @@ MohawkEngine_LivingBooks::MohawkEngine_LivingBooks(OSystem *syst, const MohawkGa
 
 	const Common::FSNode gameDataDir(ConfMan.get("path"));
 	// Rugrats
-	const Common::FSNode ProgPath = gameDataDir.getChild("program");
-	if (ProgPath.exists())
-		SearchMan.addDirectory(ProgPath.getPath(), ProgPath, 0, 2);
-	const Common::FSNode RugPath = gameDataDir.getChild("Rugrats Adventure Game");
-	if (RugPath.exists())
-		SearchMan.addDirectory(RugPath.getPath(), RugPath, 0, 2);
+	SearchMan.addSubDirectoryMatching(gameDataDir, "program", 0, 2);
+	SearchMan.addSubDirectoryMatching(gameDataDir, "Rugrats Adventure Game", 0, 2);
 	// CarmenTQ
-	const Common::FSNode CTQPath = gameDataDir.getChild("95instal");
-	if (CTQPath.exists())
-		SearchMan.addDirectory(CTQPath.getPath(), CTQPath, 0, 4);
+	SearchMan.addSubDirectoryMatching(gameDataDir, "95instal", 0, 4);
 }
 
 MohawkEngine_LivingBooks::~MohawkEngine_LivingBooks() {
@@ -223,7 +219,7 @@ Common::Error MohawkEngine_LivingBooks::run() {
 					}
 				}
 
-				if (found)
+				if (found && CursorMan.isVisible())
 					found->handleMouseDown(event.mouse);
 				break;
 
@@ -243,6 +239,8 @@ Common::Error MohawkEngine_LivingBooks::run() {
 				case Common::KEYCODE_ESCAPE:
 					if (_curMode == kLBIntroMode)
 						tryLoadPageStart(kLBControlMode, 1);
+					else
+						_video->stopVideos();
 					break;
 
 				case Common::KEYCODE_LEFT:
@@ -313,8 +311,8 @@ void MohawkEngine_LivingBooks::loadBookInfo(const Common::String &filename) {
 	//     - fDebugWindow                (always 0?)
 
 	if (_bookInfoFile.hasSection("Globals")) {
-		const Common::ConfigFile::SectionKeyList globals = _bookInfoFile.getKeys("Globals");
-		for (Common::ConfigFile::SectionKeyList::const_iterator i = globals.begin(); i != globals.end(); i++) {
+		const Common::INIFile::SectionKeyList globals = _bookInfoFile.getKeys("Globals");
+		for (Common::INIFile::SectionKeyList::const_iterator i = globals.begin(); i != globals.end(); i++) {
 			Common::String command = Common::String::format("%s = %s", i->key.c_str(), i->value.c_str());
 			LBCode tempCode(this, 0);
 			uint offset = tempCode.parseCode(command);
@@ -585,8 +583,8 @@ void MohawkEngine_LivingBooks::updatePage() {
 				_items.remove_at(i);
 				i--;
 				_orderedItems.remove(delayedEvent.item);
-				delete delayedEvent.item;
 				_page->itemDestroyed(delayedEvent.item);
+				delete delayedEvent.item;
 				if (_focus == delayedEvent.item)
 					_focus = NULL;
 				break;
@@ -1354,8 +1352,9 @@ void MohawkEngine_LivingBooks::handleNotify(NotifyEvent &event) {
 			if (!loadPage((LBMode)event.newMode, event.newPage, event.newSubpage)) {
 				if (event.newPage != 0 || !loadPage((LBMode)event.newMode, _curPage, event.newSubpage))
 					if (event.newSubpage != 0 || !loadPage((LBMode)event.newMode, event.newPage, 1))
-						error("kLBNotifyChangeMode failed to move to mode %d, page %d.%d",
-							event.newMode, event.newPage, event.newSubpage);
+						if (event.newSubpage != 1 || !loadPage((LBMode)event.newMode, event.newPage, 0))
+							error("kLBNotifyChangeMode failed to move to mode %d, page %d.%d",
+								event.newMode, event.newPage, event.newSubpage);
 			}
 			break;
 		case 3:
@@ -3378,11 +3377,10 @@ void LBLiveTextItem::readData(uint16 type, uint16 size, Common::MemoryReadStream
 			LiveTextWord word;
 			word.bounds = _vm->readRect(stream);
 			word.soundId = stream->readUint16();
-			// TODO: unknowns
-			uint16 unknown1 = stream->readUint16();
-			uint16 unknown2 = stream->readUint16();
-			debug(4, "Word: (%d, %d) to (%d, %d), sound %d, unknowns %04x, %04x",
-				word.bounds.left, word.bounds.top, word.bounds.right, word.bounds.bottom, word.soundId, unknown1, unknown2);
+			word.itemType = stream->readUint16();
+			word.itemId = stream->readUint16();
+			debug(4, "Word: (%d, %d) to (%d, %d), sound %d, item %d (type %d)",
+				word.bounds.left, word.bounds.top, word.bounds.right, word.bounds.bottom, word.soundId, word.itemId, word.itemType);
 			_words.push_back(word);
 		}
 
@@ -3461,6 +3459,12 @@ void LBLiveTextItem::update() {
 		uint16 soundId = _words[_currentWord].soundId;
 		if (soundId && !_vm->_sound->isPlaying(soundId)) {
 			paletteUpdate(_currentWord, false);
+
+			// TODO: check this in RE
+			LBItem *item = _vm->getItemById(_words[_currentWord].itemId);
+			if (item)
+				item->togglePlaying(false, true);
+
 			_currentWord = 0xFFFF;
 		}
 	}
@@ -3768,7 +3772,7 @@ LBMovieItem::~LBMovieItem() {
 void LBMovieItem::update() {
 	if (_playing) {
 		VideoHandle videoHandle = _vm->_video->findVideoHandle(_resourceId);
-		if (_vm->_video->endOfVideo(videoHandle))
+		if (videoHandle == NULL_VID_HANDLE || _vm->_video->endOfVideo(videoHandle))
 			done(true);
 	}
 
@@ -3778,6 +3782,7 @@ void LBMovieItem::update() {
 bool LBMovieItem::togglePlaying(bool playing, bool restart) {
 	if (playing) {
 		if ((_loaded && _enabled && _globalEnabled) || _phase == kLBPhaseNone) {
+			debug("toggled video for phase %d", _phase);
 			_vm->_video->playMovie(_resourceId, _rect.left, _rect.top);
 
 			return true;

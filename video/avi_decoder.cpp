@@ -36,127 +36,191 @@
 // Video Codecs
 #include "video/codecs/cinepak.h"
 #include "video/codecs/indeo3.h"
+#include "video/codecs/mpeg.h"
 #include "video/codecs/msvideo1.h"
 #include "video/codecs/msrle.h"
 #include "video/codecs/truemotion1.h"
 
 namespace Video {
 
-/*
-static byte char2num(char c) {
-	return (c >= 48 && c <= 57) ? c - 48 : 0;
+#define UNKNOWN_HEADER(a) error("Unknown header found -- \'%s\'", tag2str(a))
+
+// IDs used throughout the AVI files
+// that will be handled by this player
+#define ID_RIFF MKTAG('R','I','F','F')
+#define ID_AVI  MKTAG('A','V','I',' ')
+#define ID_LIST MKTAG('L','I','S','T')
+#define ID_HDRL MKTAG('h','d','r','l')
+#define ID_AVIH MKTAG('a','v','i','h')
+#define ID_STRL MKTAG('s','t','r','l')
+#define ID_STRH MKTAG('s','t','r','h')
+#define ID_VIDS MKTAG('v','i','d','s')
+#define ID_AUDS MKTAG('a','u','d','s')
+#define ID_MIDS MKTAG('m','i','d','s')
+#define ID_TXTS MKTAG('t','x','t','s')
+#define ID_JUNK MKTAG('J','U','N','K')
+#define ID_STRF MKTAG('s','t','r','f')
+#define ID_MOVI MKTAG('m','o','v','i')
+#define ID_REC  MKTAG('r','e','c',' ')
+#define ID_VEDT MKTAG('v','e','d','t')
+#define ID_IDX1 MKTAG('i','d','x','1')
+#define ID_STRD MKTAG('s','t','r','d')
+#define ID_INFO MKTAG('I','N','F','O')
+#define ID_ISFT MKTAG('I','S','F','T')
+#define ID_DISP MKTAG('D','I','S','P')
+#define ID_PRMI MKTAG('P','R','M','I')
+
+// Codec tags
+#define ID_RLE  MKTAG('R','L','E',' ')
+#define ID_CRAM MKTAG('C','R','A','M')
+#define ID_MSVC MKTAG('m','s','v','c')
+#define ID_WHAM MKTAG('W','H','A','M')
+#define ID_CVID MKTAG('c','v','i','d')
+#define ID_IV32 MKTAG('i','v','3','2')
+#define ID_DUCK MKTAG('D','U','C','K')
+#define ID_MPG2 MKTAG('m','p','g','2')
+
+// Stream Types
+enum {
+	kStreamTypePaletteChange = MKTAG16('p', 'c'),
+	kStreamTypeRawVideo      = MKTAG16('d', 'b'),
+	kStreamTypeAudio         = MKTAG16('w', 'b')
+};
+
+
+AVIDecoder::AVIDecoder(Audio::Mixer::SoundType soundType) : _frameRateOverride(0), _soundType(soundType) {
+	initCommon();
 }
 
-static byte getStreamNum(uint32 tag) {
-	return char2num((char)(tag >> 24)) * 16 + char2num((char)(tag >> 16));
-}
-*/
-
-static uint16 getStreamType(uint32 tag) {
-	return tag & 0xffff;
+AVIDecoder::AVIDecoder(const Common::Rational &frameRateOverride, Audio::Mixer::SoundType soundType)
+		: _frameRateOverride(frameRateOverride), _soundType(soundType) {
+	initCommon();
 }
 
-AviDecoder::AviDecoder(Audio::Mixer *mixer, Audio::Mixer::SoundType soundType) : _mixer(mixer) {
-	_soundType = soundType;
-
-	_videoCodec = NULL;
-	_decodedHeader = false;
-	_audStream = NULL;
-	_fileStream = NULL;
-	_audHandle = new Audio::SoundHandle();
-	_dirtyPalette = false;
-	memset(_palette, 0, sizeof(_palette));
-	memset(&_wvInfo, 0, sizeof(PCMWAVEFORMAT));
-	memset(&_bmInfo, 0, sizeof(BITMAPINFOHEADER));
-	memset(&_vidsHeader, 0, sizeof(AVIStreamHeader));
-	memset(&_audsHeader, 0, sizeof(AVIStreamHeader));
-	memset(&_ixInfo, 0, sizeof(AVIOLDINDEX));
-}
-
-AviDecoder::~AviDecoder() {
+AVIDecoder::~AVIDecoder() {
 	close();
-	delete _audHandle;
 }
 
-void AviDecoder::runHandle(uint32 tag) {
-	assert (_fileStream);
-	if (_fileStream->eos())
-		return;
+AVIDecoder::AVIAudioTrack *AVIDecoder::createAudioTrack(AVIStreamHeader sHeader, PCMWaveFormat wvInfo) {
+	return new AVIAudioTrack(sHeader, wvInfo, _soundType);
+}
 
-	debug (3, "Decoding tag %s", tag2str(tag));
+void AVIDecoder::initCommon() {
+	_decodedHeader = false;
+	_foundMovieList = false;
+	_movieListStart = 0;
+	_fileStream = 0;
+	memset(&_header, 0, sizeof(_header));
+}
+
+bool AVIDecoder::isSeekable() const {
+	// Only videos with an index can seek
+	// Anyone else who wants to seek is crazy.
+	return isVideoLoaded() && !_indexEntries.empty();
+}
+
+bool AVIDecoder::parseNextChunk() {
+	uint32 tag = _fileStream->readUint32BE();
+	uint32 size = _fileStream->readUint32LE();
+
+	if (_fileStream->eos())
+		return false;
+
+	debug(3, "Decoding tag %s", tag2str(tag));
 
 	switch (tag) {
-		case ID_RIFF:
-			/*_filesize = */_fileStream->readUint32LE();
-			if (_fileStream->readUint32BE() != ID_AVI)
-				error("RIFF file is not an AVI video");
-			break;
-		case ID_LIST:
-			handleList();
-			break;
-		case ID_AVIH:
-			_header.size = _fileStream->readUint32LE();
-			_header.microSecondsPerFrame = _fileStream->readUint32LE();
-			_header.maxBytesPerSecond = _fileStream->readUint32LE();
-			_header.padding = _fileStream->readUint32LE();
-			_header.flags = _fileStream->readUint32LE();
-			_header.totalFrames = _fileStream->readUint32LE();
-			_header.initialFrames = _fileStream->readUint32LE();
-			_header.streams = _fileStream->readUint32LE();
-			_header.bufferSize = _fileStream->readUint32LE();
-			_header.width = _fileStream->readUint32LE();
-			_header.height = _fileStream->readUint32LE();
-			//Ignore 16 bytes of reserved data
-			_fileStream->skip(16);
-			break;
-		case ID_STRH:
-			handleStreamHeader();
-			break;
-		case ID_STRD: // Extra stream info, safe to ignore
-		case ID_VEDT: // Unknown, safe to ignore
-		case ID_JUNK: // Alignment bytes, should be ignored
-			{
-			uint32 junkSize = _fileStream->readUint32LE();
-			_fileStream->skip(junkSize + (junkSize & 1)); // Alignment
-			} break;
-		case ID_IDX1:
-			_ixInfo.size = _fileStream->readUint32LE();
-			_ixInfo.indices = new AVIOLDINDEX::Index[_ixInfo.size / 16];
-			debug (0, "%d Indices", (_ixInfo.size / 16));
-			for (uint32 i = 0; i < (_ixInfo.size / 16); i++) {
-				_ixInfo.indices[i].id = _fileStream->readUint32BE();
-				_ixInfo.indices[i].flags = _fileStream->readUint32LE();
-				_ixInfo.indices[i].offset = _fileStream->readUint32LE();
-				_ixInfo.indices[i].size = _fileStream->readUint32LE();
-				debug (0, "Index %d == Tag \'%s\', Offset = %d, Size = %d", i, tag2str(_ixInfo.indices[i].id), _ixInfo.indices[i].offset, _ixInfo.indices[i].size);
-			}
-			break;
-		default:
-			error ("Unknown tag \'%s\' found", tag2str(tag));
+	case ID_LIST:
+		handleList(size);
+		break;
+	case ID_AVIH:
+		_header.size = size;
+		_header.microSecondsPerFrame = _fileStream->readUint32LE();
+		_header.maxBytesPerSecond = _fileStream->readUint32LE();
+		_header.padding = _fileStream->readUint32LE();
+		_header.flags = _fileStream->readUint32LE();
+		_header.totalFrames = _fileStream->readUint32LE();
+		_header.initialFrames = _fileStream->readUint32LE();
+		_header.streams = _fileStream->readUint32LE();
+		_header.bufferSize = _fileStream->readUint32LE();
+		_header.width = _fileStream->readUint32LE();
+		_header.height = _fileStream->readUint32LE();
+		// Ignore 16 bytes of reserved data
+		_fileStream->skip(16);
+		break;
+	case ID_STRH:
+		handleStreamHeader(size);
+		break;
+	case ID_STRD: // Extra stream info, safe to ignore
+	case ID_VEDT: // Unknown, safe to ignore
+	case ID_JUNK: // Alignment bytes, should be ignored
+	case ID_ISFT: // Metadata, safe to ignore
+	case ID_DISP: // Metadata, should be safe to ignore
+		skipChunk(size);
+		break;
+	case ID_IDX1:
+		debug(0, "%d Indices", size / 16);
+		for (uint32 i = 0; i < size / 16; i++) {
+			OldIndex indexEntry;
+			indexEntry.id = _fileStream->readUint32BE();
+			indexEntry.flags = _fileStream->readUint32LE();
+			indexEntry.offset = _fileStream->readUint32LE() + _movieListStart - 4; // Adjust to absolute
+			indexEntry.size = _fileStream->readUint32LE();
+			_indexEntries.push_back(indexEntry);
+			debug(0, "Index %d == Tag \'%s\', Offset = %d, Size = %d (Flags = %d)", i, tag2str(indexEntry.id), indexEntry.offset, indexEntry.size, indexEntry.flags);
+		}
+		break;
+	default:
+		error("Unknown tag \'%s\' found", tag2str(tag));
 	}
+
+	return true;
 }
 
-void AviDecoder::handleList() {
-	uint32 listSize = _fileStream->readUint32LE() - 4; // Subtract away listType's 4 bytes
+void AVIDecoder::skipChunk(uint32 size) {
+	// Make sure we're aligned on a word boundary
+	_fileStream->skip(size + (size & 1));
+}
+
+void AVIDecoder::handleList(uint32 listSize) {
 	uint32 listType = _fileStream->readUint32BE();
+	listSize -= 4; // Subtract away listType's 4 bytes
 	uint32 curPos = _fileStream->pos();
 
-	debug (0, "Found LIST of type %s", tag2str(listType));
+	debug(0, "Found LIST of type %s", tag2str(listType));
+
+	switch (listType) {
+	case ID_MOVI: // Movie List
+		// We found the movie block
+		_foundMovieList = true;
+		_movieListStart = curPos;
+		_fileStream->skip(listSize);
+		return;
+	case ID_HDRL: // Header List
+		// Mark the header as decoded
+		_decodedHeader = true;
+		break;
+	case ID_INFO: // Metadata
+	case ID_PRMI: // Unknown metadata, should be safe to ignore
+		// Ignore metadata
+		_fileStream->skip(listSize);
+		return;
+	case ID_STRL: // Stream list
+	default:      // (Just hope we can parse it!)
+		break;
+	}
 
 	while ((_fileStream->pos() - curPos) < listSize)
-		runHandle(_fileStream->readUint32BE());
-
-	// We now have all the header data
-	if (listType == ID_HDRL)
-		_decodedHeader = true;
+		parseNextChunk();
 }
 
-void AviDecoder::handleStreamHeader() {
+void AVIDecoder::handleStreamHeader(uint32 size) {
 	AVIStreamHeader sHeader;
-	sHeader.size = _fileStream->readUint32LE();
+	sHeader.size = size;
 	sHeader.streamType = _fileStream->readUint32BE();
+
 	if (sHeader.streamType == ID_MIDS || sHeader.streamType == ID_TXTS)
-		error ("Unhandled MIDI/Text stream");
+		error("Unhandled MIDI/Text stream");
+
 	sHeader.streamHandler = _fileStream->readUint32BE();
 	sHeader.flags = _fileStream->readUint32LE();
 	sHeader.priority = _fileStream->readUint16LE();
@@ -174,281 +238,561 @@ void AviDecoder::handleStreamHeader() {
 
 	if (_fileStream->readUint32BE() != ID_STRF)
 		error("Could not find STRF tag");
+
 	uint32 strfSize = _fileStream->readUint32LE();
 	uint32 startPos = _fileStream->pos();
 
 	if (sHeader.streamType == ID_VIDS) {
-		_vidsHeader = sHeader;
-
-		_bmInfo.size = _fileStream->readUint32LE();
-		_bmInfo.width = _fileStream->readUint32LE();
-		assert (_header.width == _bmInfo.width);
-		_bmInfo.height = _fileStream->readUint32LE();
-		assert (_header.height == _bmInfo.height);
-		_bmInfo.planes = _fileStream->readUint16LE();
-		_bmInfo.bitCount = _fileStream->readUint16LE();
-		_bmInfo.compression = _fileStream->readUint32BE();
-		_bmInfo.sizeImage = _fileStream->readUint32LE();
-		_bmInfo.xPelsPerMeter = _fileStream->readUint32LE();
-		_bmInfo.yPelsPerMeter = _fileStream->readUint32LE();
-		_bmInfo.clrUsed = _fileStream->readUint32LE();
-		_bmInfo.clrImportant = _fileStream->readUint32LE();
-
-		if (_bmInfo.bitCount == 8) {
-			if (_bmInfo.clrUsed == 0)
-				_bmInfo.clrUsed = 256;
-
-			for (uint32 i = 0; i < _bmInfo.clrUsed; i++) {
-				_palette[i * 3 + 2] = _fileStream->readByte();
-				_palette[i * 3 + 1] = _fileStream->readByte();
-				_palette[i * 3] = _fileStream->readByte();
-				_fileStream->readByte();
-			}
-
-			_dirtyPalette = true;
+		if (_frameRateOverride != 0) {
+			sHeader.rate = _frameRateOverride.getNumerator();
+			sHeader.scale = _frameRateOverride.getDenominator();
 		}
 
-		if (!_vidsHeader.streamHandler)
-			_vidsHeader.streamHandler = _bmInfo.compression;
-	} else if (sHeader.streamType == ID_AUDS) {
-		_audsHeader = sHeader;
+		BitmapInfoHeader bmInfo;
+		bmInfo.size = _fileStream->readUint32LE();
+		bmInfo.width = _fileStream->readUint32LE();
+		bmInfo.height = _fileStream->readUint32LE();
+		bmInfo.planes = _fileStream->readUint16LE();
+		bmInfo.bitCount = _fileStream->readUint16LE();
+		bmInfo.compression = _fileStream->readUint32BE();
+		bmInfo.sizeImage = _fileStream->readUint32LE();
+		bmInfo.xPelsPerMeter = _fileStream->readUint32LE();
+		bmInfo.yPelsPerMeter = _fileStream->readUint32LE();
+		bmInfo.clrUsed = _fileStream->readUint32LE();
+		bmInfo.clrImportant = _fileStream->readUint32LE();
 
-		_wvInfo.tag = _fileStream->readUint16LE();
-		_wvInfo.channels = _fileStream->readUint16LE();
-		_wvInfo.samplesPerSec = _fileStream->readUint32LE();
-		_wvInfo.avgBytesPerSec = _fileStream->readUint32LE();
-		_wvInfo.blockAlign = _fileStream->readUint16LE();
-		_wvInfo.size = _fileStream->readUint16LE();
+		if (bmInfo.clrUsed == 0)
+			bmInfo.clrUsed = 256;
+
+		if (sHeader.streamHandler == 0)
+			sHeader.streamHandler = bmInfo.compression;
+
+		byte *initialPalette = 0;
+
+		if (bmInfo.bitCount == 8) {
+			initialPalette = new byte[256 * 3];
+			memset(initialPalette, 0, 256 * 3);
+
+			byte *palette = initialPalette;
+			for (uint32 i = 0; i < bmInfo.clrUsed; i++) {
+				palette[i * 3 + 2] = _fileStream->readByte();
+				palette[i * 3 + 1] = _fileStream->readByte();
+				palette[i * 3] = _fileStream->readByte();
+				_fileStream->readByte();
+			}
+		}
+
+		addTrack(new AVIVideoTrack(_header.totalFrames, sHeader, bmInfo, initialPalette));
+	} else if (sHeader.streamType == ID_AUDS) {
+		PCMWaveFormat wvInfo;
+		wvInfo.tag = _fileStream->readUint16LE();
+		wvInfo.channels = _fileStream->readUint16LE();
+		wvInfo.samplesPerSec = _fileStream->readUint32LE();
+		wvInfo.avgBytesPerSec = _fileStream->readUint32LE();
+		wvInfo.blockAlign = _fileStream->readUint16LE();
+		wvInfo.size = _fileStream->readUint16LE();
 
 		// AVI seems to treat the sampleSize as including the second
 		// channel as well, so divide for our sake.
-		if (_wvInfo.channels == 2)
-			_audsHeader.sampleSize /= 2;
+		if (wvInfo.channels == 2)
+			sHeader.sampleSize /= 2;
+
+		addTrack(createAudioTrack(sHeader, wvInfo));
 	}
 
 	// Ensure that we're at the end of the chunk
 	_fileStream->seek(startPos + strfSize);
 }
 
-bool AviDecoder::loadStream(Common::SeekableReadStream *stream) {
+bool AVIDecoder::loadStream(Common::SeekableReadStream *stream) {
 	close();
 
-	_fileStream = stream;
-	_decodedHeader = false;
-
-	// Read chunks until we have decoded the header
-	while (!_decodedHeader)
-		runHandle(_fileStream->readUint32BE());
-
-	uint32 nextTag = _fileStream->readUint32BE();
-
-	// Throw out any JUNK section
-	if (nextTag == ID_JUNK) {
-		runHandle(ID_JUNK);
-		nextTag = _fileStream->readUint32BE();
+	uint32 riffTag = stream->readUint32BE();
+	if (riffTag != ID_RIFF) {
+		warning("Failed to find RIFF header");
+		return false;
 	}
 
-	// Ignore the 'movi' LIST
-	if (nextTag == ID_LIST) {
-		_fileStream->readUint32BE(); // Skip size
-		if (_fileStream->readUint32BE() != ID_MOVI)
-			error ("Expected 'movi' LIST");
-	} else
-		error ("Expected 'movi' LIST");
+	/* uint32 fileSize = */ stream->readUint32LE();
+	uint32 riffType = stream->readUint32BE();
 
-	// Now, create the codec
-	_videoCodec = createCodec();
-
-	// Initialize the video stuff too
-	_audStream = createAudioStream();
-	if (_audStream)
-		_mixer->playStream(_soundType, _audHandle, _audStream);
-
-	debug (0, "Frames = %d, Dimensions = %d x %d", _header.totalFrames, _header.width, _header.height);
-	debug (0, "Frame Rate = %d", _vidsHeader.rate / _vidsHeader.scale);
-	if (_wvInfo.samplesPerSec != 0)
-		debug (0, "Sound Rate = %d", _wvInfo.samplesPerSec);
-	debug (0, "Video Codec = \'%s\'", tag2str(_vidsHeader.streamHandler));
-
-	if (!_videoCodec)
+	if (riffType != ID_AVI) {
+		warning("RIFF not an AVI file");
 		return false;
+	}
+
+	_fileStream = stream;
+
+	// Go through all chunks in the file
+	while (parseNextChunk())
+		;
+
+	if (!_decodedHeader) {
+		warning("Failed to parse AVI header");
+		close();
+		return false;
+	}
+
+	if (!_foundMovieList) {
+		warning("Failed to find 'MOVI' list");
+		close();
+		return false;
+	}
+
+	// Seek back to the start of the MOVI list
+	_fileStream->seek(_movieListStart);
 
 	return true;
 }
 
-void AviDecoder::close() {
-	if (!_fileStream)
-		return;
+void AVIDecoder::close() {
+	VideoDecoder::close();
 
 	delete _fileStream;
 	_fileStream = 0;
-
-	// Deinitialize sound
-	_mixer->stopHandle(*_audHandle);
-	_audStream = 0;
-
 	_decodedHeader = false;
+	_foundMovieList = false;
+	_movieListStart = 0;
 
-	delete _videoCodec;
-	_videoCodec = 0;
-
-	delete[] _ixInfo.indices;
-	_ixInfo.indices = 0;
-
-	memset(_palette, 0, sizeof(_palette));
-	memset(&_wvInfo, 0, sizeof(PCMWAVEFORMAT));
-	memset(&_bmInfo, 0, sizeof(BITMAPINFOHEADER));
-	memset(&_vidsHeader, 0, sizeof(AVIStreamHeader));
-	memset(&_audsHeader, 0, sizeof(AVIStreamHeader));
-	memset(&_ixInfo, 0, sizeof(AVIOLDINDEX));
-
-	reset();
+	_indexEntries.clear();
+	memset(&_header, 0, sizeof(_header));
 }
 
-uint32 AviDecoder::getElapsedTime() const {
-	if (_audStream)
-		return _mixer->getSoundElapsedTime(*_audHandle);
-
-	return FixedRateVideoDecoder::getElapsedTime();
-}
-
-const Graphics::Surface *AviDecoder::decodeNextFrame() {
+void AVIDecoder::readNextPacket() {
 	uint32 nextTag = _fileStream->readUint32BE();
+	uint32 size = _fileStream->readUint32LE();
 
 	if (_fileStream->eos())
-		return NULL;
-
-	if (_curFrame == -1)
-		_startTime = g_system->getMillis();
+		return;
 
 	if (nextTag == ID_LIST) {
 		// A list of audio/video chunks
-		uint32 listSize = _fileStream->readUint32LE() - 4;
 		int32 startPos = _fileStream->pos();
 
 		if (_fileStream->readUint32BE() != ID_REC)
-			error ("Expected 'rec ' LIST");
+			error("Expected 'rec ' LIST");
 
-		// Decode chunks in the list and see if we get a frame
-		const Graphics::Surface *frame = NULL;
-		while (_fileStream->pos() < startPos + (int32)listSize) {
-			const Graphics::Surface *temp = decodeNextFrame();
-			if (temp)
-				frame = temp;
-		}
+		size -= 4; // subtract list type
 
-		return frame;
-	} else if (getStreamType(nextTag) == 'wb') {
-		// Audio Chunk
-		uint32 chunkSize = _fileStream->readUint32LE();
-		queueAudioBuffer(chunkSize);
-		_fileStream->skip(chunkSize & 1); // Alignment
-	} else if (getStreamType(nextTag) == 'dc' || getStreamType(nextTag) == 'id' ||
-	           getStreamType(nextTag) == 'AM' || getStreamType(nextTag) == '32' ||
-			   getStreamType(nextTag) == 'iv') {
-		// Compressed Frame
-		_curFrame++;
-		uint32 chunkSize = _fileStream->readUint32LE();
+		// Decode chunks in the list
+		while (_fileStream->pos() < startPos + (int32)size)
+			readNextPacket();
 
-		if (chunkSize == 0) // Keep last frame on screen
-			return NULL;
-
-		Common::SeekableReadStream *frameData = _fileStream->readStream(chunkSize);
-		const Graphics::Surface *surface = _videoCodec->decodeImage(frameData);
-		delete frameData;
-		_fileStream->skip(chunkSize & 1); // Alignment
-		return surface;
-	} else if (getStreamType(nextTag) == 'pc') {
-		// Palette Change
-		_fileStream->readUint32LE(); // Chunk size, not needed here
-		byte firstEntry = _fileStream->readByte();
-		uint16 numEntries = _fileStream->readByte();
-		_fileStream->readUint16LE(); // Reserved
-
-		// 0 entries means all colors are going to be changed
-		if (numEntries == 0)
-			numEntries = 256;
-
-		for (uint16 i = firstEntry; i < numEntries + firstEntry; i++) {
-			_palette[i * 3] = _fileStream->readByte();
-			_palette[i * 3 + 1] = _fileStream->readByte();
-			_palette[i * 3 + 2] = _fileStream->readByte();
-			_fileStream->readByte(); // Flags that don't serve us any purpose
-		}
-
-		_dirtyPalette = true;
-
-		// No alignment necessary. It's always even.
-	} else if (nextTag == ID_JUNK) {
-		runHandle(ID_JUNK);
-	} else if (nextTag == ID_IDX1) {
-		runHandle(ID_IDX1);
-	} else
-		error("Tag = \'%s\', %d", tag2str(nextTag), _fileStream->pos());
-
-	return NULL;
-}
-
-Codec *AviDecoder::createCodec() {
-	switch (_vidsHeader.streamHandler) {
-		case ID_CRAM:
-		case ID_MSVC:
-		case ID_WHAM:
-			return new MSVideo1Decoder(_bmInfo.width, _bmInfo.height, _bmInfo.bitCount);
-		case ID_RLE:
-			return new MSRLEDecoder(_bmInfo.width, _bmInfo.height, _bmInfo.bitCount);
-		case ID_CVID:
-			return new CinepakDecoder(_bmInfo.bitCount);
-		case ID_IV32:
-			return new Indeo3Decoder(_bmInfo.width, _bmInfo.height);
-#ifdef VIDEO_CODECS_TRUEMOTION1_H
-		case ID_DUCK:
-			return new TrueMotion1Decoder(_bmInfo.width, _bmInfo.height);
-#endif
-		default:
-			warning ("Unknown/Unhandled compression format \'%s\'", tag2str(_vidsHeader.streamHandler));
+		return;
+	} else if (nextTag == ID_JUNK || nextTag == ID_IDX1) {
+		skipChunk(size);
+		return;
 	}
 
-	return NULL;
+	Track *track = getTrack(getStreamIndex(nextTag));
+
+	if (!track)
+		error("Cannot get track from tag '%s'", tag2str(nextTag));
+
+	Common::SeekableReadStream *chunk = 0;
+
+	if (size != 0) {
+		chunk = _fileStream->readStream(size);
+		_fileStream->skip(size & 1);
+	}
+
+	if (track->getTrackType() == Track::kTrackTypeAudio) {
+		if (getStreamType(nextTag) != kStreamTypeAudio)
+			error("Invalid audio track tag '%s'", tag2str(nextTag));
+
+		assert(chunk);
+		((AVIAudioTrack *)track)->queueSound(chunk);
+	} else {
+		AVIVideoTrack *videoTrack = (AVIVideoTrack *)track;
+
+		if (getStreamType(nextTag) == kStreamTypePaletteChange) {
+			// Palette Change
+			videoTrack->loadPaletteFromChunk(chunk);
+		} else if (getStreamType(nextTag) == kStreamTypeRawVideo) {
+			// TODO: Check if this really is uncompressed. Many videos
+			// falsely put compressed data in here.
+			error("Uncompressed AVI frame found");
+		} else {
+			// Otherwise, assume it's a compressed frame
+			videoTrack->decodeFrame(chunk);
+		}
+	}
 }
 
-Graphics::PixelFormat AviDecoder::getPixelFormat() const {
-	assert(_videoCodec);
-	return _videoCodec->getPixelFormat();
+bool AVIDecoder::rewind() {
+	if (!VideoDecoder::rewind())
+		return false;
+
+	_fileStream->seek(_movieListStart);
+	return true;
 }
 
-Audio::QueuingAudioStream *AviDecoder::createAudioStream() {
-	if (_wvInfo.tag == kWaveFormatPCM || _wvInfo.tag == kWaveFormatDK3)
+bool AVIDecoder::seekIntern(const Audio::Timestamp &time) {
+	// Can't seek beyond the end
+	if (time > getDuration())
+		return false;
+
+	// Track down our video track (optionally audio too).
+	// We only support seeking with one track right now.
+	AVIVideoTrack *videoTrack = 0;
+	AVIAudioTrack *audioTrack = 0;
+	int videoIndex = -1;
+	int audioIndex = -1;
+	uint trackID = 0;
+
+	for (TrackListIterator it = getTrackListBegin(); it != getTrackListEnd(); it++, trackID++) {
+		if ((*it)->getTrackType() == Track::kTrackTypeVideo) {
+			if (videoTrack) {
+				// Already have one
+				// -> Not supported
+				return false;
+			}
+
+			videoTrack = (AVIVideoTrack *)*it;
+			videoIndex = trackID;
+		} else if ((*it)->getTrackType() == Track::kTrackTypeAudio) {
+			if (audioTrack) {
+				// Already have one
+				// -> Not supported
+				return false;
+			}
+
+			audioTrack = (AVIAudioTrack *)*it;
+			audioIndex = trackID;
+		}
+	}
+
+	// Need a video track to go forwards
+	// If there isn't a video track, why would anyone be using AVI then?
+	if (!videoTrack)
+		return false;
+
+	// If we seek directly to the end, just mark the tracks as over
+	if (time == getDuration()) {
+		videoTrack->setCurFrame(videoTrack->getFrameCount() - 1);
+
+		if (audioTrack)
+			audioTrack->resetStream();
+
+		return true;
+	}
+
+	// Get the frame we should be on at this time
+	uint frame = videoTrack->getFrameAtTime(time);
+
+	// Reset any palette, if necessary
+	videoTrack->useInitialPalette();
+
+	int lastKeyFrame = -1;
+	int frameIndex = -1;
+	int lastRecord = -1;
+	uint curFrame = 0;
+
+	// Go through and figure out where we should be
+	// If there's a palette, we need to find the palette too
+	for (uint32 i = 0; i < _indexEntries.size(); i++) {
+		const OldIndex &index = _indexEntries[i];
+
+		if (index.id == ID_REC) {
+			// Keep track of any records we find
+			lastRecord = i;
+		} else {
+			if (getStreamIndex(index.id) != videoIndex)
+				continue;
+
+			uint16 streamType = getStreamType(index.id);
+
+			if (streamType == kStreamTypePaletteChange) {
+				// We need to handle any palette change we see since there's no
+				// flag to tell if this is a "key" palette.
+				// Decode the palette
+				_fileStream->seek(_indexEntries[i].offset + 8);
+				Common::SeekableReadStream *chunk = 0;
+
+				if (_indexEntries[i].size != 0)
+					chunk = _fileStream->readStream(_indexEntries[i].size);
+
+				videoTrack->loadPaletteFromChunk(chunk);
+			} else {
+				// Check to see if this is a keyframe
+				// The first frame has to be a keyframe
+				if ((_indexEntries[i].flags & AVIIF_INDEX) || curFrame == 0)
+					lastKeyFrame = i;
+
+				// Did we find the target frame?
+				if (frame == curFrame) {
+					frameIndex = i;
+					break;
+				}
+
+				curFrame++;
+			}
+		}
+	}
+
+	if (frameIndex < 0) // This shouldn't happen.
+		return false;
+
+	if (audioTrack) {
+		// We need to find where the start of audio should be.
+		// Which is exactly 'initialFrames' audio chunks back from where
+		// our found frame is.
+
+		// Recreate the audio stream
+		audioTrack->resetStream();
+
+		uint framesNeeded = _header.initialFrames;
+		uint startAudioChunk = 0;
+		int startAudioSearch = (lastRecord < 0) ? (frameIndex - 1) : (lastRecord - 1);
+
+		for (int i = startAudioSearch; i >= 0; i--) {
+			if (getStreamIndex(_indexEntries[i].id) != audioIndex)
+				continue;
+
+			assert(getStreamType(_indexEntries[i].id) == kStreamTypeAudio);
+
+			framesNeeded--;
+
+			if (framesNeeded == 0) {
+				startAudioChunk = i;
+				break;
+			}
+		}
+
+		// Now go forward and queue them all
+		for (int i = startAudioChunk; i <= startAudioSearch; i++) {
+			if (_indexEntries[i].id == ID_REC)
+				continue;
+
+			if (getStreamIndex(_indexEntries[i].id) != audioIndex)
+				continue;
+
+			assert(getStreamType(_indexEntries[i].id) == kStreamTypeAudio);
+
+			_fileStream->seek(_indexEntries[i].offset + 8);
+			Common::SeekableReadStream *chunk = _fileStream->readStream(_indexEntries[i].size);
+			audioTrack->queueSound(chunk);
+		}
+
+		// Skip any audio to bring us to the right time
+		audioTrack->skipAudio(time, videoTrack->getFrameTime(frame));
+	}
+
+	// Decode from keyFrame to curFrame - 1
+	for (int i = lastKeyFrame; i < frameIndex; i++) {
+		if (_indexEntries[i].id == ID_REC)
+			continue;
+
+		if (getStreamIndex(_indexEntries[i].id) != videoIndex)
+			continue;
+
+		uint16 streamType = getStreamType(_indexEntries[i].id);
+
+		// Ignore palettes, they were already handled
+		if (streamType == kStreamTypePaletteChange)
+			continue;
+
+		// Frame, hopefully
+		_fileStream->seek(_indexEntries[i].offset + 8);
+		Common::SeekableReadStream *chunk = 0;
+
+		if (_indexEntries[i].size != 0)
+			chunk = _fileStream->readStream(_indexEntries[i].size);
+
+		videoTrack->decodeFrame(chunk);
+	}
+
+	// Seek to the right spot
+	// To the beginning of the last record, or frame if that doesn't exist
+	if (lastRecord >= 0)
+		_fileStream->seek(_indexEntries[lastRecord].offset);
+	else
+		_fileStream->seek(_indexEntries[frameIndex].offset);
+
+	videoTrack->setCurFrame((int)frame - 1);
+
+	return true;
+}
+
+byte AVIDecoder::getStreamIndex(uint32 tag) const {
+	char string[3];
+	WRITE_BE_UINT16(string, tag >> 16);
+	string[2] = 0;
+	return strtol(string, 0, 16);
+}
+
+AVIDecoder::AVIVideoTrack::AVIVideoTrack(int frameCount, const AVIStreamHeader &streamHeader, const BitmapInfoHeader &bitmapInfoHeader, byte *initialPalette)
+		: _frameCount(frameCount), _vidsHeader(streamHeader), _bmInfo(bitmapInfoHeader), _initialPalette(initialPalette) {
+	_videoCodec = createCodec();
+	_lastFrame = 0;
+	_curFrame = -1;
+
+	useInitialPalette();
+}
+
+AVIDecoder::AVIVideoTrack::~AVIVideoTrack() {
+	delete _videoCodec;
+	delete[] _initialPalette;
+}
+
+void AVIDecoder::AVIVideoTrack::decodeFrame(Common::SeekableReadStream *stream) {
+	if (stream) {
+		if (_videoCodec)
+			_lastFrame = _videoCodec->decodeImage(stream);
+	} else {
+		// Empty frame
+		_lastFrame = 0;
+	}
+
+	delete stream;
+	_curFrame++;
+}
+
+Graphics::PixelFormat AVIDecoder::AVIVideoTrack::getPixelFormat() const {
+	if (_videoCodec)
+		return _videoCodec->getPixelFormat();
+
+	return Graphics::PixelFormat();
+}
+
+void AVIDecoder::AVIVideoTrack::loadPaletteFromChunk(Common::SeekableReadStream *chunk) {
+	assert(chunk);
+	byte firstEntry = chunk->readByte();
+	uint16 numEntries = chunk->readByte();
+	chunk->readUint16LE(); // Reserved
+
+	// 0 entries means all colors are going to be changed
+	if (numEntries == 0)
+		numEntries = 256;
+
+	for (uint16 i = firstEntry; i < numEntries + firstEntry; i++) {
+		_palette[i * 3] = chunk->readByte();
+		_palette[i * 3 + 1] = chunk->readByte();
+		_palette[i * 3 + 2] = chunk->readByte();
+		chunk->readByte(); // Flags that don't serve us any purpose
+	}
+
+	delete chunk;
+	_dirtyPalette = true;
+}
+
+void AVIDecoder::AVIVideoTrack::useInitialPalette() {
+	_dirtyPalette = false;
+
+	if (_initialPalette) {
+		memcpy(_palette, _initialPalette, sizeof(_palette));
+		_dirtyPalette = true;
+	}
+}
+
+bool AVIDecoder::AVIVideoTrack::rewind() {
+	_curFrame = -1;
+
+	useInitialPalette();
+
+	delete _videoCodec;
+	_videoCodec = createCodec();
+	_lastFrame = 0;
+	return true;
+}
+
+Codec *AVIDecoder::AVIVideoTrack::createCodec() {
+	switch (_vidsHeader.streamHandler) {
+	case ID_CRAM:
+	case ID_MSVC:
+	case ID_WHAM:
+		return new MSVideo1Decoder(_bmInfo.width, _bmInfo.height, _bmInfo.bitCount);
+	case ID_RLE:
+		return new MSRLEDecoder(_bmInfo.width, _bmInfo.height, _bmInfo.bitCount);
+	case ID_CVID:
+		return new CinepakDecoder(_bmInfo.bitCount);
+	case ID_IV32:
+		return new Indeo3Decoder(_bmInfo.width, _bmInfo.height);
+#ifdef VIDEO_CODECS_TRUEMOTION1_H
+	case ID_DUCK:
+		return new TrueMotion1Decoder(_bmInfo.width, _bmInfo.height);
+#endif
+#ifdef USE_MPEG2
+	case ID_MPG2:
+		return new MPEGDecoder();
+#endif
+	default:
+		warning("Unknown/Unhandled compression format \'%s\'", tag2str(_vidsHeader.streamHandler));
+	}
+
+	return 0;
+}
+
+AVIDecoder::AVIAudioTrack::AVIAudioTrack(const AVIStreamHeader &streamHeader, const PCMWaveFormat &waveFormat, Audio::Mixer::SoundType soundType)
+		: _audsHeader(streamHeader), _wvInfo(waveFormat), _soundType(soundType) {
+	_audStream = createAudioStream();
+}
+
+AVIDecoder::AVIAudioTrack::~AVIAudioTrack() {
+	delete _audStream;
+}
+
+void AVIDecoder::AVIAudioTrack::queueSound(Common::SeekableReadStream *stream) {
+	if (_audStream) {
+		if (_wvInfo.tag == kWaveFormatPCM) {
+			byte flags = 0;
+			if (_audsHeader.sampleSize == 2)
+				flags |= Audio::FLAG_16BITS | Audio::FLAG_LITTLE_ENDIAN;
+			else
+				flags |= Audio::FLAG_UNSIGNED;
+
+			if (_wvInfo.channels == 2)
+				flags |= Audio::FLAG_STEREO;
+
+			_audStream->queueAudioStream(Audio::makeRawStream(stream, _wvInfo.samplesPerSec, flags, DisposeAfterUse::YES), DisposeAfterUse::YES);
+		} else if (_wvInfo.tag == kWaveFormatMSADPCM) {
+			_audStream->queueAudioStream(Audio::makeADPCMStream(stream, DisposeAfterUse::YES, stream->size(), Audio::kADPCMMS, _wvInfo.samplesPerSec, _wvInfo.channels, _wvInfo.blockAlign), DisposeAfterUse::YES);
+		} else if (_wvInfo.tag == kWaveFormatMSIMAADPCM) {
+			_audStream->queueAudioStream(Audio::makeADPCMStream(stream, DisposeAfterUse::YES, stream->size(), Audio::kADPCMMSIma, _wvInfo.samplesPerSec, _wvInfo.channels, _wvInfo.blockAlign), DisposeAfterUse::YES);
+		} else if (_wvInfo.tag == kWaveFormatDK3) {
+			_audStream->queueAudioStream(Audio::makeADPCMStream(stream, DisposeAfterUse::YES, stream->size(), Audio::kADPCMDK3, _wvInfo.samplesPerSec, _wvInfo.channels, _wvInfo.blockAlign), DisposeAfterUse::YES);
+		}
+	} else {
+		delete stream;
+	}
+}
+
+void AVIDecoder::AVIAudioTrack::skipAudio(const Audio::Timestamp &time, const Audio::Timestamp &frameTime) {
+	Audio::Timestamp timeDiff = time.convertToFramerate(_wvInfo.samplesPerSec) - frameTime.convertToFramerate(_wvInfo.samplesPerSec);
+	int skipFrames = timeDiff.totalNumberOfFrames();
+
+	if (skipFrames <= 0)
+		return;
+
+	if (_audStream->isStereo())
+		skipFrames *= 2;
+
+	int16 *tempBuffer = new int16[skipFrames];
+	_audStream->readBuffer(tempBuffer, skipFrames);
+	delete[] tempBuffer;
+}
+
+void AVIDecoder::AVIAudioTrack::resetStream() {
+	delete _audStream;
+	_audStream = createAudioStream();
+}
+
+bool AVIDecoder::AVIAudioTrack::rewind() {
+	resetStream();
+	return true;
+}
+
+Audio::AudioStream *AVIDecoder::AVIAudioTrack::getAudioStream() const {
+	return _audStream;
+}
+
+Audio::QueuingAudioStream *AVIDecoder::AVIAudioTrack::createAudioStream() {
+	if (_wvInfo.tag == kWaveFormatPCM || _wvInfo.tag == kWaveFormatMSADPCM || _wvInfo.tag == kWaveFormatMSIMAADPCM || _wvInfo.tag == kWaveFormatDK3)
 		return Audio::makeQueuingAudioStream(_wvInfo.samplesPerSec, _wvInfo.channels == 2);
 	else if (_wvInfo.tag != kWaveFormatNone) // No sound
 		warning("Unsupported AVI audio format %d", _wvInfo.tag);
 
-	return NULL;
-}
-
-void AviDecoder::queueAudioBuffer(uint32 chunkSize) {
-	// Return if we haven't created the queue (unsupported audio format)
-	if (!_audStream) {
-		_fileStream->skip(chunkSize);
-		return;
-	}
-
-	Common::SeekableReadStream *stream = _fileStream->readStream(chunkSize);
-
-	if (_wvInfo.tag == kWaveFormatPCM) {
-		byte flags = 0;
-		if (_audsHeader.sampleSize == 2)
-			flags |= Audio::FLAG_16BITS | Audio::FLAG_LITTLE_ENDIAN;
-		else
-			flags |= Audio::FLAG_UNSIGNED;
-
-		if (_wvInfo.channels == 2)
-			flags |= Audio::FLAG_STEREO;
-
-		_audStream->queueAudioStream(Audio::makeRawStream(stream, _wvInfo.samplesPerSec, flags, DisposeAfterUse::YES), DisposeAfterUse::YES);
-	} else if (_wvInfo.tag == kWaveFormatDK3) {
-		_audStream->queueAudioStream(Audio::makeADPCMStream(stream, DisposeAfterUse::YES, chunkSize, Audio::kADPCMDK3, _wvInfo.samplesPerSec, _wvInfo.channels, _wvInfo.blockAlign), DisposeAfterUse::YES);
-	}
+	return 0;
 }
 
 } // End of namespace Video

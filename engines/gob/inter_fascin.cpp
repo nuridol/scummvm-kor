@@ -132,7 +132,7 @@ void Inter_Fascination::oFascin_repeatUntil(OpFuncParams &params) {
 		// WORKAROUND: The script of the PC version of Fascination, when the protection check
 		// fails, writes on purpose everywhere in the memory in order to hang the computer.
 		// This results in a crash in Scummvm. This workaround avoids that crash.
-		if (_vm->getPlatform() == Common::kPlatformPC) {
+		if (_vm->getPlatform() == Common::kPlatformDOS) {
 			if (((blockPos == 3533) && _vm->isCurrentTot("INTRO1.TOT")) ||
 			    ((blockPos == 3519) && _vm->isCurrentTot("INTRO2.TOT")) ||
 			    ((blockPos == 3265) && _vm->isCurrentTot("INTRO2.TOT")))  //PC Hebrew
@@ -248,12 +248,11 @@ void Inter_Fascination::oFascin_playTira(OpGobParams &params) {
 void Inter_Fascination::oFascin_loadExtasy(OpGobParams &params) {
 	_vm->_sound->adlibLoadTBR("extasy.tbr");
 	_vm->_sound->adlibLoadMDY("extasy.mdy");
+	_vm->_sound->adlibSetRepeating(-1);
 }
 
 void Inter_Fascination::oFascin_adlibPlay(OpGobParams &params) {
-#ifdef ENABLE_FASCIN_ADLIB
 	_vm->_sound->adlibPlay();
-#endif
 }
 
 void Inter_Fascination::oFascin_adlibStop(OpGobParams &params) {

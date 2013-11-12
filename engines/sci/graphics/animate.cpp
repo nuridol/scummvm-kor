@@ -528,7 +528,7 @@ void GfxAnimate::addToPicDrawCels() {
 			it->priority = _ports->kernelCoordinateToPriority(it->y);
 
 		if (!view->isScaleable()) {
-			// Laura Bow 2 specific - ffs. fill()
+			// Laura Bow 2 specific - Check fill() below
 			it->scaleSignal = 0;
 			it->scaleY = it->scaleX = 128;
 		}
@@ -723,7 +723,7 @@ void GfxAnimate::printAnimateList(Console *con) {
 	const AnimateList::iterator end = _list.end();
 
 	for (it = _list.begin(); it != end; ++it) {
-		Script *scr = _s->_segMan->getScriptIfLoaded(it->object.segment);
+		Script *scr = _s->_segMan->getScriptIfLoaded(it->object.getSegment());
 		int16 scriptNo = scr ? scr->getScriptNumber() : -1;
 
 		con->DebugPrintf("%04x:%04x (%s), script %d, view %d (%d, %d), pal %d, "

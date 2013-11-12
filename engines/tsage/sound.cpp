@@ -22,6 +22,8 @@
 
 #include "audio/decoders/raw.h"
 #include "common/config-manager.h"
+#include "audio/decoders/raw.h"
+#include "audio/audiostream.h"
 #include "tsage/core.h"
 #include "tsage/globals.h"
 #include "tsage/debugger.h"
@@ -66,7 +68,7 @@ SoundManager::~SoundManager() {
 			++i;
 			delete driver;
 		}
-		_sfTerminate();
+		sfTerminate();
 
 //		g_system->getTimerManager()->removeTimerProc(_sfUpdateCallback);
 	}
@@ -118,21 +120,35 @@ void SoundManager::syncSounds() {
 	bool mute = false;
 	if (ConfMan.hasKey("mute"))
 		mute = ConfMan.getBool("mute");
+	bool subtitles = ConfMan.hasKey("subtitles") ? ConfMan.getBool("subtitles") : true;
 
 	bool music_mute = mute;
+	bool voice_mute = mute;
 
 	if (!mute) {
 		music_mute = ConfMan.getBool("music_mute");
+		voice_mute = ConfMan.getBool("speech_mute");
 	}
 
 	// Get the new music volume
 	int musicVolume = music_mute ? 0 : MIN(255, ConfMan.getInt("music_volume"));
 
 	this->setMasterVol(musicVolume / 2);
+
+	// Return to Ringworld voice settings
+	if (g_vm->getGameID() == GType_Ringworld2) {
+		// If we don't have voice, then ensure that text is turned on
+		if (voice_mute)
+			subtitles = true;
+
+		R2_GLOBALS._speechSubtitles = 
+			(voice_mute ? 0 : SPEECH_VOICE) | 
+			(!subtitles ? 0 : SPEECH_TEXT);
+	}
 }
 
 void SoundManager::update() {
-	_sfSoundServer();
+	sfSoundServer();
 }
 
 Common::List<SoundDriverEntry> &SoundManager::buildDriverList(bool detectFlag) {
@@ -144,22 +160,22 @@ Common::List<SoundDriverEntry> &SoundManager::buildDriverList(bool detectFlag) {
 
 	// Adlib driver
 	SoundDriverEntry sd;
-	sd.driverNum = ADLIB_DRIVER_NUM;
-	sd.status = detectFlag ? SNDSTATUS_DETECTED : SNDSTATUS_SKIPPED;
-	sd.field2 = 0;
-	sd.field6 = 15000;
-	sd.shortDescription = "Adlib or SoundBlaster";
-	sd.longDescription = "3812fm";
+	sd._driverNum = ADLIB_DRIVER_NUM;
+	sd._status = detectFlag ? SNDSTATUS_DETECTED : SNDSTATUS_SKIPPED;
+	sd._field2 = 0;
+	sd._field6 = 15000;
+	sd._shortDescription = "Adlib or SoundBlaster";
+	sd._longDescription = "3812fm";
 	_availableDrivers.push_back(sd);
 
 	// SoundBlaster entry
 	SoundDriverEntry sdFx;
-	sdFx.driverNum = SBLASTER_DRIVER_NUM;
-	sdFx.status = detectFlag ? SNDSTATUS_DETECTED : SNDSTATUS_SKIPPED;
-	sdFx.field2 = 0;
-	sdFx.field6 = 15000;
-	sdFx.shortDescription = "SndBlast";
-	sdFx.longDescription = "SoundBlaster";
+	sdFx._driverNum = SBLASTER_DRIVER_NUM;
+	sdFx._status = detectFlag ? SNDSTATUS_DETECTED : SNDSTATUS_SKIPPED;
+	sdFx._field2 = 0;
+	sdFx._field6 = 15000;
+	sdFx._shortDescription = "SndBlast";
+	sdFx._longDescription = "SoundBlaster";
 	_availableDrivers.push_back(sdFx);
 
 	_driversDetected = true;
@@ -204,7 +220,7 @@ void SoundManager::installDriver(int driverNum) {
 		(*i)->mute(true);
 
 	// Install the driver
-	if (!_sfInstallDriver(driver))
+	if (!sfInstallDriver(driver))
 		error("Sound driver initialization failed");
 
 	switch (driverNum) {
@@ -214,11 +230,11 @@ void SoundManager::installDriver(int driverNum) {
 		byte *bankData = g_resourceManager->getResource(RES_BANK, driverNum, 0, true);
 		if (bankData) {
 			// Install the patch bank data
-			_sfInstallPatchBank(driver, bankData);
+			sfInstallPatchBank(driver, bankData);
 			DEALLOCATE(bankData);
 		} else {
 			// Could not locate patch bank data, so unload the driver
-			_sfUnInstallDriver(driver);
+			sfUnInstallDriver(driver);
 
 			// Unmute currently active sounds
 			for (Common::List<Sound *>::iterator i = _playList.begin(); i != _playList.end(); ++i)
@@ -260,7 +276,7 @@ void SoundManager::unInstallDriver(int driverNum) {
 				(*j)->mute(true);
 
 			// Uninstall the driver
-			_sfUnInstallDriver(*i);
+			sfUnInstallDriver(*i);
 
 			// Re-orient all the loaded sounds
 			for (j = _soundList.begin(); j != _soundList.end(); ++j)
@@ -303,7 +319,7 @@ void SoundManager::unloadSound(int soundNum) {
 }
 
 int SoundManager::determineGroup(const byte *soundData) {
-	return _sfDetermineGroup(soundData);
+	return sfDetermineGroup(soundData);
 }
 
 void SoundManager::checkResVersion(const byte *soundData) {
@@ -325,7 +341,7 @@ int SoundManager::extractLoop(const byte *soundData) {
 }
 
 void SoundManager::extractTrackInfo(trackInfoStruct *trackInfo, const byte *soundData, int groupNum) {
-	_sfExtractTrackInfo(trackInfo, soundData, groupNum);
+	sfExtractTrackInfo(trackInfo, soundData, groupNum);
 }
 
 void SoundManager::addToSoundList(Sound *sound) {
@@ -338,46 +354,46 @@ void SoundManager::removeFromSoundList(Sound *sound) {
 }
 
 void SoundManager::addToPlayList(Sound *sound) {
-	_sfAddToPlayList(sound);
+	sfAddToPlayList(sound);
 }
 
 void SoundManager::removeFromPlayList(Sound *sound) {
 	if (_soundManager)
-		_sfRemoveFromPlayList(sound);
+		sfRemoveFromPlayList(sound);
 }
 
 bool SoundManager::isOnPlayList(Sound *sound) {
-	return _sfIsOnPlayList(sound);
+	return sfIsOnPlayList(sound);
 }
 
 void SoundManager::updateSoundVol(Sound *sound) {
-	_sfUpdateVolume(sound);
+	sfUpdateVolume(sound);
 }
 
 void SoundManager::updateSoundPri(Sound *sound) {
-	_sfUpdatePriority(sound);
+	sfUpdatePriority(sound);
 }
 
 void SoundManager::updateSoundLoop(Sound *sound) {
-	_sfUpdateLoop(sound);
+	sfUpdateLoop(sound);
 }
 
 void SoundManager::rethinkVoiceTypes() {
 	Common::StackLock slock(sfManager()._serverSuspendedMutex);
-	_sfRethinkVoiceTypes();
+	sfRethinkVoiceTypes();
 }
 
-void SoundManager::_sfSoundServer() {
+void SoundManager::sfSoundServer() {
 	if (sfManager()._needToRethink) {
-		_sfRethinkVoiceTypes();
+		sfRethinkVoiceTypes();
 		sfManager()._needToRethink = false;
 	} else {
-		_sfDereferenceAll();
+		sfDereferenceAll();
 	}
 
 	// If the master volume has changed, update it
 	if (sfManager()._newVolume != sfManager()._masterVol)
-		_sfSetMasterVol(sfManager()._newVolume);
+		sfSetMasterVol(sfManager()._newVolume);
 
 	// If a time index has been set for any sound, fast forward to it
 	SynchronizedList<Sound *>::iterator i;
@@ -385,14 +401,14 @@ void SoundManager::_sfSoundServer() {
 		Sound *s = *i;
 		if (s->_newTimeIndex != 0) {
 			s->mute(true);
-			s->_soSetTimeIndex(s->_newTimeIndex);
+			s->soSetTimeIndex(s->_newTimeIndex);
 			s->mute(false);
 			s->_newTimeIndex = 0;
 		}
 	}
 
 	// Handle any fading if necessary
-	_sfProcessFading();
+	sfProcessFading();
 
 	// Poll all sound drivers in case they need it
 	for (Common::List<SoundDriver *>::iterator j = sfManager()._installedDrivers.begin();
@@ -401,7 +417,7 @@ void SoundManager::_sfSoundServer() {
 	}
 }
 
-void SoundManager::_sfProcessFading() {
+void SoundManager::sfProcessFading() {
 	// Loop through processing active sounds
 	bool removeFlag = false;
 	Common::List<Sound *>::iterator i = sfManager()._playList.begin();
@@ -410,9 +426,9 @@ void SoundManager::_sfProcessFading() {
 		++i;
 
 		if (!s->_pausedCount)
-			removeFlag = s->_soServiceTracks();
+			removeFlag = s->soServiceTracks();
 		if (removeFlag) {
-			_sfDoRemoveFromPlayList(s);
+			sfDoRemoveFromPlayList(s);
 			s->_stoppedAsynchronously = true;
 			sfManager()._needToRethink = true;
 		}
@@ -429,13 +445,13 @@ void SoundManager::_sfProcessFading() {
 						s->_volume + s->_fadeSteps : s->_fadeDest;
 				}
 
-				_sfDoUpdateVolume(s);
+				sfDoUpdateVolume(s);
 				if (s->_volume != s->_fadeDest)
 					s->_fadeCounter = s->_fadeTicks;
 				else {
 					s->_fadeDest = -1;
 					if (s->_stopAfterFadeFlag) {
-						_sfDoRemoveFromPlayList(s);
+						sfDoRemoveFromPlayList(s);
 						s->_stoppedAsynchronously = true;
 						sfManager()._needToRethink = true;
 					}
@@ -475,7 +491,7 @@ bool SoundManager::isFading() {
 	return false;
 }
 
-void SoundManager::_sfUpdateVoiceStructs() {
+void SoundManager::sfUpdateVoiceStructs() {
 	for (int voiceIndex = 0; voiceIndex < SOUND_ARR_SIZE; ++voiceIndex) {
 		VoiceTypeStruct *vs = sfManager()._voiceTypeStructPtrs[voiceIndex];
 		if (!vs)
@@ -504,7 +520,7 @@ void SoundManager::_sfUpdateVoiceStructs() {
 	}
 }
 
-void SoundManager::_sfUpdateVoiceStructs2() {
+void SoundManager::sfUpdateVoiceStructs2() {
 	for (int voiceIndex = 0; voiceIndex < SOUND_ARR_SIZE; ++voiceIndex) {
 		VoiceTypeStruct *vtStruct = sfManager()._voiceTypeStructPtrs[voiceIndex];
 		if (!vtStruct)
@@ -528,7 +544,7 @@ void SoundManager::_sfUpdateVoiceStructs2() {
 	}
 }
 
-void SoundManager::_sfUpdateCallback(void *ref) {
+void SoundManager::sfUpdateCallback(void *ref) {
 	((SoundManager *)ref)->update();
 }
 
@@ -587,7 +603,7 @@ SoundManager &SoundManager::sfManager() {
 	return *_soundManager;
 }
 
-int SoundManager::_sfDetermineGroup(const byte *soundData) {
+int SoundManager::sfDetermineGroup(const byte *soundData) {
 	const byte *p = soundData + READ_LE_UINT16(soundData + 8);
 	uint32 v;
 	while ((v = READ_LE_UINT32(p)) != 0) {
@@ -600,22 +616,22 @@ int SoundManager::_sfDetermineGroup(const byte *soundData) {
 	return 0;
 }
 
-void SoundManager::_sfAddToPlayList(Sound *sound) {
+void SoundManager::sfAddToPlayList(Sound *sound) {
 	Common::StackLock slock(sfManager()._serverSuspendedMutex);
 
-	_sfDoAddToPlayList(sound);
+	sfDoAddToPlayList(sound);
 	sound->_stoppedAsynchronously = false;
-	_sfRethinkVoiceTypes();
+	sfRethinkVoiceTypes();
 }
 
-void SoundManager::_sfRemoveFromPlayList(Sound *sound) {
+void SoundManager::sfRemoveFromPlayList(Sound *sound) {
 	Common::StackLock slock(sfManager()._serverSuspendedMutex);
 
-	if (_sfDoRemoveFromPlayList(sound))
-		_sfRethinkVoiceTypes();
+	if (sfDoRemoveFromPlayList(sound))
+		sfRethinkVoiceTypes();
 }
 
-bool SoundManager::_sfIsOnPlayList(Sound *sound) {
+bool SoundManager::sfIsOnPlayList(Sound *sound) {
 	Common::StackLock slock(sfManager()._serverSuspendedMutex);
 
 	bool result = contains(_soundManager->_playList, sound);
@@ -623,7 +639,7 @@ bool SoundManager::_sfIsOnPlayList(Sound *sound) {
 	return result;
 }
 
-void SoundManager::_sfRethinkSoundDrivers() {
+void SoundManager::sfRethinkSoundDrivers() {
 	// Free any existing entries
 	int idx;
 
@@ -643,7 +659,7 @@ void SoundManager::_sfRethinkSoundDrivers() {
 				i != sfManager()._installedDrivers.end(); ++i) {
 			// Process the group data for each sound driver
 			SoundDriver *driver = *i;
-			const byte *groupData = driver->_groupOffset->pData;
+			const byte *groupData = driver->_groupOffset->_pData;
 
 			while (*groupData != 0xff) {
 				byte byteVal = *groupData++;
@@ -690,7 +706,7 @@ void SoundManager::_sfRethinkSoundDrivers() {
 							i != sfManager()._installedDrivers.end(); ++i) {
 				// Process the group data for each sound driver
 				SoundDriver *driver = *i;
-				const byte *groupData = driver->_groupOffset->pData;
+				const byte *groupData = driver->_groupOffset->_pData;
 
 				while (*groupData != 0xff) {
 					byte byteVal = *groupData++;
@@ -746,8 +762,8 @@ void SoundManager::_sfRethinkSoundDrivers() {
 	}
 }
 
-void SoundManager::_sfRethinkVoiceTypes() {
-	_sfDereferenceAll();
+void SoundManager::sfRethinkVoiceTypes() {
+	sfDereferenceAll();
 
 	// Pre-processing
 	for (int voiceIndex = 0; voiceIndex < SOUND_ARR_SIZE; ++voiceIndex) {
@@ -797,7 +813,7 @@ void SoundManager::_sfRethinkVoiceTypes() {
 		if ((sound->_mutedCount != 0) || (sound->_pausedCount != 0))
 			continue;
 
-		_sfUpdateVoiceStructs();
+		sfUpdateVoiceStructs();
 		Common::fill(sound->_chWork, sound->_chWork + SOUND_ARR_SIZE, false);
 
 		for (;;) {
@@ -831,7 +847,7 @@ void SoundManager::_sfRethinkVoiceTypes() {
 				if (foundPriority)
 					continue;
 
-				_sfUpdateVoiceStructs2();
+				sfUpdateVoiceStructs2();
 				break;
 			}
 
@@ -860,7 +876,7 @@ void SoundManager::_sfRethinkVoiceTypes() {
 							maxPriority = MAX(maxPriority, vtStruct->_entries[idx]._type1._priority2);
 
 						if (!maxPriority) {
-							_sfUpdateVoiceStructs2();
+							sfUpdateVoiceStructs2();
 							break;
 						}
 
@@ -944,7 +960,7 @@ void SoundManager::_sfRethinkVoiceTypes() {
 						continue;
 					}
 
-					_sfUpdateVoiceStructs2();
+					sfUpdateVoiceStructs2();
 					break;
 				} else {
 					// Channel mode 1 handling (loc_23FAC)
@@ -973,7 +989,7 @@ void SoundManager::_sfRethinkVoiceTypes() {
 						if (foundPriority)
 							continue;
 						if (entryIndex == -1) {
-							_sfUpdateVoiceStructs2();
+							sfUpdateVoiceStructs2();
 							break;
 						}
 					}
@@ -1008,7 +1024,7 @@ void SoundManager::_sfRethinkVoiceTypes() {
 							continue;
 						}
 
-						_sfUpdateVoiceStructs2();
+						sfUpdateVoiceStructs2();
 						break;
 					}
 
@@ -1051,7 +1067,7 @@ void SoundManager::_sfRethinkVoiceTypes() {
 					if (!foundPriority)
 						continue;
 					if (priorityIndex == -1) {
-						_sfUpdateVoiceStructs2();
+						sfUpdateVoiceStructs2();
 						break;
 					}
 
@@ -1271,38 +1287,38 @@ void SoundManager::_sfRethinkVoiceTypes() {
 	}
 }
 
-void SoundManager::_sfUpdateVolume(Sound *sound) {
-	_sfDereferenceAll();
-	_sfDoUpdateVolume(sound);
+void SoundManager::sfUpdateVolume(Sound *sound) {
+	sfDereferenceAll();
+	sfDoUpdateVolume(sound);
 }
 
-void SoundManager::_sfDereferenceAll() {
+void SoundManager::sfDereferenceAll() {
 	// Orignal used handles for both the driver list and voiceTypeStructPtrs list. This method then refreshed
 	// pointer lists based on the handles. Since in ScummVM we're just using pointers directly, this
 	// method doesn't need any implementation
 }
 
-void SoundManager::_sfUpdatePriority(Sound *sound) {
+void SoundManager::sfUpdatePriority(Sound *sound) {
 	Common::StackLock slock(sfManager()._serverSuspendedMutex);
 
 	int tempPriority = (sound->_fixedPriority == 255) ? sound->_sndResPriority : sound->_priority;
 	if (sound->_priority != tempPriority) {
 		sound->_priority = tempPriority;
-		if (_sfDoRemoveFromPlayList(sound)) {
-			_sfDoAddToPlayList(sound);
-			_sfRethinkVoiceTypes();
+		if (sfDoRemoveFromPlayList(sound)) {
+			sfDoAddToPlayList(sound);
+			sfRethinkVoiceTypes();
 		}
 	}
 }
 
-void SoundManager::_sfUpdateLoop(Sound *sound) {
+void SoundManager::sfUpdateLoop(Sound *sound) {
 	if (sound->_fixedLoop)
 		sound->_loop = sound->_sndResLoop;
 	else
 		sound->_loop = sound->_fixedLoop;
 }
 
-void SoundManager::_sfSetMasterVol(int volume) {
+void SoundManager::sfSetMasterVol(int volume) {
 	if (volume > 127)
 		volume = 127;
 
@@ -1316,7 +1332,7 @@ void SoundManager::_sfSetMasterVol(int volume) {
 	}
 }
 
-void SoundManager::_sfExtractTrackInfo(trackInfoStruct *trackInfo, const byte *soundData, int groupNum) {
+void SoundManager::sfExtractTrackInfo(trackInfoStruct *trackInfo, const byte *soundData, int groupNum) {
 	trackInfo->_numTracks = 0;
 
 	const byte *p = soundData + READ_LE_UINT16(soundData + 8);
@@ -1345,11 +1361,11 @@ void SoundManager::_sfExtractTrackInfo(trackInfoStruct *trackInfo, const byte *s
 	}
 }
 
-void SoundManager::_sfTerminate() {
+void SoundManager::sfTerminate() {
 
 }
 
-void SoundManager::_sfExtractGroupMask() {
+void SoundManager::sfExtractGroupMask() {
 	uint32 mask = 0;
 
 	for (Common::List<SoundDriver *>::iterator i = sfManager()._installedDrivers.begin();
@@ -1359,37 +1375,37 @@ void SoundManager::_sfExtractGroupMask() {
 	_soundManager->_groupsAvail = mask;
 }
 
-bool SoundManager::_sfInstallDriver(SoundDriver *driver) {
+bool SoundManager::sfInstallDriver(SoundDriver *driver) {
 	if (!driver->open())
 		return false;
 
 	sfManager()._installedDrivers.push_back(driver);
 	driver->_groupOffset = driver->getGroupData();
-	driver->_groupMask = driver->_groupOffset->groupMask;
+	driver->_groupMask = driver->_groupOffset->_groupMask;
 
-	_sfExtractGroupMask();
-	_sfRethinkSoundDrivers();
+	sfExtractGroupMask();
+	sfRethinkSoundDrivers();
 	driver->setMasterVolume(sfManager()._masterVol);
 
 	return true;
 }
 
-void SoundManager::_sfUnInstallDriver(SoundDriver *driver) {
+void SoundManager::sfUnInstallDriver(SoundDriver *driver) {
 	sfManager()._installedDrivers.remove(driver);
 	delete driver;
 
-	_sfExtractGroupMask();
-	_sfRethinkSoundDrivers();
+	sfExtractGroupMask();
+	sfRethinkSoundDrivers();
 }
 
-void SoundManager::_sfInstallPatchBank(SoundDriver *driver, const byte *bankData) {
+void SoundManager::sfInstallPatchBank(SoundDriver *driver, const byte *bankData) {
 	driver->installPatch(bankData, g_vm->_memoryManager.getSize(bankData));
 }
 
 /**
  * Adds the specified sound in the playing sound list, inserting in order of priority
  */
-void SoundManager::_sfDoAddToPlayList(Sound *sound) {
+void SoundManager::sfDoAddToPlayList(Sound *sound) {
 	Common::StackLock slock2(sfManager()._serverSuspendedMutex);
 
 	Common::List<Sound *>::iterator i = sfManager()._playList.begin();
@@ -1402,7 +1418,7 @@ void SoundManager::_sfDoAddToPlayList(Sound *sound) {
 /**
  * Removes the specified sound from the play list
  */
-bool SoundManager::_sfDoRemoveFromPlayList(Sound *sound) {
+bool SoundManager::sfDoRemoveFromPlayList(Sound *sound) {
 	Common::StackLock slock(sfManager()._serverSuspendedMutex);
 
 	bool result = false;
@@ -1417,7 +1433,7 @@ bool SoundManager::_sfDoRemoveFromPlayList(Sound *sound) {
 	return result;
 }
 
-void SoundManager::_sfDoUpdateVolume(Sound *sound) {
+void SoundManager::sfDoUpdateVolume(Sound *sound) {
 	Common::StackLock slock(sfManager()._serverSuspendedMutex);
 
 	for (int voiceIndex = 0; voiceIndex < SOUND_ARR_SIZE; ++voiceIndex) {
@@ -1494,6 +1510,11 @@ Sound::Sound() {
 	memset(_trkLoopIndex, 0, SOUND_ARR_SIZE * sizeof(int));
 	memset(_trkRest, 0, SOUND_ARR_SIZE * sizeof(int));
 	memset(_trkLoopRest, 0, SOUND_ARR_SIZE * sizeof(int));
+	for (int i = 0; i < 16; i++) {
+		_chWork[i] = false;
+		_trackInfo._chunks[i] = 0;
+		_trackInfo._voiceTypes[i] = 0;
+	}
 }
 
 Sound::~Sound() {
@@ -1583,7 +1604,7 @@ void Sound::_prime(int soundResID, bool dontQueue) {
 		_remoteReceiver = ALLOCATE(200);
 	}
 
-	_soPrimeSound(dontQueue);
+	soPrimeSound(dontQueue);
 	if (!dontQueue)
 		_soundManager->addToSoundList(this);
 
@@ -1767,7 +1788,7 @@ void Sound::release() {
 	_hold = -1;
 }
 
-void Sound::_soPrimeSound(bool dontQueue) {
+void Sound::soPrimeSound(bool dontQueue) {
 	if (!dontQueue) {
 		_priority = (_fixedPriority != -1) ? _fixedPriority : _sndResPriority;
 		_loop = !_fixedLoop ? _fixedLoop : _sndResLoop;
@@ -1785,21 +1806,21 @@ void Sound::_soPrimeSound(bool dontQueue) {
 	_timer = 0;
 	_newTimeIndex = 0;
 	_loopTimer = 0;
-	_soPrimeChannelData();
+	soPrimeChannelData();
 }
 
-void Sound::_soSetTimeIndex(uint timeIndex) {
+void Sound::soSetTimeIndex(uint timeIndex) {
 	Common::StackLock slock(g_globals->_soundManager._serverSuspendedMutex);
 
 	if (timeIndex != _timer) {
 		_soundManager->_soTimeIndexFlag = true;
 		_timer = 0;
 		_loopTimer = 0;
-		_soPrimeChannelData();
+		soPrimeChannelData();
 
 		while (timeIndex > 0) {
-			if (_soServiceTracks()) {
-				SoundManager::_sfDoRemoveFromPlayList(this);
+			if (soServiceTracks()) {
+				SoundManager::sfDoRemoveFromPlayList(this);
 				_stoppedAsynchronously = true;
 				_soundManager->_needToRethink = true;
 				break;
@@ -1812,9 +1833,9 @@ void Sound::_soSetTimeIndex(uint timeIndex) {
 	}
 }
 
-bool Sound::_soServiceTracks() {
+bool Sound::soServiceTracks() {
 	if (_isEmpty) {
-		_soRemoteReceive();
+		soRemoteReceive();
 		return false;
 	}
 
@@ -1823,9 +1844,9 @@ bool Sound::_soServiceTracks() {
 		int mode = *_channelData[trackCtr];
 
 		if (mode == 0) {
-			_soServiceTrackType0(trackCtr, _channelData[trackCtr]);
+			soServiceTrackType0(trackCtr, _channelData[trackCtr]);
 		} else if (mode == 1) {
-			_soServiceTrackType1(trackCtr, _channelData[trackCtr]);
+			soServiceTrackType1(trackCtr, _channelData[trackCtr]);
 		} else {
 			error("Unknown sound mode encountered");
 		}
@@ -1851,7 +1872,7 @@ bool Sound::_soServiceTracks() {
 	}
 }
 
-void Sound::_soPrimeChannelData() {
+void Sound::soPrimeChannelData() {
 	if (_isEmpty) {
 		for (int idx = 0; idx < 16; ++idx) {
 			_chProgram[idx] = 0;
@@ -1917,11 +1938,11 @@ void Sound::_soPrimeChannelData() {
 	}
 }
 
-void Sound::_soRemoteReceive() {
-	error("_soRemoteReceive not implemented");
+void Sound::soRemoteReceive() {
+	error("soRemoteReceive not implemented");
 }
 
-void Sound::_soServiceTrackType0(int trackIndex, const byte *channelData) {
+void Sound::soServiceTrackType0(int trackIndex, const byte *channelData) {
 	if (_trkRest[trackIndex]) {
 		--_trkRest[trackIndex];
 		return;
@@ -1970,7 +1991,7 @@ void Sound::_soServiceTrackType0(int trackIndex, const byte *channelData) {
 				// Only do processing if fast forwarding to a given time index
 				if (channelNum != -1) {
 					if (voiceType == VOICETYPE_1) {
-						_soUpdateDamper(vtStruct, channelNum, chVoiceType, v);
+						soUpdateDamper(vtStruct, channelNum, chVoiceType, v);
 					} else if (voiceNum != -1) {
 						assert(driver);
 						driver->proc18(voiceNum, chVoiceType);
@@ -1991,9 +2012,9 @@ void Sound::_soServiceTrackType0(int trackIndex, const byte *channelData) {
 				if (channelNum != -1) {
 					if (voiceType != VOICETYPE_0) {
 						if (chFlags & 0x10)
-							_soPlaySound2(vtStruct, channelData, channelNum, chVoiceType, v);
+							soPlaySound2(vtStruct, channelData, channelNum, chVoiceType, v);
 						else
-							_soPlaySound(vtStruct, channelData, channelNum, chVoiceType, v, b);
+							soPlaySound(vtStruct, channelData, channelNum, chVoiceType, v, b);
 					} else if (voiceNum != -1) {
 						assert(driver);
 						driver->proc20(voiceNum, chVoiceType);
@@ -2030,17 +2051,17 @@ void Sound::_soServiceTrackType0(int trackIndex, const byte *channelData) {
 			int cmdVal = cmdList[v];
 
 			if (channelNum == -1) {
-				if (_soDoUpdateTracks(cmdVal, b))
+				if (soDoUpdateTracks(cmdVal, b))
 					return;
 			} else {
-				_soDoTrackCommand(_trkChannel[trackIndex], cmdVal, b);
+				soDoTrackCommand(_trkChannel[trackIndex], cmdVal, b);
 
 				if (!_soundManager->_soTimeIndexFlag) {
 					if (cmdVal == 7)
 						b = static_cast<byte>(_volume * (int)b / 127);
 
 					if (voiceType != VOICETYPE_0) {
-						_soProc38(vtStruct, channelNum, chVoiceType, cmdVal, b);
+						soProc38(vtStruct, channelNum, chVoiceType, cmdVal, b);
 					} else if (voiceNum != -1) {
 						assert(driver);
 						driver->proc24(voiceNum, chVoiceType, this, cmdVal, b);
@@ -2067,17 +2088,17 @@ void Sound::_soServiceTrackType0(int trackIndex, const byte *channelData) {
 			int value = *pData++;
 
 			if (channelNum != -1) {
-				_soDoTrackCommand(_trkChannel[trackIndex], cmd, value);
+				soDoTrackCommand(_trkChannel[trackIndex], cmd, value);
 
 				if (!_soundManager->_soTimeIndexFlag) {
 					if (voiceType != VOICETYPE_0) {
-						_soProc38(vtStruct, channelNum, chVoiceType, cmd, value);
+						soProc38(vtStruct, channelNum, chVoiceType, cmd, value);
 					} else if (voiceNum != -1) {
 						assert(driver);
 						driver->proc24(voiceNum, chVoiceType, this, cmd, value);
 					}
 				}
-			} else if (_soDoUpdateTracks(cmd, value)) {
+			} else if (soDoUpdateTracks(cmd, value)) {
 				return;
 			}
 		} else if (!(v & 0x2)) {
@@ -2091,7 +2112,7 @@ void Sound::_soServiceTrackType0(int trackIndex, const byte *channelData) {
 					_chPitchBlend[channel] = pitchBlend;
 
 					if (voiceType != VOICETYPE_0) {
-						_soProc40(vtStruct, channelNum, pitchBlend);
+						soProc40(vtStruct, channelNum, pitchBlend);
 					} else if (voiceNum != -1) {
 						assert(driver);
 						driver->setPitchBlend(channel, pitchBlend);
@@ -2115,7 +2136,7 @@ void Sound::_soServiceTrackType0(int trackIndex, const byte *channelData) {
 					}
 				}
 			} else {
-				_soSetTrackPos(trackIndex, pData - channelData, program);
+				soSetTrackPos(trackIndex, pData - channelData, program);
 			}
 
 		} else {
@@ -2139,7 +2160,7 @@ void Sound::_soServiceTrackType0(int trackIndex, const byte *channelData) {
 	}
 }
 
-void Sound::_soUpdateDamper(VoiceTypeStruct *voiceType, int channelNum, VoiceType mode, int v0) {
+void Sound::soUpdateDamper(VoiceTypeStruct *voiceType, int channelNum, VoiceType mode, int v0) {
 	bool hasDamper = _chDamper[channelNum] != 0;
 
 	for (uint idx = 0; idx < voiceType->_entries.size(); ++idx) {
@@ -2161,8 +2182,8 @@ void Sound::_soUpdateDamper(VoiceTypeStruct *voiceType, int channelNum, VoiceTyp
 	}
 }
 
-void Sound::_soPlaySound(VoiceTypeStruct *vtStruct, const byte *channelData, int channelNum, VoiceType voiceType, int v0, int v1) {
-	int entryIndex = _soFindSound(vtStruct, channelNum);
+void Sound::soPlaySound(VoiceTypeStruct *vtStruct, const byte *channelData, int channelNum, VoiceType voiceType, int v0, int v1) {
+	int entryIndex = soFindSound(vtStruct, channelNum);
 	if (entryIndex != -1) {
 		SoundDriver *driver = vtStruct->_entries[entryIndex]._driver;
 		assert(driver);
@@ -2175,11 +2196,11 @@ void Sound::_soPlaySound(VoiceTypeStruct *vtStruct, const byte *channelData, int
 	}
 }
 
-void Sound::_soPlaySound2(VoiceTypeStruct *vtStruct, const byte *channelData, int channelNum, VoiceType voiceType, int v0) {
+void Sound::soPlaySound2(VoiceTypeStruct *vtStruct, const byte *channelData, int channelNum, VoiceType voiceType, int v0) {
 	for (int trackCtr = 0; trackCtr < _trackInfo._numTracks; ++trackCtr) {
 		const byte *instrument = _channelData[trackCtr];
 		if ((*(instrument + 13) == v0) && (*instrument == 1)) {
-			int entryIndex = _soFindSound(vtStruct, channelNum);
+			int entryIndex = soFindSound(vtStruct, channelNum);
 
 			if (entryIndex != -1) {
 				SoundDriver *driver = vtStruct->_entries[entryIndex]._driver;
@@ -2199,7 +2220,7 @@ void Sound::_soPlaySound2(VoiceTypeStruct *vtStruct, const byte *channelData, in
 	}
 }
 
-void Sound::_soProc38(VoiceTypeStruct *vtStruct, int channelNum, VoiceType voiceType, int cmd, int value) {
+void Sound::soProc38(VoiceTypeStruct *vtStruct, int channelNum, VoiceType voiceType, int cmd, int value) {
 	if (cmd == 64) {
 		if (value == 0) {
 			for (uint entryIndex = 0; entryIndex < vtStruct->_entries.size(); ++entryIndex) {
@@ -2231,7 +2252,7 @@ void Sound::_soProc38(VoiceTypeStruct *vtStruct, int channelNum, VoiceType voice
 	}
 }
 
-void Sound::_soProc40(VoiceTypeStruct *vtStruct, int channelNum, int pitchBlend) {
+void Sound::soProc40(VoiceTypeStruct *vtStruct, int channelNum, int pitchBlend) {
 	for (uint entryIndex = 0; entryIndex < vtStruct->_entries.size(); ++entryIndex) {
 		VoiceStructEntryType1 &vte = vtStruct->_entries[entryIndex]._type1;
 
@@ -2244,7 +2265,7 @@ void Sound::_soProc40(VoiceTypeStruct *vtStruct, int channelNum, int pitchBlend)
 	}
 }
 
-void Sound::_soDoTrackCommand(int channelNum, int command, int value) {
+void Sound::soDoTrackCommand(int channelNum, int command, int value) {
 	switch (command) {
 	case 1:
 		_chModulation[channelNum] = value;
@@ -2264,7 +2285,7 @@ void Sound::_soDoTrackCommand(int channelNum, int command, int value) {
 	}
 }
 
-bool Sound::_soDoUpdateTracks(int command, int value) {
+bool Sound::soDoUpdateTracks(int command, int value) {
 	if ((command == 76) || (_hold != value))
 		return false;
 
@@ -2278,7 +2299,7 @@ bool Sound::_soDoUpdateTracks(int command, int value) {
 	return true;
 }
 
-void Sound::_soSetTrackPos(int trackIndex, int trackPos, int cueValue) {
+void Sound::soSetTrackPos(int trackIndex, int trackPos, int cueValue) {
 	_trkIndex[trackIndex] = trackPos;
 	if (cueValue == 127) {
 		if (!_soundManager->_soTimeIndexFlag)
@@ -2294,7 +2315,7 @@ void Sound::_soSetTrackPos(int trackIndex, int trackPos, int cueValue) {
 	}
 }
 
-void Sound::_soServiceTrackType1(int trackIndex, const byte *channelData) {
+void Sound::soServiceTrackType1(int trackIndex, const byte *channelData) {
 	if (_soundManager->_soTimeIndexFlag || !_trkState[trackIndex])
 		return;
 
@@ -2310,7 +2331,7 @@ void Sound::_soServiceTrackType1(int trackIndex, const byte *channelData) {
 		else {
 			if (vtStruct->_voiceType != VOICETYPE_0) {
 				if (_trkState[trackIndex] == 1) {
-					int entryIndex = _soFindSound(vtStruct, *(channelData + 1));
+					int entryIndex = soFindSound(vtStruct, *(channelData + 1));
 					if (entryIndex != -1) {
 						SoundDriver *driver = vtStruct->_entries[entryIndex]._driver;
 						assert(driver);
@@ -2352,7 +2373,7 @@ void Sound::_soServiceTrackType1(int trackIndex, const byte *channelData) {
 	}
 }
 
-int Sound::_soFindSound(VoiceTypeStruct *vtStruct, int channelNum) {
+int Sound::soFindSound(VoiceTypeStruct *vtStruct, int channelNum) {
 	int entryIndex = -1, entry2Index = -1;
 	int v6 = 0, v8 = 0;
 
@@ -2500,10 +2521,184 @@ void ASoundExt::changeSound(int soundNum) {
 
 /*--------------------------------------------------------------------------*/
 
+void PlayStream::ResFileData::load(Common::SeekableReadStream &stream) {
+	// Validate that it's the correct data file
+	char header[4];
+	stream.read(&header[0], 4);
+	if (strncmp(header, "SPAM", 4))
+		error("Invalid voice resource data");
+
+	_fileChunkSize = stream.readUint32LE();
+	stream.skip(2);
+	_indexSize = stream.readUint16LE();
+	_chunkSize = stream.readUint16LE();
+
+	stream.skip(18);
+}
+
+PlayStream::PlayStream(): EventHandler() {
+	_index = NULL;
+	_endAction = NULL;
+	_audioStream = NULL;
+
+	_resData._fileChunkSize = 0;
+	_resData._indexSize = 0;
+	_resData._chunkSize = 0;
+	_voiceNum = 0;
+}
+
+PlayStream::~PlayStream() {
+	remove();
+}
+
+bool PlayStream::setFile(const Common::String &filename) {
+	remove();
+
+	// Open the resource file for access
+	if (!_file.open(filename))
+		return false;
+
+	// Load header
+	_resData.load(_file);
+	
+	// Load the index
+	_index = new uint16[_resData._indexSize / 2];
+	for (uint i = 0; i < (_resData._indexSize / 2); ++i)
+		_index[i] = _file.readUint16LE();
+
+	return true;
+}
+
+bool PlayStream::play(int voiceNum, EventHandler *endAction) {
+	uint32 offset = getFileOffset(_index, _resData._fileChunkSize, voiceNum);
+	if (offset) {
+		stop();
+		_voiceNum = 0;
+
+		// Move to the offset for the start of the voice
+		_file.seek(offset);
+
+		// Read in the header and validate it
+		char header[4];
+		_file.read(&header[0], 4);
+		if (strncmp(header, "FEED", 4))
+			error("Invalid stream data");
+		
+		// Get basic details of first sound chunk
+		uint chunkSize = _file.readUint16LE() - 16;
+		_file.skip(4);
+		int rate = _file.readUint16LE();
+		_file.skip(4);
+
+		// Create the stream
+		_audioStream = Audio::makeQueuingAudioStream(rate, false);
+
+		// Load in the first chunk
+		byte *data = (byte *)malloc(chunkSize);
+		_file.read(data, chunkSize);
+		_audioStream->queueBuffer(data, chunkSize, DisposeAfterUse::YES, Audio::FLAG_UNSIGNED);
+		
+		// If necessary, load further chunks of the voice in
+		while (chunkSize == (_resData._chunkSize - 16)) {
+			// Ensure the next chunk has the 'MORE' header
+			_file.read(&header[0], 4);
+			if (!strncmp(header, "FEED", 4))
+				// Reached start of next voice sample, so stop
+				break;
+			if (strncmp(header, "MORE", 4))
+				error("Invalid stream data");
+
+			// Get the size of the chunk
+			chunkSize  = _file.readUint16LE() - 16;
+			_file.skip(10);
+
+			// Read in the data for this next chunk and queue it
+			data = (byte *)malloc(chunkSize);
+			_file.read(data, chunkSize);
+			_audioStream->queueBuffer(data, chunkSize, DisposeAfterUse::YES, Audio::FLAG_UNSIGNED);
+		}
+		
+		g_vm->_mixer->playStream(Audio::Mixer::kSpeechSoundType, &_soundHandle, 
+			_audioStream, DisposeAfterUse::YES);
+		_voiceNum = voiceNum;
+		return true;
+	}
+	 
+	// If it reaches this point, no valid voice data found
+	return false;
+}
+
+void PlayStream::stop() {
+	if (_audioStream) {
+		g_vm->_mixer->stopHandle(_soundHandle);
+	}
+
+	_audioStream = NULL;
+	_voiceNum = 0;
+	_endAction = NULL;
+}
+
+bool PlayStream::isPlaying() const {
+	return _audioStream != NULL && !_audioStream->endOfData();
+}
+
+void PlayStream::remove() {
+	stop();
+	_file.close();
+
+	// Free index
+	delete[] _index;
+	_index = NULL;
+
+	_endAction = NULL;
+	_voiceNum = 0;
+}
+
+void PlayStream::dispatch() {
+	if (_voiceNum != 0 && !isPlaying()) {
+		// If voice has finished playing, reset fields
+		EventHandler *endAction = _endAction;
+		_endAction = NULL;
+		_voiceNum = 0;
+
+		if (endAction)
+			// Signal given end action
+			endAction->signal();
+	}
+}
+
+uint32 PlayStream::getFileOffset(const uint16 *data, int count, int voiceNum) {
+	assert(data);
+	int bitsIndex = voiceNum & 7;
+	int byteIndex = voiceNum >> 3;
+	int shiftAmount = bitsIndex * 2;
+	int bitMask = 3 << shiftAmount;
+	int v = (data[byteIndex] & bitMask) >> shiftAmount; 
+	uint32 offset = 0;
+
+	if (!v)
+		return 0;
+
+	// Loop to figure out offsets from index words skipped over
+	for (int i = 0; i < (voiceNum >> 3); ++i) {
+		for (int bit = 0; bit < 16; bit += 2)
+			offset += ((data[i] >> bit) & 3) * count;
+	}
+
+	// Bit index loop
+	for (int i = 0; i < bitsIndex; ++i)
+		offset += ((data[byteIndex] >> (i * 2)) & 3) * count;
+
+	return offset;
+}
+
+/*--------------------------------------------------------------------------*/
+
 SoundDriver::SoundDriver() {
 	_driverResID = 0;
 	_minVersion = _maxVersion = 0;
 	_groupMask = 0;
+	_groupOffset = NULL;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -2539,10 +2734,10 @@ AdlibSoundDriver::AdlibSoundDriver(): SoundDriver() {
 	_maxVersion = 0x10A;
 	_masterVolume = 0;
 
-	_groupData.groupMask = 9;
-	_groupData.v1 = 0x46;
-	_groupData.v2 = 0;
-	_groupData.pData = &adlib_group_data[0];
+	_groupData._groupMask = 9;
+	_groupData._v1 = 0x46;
+	_groupData._v2 = 0;
+	_groupData._pData = &adlib_group_data[0];
 
 	_mixer = g_vm->_mixer;
 	_sampleRate = _mixer->getOutputRate();
@@ -2568,6 +2763,12 @@ AdlibSoundDriver::AdlibSoundDriver(): SoundDriver() {
 	Common::fill(_pitchBlend, _pitchBlend + ADLIB_CHANNEL_COUNT, 0x2000);
 	memset(_v4409E, 0, ADLIB_CHANNEL_COUNT * sizeof(int));
 	_patchData = NULL;
+	for (int i = 0; i < 256; i++)
+		_portContents[i] = 0;
+	for (int i = 0; i < 9; i++) {
+		_channelVoiced[i] = false;
+		_pitchBlend[i] = 0;
+	}
 }
 
 AdlibSoundDriver::~AdlibSoundDriver() {
@@ -2823,7 +3024,7 @@ int AdlibSoundDriver::readBuffer(int16 *buffer, const int numSamples) {
 	memset(buffer, 0, sizeof(int16) * numSamples);
 	while (samplesLeft) {
 		if (!_samplesTillCallback) {
-			SoundManager::_sfUpdateCallback(NULL);
+			SoundManager::sfUpdateCallback(NULL);
 			flush();
 
 			_samplesTillCallback = _samplesPerCallback;
@@ -2852,16 +3053,17 @@ SoundBlasterDriver::SoundBlasterDriver(): SoundDriver() {
 	_maxVersion = 0x10A;
 	_masterVolume = 0;
 
-	_groupData.groupMask = 1;
-	_groupData.v1 = 0x3E;
-	_groupData.v2 = 0;
+	_groupData._groupMask = 1;
+	_groupData._v1 = 0x3E;
+	_groupData._v2 = 0;
 	static byte const group_data[] = { 3, 1, 1, 0, 0xff };
-	_groupData.pData = group_data;
+	_groupData._pData = group_data;
 
 	_mixer = g_vm->_mixer;
 	_sampleRate = _mixer->getOutputRate();
 	_audioStream = NULL;
 	_channelData = NULL;
+	_channelVolume = 0;
 }
 
 SoundBlasterDriver::~SoundBlasterDriver() {

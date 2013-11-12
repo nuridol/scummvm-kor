@@ -169,7 +169,7 @@ protected:
 	PluginType _type;
 
 public:
-	Plugin() : _pluginObject(0) {}
+	Plugin() : _pluginObject(0), _type(PLUGIN_TYPE_MAX) {}
 	virtual ~Plugin() {
 		//if (isLoaded())
 			//unloadPlugin();
@@ -205,6 +205,10 @@ typedef Common::Array<Plugin *> PluginList;
 template<class PO_t>
 class PluginSubclass : public Plugin {
 public:
+	PO_t &operator*() const {
+		return *(PO_t *)_pluginObject;
+	}
+
 	PO_t *operator->() const {
 		return (PO_t *)_pluginObject;
 	}

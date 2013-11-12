@@ -98,7 +98,7 @@ void WagProperty::setDefaults() {
 }
 
 void WagProperty::deleteData() {
-	delete _propData;
+	delete[] _propData;
 	_propData = NULL;
 }
 
@@ -112,11 +112,11 @@ WagFileParser::~WagFileParser() {
 bool WagFileParser::checkAgiVersionProperty(const WagProperty &version) const {
 	if (version.getCode() == WagProperty::PC_INTVERSION && // Must be AGI interpreter version property
 		version.getSize() >= 3 && // Need at least three characters for a version number like "X.Y"
-		isdigit(static_cast<unsigned char>(version.getData()[0])) && // And the first character must be a digit
+		Common::isDigit(version.getData()[0]) && // And the first character must be a digit
 		(version.getData()[1] == ',' || version.getData()[1] == '.')) { // And the second a comma or a period
 
 		for (int i = 2; i < version.getSize(); i++) // And the rest must all be digits
-			if (!isdigit(static_cast<unsigned char>(version.getData()[i])))
+			if (!Common::isDigit(version.getData()[i]))
 				return false; // Bail out if found a non-digit after the decimal point
 
 		return true;
@@ -178,7 +178,7 @@ bool WagFileParser::parse(const Common::FSNode &node) {
 	_parsedOk = false; // We haven't parsed the file yet
 
 	stream = node.createReadStream(); // Open the file
-	if (stream) { // Check that opening the file was succesful
+	if (stream) { // Check that opening the file was successful
 		if (checkWagVersion(*stream)) { // Check that WinAGI version string is valid
 			// It seems we've got a valid *.wag file so let's parse its properties from the start.
 			stream->seek(0); // Rewind the stream

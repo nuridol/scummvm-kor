@@ -41,33 +41,44 @@ enum seqFrameTypes {
 	kSeqFrameDiff = 1
 };
 
-SeqDecoder::SeqDecoder() {
-	_fileStream = 0;
-	_surface = 0;
-	_dirtyPalette = false;
+SEQDecoder::SEQDecoder(uint frameDelay) : _frameDelay(frameDelay) {
 }
 
-SeqDecoder::~SeqDecoder() {
+SEQDecoder::~SEQDecoder() {
 	close();
 }
 
-bool SeqDecoder::loadStream(Common::SeekableReadStream *stream) {
+bool SEQDecoder::loadStream(Common::SeekableReadStream *stream) {
 	close();
 
+	addTrack(new SEQVideoTrack(stream, _frameDelay));
+
+	return true;
+}
+
+SEQDecoder::SEQVideoTrack::SEQVideoTrack(Common::SeekableReadStream *stream, uint frameDelay) {
+	assert(stream);
+	assert(frameDelay != 0);
 	_fileStream = stream;
+	_frameDelay = frameDelay;
+	_curFrame = -1;
+
 	_surface = new Graphics::Surface();
 	_surface->create(SEQ_SCREEN_WIDTH, SEQ_SCREEN_HEIGHT, Graphics::PixelFormat::createFormatCLUT8());
 
 	_frameCount = _fileStream->readUint16LE();
 
-	// Set palette
-	int paletteChunkSize = _fileStream->readUint32LE();
-	readPaletteChunk(paletteChunkSize);
-
-	return true;
+	// Set initial palette
+	readPaletteChunk(_fileStream->readUint32LE());
 }
 
-void SeqDecoder::readPaletteChunk(uint16 chunkSize) {
+SEQDecoder::SEQVideoTrack::~SEQVideoTrack() {
+	delete _fileStream;
+	_surface->free();
+	delete _surface;
+}
+
+void SEQDecoder::SEQVideoTrack::readPaletteChunk(uint16 chunkSize) {
 	byte *paletteData = new byte[chunkSize];
 	_fileStream->read(paletteData, chunkSize);
 
@@ -91,23 +102,7 @@ void SeqDecoder::readPaletteChunk(uint16 chunkSize) {
 	delete[] paletteData;
 }
 
-void SeqDecoder::close() {
-	if (!_fileStream)
-		return;
-
-	_frameDelay = 0;
-
-	delete _fileStream;
-	_fileStream = 0;
-
-	_surface->free();
-	delete _surface;
-	_surface = 0;
-
-	reset();
-}
-
-const Graphics::Surface *SeqDecoder::decodeNextFrame() {
+const Graphics::Surface *SEQDecoder::SEQVideoTrack::decodeNextFrame() {
 	int16 frameWidth = _fileStream->readUint16LE();
 	int16 frameHeight = _fileStream->readUint16LE();
 	int16 frameLeft = _fileStream->readUint16LE();
@@ -124,7 +119,7 @@ const Graphics::Surface *SeqDecoder::decodeNextFrame() {
 	_fileStream->seek(offset);
 
 	if (frameType == kSeqFrameFull) {
-		byte *dst = (byte *)_surface->pixels + frameTop * SEQ_SCREEN_WIDTH + frameLeft;
+		byte *dst = (byte *)_surface->getBasePtr(frameLeft, frameTop);
 
 		byte *linebuf = new byte[frameWidth];
 
@@ -138,12 +133,9 @@ const Graphics::Surface *SeqDecoder::decodeNextFrame() {
 	} else {
 		byte *buf = new byte[frameSize];
 		_fileStream->read(buf, frameSize);
-		decodeFrame(buf, rleSize, buf + rleSize, frameSize - rleSize, (byte *)_surface->pixels + SEQ_SCREEN_WIDTH * frameTop, frameLeft, frameWidth, frameHeight, colorKey);
+		decodeFrame(buf, rleSize, buf + rleSize, frameSize - rleSize, (byte *)_surface->getBasePtr(0, frameTop), frameLeft, frameWidth, frameHeight, colorKey);
 		delete[] buf;
 	}
-
-	if (_curFrame == -1)
-		_startTime = g_system->getMillis();
 
 	_curFrame++;
 	return _surface;
@@ -159,7 +151,7 @@ const Graphics::Surface *SeqDecoder::decodeNextFrame() {
 	} \
 	memcpy(dest + writeRow * SEQ_SCREEN_WIDTH + writeCol, litData + litPos, n);
 
-bool SeqDecoder::decodeFrame(byte *rleData, int rleSize, byte *litData, int litSize, byte *dest, int left, int width, int height, int colorKey) {
+bool SEQDecoder::SEQVideoTrack::decodeFrame(byte *rleData, int rleSize, byte *litData, int litSize, byte *dest, int left, int width, int height, int colorKey) {
 	int writeRow = 0;
 	int writeCol = left;
 	int litPos = 0;
@@ -235,6 +227,11 @@ bool SeqDecoder::decodeFrame(byte *rleData, int rleSize, byte *litData, int litS
 	}
 
 	return true;
+}
+
+const byte *SEQDecoder::SEQVideoTrack::getPalette() const {
+	_dirtyPalette = false;
+	return _palette;
 }
 
 } // End of namespace Sci

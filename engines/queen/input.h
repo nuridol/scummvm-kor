@@ -23,7 +23,7 @@
 #ifndef QUEEN_INPUT_H
 #define QUEEN_INPUT_H
 
-#include "common/util.h"
+#include "common/language.h"
 #include "common/rect.h"
 #include "common/events.h"
 #include "queen/defs.h"
@@ -46,7 +46,7 @@ public:
 		MOUSE_RBUTTON = 2
 	};
 
-	Input(Common::Language language, OSystem *system, QueenEngine *vm);
+	Input(Common::Language language, OSystem *system);
 
 	void delay(uint amount);
 
@@ -95,8 +95,6 @@ private:
 	OSystem *_system;
 
 	Common::EventManager *_eventMan;
-
-	QueenEngine *_vm;
 
 	//! some cutaways require update() run faster
 	bool _fastMode;

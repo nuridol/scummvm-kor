@@ -73,11 +73,11 @@ MessageDialog::MessageDialog(const Common::String &message, const char *defaultB
 
 	// Center the dialog
 	_x = (screenW - _w) / 2;
-#ifdef SCUMMVMKOR
-    _y = (screenH - _h) / 4;
-#else
+// #ifdef SCUMMVMKOR
+//     _y = (screenH - _h) / 4;
+// #else
 	_y = (screenH - _h) / 2;
-#endif
+// #endif
 
 	// Each line is represented by one static text item.
 	for (int i = 0; i < lineCount; i++) {

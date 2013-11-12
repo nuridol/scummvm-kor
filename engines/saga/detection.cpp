@@ -156,7 +156,8 @@ bool SagaMetaEngine::hasFeature(MetaEngineFeature f) const {
 		(f == kSupportsDeleteSave) ||
 		(f == kSavesSupportMetaInfo) ||
 		(f == kSavesSupportThumbnail) ||
-		(f == kSavesSupportCreationDate);
+		(f == kSavesSupportCreationDate) ||
+		(f == kSavesSupportPlayTime);
 }
 
 bool Saga::SagaEngine::hasFeature(EngineFeature f) const {
@@ -252,9 +253,6 @@ SaveStateDescriptor SagaMetaEngine::querySaveMetaInfos(const char *target, int s
 			debug(0, "Save is for: %s", title);
 		}
 
-		desc.setDeletableFlag(true);
-		desc.setWriteProtectedFlag(false);
-
 		if (version >= 6) {
 			Graphics::Surface *const thumbnail = Graphics::loadThumbnail(*in);
 			desc.setThumbnail(thumbnail);
@@ -273,7 +271,10 @@ SaveStateDescriptor SagaMetaEngine::querySaveMetaInfos(const char *target, int s
 
 			desc.setSaveTime(hour, minutes);
 
-			// TODO: played time
+			if (version >= 8) {
+				uint32 playTime = in->readUint32BE();
+				desc.setPlayTime(playTime * 1000);
+			}
 		}
 
 		delete in;

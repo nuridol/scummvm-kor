@@ -55,26 +55,32 @@ SoundProc OSystem_IPHONE::s_soundCallback = NULL;
 void *OSystem_IPHONE::s_soundParam = NULL;
 
 OSystem_IPHONE::OSystem_IPHONE() :
-	_mixer(NULL), _gameScreenRaw(NULL),
-	_overlayVisible(false), _gameScreenConverted(NULL),
-	_mouseHeight(0), _mouseWidth(0), _mouseBuf(NULL), _lastMouseTap(0), _queuedEventTime(0),
+	_mixer(NULL), _lastMouseTap(0), _queuedEventTime(0),
 	_mouseNeedTextureUpdate(false), _secondaryTapped(false), _lastSecondaryTap(0),
 	_screenOrientation(kScreenOrientationFlippedLandscape), _mouseClickAndDragEnabled(false),
 	_gestureStartX(-1), _gestureStartY(-1), _fullScreenIsDirty(false), _fullScreenOverlayIsDirty(false),
 	_mouseDirty(false), _timeSuspended(0), _lastDragPosX(-1), _lastDragPosY(-1), _screenChangeCount(0),
-	_overlayHeight(0), _overlayWidth(0), _overlayBuffer(0), _mouseCursorPaletteEnabled(false),
-	_currentGraphicsMode(kGraphicsModeLinear), _arCorrectionEnabled(false) {
+	_mouseCursorPaletteEnabled(false), _gfxTransactionError(kTransactionSuccess) {
 	_queuedInputEvent.type = Common::EVENT_INVALID;
 	_touchpadModeEnabled = !iPhone_isHighResDevice();
 	_fsFactory = new POSIXFilesystemFactory();
+	initVideoContext();
+
+	memset(_gamePalette, 0, sizeof(_gamePalette));
+	memset(_gamePaletteRGBA5551, 0, sizeof(_gamePaletteRGBA5551));
+	memset(_mouseCursorPalette, 0, sizeof(_mouseCursorPalette));
 }
 
 OSystem_IPHONE::~OSystem_IPHONE() {
 	AudioQueueDispose(s_AudioQueue.queue, true);
 
 	delete _mixer;
-	free(_gameScreenRaw);
-	free(_gameScreenConverted);
+	// Prevent accidental freeing of the screen texture here. This needs to be
+	// checked since we might use the screen texture as framebuffer in the case
+	// of hi-color games for example. Otherwise this can lead to a double free.
+	if (_framebuffer.getPixels() != _videoContext->screenTexture.getPixels())
+		_framebuffer.free();
+	_mouseBuffer.free();
 }
 
 int OSystem_IPHONE::timerHandler(int t) {
@@ -120,9 +126,9 @@ void OSystem_IPHONE::setFeatureState(Feature f, bool enable) {
 			_mouseCursorPaletteEnabled = enable;
 		}
 		break;
-    case kFeatureAspectRatioCorrection:
-            setARCorrectionEnabled(true);    
-        break;
+	case kFeatureAspectRatioCorrection:
+		_videoContext->asprectRatioCorrection = enable;
+		break;
 
 	default:
 		break;
@@ -133,6 +139,8 @@ bool OSystem_IPHONE::getFeatureState(Feature f) {
 	switch (f) {
 	case kFeatureCursorPalette:
 		return _mouseCursorPaletteEnabled;
+	case kFeatureAspectRatioCorrection:
+		return _videoContext->asprectRatioCorrection;
 
 	default:
 		return false;
@@ -141,15 +149,14 @@ bool OSystem_IPHONE::getFeatureState(Feature f) {
 
 void OSystem_IPHONE::suspendLoop() {
 	bool done = false;
-	int eventType;
-	int x, y;
 	uint32 startTime = getMillis();
 
 	stopSoundsystem();
 
+	InternalEvent event;
 	while (!done) {
-		if (iPhone_fetchEvent(&eventType, &x, &y))
-			if ((InputEvent)eventType == kInputApplicationResumed)
+		if (iPhone_fetchEvent(&event))
+			if (event.type == kInputApplicationResumed)
 				done = true;
 		usleep(100000);
 	}
@@ -159,7 +166,7 @@ void OSystem_IPHONE::suspendLoop() {
 	_timeSuspended += getMillis() - startTime;
 }
 
-uint32 OSystem_IPHONE::getMillis() {
+uint32 OSystem_IPHONE::getMillis(bool skipRecord) {
 	//printf("getMillis()\n");
 
 	struct timeval currentTime;
@@ -232,6 +239,7 @@ void OSystem_IPHONE::getTimeAndDate(TimeDate &td) const {
 	td.tm_mday = t.tm_mday;
 	td.tm_mon = t.tm_mon;
 	td.tm_year = t.tm_year;
+	td.tm_wday = t.tm_wday;
 }
 
 Audio::Mixer *OSystem_IPHONE::getMixer() {

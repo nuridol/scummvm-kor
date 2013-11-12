@@ -94,6 +94,10 @@ const char *gScummVMFeatures = ""
 	"SEQ "
 #endif
 
+#ifdef USE_SNDIO
+	"sndio "
+#endif
+
 #ifdef USE_TIMIDITY
 	"TiMidity "
 #endif
@@ -124,5 +128,13 @@ const char *gScummVMFeatures = ""
 
 #ifdef USE_FREETYPE2
 	"FreeType2 "
+#endif
+
+#ifdef USE_JPEG
+	"JPEG "
+#endif
+
+#ifdef USE_PNG
+	"PNG "
 #endif
 	;

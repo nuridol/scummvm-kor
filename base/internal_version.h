@@ -16,4 +16,8 @@
 #define SCUMMVM_REVISION
 #endif
 
-#define SCUMMVM_VERSION "1.5.0git-kor" SCUMMVM_REVISION
+#ifdef SCUMMVMKOR
+#define SCUMMVM_VERSION "1.7.0git-kor" SCUMMVM_REVISION
+#else
+#define SCUMMVM_VERSION "1.7.0git" SCUMMVM_REVISION
+#endif

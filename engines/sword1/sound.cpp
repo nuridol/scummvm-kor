@@ -45,9 +45,8 @@ namespace Sword1 {
 #define SOUND_SPEECH_ID 1
 #define SPEECH_FLAGS (Audio::FLAG_16BITS | Audio::FLAG_LITTLE_ENDIAN)
 
-Sound::Sound(const char *searchPath, Audio::Mixer *mixer, ResMan *pResMan)
+Sound::Sound(Audio::Mixer *mixer, ResMan *pResMan)
 	: _rnd("sword1sound") {
-	strcpy(_filePath, searchPath);
 	_mixer = mixer;
 	_resMan = pResMan;
 	_bigEndianSpeech = false;
@@ -142,7 +141,7 @@ void Sound::checkSpeechFileEndianness() {
 				be_diff_sum += fabs((double)(be_value - prev_be_value));
 				prev_be_value = be_value;
 			}
-			delete [] data;
+			delete[] data;
 		}
 		// Set the big endian flag
 		_bigEndianSpeech = (be_diff_sum < le_diff_sum);

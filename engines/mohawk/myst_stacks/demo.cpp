@@ -21,8 +21,8 @@
  */
 
 #include "mohawk/cursors.h"
-#include "mohawk/graphics.h"
 #include "mohawk/myst.h"
+#include "mohawk/myst_graphics.h"
 #include "mohawk/myst_stacks/demo.h"
 
 #include "common/system.h"
@@ -104,14 +104,14 @@ void Demo::returnToMenu_run() {
 	switch (_returnToMenuStep){
 	case 0:
 		_vm->_gfx->fadeToBlack();
-		_vm->changeToCard(2003, false);
+		_vm->changeToCard(2003, kNoTransition);
 		_vm->_gfx->fadeFromBlack();
 
 		_returnToMenuStep++;
 		break;
 	case 1:
 		_vm->_gfx->fadeToBlack();
-		_vm->changeToCard(2001, false);
+		_vm->changeToCard(2001, kNoTransition);
 		_vm->_gfx->fadeFromBlack();
 		_vm->_cursor->showCursor();
 

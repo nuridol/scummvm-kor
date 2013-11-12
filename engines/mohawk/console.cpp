@@ -21,7 +21,6 @@
  */
 
 #include "mohawk/console.h"
-#include "mohawk/graphics.h"
 #include "mohawk/livingbooks.h"
 #include "mohawk/sound.h"
 #include "mohawk/video.h"
@@ -36,6 +35,7 @@
 #ifdef ENABLE_MYST
 #include "mohawk/myst.h"
 #include "mohawk/myst_areas.h"
+#include "mohawk/myst_graphics.h"
 #include "mohawk/myst_scripts.h"
 #endif
 
@@ -75,7 +75,7 @@ bool MystConsole::Cmd_ChangeCard(int argc, const char **argv) {
 	}
 
 	_vm->_sound->stopSound();
-	_vm->changeToCard((uint16)atoi(argv[1]), true);
+	_vm->changeToCard((uint16)atoi(argv[1]), kTransitionCopy);
 
 	return false;
 }
@@ -531,6 +531,7 @@ bool RivenConsole::Cmd_DumpScript(int argc, const char **argv) {
 		varNames.push_back(name);
 	}
 	delete nameStream;
+	delete[] stringOffsets;
 
 	// Load in External Command Names
 	nameStream = _vm->getResource(ID_NAME, ExternalCommandNames);
@@ -552,6 +553,7 @@ bool RivenConsole::Cmd_DumpScript(int argc, const char **argv) {
 		xNames.push_back(name);
 	}
 	delete nameStream;
+	delete[] stringOffsets;
 
 	// Get CARD/HSPT data and dump their scripts
 	if (!scumm_stricmp(argv[2], "CARD")) {

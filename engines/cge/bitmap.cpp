@@ -51,7 +51,7 @@ Bitmap::Bitmap(CGEEngine *vm, const char *fname) : _m(NULL), _v(NULL), _map(0), 
 	}
 }
 
-Bitmap::Bitmap(CGEEngine *vm, uint16 w, uint16 h, uint8 *map) : _w(w), _h(h), _m(map), _v(NULL), _map(0), _vm(vm) {
+Bitmap::Bitmap(CGEEngine *vm, uint16 w, uint16 h, uint8 *map) : _w(w), _h(h), _m(map), _v(NULL), _map(0), _b(NULL), _vm(vm) {
 	debugC(1, kCGEDebugBitmap, "Bitmap::Bitmap(%d, %d, map)", w, h);
 	if (map)
 		code();
@@ -62,7 +62,7 @@ Bitmap::Bitmap(CGEEngine *vm, uint16 w, uint16 h, uint8 *map) : _w(w), _h(h), _m
 // especially for text line real time display
 Bitmap::Bitmap(CGEEngine *vm, uint16 w, uint16 h, uint8 fill)
 	: _w((w + 3) & ~3),                              // only full uint32 allowed!
-	  _h(h), _m(NULL), _map(0), _vm(vm) {
+	  _h(h), _m(NULL), _map(0), _b(NULL), _vm(vm) {
 	debugC(1, kCGEDebugBitmap, "Bitmap::Bitmap(%d, %d, %d)", w, h, fill);
 
 	uint16 dsiz = _w >> 2;                           // data size (1 plane line size)
@@ -94,13 +94,13 @@ Bitmap::Bitmap(CGEEngine *vm, uint16 w, uint16 h, uint8 fill)
 	// Replicate across the entire table
 	for (HideDesc *hdP = b + 1; hdP < (b + _h); hdP++)
 		*hdP = *b;
-	
+
 	b->_skip = 0;                                    // fix the first entry
 	_v = v;
 	_b = b;
 }
 
-Bitmap::Bitmap(CGEEngine *vm, const Bitmap &bmp) : _w(bmp._w), _h(bmp._h), _m(NULL), _v(NULL), _map(0), _vm(vm) {
+Bitmap::Bitmap(CGEEngine *vm, const Bitmap &bmp) : _w(bmp._w), _h(bmp._h), _m(NULL), _v(NULL), _map(0), _b(NULL), _vm(vm) {
 	debugC(1, kCGEDebugBitmap, "Bitmap::Bitmap(bmp)");
 	uint8 *v0 = bmp._v;
 	if (!v0)
@@ -123,12 +123,15 @@ Bitmap::~Bitmap() {
 
 Bitmap &Bitmap::operator=(const Bitmap &bmp) {
 	debugC(1, kCGEDebugBitmap, "&Bitmap::operator =");
+	if (this == &bmp)
+		return *this;
 
 	uint8 *v0 = bmp._v;
 	_w = bmp._w;
 	_h = bmp._h;
 	_m = NULL;
 	_map = 0;
+	_vm = bmp._vm;
 	delete[] _v;
 
 	if (v0 == NULL) {
@@ -158,7 +161,7 @@ BitmapPtr Bitmap::code() {
 	debugC(1, kCGEDebugBitmap, "Bitmap::code()");
 
 	if (!_m)
-		return false;
+		return NULL;
 
 	uint16 cnt;
 
@@ -198,7 +201,7 @@ BitmapPtr Bitmap::code() {
 					if ((pix == kPixelTransp) != skip || cnt >= 0x3FF0) { // end of block
 						cnt |= (skip) ? kBmpSKP : kBmpCPY;
 						if (_v)
-							*cp = TO_LE_16(cnt);                          // store block description uint16
+							WRITE_LE_UINT16(cp, cnt); // store block description uint16
 
 						cp = (uint16 *) im;
 						im += 2;
@@ -220,7 +223,7 @@ BitmapPtr Bitmap::code() {
 					} else {
 						cnt |= kBmpCPY;
 						if (_v)
-							*cp = TO_LE_16(cnt);
+							WRITE_LE_UINT16(cp, cnt);
 
 						cp = (uint16 *) im;
 						im += 2;
@@ -232,13 +235,13 @@ BitmapPtr Bitmap::code() {
 			if (cnt && ! skip) {
 				cnt |= kBmpCPY;
 				if (_v)
-					*cp = TO_LE_16(cnt);
+					WRITE_LE_UINT16(cp, cnt);
 
 				cp = (uint16 *) im;
 				im += 2;
 			}
 			if (_v)
-				*cp = TO_LE_16(kBmpEOI);
+				WRITE_LE_UINT16(cp, kBmpEOI);
 			cp = (uint16 *) im;
 			im += 2;
 		}
@@ -354,7 +357,7 @@ bool Bitmap::loadVBM(EncryptedStream *f) {
 				// Read in the palette
 				byte palData[kPalSize];
 				f->read(palData, kPalSize);
-				
+
 				const byte *srcP = palData;
 				for (int idx = 0; idx < kPalCount; idx++, srcP += 3) {
 					_vm->_bitmapPalette[idx]._r = *srcP;

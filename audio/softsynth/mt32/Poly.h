@@ -1,5 +1,5 @@
 /* Copyright (C) 2003, 2004, 2005, 2006, 2008, 2009 Dean Beeler, Jerome Fisher
- * Copyright (C) 2011 Dean Beeler, Jerome Fisher, Sergey V. Mikayev
+ * Copyright (C) 2011, 2012, 2013 Dean Beeler, Jerome Fisher, Sergey V. Mikayev
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU Lesser General Public License as published by
@@ -41,14 +41,16 @@ private:
 
 	Partial *partials[4];
 
+	Poly *next;
+
 public:
-	Poly(Part *part);
+	Poly();
+	void setPart(Part *usePart);
 	void reset(unsigned int key, unsigned int velocity, bool sustain, Partial **partials);
 	bool noteOff(bool pedalHeld);
 	bool stopPedalHold();
 	bool startDecay();
 	bool startAbort();
-	void terminate();
 
 	void backupCacheToPartials(PatchCache cache[4]);
 
@@ -60,6 +62,9 @@ public:
 	bool isActive() const;
 
 	void partialDeactivated(Partial *partial);
+
+	Poly *getNext() const;
+	void setNext(Poly *poly);
 };
 
 }

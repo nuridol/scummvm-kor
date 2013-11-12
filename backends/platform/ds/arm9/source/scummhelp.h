@@ -24,14 +24,14 @@
 #define _SCUMMHELP_H_
 
 #include "common/str.h"
-#include "common/util.h"
+#include "common/platform.h"
 
 namespace DS {
 
 void updateStrings(byte gameId, byte version, Common::Platform platform,
 			int page, Common::String &title, Common::String *&key, Common::String *&dsc);
 
-}	// End of namespace DS
+} // End of namespace DS
 
 
 #endif

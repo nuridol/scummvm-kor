@@ -24,6 +24,8 @@
 #include "base/plugins.h"
 
 #include "engines/advancedDetector.h"
+
+#include "common/translation.h"
 #include "common/savefile.h"
 #include "common/str-array.h"
 #include "common/system.h"
@@ -64,7 +66,21 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			0,
 			AD_ENTRY1s("WESTERN", "05472037e9cfde146e953c434e74f0f4", 337643527),
 			Common::EN_ANY,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NONE)
+		},
+	},
+
+	{
+		// 3 Skulls of the Toltecs English version (alternate)
+		// From bug #3614933
+		{
+			"toltecs",
+			0,
+			AD_ENTRY1s("WESTERN", "a9c9cfef9d05b8f7a5573b626fa4ea87", 337643527),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NONE)
 		},
@@ -77,7 +93,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			0,
 			AD_ENTRY1s("WESTERN", "ba1742d3193b68ceb9434e2ab7a09a9b", 391462783),
 			Common::RU_RUS,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NONE)
 		},
@@ -90,20 +106,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			0,
 			AD_ENTRY1s("WESTERN", "1a3292bad8e0bb5701800c73531dd75e", 345176617),
 			Common::DE_DEU,
-			Common::kPlatformPC,
-			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
-		},
-	},
-
-	{
-		// 3 Skulls of the Toltecs German Demo version
-		{
-			"toltecs",
-			0,
-			AD_ENTRY1s("WESTERN", "1c85e82712d24f1d5c1ea2a66ddd75c2", 47730038),
-			Common::DE_DEU,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NONE)
 		},
@@ -116,7 +119,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			0,
 			AD_ENTRY1s("WESTERN", "4fb845635cbdac732453fe23be350df9", 327269545),
 			Common::FR_FRA,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NONE)
 		},
@@ -129,7 +132,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			0,
 			AD_ENTRY1s("WESTERN", "479f468beccc1b0ce5873ec523d1380e", 308391018),
 			Common::ES_ESP,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NONE)
 		},
@@ -143,8 +146,34 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			0,
 			AD_ENTRY1s("WESTERN", "69a5572e75409d8c6230b787faa353af", 337647960),
 			Common::HU_HUN,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NONE)
+		},
+	},
+
+	{
+		// 3 Skulls of the Toltecs English Demo version
+		{
+			"toltecs",
+			0,
+			AD_ENTRY1s("WESTERN", "53a0abd1c0bc5cad8ba18f0e56877705", 46241833),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_DEMO,
+			GUIO1(GUIO_NONE)
+		},
+	},
+
+	{
+		// 3 Skulls of the Toltecs German Demo version
+		{
+			"toltecs",
+			0,
+			AD_ENTRY1s("WESTERN", "1c85e82712d24f1d5c1ea2a66ddd75c2", 47730038),
+			Common::DE_DEU,
+			Common::kPlatformDOS,
+			ADGF_DEMO,
 			GUIO1(GUIO_NONE)
 		},
 	},
@@ -153,6 +182,13 @@ static const ToltecsGameDescription gameDescriptions[] = {
 };
 
 } // End of namespace Toltecs
+
+static const ExtraGuiOption toltecsExtraGuiOption = {
+	_s("Use original save/load screens"),
+	_s("Use the original save/load screens, instead of the ScummVM ones"),
+	"originalsaveload",
+	false
+};
 
 class ToltecsMetaEngine : public AdvancedMetaEngine {
 public:
@@ -170,6 +206,7 @@ public:
 
 	virtual bool hasFeature(MetaEngineFeature f) const;
 	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
+	virtual const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const;
 	SaveStateList listSaves(const char *target) const;
 	virtual int getMaximumSaveSlot() const;
 	void removeSaveState(const char *target, int slot) const;
@@ -200,6 +237,12 @@ bool ToltecsMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADG
 		*engine = new Toltecs::ToltecsEngine(syst, gd);
 	}
 	return gd != 0;
+}
+
+const ExtraGuiOptions ToltecsMetaEngine::getExtraGuiOptions(const Common::String &target) const {
+	ExtraGuiOptions options;
+	options.push_back(toltecsExtraGuiOption);
+	return options;
 }
 
 SaveStateList ToltecsMetaEngine::listSaves(const char *target) const {
@@ -273,8 +316,6 @@ SaveStateDescriptor ToltecsMetaEngine::querySaveMetaInfos(const char *target, in
 		if (error == Toltecs::ToltecsEngine::kRSHENoError) {
 			SaveStateDescriptor desc(slot, header.description);
 
-			desc.setDeletableFlag(true);
-			desc.setWriteProtectedFlag(false);
 			desc.setThumbnail(header.thumbnail);
 
 			if (header.version > 0) {
@@ -297,7 +338,7 @@ SaveStateDescriptor ToltecsMetaEngine::querySaveMetaInfos(const char *target, in
 	}
 
 	return SaveStateDescriptor();
-}	// End of namespace Toltecs
+} // End of namespace Toltecs
 
 #if PLUGIN_ENABLED_DYNAMIC(TOLTECS)
 	REGISTER_PLUGIN_DYNAMIC(TOLTECS, PLUGIN_TYPE_ENGINE, ToltecsMetaEngine);

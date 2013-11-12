@@ -31,7 +31,7 @@
 
 namespace Kyra {
 
-struct EoBShapeDef {
+struct DarkMoonShapeDef {
 	int16 index;
 	uint8 x, y, w, h;
 };
@@ -263,7 +263,7 @@ protected:
 
 	// Main Menu, Intro, Finale
 	virtual int mainMenu() = 0;
-	virtual void seq_xdeath() {};
+	virtual void seq_xdeath() {}
 	virtual void seq_playFinale() = 0;
 	bool _playFinale;
 
@@ -302,8 +302,8 @@ protected:
 	const uint8 *_blackBoxWideGrid;
 	const uint8 *_lightningColumnShape;
 
-	uint8 *_tempIconShape;
 	uint8 *_itemsOverlay;
+	static const uint8 _itemsOverlayCGA[];
 
 	static const uint8 _teleporterShapeDefs[];
 	static const uint8 _wallOfForceShapeDefs[];
@@ -487,7 +487,7 @@ protected:
 	void placeMonster(EoBMonsterInPlay *m, uint16 block, int dir);
 	virtual void replaceMonster(int b, uint16 block, int pos, int dir, int type, int shpIndex, int mode, int h2, int randItem, int fixedItem) = 0;
 	void killMonster(EoBMonsterInPlay *m, bool giveExperience);
-	virtual bool killMonsterExtra(EoBMonsterInPlay *m);
+	virtual bool killMonsterExtra(EoBMonsterInPlay *m) = 0;
 	int countSpecificMonsters(int type);
 	void updateAttackingMonsterFlags();
 
@@ -528,8 +528,8 @@ protected:
 	void updateMonstersSpellStatus(EoBMonsterInPlay *m);
 	void setBlockMonsterDirection(int block, int dir);
 
-	uint8 *_monsterOvl1;
-	uint8 *_monsterOvl2;
+	uint8 *_monsterFlashOverlay;
+	uint8 *_monsterStoneOverlay;
 
 	SpriteDecoration *_monsterDecorations;
 	EoBMonsterProperty *_monsterProps;
@@ -577,7 +577,7 @@ protected:
 	void readLevelFileData(int level);
 	Common::String initLevelData(int sub);
 	void addLevelItems();
-	void loadVcnData(const char *file, const char * /*nextFile*/);
+	void loadVcnData(const char *file, const uint8 *cgaMapping);
 	void loadBlockProperties(const char *mazFile);
 	const uint8 *getBlockFileData(int levelIndex = 0);
 	Common::String getBlockFileName(int levelIndex, int sub);
@@ -722,21 +722,21 @@ protected:
 	void gui_processWeaponSlotClickRight(int charIndex, int slotIndex);
 	void gui_processInventorySlotClick(int slot);
 
-	static const int16 _buttonList1[];
+	static const uint8 _buttonList1[];
 	int _buttonList1Size;
-	static const int16 _buttonList2[];
+	static const uint8 _buttonList2[];
 	int _buttonList2Size;
-	static const int16 _buttonList3[];
+	static const uint8 _buttonList3[];
 	int _buttonList3Size;
-	static const int16 _buttonList4[];
+	static const uint8 _buttonList4[];
 	int _buttonList4Size;
-	static const int16 _buttonList5[];
+	static const uint8 _buttonList5[];
 	int _buttonList5Size;
-	static const int16 _buttonList6[];
+	static const uint8 _buttonList6[];
 	int _buttonList6Size;
-	static const int16 _buttonList7[];
+	static const uint8 _buttonList7[];
 	int _buttonList7Size;
-	static const int16 _buttonList8[];
+	static const uint8 _buttonList8[];
 	int _buttonList8Size;
 
 	const EoBGuiButtonDef *_buttonDefs;
@@ -834,9 +834,23 @@ protected:
 	Common::Error loadGameState(int slot);
 	Common::Error saveGameStateIntern(int slot, const char *saveName, const Graphics::Surface *thumbnail);
 
+	const uint8 *_cgaMappingDefault;
+	const uint8 *_cgaMappingAlt;
+	const uint8 *_cgaMappingInv;
+	const uint8 *_cgaMappingItemsL;
+	const uint8 *_cgaMappingItemsS;
+	const uint8 *_cgaMappingThrown;
+	const uint8 *_cgaMappingIcons;
+	const uint8 *_cgaMappingDeco;
+	const uint8 *_cgaMappingLevel[5];
+	const uint8 *_cgaLevelMappingIndex;
+
+	bool _enableHiResDithering;
+
 	// Default parameters will import all present original save files and push them to the top of the save dialog.
 	bool importOriginalSaveFile(int destSlot, const char *sourceFile = 0);
 	Common::String readOriginalSaveFile(Common::String &file);
+	bool saveAsOriginalSaveFile(int slot = -1);
 
 	void *generateMonsterTempData(LevelTempData *tmp);
 	void restoreMonsterTempData(LevelTempData *tmp);
@@ -845,11 +859,11 @@ protected:
 	void restoreWallOfForceTempData(LevelTempData *tmp);
 	void releaseWallOfForceTempData(LevelTempData *tmp);
 
-	const char * const *_saveLoadStrings;
+	const char *const *_saveLoadStrings;
 
 	const uint8 *_mnDef;
-	const char * const *_mnWord;
-	const char * const *_mnPrompt;
+	const char *const *_mnWord;
+	const char *const *_mnPrompt;
 	int _mnNumWord;
 
 	int _rrCount;
@@ -908,8 +922,8 @@ protected:
 	void usePotion(int charIndex, int weaponSlot);
 	void useWand(int charIndex, int weaponSlot);
 
-	virtual void turnUndeadAuto() {};
-	virtual void turnUndeadAutoHit() {};
+	virtual void turnUndeadAuto() {}
+	virtual void turnUndeadAutoHit() {}
 
 	void castSpell(int spell, int weaponSlot);
 	void removeCharacterEffect(int spell, int charIndex, int showWarning);

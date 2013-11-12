@@ -24,9 +24,9 @@
 #ifndef TINSEL_EVENTS_H
 #define TINSEL_EVENTS_H
 
-#include "tinsel/dw.h"
-#include "tinsel/coroutine.h"
+#include "common/coroutines.h"
 #include "common/rect.h"
+#include "tinsel/dw.h"
 
 namespace Tinsel {
 
@@ -65,6 +65,8 @@ enum PLR_EVENT {
 	PLR_NOEVENT = 16,
 	PLR_SAVE = 17,
 	PLR_LOAD = 18,
+	PLR_WHEEL_UP = 19,
+	PLR_WHEEL_DOWN = 20,
 
 	// Aliases used for DW1 actions
 	PLR_SLEFT = PLR_WALKTO,

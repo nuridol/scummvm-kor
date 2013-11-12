@@ -51,7 +51,7 @@ void ToonEngine::init() {
 	_currentScriptRegion = 0;
 	_resources = new Resources(this);
 	_animationManager = new AnimationManager(this);
-	_moviePlayer = new Movie(this, new ToonstruckSmackerDecoder(_mixer));
+	_moviePlayer = new Movie(this, new ToonstruckSmackerDecoder());
 	_hotspots = new Hotspots(this);
 
 	_mainSurface = new Graphics::Surface();
@@ -100,7 +100,7 @@ void ToonEngine::init() {
 
 	syncSoundSettings();
 
-	_pathFinding = new PathFinding(this);
+	_pathFinding = new PathFinding();
 
 	resources()->openPackage("LOCAL.PAK");
 	resources()->openPackage("ONETIME.PAK");
@@ -168,7 +168,7 @@ void ToonEngine::waitForScriptStep() {
 	// Wait after a specified number of script steps when executing a script
 	// to lower CPU usage
 	if (++_scriptStep >= 40) {
-		g_system->delayMillis(1);
+		_system->delayMillis(1);
 		_scriptStep = 0;
 	}
 }
@@ -466,8 +466,7 @@ void ToonEngine::doMagnifierEffect() {
 		int32 cy = CLIP<int32>(posY + y, 0, TOON_BACKBUFFER_HEIGHT-1);
 		for (int32 x = -12; x <= 12; x++) {
 			int32 cx = CLIP<int32>(posX + x, 0, TOON_BACKBUFFER_WIDTH-1);
-			int32 destPitch = surface.pitch;
-			uint8 *curRow = (uint8 *)surface.pixels + cy * destPitch + cx;
+			uint8 *curRow = (uint8 *)surface.getBasePtr(cx, cy);
 			tempBuffer[(y + 12) * 25 + x + 12] = *curRow;
 		}
 	}
@@ -479,8 +478,7 @@ void ToonEngine::doMagnifierEffect() {
 			if (dist > 144)
 				continue;
 			int32 cx = CLIP<int32>(posX + x, 0, TOON_BACKBUFFER_WIDTH-1);
-			int32 destPitch = surface.pitch;
-			uint8 *curRow = (uint8 *)surface.pixels + cy * destPitch + cx;
+			uint8 *curRow = (uint8 *)surface.getBasePtr(cx, cy);
 			int32 lerp = (512 + intSqrt[dist] * 256 / 12);
 			*curRow = tempBuffer[(y * lerp / 1024 + 12) * 25 + x * lerp / 1024 + 12];
 		}
@@ -501,7 +499,7 @@ void ToonEngine::copyToVirtualScreen(bool updateScreen) {
 
 	if (_dirtyAll || _gameState->_currentScrollValue != lastScroll) {
 		// we have to refresh everything in case of scrolling.
-		_system->copyRectToScreen((byte *)_mainSurface->pixels + state()->_currentScrollValue, TOON_BACKBUFFER_WIDTH, 0, 0, TOON_SCREEN_WIDTH, TOON_SCREEN_HEIGHT);
+		_system->copyRectToScreen((byte *)_mainSurface->getPixels() + state()->_currentScrollValue, TOON_BACKBUFFER_WIDTH, 0, 0, TOON_SCREEN_WIDTH, TOON_SCREEN_HEIGHT);
 	} else {
 
 		int32 offX = 0;
@@ -517,7 +515,7 @@ void ToonEngine::copyToVirtualScreen(bool updateScreen) {
 			}
 			rect.clip(TOON_SCREEN_WIDTH, TOON_SCREEN_HEIGHT);
 			if (rect.left >= 0 && rect.top >= 0 && rect.right - rect.left > 0 && rect.bottom - rect.top > 0) {
-				_system->copyRectToScreen((byte *)_mainSurface->pixels + _oldDirtyRects[i].left + offX + _oldDirtyRects[i].top * TOON_BACKBUFFER_WIDTH, TOON_BACKBUFFER_WIDTH, rect.left , rect.top, rect.right - rect.left, rect.bottom - rect.top);
+				_system->copyRectToScreen((byte *)_mainSurface->getBasePtr(_oldDirtyRects[i].left + offX, _oldDirtyRects[i].top), TOON_BACKBUFFER_WIDTH, rect.left , rect.top, rect.right - rect.left, rect.bottom - rect.top);
 			}
 		}
 
@@ -533,7 +531,7 @@ void ToonEngine::copyToVirtualScreen(bool updateScreen) {
 			}
 			rect.clip(TOON_SCREEN_WIDTH, TOON_SCREEN_HEIGHT);
 			if (rect.left >= 0 && rect.top >= 0 && rect.right - rect.left > 0 && rect.bottom - rect.top > 0) {
-				_system->copyRectToScreen((byte *)_mainSurface->pixels + _dirtyRects[i].left + offX + _dirtyRects[i].top * TOON_BACKBUFFER_WIDTH, TOON_BACKBUFFER_WIDTH, rect.left , rect.top, rect.right - rect.left, rect.bottom - rect.top);
+				_system->copyRectToScreen((byte *)_mainSurface->getBasePtr(_dirtyRects[i].left + offX, _dirtyRects[i].top), TOON_BACKBUFFER_WIDTH, rect.left , rect.top, rect.right - rect.left, rect.bottom - rect.top);
 			}
 		}
 	}
@@ -820,7 +818,6 @@ Common::Error ToonEngine::run() {
 ToonEngine::ToonEngine(OSystem *syst, const ADGameDescription *gameDescription)
 	: Engine(syst), _gameDescription(gameDescription),
 	_language(gameDescription->language), _rnd("toon") {
-	_system = syst;
 	_tickLength = 16;
 	_currentPicture = NULL;
 	_inventoryPicture = NULL;
@@ -925,6 +922,36 @@ ToonEngine::ToonEngine(OSystem *syst, const ADGameDescription *gameDescription)
 		_gameVariant = 0;
 		break;
 	}
+
+	for (int i = 0; i < 64; i++) {
+		_sceneAnimationScripts[i]._lastTimer = 0;
+		_sceneAnimationScripts[i]._frozen = false;
+		_sceneAnimationScripts[i]._frozenForConversation = false;
+		_sceneAnimationScripts[i]._active = false;
+	}
+
+	_lastProcessedSceneScript = 0;
+	_animationSceneScriptRunFlag = false;
+	_updatingSceneScriptRunFlag = false;
+	_dirtyAll = false;
+	_cursorOffsetX = 0;
+	_cursorOffsetY = 0;
+	_currentTextLine = 0;
+	_currentTextLineId = 0;
+	_currentTextLineX = 0;
+	_currentTextLineY = 0;
+	_currentTextLineCharacterId = -1;
+	_oldScrollValue = 0;
+	_drew = nullptr;
+	_flux = nullptr;
+	_currentHotspotItem = 0;
+	_shouldQuit = false;
+	_scriptStep = 0;
+	_oldTimer = 0;
+	_oldTimer2 = 0;
+	_lastRenderTime = 0;
+	_firstFrame = false;
+	_needPaletteFlush = true;
 }
 
 ToonEngine::~ToonEngine() {
@@ -1224,7 +1251,7 @@ void ToonEngine::loadScene(int32 SceneId, bool forGameLoad) {
 		_script->init(&_sceneAnimationScripts[i]._state, _sceneAnimationScripts[i]._data);
 		if (!forGameLoad) {
 			_script->start(&_sceneAnimationScripts[i]._state, 9 + i);
-			_sceneAnimationScripts[i]._lastTimer = getSystem()->getMillis();
+			_sceneAnimationScripts[i]._lastTimer = _system->getMillis();
 			_sceneAnimationScripts[i]._frozen = false;
 			_sceneAnimationScripts[i]._frozenForConversation = false;
 		}
@@ -1488,7 +1515,7 @@ void ToonEngine::clickEvent() {
 	}
 
 	if (!currentHot) {
-		int32 xx, yy;
+		int16 xx, yy;
 
 		if (_gameState->_inCutaway || _gameState->_inInventory || _gameState->_inCloseUp)
 			return;
@@ -1588,12 +1615,12 @@ void ToonEngine::clickEvent() {
 }
 
 void ToonEngine::selectHotspot() {
-	int32 x1 = 0;
-	int32 x2 = 0;
-	int32 y1 = 0;
-	int32 y2 = 0;
+	int16 x1 = 0;
+	int16 x2 = 0;
+	int16 y1 = 0;
+	int16 y2 = 0;
 
-	int32 mouseX = _mouseX;
+	int16 mouseX = _mouseX;
 
 	if (_gameState->_inCutaway)
 		mouseX += TOON_BACKBUFFER_WIDTH;
@@ -1693,7 +1720,6 @@ void ToonEngine::selectHotspot() {
 }
 
 void ToonEngine::exitScene() {
-
 	fadeOut(5);
 
 	// disable all scene animation
@@ -2831,7 +2857,6 @@ void ToonEngine::playSoundWrong() {
 }
 
 void ToonEngine::getTextPosition(int32 characterId, int32 *retX, int32 *retY) {
-
 	if (characterId < 0)
 		characterId = 0;
 
@@ -2852,8 +2877,8 @@ void ToonEngine::getTextPosition(int32 characterId, int32 *retX, int32 *retY) {
 		}
 	} else if (characterId == 1) {
 		// flux
-		int32 x = _flux->getX();
-		int32 y = _flux->getY();
+		int16 x = _flux->getX();
+		int16 y = _flux->getY();
 		if (x >= _gameState->_currentScrollValue && x <= _gameState->_currentScrollValue + TOON_SCREEN_WIDTH) {
 			if (!_gameState->_inCutaway) {
 				*retX = x;
@@ -2885,7 +2910,7 @@ void ToonEngine::getTextPosition(int32 characterId, int32 *retX, int32 *retY) {
 		if (character && !_gameState->_inCutaway) {
 			if (character->getAnimationInstance()) {
 				if (character->getX() >= _gameState->_currentScrollValue && character->getX() <= _gameState->_currentScrollValue + TOON_SCREEN_WIDTH) {
-					int32 x1, y1, x2, y2;
+					int16 x1= 0, y1 = 0, x2 = 0, y2 = 0;
 					character->getAnimationInstance()->getRect(&x1, &y1, &x2, &y2);
 					*retX = (x1 + x2) / 2;
 					*retY = y1;
@@ -2896,7 +2921,6 @@ void ToonEngine::getTextPosition(int32 characterId, int32 *retX, int32 *retY) {
 }
 
 Character *ToonEngine::getCharacterById(int32 charId) {
-
 	for (int32 i = 0; i < 8; i++) {
 		if (_characters[i] && _characters[i]->getId() == charId)
 			return _characters[i];
@@ -2955,15 +2979,12 @@ Common::String ToonEngine::getSavegameName(int nr) {
 }
 
 bool ToonEngine::saveGame(int32 slot, const Common::String &saveGameDesc) {
-	const EnginePlugin *plugin = NULL;
 	int16 savegameId;
 	Common::String savegameDescription;
-	EngineMan.findGame(_gameDescription->gameid, &plugin);
 
 	if (slot == -1) {
-		GUI::SaveLoadChooser *dialog = new GUI::SaveLoadChooser("Save game:", "Save");
-		dialog->setSaveMode(true);
-		savegameId = dialog->runModalWithPluginAndTarget(plugin, ConfMan.getActiveDomainName());
+		GUI::SaveLoadChooser *dialog = new GUI::SaveLoadChooser("Save game:", "Save", true);
+		savegameId = dialog->runModalWithCurrentTarget();
 		savegameDescription = dialog->getResultString();
 		delete dialog;
 	} else {
@@ -2979,8 +3000,7 @@ bool ToonEngine::saveGame(int32 slot, const Common::String &saveGameDesc) {
 		return false; // dialog aborted
 
 	Common::String savegameFile = getSavegameName(savegameId);
-	Common::SaveFileManager *saveMan = g_system->getSavefileManager();
-	Common::OutSaveFile *saveFile = saveMan->openForSaving(savegameFile);
+	Common::OutSaveFile *saveFile = _saveFileMan->openForSaving(savegameFile);
 	if (!saveFile)
 		return false;
 
@@ -3052,14 +3072,11 @@ bool ToonEngine::saveGame(int32 slot, const Common::String &saveGameDesc) {
 }
 
 bool ToonEngine::loadGame(int32 slot) {
-	const EnginePlugin *plugin = NULL;
 	int16 savegameId;
-	EngineMan.findGame(_gameDescription->gameid, &plugin);
 
 	if (slot == -1) {
-		GUI::SaveLoadChooser *dialog = new GUI::SaveLoadChooser("Restore game:", "Restore");
-		dialog->setSaveMode(false);
-		savegameId = dialog->runModalWithPluginAndTarget(plugin, ConfMan.getActiveDomainName());
+		GUI::SaveLoadChooser *dialog = new GUI::SaveLoadChooser("Restore game:", "Restore", false);
+		savegameId = dialog->runModalWithCurrentTarget();
 		delete dialog;
 	} else {
 		savegameId = slot;
@@ -3068,8 +3085,7 @@ bool ToonEngine::loadGame(int32 slot) {
 		return false; // dialog aborted
 
 	Common::String savegameFile = getSavegameName(savegameId);
-	Common::SaveFileManager *saveMan = g_system->getSavefileManager();
-	Common::InSaveFile *loadFile = saveMan->openForLoading(savegameFile);
+	Common::InSaveFile *loadFile = _saveFileMan->openForLoading(savegameFile);
 	if (!loadFile)
 		return false;
 

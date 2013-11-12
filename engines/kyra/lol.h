@@ -270,6 +270,8 @@ public:
 
 	virtual void initKeymap();
 
+	void pauseEngineIntern(bool pause);
+
 	Screen *screen();
 	GUI *gui() const;
 
@@ -334,9 +336,9 @@ private:
 	static const char *const _charPreviewNamesDefault[];
 	static const char *const _charPreviewNamesRussianFloppy[];
 
-	// PC98 specific data
+	// PC98/FM-TOWNS specific data
 	static const uint16 _charPosXPC98[];
-	static const uint8 _charNamesPC98[][11];
+	static const char *const _charNamesJapanese[];
 
 	WSAMovie_v2 *_chargenWSA;
 	static const uint8 _chargenFrameTableTalkie[];
@@ -389,7 +391,7 @@ private:
 	uint8 _outroShapeTable[256];
 
 	// TODO: Consider moving these tables to kyra.dat
-	static const char * const _outroShapeFileTable[];
+	static const char *const _outroShapeFileTable[];
 	static const uint8 _outroFrameTable[];
 
 	static const int16 _outroRightMonsterPos[];
@@ -399,6 +401,10 @@ private:
 
 	static const int _outroMonsterScaleTableX[];
 	static const int _outroMonsterScaleTableY[];
+
+	// Non-interactive demo
+	int playDemo();
+	void pauseDemoPlayer(bool toggle);
 
 	// timers
 	void setupTimers();
@@ -463,8 +469,6 @@ private:
 	int _ingameMT32SoundIndexSize;
 	const uint8 *_ingamePCSpeakerSoundIndex;
 	int _ingamePCSpeakerSoundIndexSize;
-
-	AudioDataStruct _soundData[3];
 
 	// gui
 	void gui_drawPlayField();
@@ -554,14 +558,14 @@ private:
 	int clickedStatusIcon(Button *button);
 
 	const LoLButtonDef *_buttonData;
-	const int16 *_buttonList1;
-	const int16 *_buttonList2;
-	const int16 *_buttonList3;
-	const int16 *_buttonList4;
-	const int16 *_buttonList5;
-	const int16 *_buttonList6;
-	const int16 *_buttonList7;
-	const int16 *_buttonList8;
+	const uint8 *_buttonList1;
+	const uint8 *_buttonList2;
+	const uint8 *_buttonList3;
+	const uint8 *_buttonList4;
+	const uint8 *_buttonList5;
+	const uint8 *_buttonList6;
+	const uint8 *_buttonList7;
+	const uint8 *_buttonList8;
 
 	// text
 	int characterSays(int track, int charId, bool redraw);
@@ -810,7 +814,7 @@ private:
 	void decodeSjis(const char *src, char *dst);
 	int decodeCyrillic(const char *src, char *dst);
 
-	static const char * const _languageExt[];
+	static const char *const _languageExt[];
 
 	// graphics
 	void setupScreenDims();
@@ -1009,8 +1013,8 @@ private:
 
 	uint8 *_tempBuffer5120;
 
-	const char * const *_levelDatList;
-	const char * const *_levelShpList;
+	const char *const *_levelDatList;
+	const char *const *_levelShpList;
 
 	const int8 *_dscWalls;
 
@@ -1047,14 +1051,14 @@ private:
 	void setItemPosition(Item item, uint16 x, uint16 y, int flyingHeight, int moveable);
 	void removeLevelItem(Item item, int block);
 	bool launchObject(int objectType, Item item, int startX, int startY, int flyingHeight, int direction, int, int attackerId, int c);
-	void endObjectFlight(FlyingObject *t, int x, int y, int collisionObject);
+	void endObjectFlight(FlyingObject *t, int x, int y, int collisionType);
 	void processObjectFlight(FlyingObject *t, int x, int y);
 	void updateObjectFlightPosition(FlyingObject *t);
-	void objectFlightProcessHits(FlyingObject *t, int x, int y, int objectOnNextBlock);
+	void objectFlightProcessHits(FlyingObject *t, int x, int y, int collisionType);
 	void updateFlyingObject(FlyingObject *t);
 
 	void assignItemToBlock(uint16 *assignedBlockObjects, int id);
-	int checkDrawObjectSpace(int itemX, int itemY, int partyX, int partyY);
+	int checkDrawObjectSpace(int x1, int y1, int x2, int y2);
 	int checkSceneForItems(uint16 *blockDrawObjects, int color);
 
 	uint8 _moneyColumnHeight[5];
@@ -1095,7 +1099,7 @@ private:
 	void monsterDropItems(LoLMonster *monster);
 	void giveItemToMonster(LoLMonster *monster, Item item);
 	int checkBlockBeforeObjectPlacement(uint16 x, uint16 y, uint16 objectWidth, uint16 testFlag, uint16 wallFlag);
-	int checkBlockForWallsAndSufficientSpace(int block, int x, int y, int objectWidth, int testFlag, int wallFlag);
+	int testBlockPassability(int block, int x, int y, int objectWidth, int testFlag, int wallFlag);
 	int calcMonsterSkillLevel(int id, int a);
 	int checkBlockOccupiedByParty(int x, int y, int testFlag);
 	const uint16 *getCharacterOrMonsterStats(int id);
@@ -1122,7 +1126,7 @@ private:
 	int checkForPossibleDistanceAttack(uint16 monsterBlock, int direction, int distance, uint16 curBlock);
 	int walkMonsterCheckDest(int x, int y, LoLMonster *monster, int unk);
 	void getNextStepCoords(int16 monsterX, int16 monsterY, int &newX, int &newY, uint16 direction);
-	void rearrangeAttackingMonster(LoLMonster *monster);
+	void alignMonsterToParty(LoLMonster *monster);
 	void moveStrayingMonster(LoLMonster *monster);
 	void killMonster(LoLMonster *monster);
 
@@ -1133,7 +1137,11 @@ private:
 	uint16 _monsterCurBlock;
 	int _objectLastDirection;
 
-	const uint16 *_monsterModifiers;
+	const uint16 *_monsterModifiers1;
+	const uint16 *_monsterModifiers2;
+	const uint16 *_monsterModifiers3;
+	const uint16 *_monsterModifiers4;
+
 	const int8 *_monsterShiftOffs;
 	const uint8 *_monsterDirFlags;
 	const uint8 *_monsterScaleX;

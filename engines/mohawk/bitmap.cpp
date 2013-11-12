@@ -29,6 +29,7 @@
 #include "common/substream.h"
 #include "common/system.h"
 #include "common/textconsole.h"
+#include "graphics/decoders/bmp.h"
 
 namespace Mohawk {
 
@@ -579,7 +580,7 @@ void MohawkBitmap::drawRaw(Graphics::Surface *surface) {
 
 			_data->skip(_header.bytesPerRow - _header.width * 3);
 		} else {
-			_data->read((byte *)surface->pixels + y * _header.width, _header.width);
+			_data->read((byte *)surface->getBasePtr(0, y), _header.width);
 			_data->skip(_header.bytesPerRow - _header.width);
 		}
 	}
@@ -598,7 +599,7 @@ void MohawkBitmap::drawRLE8(Graphics::Surface *surface, bool isLE) {
 	for (uint16 i = 0; i < _header.height; i++) {
 		uint16 rowByteCount = isLE ? _data->readUint16LE() : _data->readUint16BE();
 		int32 startPos = _data->pos();
-		byte *dst = (byte *)surface->pixels + i * _header.width;
+		byte *dst = (byte *)surface->getBasePtr(0, i);
 		int16 remaining = _header.width;
 
 		while (remaining > 0) {
@@ -629,99 +630,39 @@ void MohawkBitmap::drawRLE8(Graphics::Surface *surface, bool isLE) {
 // Myst Bitmap Decoder
 //////////////////////////////////////////
 
-MohawkSurface *MystBitmap::decodeImage(Common::SeekableReadStream* stream) {
+MohawkSurface *MystBitmap::decodeImage(Common::SeekableReadStream *stream) {
 	uint32 uncompressedSize = stream->readUint32LE();
-	Common::SeekableReadStream* bmpStream = decompressLZ(stream, uncompressedSize);
+	Common::SeekableReadStream *bmpStream = decompressLZ(stream, uncompressedSize);
 	delete stream;
 
-	_header.type = bmpStream->readUint16BE();
+	Graphics::BitmapDecoder bitmapDecoder;
+	if (!bitmapDecoder.loadStream(*bmpStream))
+		error("Could not decode Myst bitmap");
 
-	if (_header.type != 'BM')
-		error("BMP header not detected");
+	const Graphics::Surface *bmpSurface = bitmapDecoder.getSurface();
+	Graphics::Surface *newSurface = 0;
 
-	_header.size = bmpStream->readUint32LE();
-	assert (_header.size > 0);
-	_header.res1 = bmpStream->readUint16LE();
-	_header.res2 = bmpStream->readUint16LE();
-	_header.imageOffset = bmpStream->readUint32LE();
-
-	_info.size = bmpStream->readUint32LE();
-
-	if (_info.size != 40)
-		error("Only Windows v3 BMP's are supported");
-
-	_info.width = bmpStream->readUint32LE();
-	_info.height = bmpStream->readUint32LE();
-	_info.planes = bmpStream->readUint16LE();
-	_info.bitsPerPixel = bmpStream->readUint16LE();
-	_info.compression = bmpStream->readUint32LE();
-	_info.imageSize = bmpStream->readUint32LE();
-	_info.pixelsPerMeterX = bmpStream->readUint32LE();
-	_info.pixelsPerMeterY = bmpStream->readUint32LE();
-	_info.colorsUsed = bmpStream->readUint32LE();
-	_info.colorsImportant = bmpStream->readUint32LE();
-
-	if (_info.compression != 0)
-		error("Unhandled BMP compression %d", _info.compression);
-
-	if (_info.colorsUsed == 0)
-		_info.colorsUsed = 256;
-
-	if (_info.bitsPerPixel != 8 && _info.bitsPerPixel != 24)
-		error("%dbpp Bitmaps not supported", _info.bitsPerPixel);
-
-	byte *palData = NULL;
-
-	if (_info.bitsPerPixel == 8) {
-		palData = (byte *)malloc(256 * 3);
-		for (uint16 i = 0; i < _info.colorsUsed; i++) {
-			palData[i * 3 + 2] = bmpStream->readByte();
-			palData[i * 3 + 1] = bmpStream->readByte();
-			palData[i * 3 + 0] = bmpStream->readByte();
-			bmpStream->readByte();
-		}
+	if (bmpSurface->format.bytesPerPixel == 1) {
+		_bitsPerPixel = 8;
+		newSurface = new Graphics::Surface();
+		newSurface->copyFrom(*bmpSurface);
+	} else {
+		_bitsPerPixel = 24;
+		newSurface = bmpSurface->convertTo(g_system->getScreenFormat());
 	}
 
-	bmpStream->seek(_header.imageOffset);
+	// Copy the palette to one of our own
+	byte *newPal = 0;
 
-	Graphics::Surface *surface = createSurface(_info.width, _info.height);
-	int srcPitch = _info.width * (_info.bitsPerPixel >> 3);
-	const int extraDataLength = (srcPitch % 4) ? 4 - (srcPitch % 4) : 0;
-
-	if (_info.bitsPerPixel == 8) {
-		byte *dst = (byte *)surface->pixels;
-
-		for (uint32 i = 0; i < _info.height; i++) {
-			bmpStream->read(dst + (_info.height - i - 1) * _info.width, _info.width);
-			bmpStream->skip(extraDataLength);
-		}
-	} else {
-		Graphics::PixelFormat pixelFormat = g_system->getScreenFormat();
-
-		byte *dst = (byte *)surface->pixels + (surface->h - 1) * surface->pitch;
-
-		for (uint32 i = 0; i < _info.height; i++) {
-			for (uint32 j = 0; j < _info.width; j++) {
-				byte b = bmpStream->readByte();
-				byte g = bmpStream->readByte();
-				byte r = bmpStream->readByte();
-
-				if (pixelFormat.bytesPerPixel == 2)
-					*((uint16 *)dst) = pixelFormat.RGBToColor(r, g, b);
-				else
-					*((uint32 *)dst) = pixelFormat.RGBToColor(r, g, b);
-
-				dst += pixelFormat.bytesPerPixel;
-			}
-
-			bmpStream->skip(extraDataLength);
-			dst -= surface->pitch * 2;
-		}
+	if (bitmapDecoder.hasPalette()) {
+		const byte *palette = bitmapDecoder.getPalette();
+		newPal = (byte *)malloc(256 * 3);
+		memcpy(newPal, palette, 256 * 3);
 	}
 
 	delete bmpStream;
 
-	return new MohawkSurface(surface, palData);
+	return new MohawkSurface(newSurface, newPal);
 }
 
 #endif
@@ -838,7 +779,7 @@ MohawkSurface *DOSBitmap::decodeImage(Common::SeekableReadStream *stream) {
 	}
 
 	Graphics::Surface *surface = createSurface(_header.width, _header.height);
-	memset(surface->pixels, 0, _header.width * _header.height);
+	memset(surface->getPixels(), 0, _header.width * _header.height);
 
 	// Expand the <8bpp data to one byte per pixel
 	switch (getBitsPerPixel()) {
@@ -860,7 +801,7 @@ MohawkSurface *DOSBitmap::decodeImage(Common::SeekableReadStream *stream) {
 void DOSBitmap::expandMonochromePlane(Graphics::Surface *surface, Common::SeekableReadStream *rawStream) {
 	assert(surface->format.bytesPerPixel == 1);
 
-	byte *dst = (byte *)surface->pixels;
+	byte *dst = (byte *)surface->getPixels();
 
 	// Expand the 8 pixels in a byte into a full byte per pixel
 
@@ -889,7 +830,7 @@ void DOSBitmap::expandEGAPlanes(Graphics::Surface *surface, Common::SeekableRead
 	// Note that the image is in EGA planar form and not just standard 4bpp
 	// This seems to contradict the PoP specs which seem to do something else
 
-	byte *dst = (byte *)surface->pixels;
+	byte *dst = (byte *)surface->getPixels();
 
 	for (uint32 i = 0; i < surface->h; i++) {
 		uint x = 0;

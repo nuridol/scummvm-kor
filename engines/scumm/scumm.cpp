@@ -52,6 +52,7 @@
 #include "scumm/he/logic_he.h"
 #include "scumm/he/sound_he.h"
 #include "scumm/object.h"
+#include "scumm/player_ad.h"
 #include "scumm/player_nes.h"
 #include "scumm/player_sid.h"
 #include "scumm/player_pce.h"
@@ -61,7 +62,9 @@
 #include "scumm/player_v2cms.h"
 #include "scumm/player_v2a.h"
 #include "scumm/player_v3a.h"
+#include "scumm/player_v3m.h"
 #include "scumm/player_v4a.h"
+#include "scumm/player_v5m.h"
 #include "scumm/resource.h"
 #include "scumm/he/resource_he.h"
 #include "scumm/scumm_v0.h"
@@ -73,6 +76,7 @@
 #include "scumm/util.h"
 #include "scumm/verbs.h"
 #include "scumm/imuse/pcspk.h"
+#include "scumm/imuse/mac_m68k.h"
 
 #include "backends/audiocd/audiocd.h"
 
@@ -1800,7 +1804,7 @@ void ScummEngine::setupMusic(int midi) {
 	}
 
 	if ((_game.id == GID_MONKEY_EGA || (_game.id == GID_LOOM && _game.version == 3))
-	   &&  (_game.platform == Common::kPlatformPC) && _sound->_musicType == MDT_MIDI) {
+	   &&  (_game.platform == Common::kPlatformDOS) && _sound->_musicType == MDT_MIDI) {
 		Common::String fileName;
 		bool missingFile = false;
 		if (_game.id == GID_LOOM) {
@@ -1874,6 +1878,12 @@ void ScummEngine::setupMusic(int midi) {
 #endif
 	} else if (_game.platform == Common::kPlatformAmiga && _game.version <= 4) {
 		_musicEngine = new Player_V4A(this, _mixer);
+	} else if (_game.platform == Common::kPlatformMacintosh && _game.id == GID_LOOM) {
+		_musicEngine = new Player_V3M(this, _mixer);
+		((Player_V3M *)_musicEngine)->init();
+	} else if (_game.platform == Common::kPlatformMacintosh && _game.id == GID_MONKEY) {
+		_musicEngine = new Player_V5M(this, _mixer);
+		((Player_V5M *)_musicEngine)->init();
 	} else if (_game.id == GID_MANIAC && _game.version == 1) {
 		_musicEngine = new Player_V1(this, _mixer, MidiDriver::getMusicType(dev) != MT_PCSPK);
 	} else if (_game.version <= 2) {
@@ -1888,20 +1898,45 @@ void ScummEngine::setupMusic(int midi) {
 		_musicEngine = _townsPlayer = new Player_Towns_v1(this, _mixer);
 		if (!_townsPlayer->init())
 			error("Failed to initialize FM-Towns audio driver");
+	} else if (_game.platform == Common::kPlatformDOS && (_sound->_musicType == MDT_ADLIB) && (_game.id == GID_LOOM || _game.id == GID_INDY3)) {
+		// For Indy3 DOS and Loom DOS we use an implementation of the original
+		// AD player when AdLib is selected. This fixes sound effects in those
+		// games (see for example bug #2027877 "INDY3: Non-Looping Sound
+		// Effects"). The player itself is also used in Monkey Island DOS
+		// EGA/VGA. However, we support multi MIDI for that game and we cannot
+		// support this with the Player_AD code at the moment. The reason here
+		// is that multi MIDI is supported internally by our iMuse output.
+		_musicEngine = new Player_AD(this, _mixer);
 	} else if (_game.version >= 3 && _game.heversion <= 62) {
 		MidiDriver *nativeMidiDriver = 0;
 		MidiDriver *adlibMidiDriver = 0;
+		bool multi_midi = ConfMan.getBool("multi_midi") && _sound->_musicType != MDT_NONE && _sound->_musicType != MDT_PCSPK && (midi & MDT_ADLIB);
+		bool useOnlyNative = false;
 
-		if (_sound->_musicType != MDT_ADLIB && _sound->_musicType != MDT_TOWNS && _sound->_musicType != MDT_PCSPK)
+		if (isMacM68kIMuse()) {
+			// We setup this driver as native MIDI driver to avoid playback
+			// of the Mac music via a selected MIDI device.
+			nativeMidiDriver = new MacM68kDriver(_mixer);
+			// The Mac driver is never MT-32.
+			_native_mt32 = false;
+			// Ignore non-native drivers. This also ignores the multi MIDI setting.
+			useOnlyNative = true;
+		} else if (_sound->_musicType != MDT_ADLIB && _sound->_musicType != MDT_TOWNS && _sound->_musicType != MDT_PCSPK) {
 			nativeMidiDriver = MidiDriver::createMidi(dev);
+		}
+
 		if (nativeMidiDriver != NULL && _native_mt32)
 			nativeMidiDriver->property(MidiDriver::PROP_CHANNEL_MASK, 0x03FE);
-		bool multi_midi = ConfMan.getBool("multi_midi") && _sound->_musicType != MDT_NONE && _sound->_musicType != MDT_PCSPK && (midi & MDT_ADLIB);
-		if (_sound->_musicType == MDT_ADLIB || _sound->_musicType == MDT_TOWNS || multi_midi) {
-			adlibMidiDriver = MidiDriver::createMidi(MidiDriver::detectDevice(_sound->_musicType == MDT_TOWNS ? MDT_TOWNS : MDT_ADLIB));
-			adlibMidiDriver->property(MidiDriver::PROP_OLD_ADLIB, (_game.features & GF_SMALL_HEADER) ? 1 : 0);
-		} else if (_sound->_musicType == MDT_PCSPK) {
-			adlibMidiDriver = new PcSpkDriver(_mixer);
+
+		if (!useOnlyNative) {
+			if (_sound->_musicType == MDT_ADLIB || _sound->_musicType == MDT_TOWNS || multi_midi) {
+				adlibMidiDriver = MidiDriver::createMidi(MidiDriver::detectDevice(_sound->_musicType == MDT_TOWNS ? MDT_TOWNS : MDT_ADLIB));
+				adlibMidiDriver->property(MidiDriver::PROP_OLD_ADLIB, (_game.features & GF_SMALL_HEADER) ? 1 : 0);
+				// Try to use OPL3 mode for Sam&Max when possible.
+				adlibMidiDriver->property(MidiDriver::PROP_SCUMM_OPL3, (_game.id == GID_SAMNMAX) ? 1 : 0);
+			} else if (_sound->_musicType == MDT_PCSPK) {
+				adlibMidiDriver = new PcSpkDriver(_mixer);
+			}
 		}
 
 		_imuse = IMuse::create(_system, nativeMidiDriver, adlibMidiDriver);
@@ -1973,6 +2008,13 @@ void ScummEngine::syncSoundSettings() {
 		if (VAR_CHARINC != 0xFF)
 			VAR(VAR_CHARINC) = _defaultTalkDelay;
 	}
+
+	// Backyard Baseball 2003 uses a unique subtitle variable,
+	// rather than VAR_SUBTITLES
+	if (_game.id == GID_BASEBALL2003) {
+		_scummVars[632] = ConfMan.getBool("subtitles");
+	}
+
 }
 
 void ScummEngine::setTalkSpeed(int talkspeed) {
@@ -2020,11 +2062,11 @@ Common::Error ScummEngine::go() {
 		if (delta < 1)	// Ensure we don't get into an endless loop
 			delta = 1;  // by not decreasing sleepers.
 
-		// WORKAROUND: walking speed in the original v0/v1 interpreter 
+		// WORKAROUND: walking speed in the original v0/v1 interpreter
 		// is sometimes slower (e.g. during scrolling) than in ScummVM.
 		// This is important for the door-closing action in the dungeon,
-		// otherwise (delta < 6) a single kid is able to escape. 
-		if ((_game.version == 0 && isScriptRunning(132)) || 
+		// otherwise (delta < 6) a single kid is able to escape.
+		if ((_game.version == 0 && isScriptRunning(132)) ||
 			(_game.version == 1 && isScriptRunning(137)))
 			delta = 6;
 
@@ -2043,13 +2085,6 @@ Common::Error ScummEngine::go() {
 
 		if (shouldQuit()) {
 			// TODO: Maybe perform an autosave on exit?
-//#ifdef SCUMMVMKOR
-//			_saveLoadSlot = 0;
-//			sprintf(_saveLoadName, "Autosave %d", _saveLoadSlot);
-//			_saveLoadFlag = 1;
-//			_saveTemporaryState = false;
-//			scummLoop_handleSaveLoad();
-//#endif
 		}
 	}
 
@@ -2111,6 +2146,7 @@ void ScummEngine::scummLoop(int delta) {
 	_talkDelay -= delta;
 	if (_talkDelay < 0)
 		_talkDelay = 0;
+
 #ifdef SCUMMVMKOR
 	for(int numb = 0; numb < MAX_KOR; numb++) {
 		if (_strKSet1[numb].delay != -1) { // kor
@@ -2125,6 +2161,7 @@ void ScummEngine::scummLoop(int delta) {
 		}
 	}
 #endif
+
 	// Record the current ego actor before any scripts (including input scripts)
 	// get a chance to run.
 	int oldEgo = 0;
@@ -2168,7 +2205,7 @@ load_game:
 
 		// HACK as in game save stuff isn't supported currently
 		if (_game.id == GID_LOOM) {
-			int args[16];
+			int args[NUM_SCRIPT_LOCAL];
 			uint var;
 			memset(args, 0, sizeof(args));
 			args[0] = 2;
@@ -2556,7 +2593,7 @@ void ScummEngine::restart() {
 }
 
 void ScummEngine::runBootscript() {
-	int args[16];
+	int args[NUM_SCRIPT_LOCAL];
 	memset(args, 0, sizeof(args));
 	args[0] = _bootParam;
 	if (_game.id == GID_MANIAC && (_game.features & GF_DEMO))

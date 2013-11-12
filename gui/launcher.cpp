@@ -24,6 +24,7 @@
 #include "common/config-manager.h"
 #include "common/events.h"
 #include "common/fs.h"
+#include "common/gui_options.h"
 #include "common/util.h"
 #include "common/system.h"
 #include "common/translation.h"
@@ -36,6 +37,11 @@
 #include "gui/message.h"
 #include "gui/gui-manager.h"
 #include "gui/options.h"
+#ifdef ENABLE_EVENTRECORDER
+#include "gui/onscreendialog.h"
+#include "gui/recorderdialog.h"
+#include "gui/EventRecorder.h"
+#endif
 #include "gui/saveload.h"
 #include "gui/widgets/edittext.h"
 #include "gui/widgets/list.h"
@@ -51,9 +57,6 @@ namespace GUI {
 
 enum {
 	kStartCmd = 'STRT',
-//#ifdef SCUMMVMKOR
-//	kResumeCmd = 'RESM',
-//#endif
 	kAboutCmd = 'ABOU',
 	kOptionsCmd = 'OPTN',
 	kAddGameCmd = 'ADDG',
@@ -93,7 +96,7 @@ public:
 
 protected:
 	bool tryInsertChar(byte c, int pos) {
-		if (isalnum(c) || c == '-' || c == '_') {
+		if (Common::isAlnum(c) || c == '-' || c == '_') {
 			_editString.insertChar(c, pos);
 			return true;
 		}
@@ -147,13 +150,31 @@ protected:
 	CheckboxWidget *_globalMIDIOverride;
 	CheckboxWidget *_globalMT32Override;
 	CheckboxWidget *_globalVolumeOverride;
+
 #ifdef SCUMMVMKOR
 	CheckboxWidget *_koreanModeCheckbox;
 #endif
+
+	ExtraGuiOptions _engineOptions;
 };
 
 EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	: OptionsDialog(domain, "GameOptions") {
+	// Retrieve all game specific options.
+	const EnginePlugin *plugin = 0;
+	// To allow for game domains without a gameid.
+	// TODO: Is it intentional that this is still supported?
+	String gameId(ConfMan.get("gameid", domain));
+	if (gameId.empty())
+		gameId = domain;
+	// Retrieve the plugin, since we need to access the engine's MetaEngine
+	// implementation.
+	EngineMan.findGame(gameId, &plugin);
+	if (plugin) {
+		_engineOptions = (*plugin)->getExtraGuiOptions(domain);
+	} else {
+		warning("Plugin for target \"%s\" not found! Game specific settings might be missing", domain.c_str());
+	}
 
 	// GAME: Path to game data (r/o), extra data (r/o), and save data (r/w)
 	String gamePath(ConfMan.get("path", _domain));
@@ -213,16 +234,26 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	for (; p->code; ++p) {
 		_platformPopUp->appendEntry(p->description, p->id);
 	}
+
 #ifdef SCUMMVMKOR
-        // Korean Mode popup
-        if (g_system->getOverlayWidth() > 320)
-            _koreanModeCheckbox = new CheckboxWidget(tab, "GameOptions_Game.V1modeCheckbox", _("Use V1 Korean Mode"), 0, 0);
-        else
-            _koreanModeCheckbox = new CheckboxWidget(tab, "GameOptions_Game.V1modeCheckbox", _c("Use V1 Korean Mode", "lowres"), 0, 0);
+    // Korean Mode popup
+    if (g_system->getOverlayWidth() > 320)
+        _koreanModeCheckbox = new CheckboxWidget(tab, "GameOptions_Game.V1modeCheckbox", _("Use V1 Korean Mode"), 0, 0);
+    else
+        _koreanModeCheckbox = new CheckboxWidget(tab, "GameOptions_Game.V1modeCheckbox", _c("Use V1 Korean Mode", "lowres"), 0, 0);
 #endif
 
 	//
-	// 2) The graphics tab
+	// 2) The engine tab (shown only if there are custom engine options)
+	//
+	if (_engineOptions.size() > 0) {
+		tab->addTab(_("Engine"));
+
+		addEngineControls(tab, "GameOptions_Engine.", _engineOptions);
+	}
+
+	//
+	// 3) The graphics tab
 	//
 	_graphicsTabId = tab->addTab(g_system->getOverlayWidth() > 320 ? _("Graphics") : _("GFX"));
 
@@ -234,7 +265,7 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	addGraphicControls(tab, "GameOptions_Graphics.");
 
 	//
-	// 3) The audio tab
+	// 4) The audio tab
 	//
 	tab->addTab(_("Audio"));
 
@@ -247,7 +278,7 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	addSubtitleControls(tab, "GameOptions_Audio.");
 
 	//
-	// 4) The volume tab
+	// 5) The volume tab
 	//
 	if (g_system->getOverlayWidth() > 320)
 		tab->addTab(_("Volume"));
@@ -262,7 +293,7 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	addVolumeControls(tab, "GameOptions_Volume.");
 
 	//
-	// 5) The MIDI tab
+	// 6) The MIDI tab
 	//
 	if (!_guioptions.contains(GUIO_NOMIDI)) {
 		tab->addTab(_("MIDI"));
@@ -276,7 +307,7 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	}
 
 	//
-	// 6) The MT-32 tab
+	// 7) The MT-32 tab
 	//
 	if (!_guioptions.contains(GUIO_NOMIDI)) {
 		tab->addTab(_("MT-32"));
@@ -290,7 +321,7 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	}
 
 	//
-	// 7) The Paths tab
+	// 8) The Paths tab
 	//
 	if (g_system->getOverlayWidth() > 320)
 		tab->addTab(_("Paths"));
@@ -325,7 +356,6 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 
 	_savePathClearButton = addClearButton(tab, "GameOptions_Paths.SavePathClearButton", kCmdSavePathClear);
 
-
 	// Activate the first tab
 	tab->setActiveTab(0);
 	_tabWidget = tab;
@@ -356,8 +386,7 @@ void EditGameDialog::open() {
 	e = ConfMan.hasKey("gfx_mode", _domain) ||
 		ConfMan.hasKey("render_mode", _domain) ||
 		ConfMan.hasKey("fullscreen", _domain) ||
-		ConfMan.hasKey("aspect_ratio", _domain) ||
-		ConfMan.hasKey("disable_dithering", _domain);
+		ConfMan.hasKey("aspect_ratio", _domain);
 	_globalGraphicsOverride->setState(e);
 
 	e = ConfMan.hasKey("music_driver", _domain) ||
@@ -404,6 +433,19 @@ void EditGameDialog::open() {
 		_langPopUp->setEnabled(false);
 	}
 
+	// Set the state of engine-specific checkboxes
+	for (uint j = 0; j < _engineOptions.size(); ++j) {
+		// The default values for engine-specific checkboxes are not set when
+		// ScummVM starts, as this would require us to load and poll all of the
+		// engine plugins on startup. Thus, we set the state of each custom
+		// option checkbox to what is specified by the engine plugin, and
+		// update it only if a value has been set in the configuration of the
+		// currently selected game.
+		bool isChecked = _engineOptions[j].defaultState;
+		if (ConfMan.hasKey(_engineOptions[j].configOption, _domain))
+			isChecked = ConfMan.getBool(_engineOptions[j].configOption, _domain);
+		_engineCheckboxes[j]->setState(isChecked);
+	}
 
 	const Common::PlatformDescription *p = Common::g_platforms;
 	const Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", _domain));
@@ -456,6 +498,11 @@ void EditGameDialog::close() {
 		ConfMan.setBool("v1_korean_mode", _koreanModeCheckbox->getState(), _domain);
 		ConfMan.setBool("v1_korean_only", _koreanModeCheckbox->getState(), _domain);
 #endif
+
+		// Set the state of engine-specific checkboxes
+		for (uint i = 0; i < _engineOptions.size(); i++) {
+			ConfMan.setBool(_engineOptions[i].configOption, _engineCheckboxes[i]->getState(), _domain);
+		}
 	}
 	OptionsDialog::close();
 }
@@ -581,7 +628,6 @@ void EditGameDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 LauncherDialog::LauncherDialog()
 	: Dialog(0, 0, 320, 200) {
 	_backgroundType = GUI::ThemeEngine::kDialogBackgroundMain;
-
 	const int screenW = g_system->getOverlayWidth();
 	const int screenH = g_system->getOverlayHeight();
 
@@ -603,33 +649,6 @@ LauncherDialog::LauncherDialog()
 	new StaticTextWidget(this, "Launcher.Version", gScummVMFullVersion);
 #endif
 
-//#ifdef SCUMMVMKOR
-//        new ButtonWidget(this, "Launcher.AboutButton", _("~A~bout"), _("About ScummVM"), kAboutCmd);
-//        new ButtonWidget(this, "Launcher.OptionsButton", _("~O~ptions"), _("Change global ScummVM options"), kOptionsCmd);
-//        _startButton =
-//		new ButtonWidget(this, "Launcher.StartButton", _("~S~tart"), _("Start selected game"), kStartCmd);
-////        _resumeButton =
-////		new ButtonWidget(this, "Launcher.ResumeButton", _("~R~esume"), _("Resume selected game"), kResumeCmd);
-//        _loadButton =
-//		new ButtonWidget(this, "Launcher.LoadGameButton", _("~L~oad"), _("Load savegame for selected game"), kLoadGameCmd);
-//        
-//        // Above the lowest button rows: two more buttons (directly below the list box)
-//        if (g_system->getOverlayWidth() > 320) {
-//            _addButton =
-//			new ButtonWidget(this, "Launcher.AddGameButton", _("~A~dd Game"), _("Hold Shift for Mass Add"), kAddGameCmd);
-//            _editButton =
-//			new ButtonWidget(this, "Launcher.EditGameButton", _("~E~dit Game"), _("Change game options"), kEditGameCmd);
-//            _removeButton =
-//			new ButtonWidget(this, "Launcher.RemoveGameButton", _("~R~emove Game"), _("Remove game from the list. The game data files stay intact"), kRemoveGameCmd);
-//        } else {
-//            _addButton =
-//			new ButtonWidget(this, "Launcher.AddGameButton", _c("~A~dd Game", "lowres"), _("Hold Shift for Mass Add"), kAddGameCmd);
-//            _editButton =
-//			new ButtonWidget(this, "Launcher.EditGameButton", _c("~E~dit Game", "lowres"), _("Change game options"), kEditGameCmd);
-//            _removeButton =
-//			new ButtonWidget(this, "Launcher.RemoveGameButton", _c("~R~emove Game", "lowres"), _("Remove game from the list. The game data files stay intact"), kRemoveGameCmd);
-//        }
-//#else
 	new ButtonWidget(this, "Launcher.QuitButton", _("~Q~uit"), _("Quit ScummVM"), kQuitCmd);
 	new ButtonWidget(this, "Launcher.AboutButton", _("A~b~out..."), _("About ScummVM"), kAboutCmd);
 	new ButtonWidget(this, "Launcher.OptionsButton", _("~O~ptions..."), _("Change global ScummVM options"), kOptionsCmd);
@@ -655,7 +674,6 @@ LauncherDialog::LauncherDialog()
 		_removeButton =
 		new ButtonWidget(this, "Launcher.RemoveGameButton", _c("~R~emove Game", "lowres"), _("Remove game from the list. The game data files stay intact"), kRemoveGameCmd);
 	}
-//#endif
 
 	// Search box
 	_searchDesc = 0;
@@ -676,7 +694,6 @@ LauncherDialog::LauncherDialog()
 	_list->setEditable(false);
 	_list->setNumberingMode(kListNumberingOff);
 
-
 	// Populate the list
 	updateListing();
 
@@ -691,7 +708,7 @@ LauncherDialog::LauncherDialog()
 	_browser = new BrowserDialog(_("Select directory with game data"), true);
 
 	// Create Load dialog
-	_loadDialog = new SaveLoadChooser(_("Load game:"), _("Load"));
+	_loadDialog = new SaveLoadChooser(_("Load game:"), _("Load"), false);
 }
 
 void LauncherDialog::selectTarget(const String &target) {
@@ -793,10 +810,9 @@ void LauncherDialog::updateListing() {
 }
 
 void LauncherDialog::addGame() {
-	int modifiers = g_system->getEventManager()->getModifierState();
 
 #ifndef DISABLE_MASS_ADD
-	const bool massAdd = (modifiers & Common::KBD_SHIFT) != 0;
+	const bool massAdd = checkModifier(Common::KBD_SHIFT);
 
 	if (massAdd) {
 		MessageDialog alert(_("Do you really want to run the mass game detector? "
@@ -989,6 +1005,49 @@ void LauncherDialog::editGame(int item) {
 	}
 }
 
+void LauncherDialog::loadGameButtonPressed(int item) {
+#ifdef ENABLE_EVENTRECORDER
+	const bool shiftPressed = checkModifier(Common::KBD_SHIFT);
+	if (shiftPressed) {
+		recordGame(item);
+	} else {
+		loadGame(item);
+	}
+	updateButtons();
+#else
+	loadGame(item);
+#endif
+}
+
+#ifdef ENABLE_EVENTRECORDER
+void LauncherDialog::recordGame(int item) {
+	RecorderDialog recorderDialog;
+	MessageDialog alert(_("Do you want to load savegame?"),
+		_("Yes"), _("No"));
+	switch(recorderDialog.runModal(_domains[item])) {
+	case RecorderDialog::kRecordDialogClose:
+		break;
+	case RecorderDialog::kRecordDialogPlayback:
+		ConfMan.setActiveDomain(_domains[item]);
+		close();
+		ConfMan.set("record_mode", "playback", ConfigManager::kTransientDomain);
+		ConfMan.set("record_file_name", recorderDialog.getFileName(), ConfigManager::kTransientDomain);
+		break;
+	case RecorderDialog::kRecordDialogRecord:
+		ConfMan.setActiveDomain(_domains[item]);
+		if (alert.runModal() == GUI::kMessageOK) {
+			loadGame(item);
+		}
+		close();
+		g_eventRec.setAuthor(recorderDialog._author);
+		g_eventRec.setName(recorderDialog._name);
+		g_eventRec.setNotes(recorderDialog._notes);
+		ConfMan.set("record_mode", "record", ConfigManager::kTransientDomain);
+		break;
+	}
+}
+#endif
+
 void LauncherDialog::loadGame(int item) {
 	String gameId = ConfMan.get("gameid", _domains[item]);
 	if (gameId.empty())
@@ -1053,7 +1112,7 @@ void LauncherDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 		editGame(item);
 		break;
 	case kLoadGameCmd:
-		loadGame(item);
+		loadGameButtonPressed(item);
 		break;
 	case kOptionsCmd: {
 		GlobalOptionsDialog options;
@@ -1070,20 +1129,9 @@ void LauncherDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 	case kListItemDoubleClickedCmd:
 		// Start the selected game.
 		assert(item >= 0);
-//#ifdef SCUMMVMKOR
-//        ConfMan.set("save_slot", "-1", _domains[item]);
-//#endif
 		ConfMan.setActiveDomain(_domains[item]);
 		close();
 		break;
-//#ifdef SCUMMVMKOR
-//        case kResumeCmd:
-//            assert(item >= 0);
-//            ConfMan.set("save_slot", "0", _domains[item]);
-//            ConfMan.setActiveDomain(_domains[item]);
-//            close();
-//            break;
-//#endif
 	case kListItemRemovalRequestCmd:
 		removeGame(item);
 		break;
@@ -1115,12 +1163,6 @@ void LauncherDialog::updateButtons() {
 		_startButton->setEnabled(enable);
 		_startButton->draw();
 	}
-//#ifdef SCUMMVMKOR
-//	if (enable != _resumeButton->isEnabled()) {
-//		_resumeButton->setEnabled(enable);
-//		_resumeButton->draw();
-//	}
-//#endif
 	if (enable != _editButton->isEnabled()) {
 		_editButton->setEnabled(enable);
 		_editButton->draw();
@@ -1140,30 +1182,34 @@ void LauncherDialog::updateButtons() {
 		_loadButton->setEnabled(en);
 		_loadButton->draw();
 	}
+	switchButtonsText(_addButton, "~A~dd Game...", "Mass Add...");
+#ifdef ENABLE_EVENTRECORDER
+	switchButtonsText(_loadButton, "~L~oad...", "Record...");
+#endif
+}
 
-	// Update the label of the "Add" button depending on whether shift is pressed or not
-	int modifiers = g_system->getEventManager()->getModifierState();
-	const bool massAdd = (modifiers & Common::KBD_SHIFT) != 0;
+// Update the label of the button depending on whether shift is pressed or not
+void LauncherDialog::switchButtonsText(ButtonWidget *button, const char *normalText, const char *shiftedText) {
+	const bool shiftPressed = checkModifier(Common::KBD_SHIFT);
 	const bool lowRes = g_system->getOverlayWidth() <= 320;
 
-	const char *newAddButtonLabel = massAdd
-		? (lowRes ? _c("Mass Add...", "lowres") : _("Mass Add..."))
-//#ifdef SCUMMVMKOR
-//        : (lowRes ? _c("~A~dd Game", "lowres") : _("~A~dd Game"));
-//#else
-		: (lowRes ? _c("~A~dd Game...", "lowres") : _("~A~dd Game..."));
-//#endif
+	const char *newAddButtonLabel = shiftPressed
+		? (lowRes ? _c(shiftedText, "lowres") : _(shiftedText))
+		: (lowRes ? _c(normalText, "lowres") : _(normalText));
 
-	if (_addButton->getLabel() != newAddButtonLabel)
-		_addButton->setLabel(newAddButtonLabel);
+	if (button->getLabel() != newAddButtonLabel)
+		button->setLabel(newAddButtonLabel);
 }
+
+
+
 
 void LauncherDialog::reflowLayout() {
 #ifndef DISABLE_FANCY_THEMES
 	if (g_gui.xmlEval()->getVar("Globals.ShowLauncherLogo") == 1 && g_gui.theme()->supportsImages()) {
 		StaticTextWidget *ver = (StaticTextWidget *)findWidget("Launcher.Version");
 		if (ver) {
-			ver->setAlign((Graphics::TextAlign)g_gui.xmlEval()->getVar("Launcher.Version.Align", Graphics::kTextAlignCenter));
+			ver->setAlign(g_gui.xmlEval()->getWidgetTextHAlign("Launcher.Version"));
 			ver->setLabel(gScummVMVersionDate);
 		}
 
@@ -1174,7 +1220,7 @@ void LauncherDialog::reflowLayout() {
 	} else {
 		StaticTextWidget *ver = (StaticTextWidget *)findWidget("Launcher.Version");
 		if (ver) {
-			ver->setAlign((Graphics::TextAlign)g_gui.xmlEval()->getVar("Launcher.Version.Align", Graphics::kTextAlignCenter));
+			ver->setAlign(g_gui.xmlEval()->getWidgetTextHAlign("Launcher.Version"));
 			ver->setLabel(gScummVMFullVersion);
 		}
 
@@ -1219,6 +1265,11 @@ void LauncherDialog::reflowLayout() {
 	_h = g_system->getOverlayHeight();
 
 	Dialog::reflowLayout();
+}
+
+bool LauncherDialog::checkModifier(int checkedModifier) {
+	int modifiers = g_system->getEventManager()->getModifierState();
+	return (modifiers & checkedModifier) != 0;
 }
 
 } // End of namespace GUI

@@ -394,7 +394,7 @@ ScummEngine_v6::ArrayHeader *ScummEngine_v6::getArray(int array) {
 int ScummEngine_v6::readArray(int array, int idx, int base) {
 	ArrayHeader *ah = getArray(array);
 
-	if (ah == NULL || ah->data == NULL)
+	if (!ah)
 		error("readArray: invalid array %d (%d)", array, readVar(array));
 
 	// WORKAROUND bug #645711. This is clearly a script bug, as this script
@@ -2510,7 +2510,7 @@ void ScummEngine_v7::o6_kernelSetFunctions() {
 					_disableFadeInEffect = true;
 				}
 			} else if (_game.id == GID_FT && !_skipVideo) {
-				const int insaneVarNum = ((_game.features & GF_DEMO) && (_game.platform == Common::kPlatformPC))
+				const int insaneVarNum = ((_game.features & GF_DEMO) && (_game.platform == Common::kPlatformDOS))
 					? 232 : 233;
 
 				_insane->setSmushParams(_smushFrameRate);

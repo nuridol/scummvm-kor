@@ -100,19 +100,19 @@ enum OPCODE {
 
 #define	OPMASK		0x3F	///< mask to isolate the opcode
 
-bool bNoPause = false;
+bool g_bNoPause = false;
 
 //----------------- LOCAL GLOBAL DATA --------------------
 
 // FIXME: Avoid non-const global vars
 
-static int32 *pGlobals = 0;		// global vars
+static int32 *g_pGlobals = 0;		// global vars
 
-static int numGlobals = 0;		// How many global variables to save/restore
+static int g_numGlobals = 0;		// How many global variables to save/restore
 
-static INT_CONTEXT *icList = 0;
+static INT_CONTEXT *g_icList = 0;
 
-static uint32 hMasterScript;
+static uint32 g_hMasterScript;
 
 //----------------- SCRIPT BUGS WORKAROUNDS --------------
 
@@ -122,6 +122,8 @@ static uint32 hMasterScript;
 struct WorkaroundEntry {
 	TinselEngineVersion version;	///< Engine version this workaround applies to
 	bool scnFlag;					///< Only applicable for Tinsel 1 (DW 1)
+	bool isDemo;					///< Flags whether it's for a demo
+	Common::Platform platform;		///< Platform filter
 	SCNHANDLE hCode;				///< Script to apply fragment to
 	int ip;							///< Script offset to run this fragment before
 	int numBytes;					///< Number of bytes in the script
@@ -129,6 +131,7 @@ struct WorkaroundEntry {
 };
 
 #define FRAGMENT_WORD(x)	(byte)(x & 0xFF), (byte)(x >> 8)
+#define FRAGMENT_DWORD(x)	(byte)(x & 0xFF), (byte)(x >> 8), (byte)(x >> 16), (byte)(x >> 24)
 
 static const byte fragment1[] = {OP_ZERO, OP_GSTORE | OPSIZE16, 206, 0};
 static const byte fragment2[] = {OP_LIBCALL | OPSIZE8, 110};
@@ -149,6 +152,10 @@ static const byte fragment12[] = {OP_JMPTRUE | OPSIZE16, FRAGMENT_WORD(1491),
 		OP_IMM | OPSIZE16, FRAGMENT_WORD(322), OP_LIBCALL | OPSIZE8, 46,	// Give back the whistle
 		OP_JUMP | OPSIZE16, FRAGMENT_WORD(1568)};
 static const byte fragment13[] = {OP_ZERO, OP_GSTORE | OPSIZE16, FRAGMENT_WORD(306)};
+static const byte fragment14[] = {OP_LIBCALL | OPSIZE8, 58,
+		OP_IMM, FRAGMENT_DWORD((42 << 23)), OP_ONE, OP_ZERO, OP_LIBCALL | OPSIZE8, 44,
+		OP_LIBCALL | OPSIZE8, 97, OP_JUMP | OPSIZE16, FRAGMENT_WORD(2220)
+};
 
 #undef FRAGMENT_WORD
 
@@ -157,7 +164,7 @@ const WorkaroundEntry workaroundList[] = {
 	// book back to the present. In the GRA version, it was global 373,
 	// and was reset when he is returned to the past, but was forgotten
 	// in the SCN version, so this ensures the flag is properly reset.
-	{TINSEL_V1, true, 427942095, 1, sizeof(fragment1), fragment1},
+	{TINSEL_V1, true, false, Common::kPlatformUnknown, 427942095, 1, sizeof(fragment1), fragment1},
 
 	// DW1-GRA: Rincewind exiting the Inn is blocked by the luggage.
 	// Whilst you can then move into walkable areas, saving and
@@ -165,26 +172,26 @@ const WorkaroundEntry workaroundList[] = {
 	// fragment turns off NPC blocking for the Outside Inn rooms so that
 	// the luggage won't block Past Outside Inn.
 	// See bug report #2525010.
-	{TINSEL_V1, false, 444622076, 0,  sizeof(fragment2), fragment2},
+	{TINSEL_V1, false, false, Common::kPlatformUnknown, 444622076, 0,  sizeof(fragment2), fragment2},
 	// Present Outside Inn
-	{TINSEL_V1, false, 352600876, 0,  sizeof(fragment2), fragment2},
+	{TINSEL_V1, false, false, Common::kPlatformUnknown, 352600876, 0,  sizeof(fragment2), fragment2},
 
 	// DW1-GRA: Talking to palace guards in Act 2 gives !!!HIGH
 	// STRING||| - this happens if you initiate dialog with one of the
 	// guards, but not the other. So these fragments provide the correct
 	// talk parameters where needed.
 	// See bug report #2831159.
-	{TINSEL_V1, false, 310506872, 463, sizeof(fragment4), fragment4},
-	{TINSEL_V1, false, 310506872, 485, sizeof(fragment5), fragment5},
-	{TINSEL_V1, false, 310506872, 513, sizeof(fragment6), fragment6},
-	{TINSEL_V1, false, 310506872, 613, sizeof(fragment7), fragment7},
-	{TINSEL_V1, false, 310506872, 641, sizeof(fragment8), fragment8},
+	{TINSEL_V1, false, false, Common::kPlatformUnknown, 310506872, 463, sizeof(fragment4), fragment4},
+	{TINSEL_V1, false, false, Common::kPlatformUnknown, 310506872, 485, sizeof(fragment5), fragment5},
+	{TINSEL_V1, false, false, Common::kPlatformUnknown, 310506872, 513, sizeof(fragment6), fragment6},
+	{TINSEL_V1, false, false, Common::kPlatformUnknown, 310506872, 613, sizeof(fragment7), fragment7},
+	{TINSEL_V1, false, false, Common::kPlatformUnknown, 310506872, 641, sizeof(fragment8), fragment8},
 
 	// DW1-SCN: The script for the lovable street-Starfish does a
 	// 'StopSample' after flicking the coin to ensure it's sound is
 	// stopped, but which also accidentally can stop any active
 	// conversation with the Amazon.
-	{TINSEL_V1, true, 394640351, 121, sizeof(fragment9), fragment9},
+	{TINSEL_V1, true, false, Common::kPlatformUnknown, 394640351, 121, sizeof(fragment9), fragment9},
 
 	// DW2: In the garden, global #490 is set when the bees begin their
 	// 'out of hive' animation, and reset when done. But if the game is
@@ -197,25 +204,29 @@ const WorkaroundEntry workaroundList[] = {
 	//  * Stealing the mallets from the wizards (bug #2820788).
 	// This fix ensures that the global is reset when the Garden scene
 	// is loaded (both entering and restoring a game).
-	{TINSEL_V2, true, 2888147476U, 0, sizeof(fragment3), fragment3},
+	{TINSEL_V2, true, false, Common::kPlatformUnknown, 2888147476U, 0, sizeof(fragment3), fragment3},
 
 	// DW1-GRA: Corrects text being drawn partially off-screen during
 	// the blackboard description of the Librarian.
-	{TINSEL_V1, false, 293831402, 133, sizeof(fragment10), fragment10},
+	{TINSEL_V1, false, false, Common::kPlatformUnknown, 293831402, 133, sizeof(fragment10), fragment10},
 
 	// DW1-GRA/SCN: Corrects the dead-end of being able to give the
 	// whistle back to the pirate before giving him the parrot.
 	// See bug report #2934211.
-	{TINSEL_V1, true, 352601285, 1569, sizeof(fragment11), fragment11},
-	{TINSEL_V1, false, 352602304, 1488, sizeof(fragment12), fragment12},
+	{TINSEL_V1, true, false, Common::kPlatformUnknown, 352601285, 1569, sizeof(fragment11), fragment11},
+	{TINSEL_V1, false, false, Common::kPlatformUnknown, 352602304, 1488, sizeof(fragment12), fragment12},
 
 	// DW2: Corrects a bug with global 306 not being cleared if you leave
 	// the marketplace scene whilst D'Blah is talking (even if it's not
 	// actually audible); returning to the scene and clicking on him multiple
 	// times would cause the game to crash
-	{TINSEL_V2, true, 1109294728, 0, sizeof(fragment13), fragment13},
+	{TINSEL_V2, true, false, Common::kPlatformUnknown, 1109294728, 0, sizeof(fragment13), fragment13},
 
-	{TINSEL_V0, false, 0, 0, 0, NULL}
+	// DW1 PSX DEMO: Alters a script in the PSX DW1 demo to show the Idle animation scene rather than
+	// quitting the game when no user input happens for a while
+	{TINSEL_V1, true, true, Common::kPlatformPSX, 0, 2186, sizeof(fragment14), fragment14},
+
+	{TINSEL_V0, false, false, Common::kPlatformUnknown, 0, 0, 0, NULL}
 };
 
 //----------------- LOCAL GLOBAL DATA --------------------
@@ -227,7 +238,7 @@ void LockCode(INT_CONTEXT *ic) {
 	if (ic->GSort == GS_MASTER) {
 		if (TinselV2)
 			// Get the srcipt handle from a specific global chunk
-			ic->code = (byte *)LockMem(hMasterScript);
+			ic->code = (byte *)LockMem(g_hMasterScript);
 		else
 			ic->code = (byte *)FindChunk(MASTER_SCNHANDLE, CHUNK_PCODE);
 	} else
@@ -241,15 +252,15 @@ static INT_CONTEXT *AllocateInterpretContext(GSORT gsort) {
 	INT_CONTEXT *pic;
 	int	i;
 
-	for (i = 0, pic = icList; i < NUM_INTERPRET; i++, pic++) {
+	for (i = 0, pic = g_icList; i < NUM_INTERPRET; i++, pic++) {
 		if (pic->GSort == GS_NONE) {
-			pic->pProc = g_scheduler->getCurrentProcess();
+			pic->pProc = CoroScheduler.getCurrentProcess();
 			pic->GSort = gsort;
 			return pic;
 		}
 #ifdef DEBUG
 		else {
-			if (pic->pProc == g_scheduler->getCurrentProcess())
+			if (pic->pProc == CoroScheduler.getCurrentProcess())
 				error("Found unreleased interpret context");
 		}
 #endif
@@ -264,8 +275,8 @@ static void FreeWaitCheck(PINT_CONTEXT pic, bool bVoluntary) {
 	// Is this waiting for something?
 	if (pic->waitNumber1) {
 		for (i = 0; i < NUM_INTERPRET; i++) {
-			if ((icList + i)->waitNumber2 == pic->waitNumber1) {
-				(icList + i)->waitNumber2 = 0;
+			if ((g_icList + i)->waitNumber2 == pic->waitNumber1) {
+				(g_icList + i)->waitNumber2 = 0;
 				break;
 			}
 		}
@@ -274,10 +285,10 @@ static void FreeWaitCheck(PINT_CONTEXT pic, bool bVoluntary) {
 	// Is someone waiting for this?
 	if (pic->waitNumber2) {
 		for (i = 0; i < NUM_INTERPRET; i++) {
-			if ((icList + i)->waitNumber1 == pic->waitNumber2) {
-				(icList + i)->waitNumber1 = 0;
-				(icList + i)->resumeCode = bVoluntary ? RES_FINISHED : RES_CUTSHORT;
-				g_scheduler->reschedule((icList + i)->pProc);
+			if ((g_icList + i)->waitNumber1 == pic->waitNumber2) {
+				(g_icList + i)->waitNumber1 = 0;
+				(g_icList + i)->resumeCode = bVoluntary ? RES_FINISHED : RES_CUTSHORT;
+				CoroScheduler.reschedule((g_icList + i)->pProc);
 				break;
 			}
 		}
@@ -301,11 +312,11 @@ static void FreeInterpretContextPi(INT_CONTEXT *pic) {
  * Ensures that interpret contexts don't get lost when an Interpret()
  * call doesn't complete.
  */
-void FreeInterpretContextPr(PROCESS *pProc) {
+void FreeInterpretContextPr(Common::PROCESS *pProc) {
 	INT_CONTEXT *pic;
 	int	i;
 
-	for (i = 0, pic = icList; i < NUM_INTERPRET; i++, pic++) {
+	for (i = 0, pic = g_icList; i < NUM_INTERPRET; i++, pic++) {
 		if (pic->GSort != GS_NONE && pic->pProc == pProc) {
 			FreeWaitCheck(pic, false);
 			if (TinselV2)
@@ -323,7 +334,7 @@ void FreeMostInterpretContexts() {
 	INT_CONTEXT *pic;
 	int	i;
 
-	for (i = 0, pic = icList; i < NUM_INTERPRET; i++, pic++) {
+	for (i = 0, pic = g_icList; i < NUM_INTERPRET; i++, pic++) {
 		if ((pic->GSort != GS_MASTER) && (pic->GSort != GS_GPROCESS)) {
 			memset(pic, 0, sizeof(INT_CONTEXT));
 			pic->GSort = GS_NONE;
@@ -338,7 +349,7 @@ void FreeMasterInterpretContext() {
 	INT_CONTEXT *pic;
 	int	i;
 
-	for (i = 0, pic = icList; i < NUM_INTERPRET; i++, pic++)	{
+	for (i = 0, pic = g_icList; i < NUM_INTERPRET; i++, pic++)	{
 		if ((pic->GSort == GS_MASTER) || (pic->GSort == GS_GPROCESS)) {
 			memset(pic, 0, sizeof(INT_CONTEXT));
 			pic->GSort = GS_NONE;
@@ -393,7 +404,7 @@ INT_CONTEXT *RestoreInterpretContext(INT_CONTEXT *ric) {
 	ic = AllocateInterpretContext(GS_NONE);	// Sort will soon be overridden
 
 	memcpy(ic, ric, sizeof(INT_CONTEXT));
-	ic->pProc = g_scheduler->getCurrentProcess();
+	ic->pProc = CoroScheduler.getCurrentProcess();
 	ic->resumeState = RES_1;
 
 	LockCode(ic);
@@ -405,35 +416,35 @@ INT_CONTEXT *RestoreInterpretContext(INT_CONTEXT *ric) {
  * Allocates enough RAM to hold the global Glitter variables.
  */
 void RegisterGlobals(int num) {
-	if (pGlobals == NULL) {
-		numGlobals = num;
+	if (g_pGlobals == NULL) {
+		g_numGlobals = num;
 
-		hMasterScript = !TinselV2 ? 0 :
-			READ_LE_UINT32(FindChunk(MASTER_SCNHANDLE, CHUNK_MASTER_SCRIPT));
+		g_hMasterScript = !TinselV2 ? 0 :
+			READ_32(FindChunk(MASTER_SCNHANDLE, CHUNK_MASTER_SCRIPT));
 
 		// Allocate RAM for pGlobals and make sure it's allocated
-		pGlobals = (int32 *)calloc(numGlobals, sizeof(int32));
-		if (pGlobals == NULL) {
+		g_pGlobals = (int32 *)calloc(g_numGlobals, sizeof(int32));
+		if (g_pGlobals == NULL) {
 			error("Cannot allocate memory for global data");
 		}
 
 		// Allocate RAM for interpret contexts and make sure it's allocated
-		icList = (INT_CONTEXT *)calloc(NUM_INTERPRET, sizeof(INT_CONTEXT));
-		if (icList == NULL) {
+		g_icList = (INT_CONTEXT *)calloc(NUM_INTERPRET, sizeof(INT_CONTEXT));
+		if (g_icList == NULL) {
 			error("Cannot allocate memory for interpret contexts");
 		}
-		g_scheduler->setResourceCallback(FreeInterpretContextPr);
+		CoroScheduler.setResourceCallback(FreeInterpretContextPr);
 	} else {
 		// Check size is still the same
-		assert(numGlobals == num);
+		assert(g_numGlobals == num);
 
-		memset(pGlobals, 0, numGlobals * sizeof(int32));
-		memset(icList, 0, NUM_INTERPRET * sizeof(INT_CONTEXT));
+		memset(g_pGlobals, 0, g_numGlobals * sizeof(int32));
+		memset(g_icList, 0, NUM_INTERPRET * sizeof(INT_CONTEXT));
 	}
 
 	if (TinselV2) {
 		// read initial values
-		CdCD(nullContext);
+		CdCD(Common::nullContext);
 
 		Common::File f;
 		if (!f.open(GLOBALS_FILENAME))
@@ -444,7 +455,7 @@ void RegisterGlobals(int num) {
 			error(FILE_IS_CORRUPT, GLOBALS_FILENAME);
 
 		for (int i = 0; i < length; ++i)
-			pGlobals[i] = f.readSint32LE();
+			g_pGlobals[i] = f.readSint32LE();
 
 		if (f.eos() || f.err())
 			error(FILE_IS_CORRUPT, GLOBALS_FILENAME);
@@ -454,19 +465,19 @@ void RegisterGlobals(int num) {
 }
 
 void FreeGlobals() {
-	free(pGlobals);
-	pGlobals = NULL;
+	free(g_pGlobals);
+	g_pGlobals = NULL;
 
-	free(icList);
-	icList = NULL;
+	free(g_icList);
+	g_icList = NULL;
 }
 
 /**
  * (Un)serialize the global data for save/restore game.
  */
 void syncGlobInfo(Common::Serializer &s) {
-	for (int i = 0; i < numGlobals; i++) {
-		s.syncAsSint32LE(pGlobals[i]);
+	for (int i = 0; i < g_numGlobals; i++) {
+		s.syncAsSint32LE(g_pGlobals[i]);
 	}
 }
 
@@ -502,7 +513,7 @@ void INT_CONTEXT::syncWithSerializer(Common::Serializer &s) {
  * Return pointer to and size of global data for save/restore game.
  */
 void SaveInterpretContexts(INT_CONTEXT *sICInfo) {
-	memcpy(sICInfo, icList, NUM_INTERPRET * sizeof(INT_CONTEXT));
+	memcpy(sICInfo, g_icList, NUM_INTERPRET * sizeof(INT_CONTEXT));
 }
 
 /**
@@ -582,6 +593,8 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 				if ((wkEntry->version == TinselVersion) &&
 					(wkEntry->hCode == ic->hCode) &&
 					(wkEntry->ip == ip) &&
+					(wkEntry->isDemo == _vm->getIsADGFDemo()) &&
+					((wkEntry->platform == Common::kPlatformUnknown) || (wkEntry->platform == _vm->getPlatform())) &&
 					(!TinselV1 || (wkEntry->scnFlag == ((_vm->getFeatures() & GF_SCNFILES) != 0)))) {
 					// Point to start of workaround fragment
 					ip = 0;
@@ -633,8 +646,8 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 		case OP_GLOAD:				// loads global variable onto stack
 
 			tmp = Fetch(opcode, ic->code, wkEntry, ip);
-			assert(0 <= tmp && tmp < numGlobals);
-			ic->stack[++ic->sp] = pGlobals[tmp];
+			assert(0 <= tmp && tmp < g_numGlobals);
+			ic->stack[++ic->sp] = g_pGlobals[tmp];
 			break;
 
 		case OP_STORE:				// pops stack and stores in local variable
@@ -645,8 +658,8 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 		case OP_GSTORE:				// pops stack and stores in global variable
 
 			tmp = Fetch(opcode, ic->code, wkEntry, ip);
-			assert(0 <= tmp && tmp < numGlobals);
-			pGlobals[tmp] = ic->stack[ic->sp--];
+			assert(0 <= tmp && tmp < g_numGlobals);
+			g_pGlobals[tmp] = ic->stack[ic->sp--];
 			break;
 
 		case OP_CALL:				// procedure call
@@ -809,7 +822,7 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 			break;
 
 		case OP_ESCON:
-			bNoPause = true;
+			g_bNoPause = true;
 			ic->escOn = true;
 			ic->myEscape = GetEscEvents();
 			break;
@@ -839,7 +852,7 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
  * Associates an interpret context with the
  * process that will run it.
  */
-void AttachInterpret(INT_CONTEXT *pic, PROCESS *pProc) {
+void AttachInterpret(INT_CONTEXT *pic, Common::PROCESS *pProc) {
 	// Attach the process which is using this context
 	pic->pProc = pProc;
 }
@@ -856,8 +869,8 @@ static uint32 UniqueWaitNumber() {
 			retval = (uint32)-1;
 
 		for (i = 0; i < NUM_INTERPRET; i++) {
-			if ((icList+i)->waitNumber1 == retval
-			 || (icList+i)->waitNumber2 == retval)
+			if ((g_icList+i)->waitNumber1 == retval
+			 || (g_icList+i)->waitNumber2 == retval)
 				break;
 		}
 
@@ -869,9 +882,9 @@ static uint32 UniqueWaitNumber() {
 /**
  * WaitInterpret
  */
-void WaitInterpret(CORO_PARAM, PPROCESS pWaitProc, bool *result) {
+void WaitInterpret(CORO_PARAM, Common::PPROCESS pWaitProc, bool *result) {
 	int i;
-	PPROCESS currentProcess = g_scheduler->getCurrentProcess();
+	Common::PPROCESS currentProcess = CoroScheduler.getCurrentProcess();
 	assert(currentProcess);
 	assert(currentProcess != pWaitProc);
 	if (result) *result = false;
@@ -887,7 +900,7 @@ void WaitInterpret(CORO_PARAM, PPROCESS pWaitProc, bool *result) {
 
 	CORO_BEGIN_CODE(_ctx);
 
-	for (i = 0, _ctx->picWaiter = icList; i < NUM_INTERPRET; i++, _ctx->picWaiter++) {
+	for (i = 0, _ctx->picWaiter = g_icList; i < NUM_INTERPRET; i++, _ctx->picWaiter++) {
 		if (_ctx->picWaiter->GSort != GS_NONE && _ctx->picWaiter->pProc == currentProcess) {
 			break;
 		}
@@ -896,7 +909,7 @@ void WaitInterpret(CORO_PARAM, PPROCESS pWaitProc, bool *result) {
 	/*
 	 * Find the interpret context of the process we're waiting for
 	 */
-	for (i = 0, _ctx->picWaitee = icList; i < NUM_INTERPRET; i++, _ctx->picWaitee++) {
+	for (i = 0, _ctx->picWaitee = g_icList; i < NUM_INTERPRET; i++, _ctx->picWaitee++) {
 		if (_ctx->picWaitee->GSort != GS_NONE && _ctx->picWaitee->pProc == pWaitProc) {
 			break;
 		}
@@ -931,11 +944,11 @@ void CheckOutWaiters() {
 	// Check all waited for have someone waiting
 	for (i = 0; i < NUM_INTERPRET; i++)	{
 		// If someone is supposedly waiting for this one
-		if ((icList + i)->GSort != GS_NONE && (icList + i)->waitNumber2) {
+		if ((g_icList + i)->GSort != GS_NONE && (g_icList + i)->waitNumber2) {
 			// Someone really must be waiting for this one
 			for (j = 0; j < NUM_INTERPRET; j++) {
-				if ((icList + j)->GSort != GS_NONE
-				 && (icList + j)->waitNumber1 == (icList + i)->waitNumber2) {
+				if ((g_icList + j)->GSort != GS_NONE
+				 && (g_icList + j)->waitNumber1 == (g_icList + i)->waitNumber2) {
 					break;
 				}
 			}
@@ -946,11 +959,11 @@ void CheckOutWaiters() {
 	// Check waiting for someone to wait for
 	for (i = 0; i < NUM_INTERPRET; i++) {
 		// If someone is supposedly waiting for this one
-		if ((icList + i)->GSort != GS_NONE && (icList + i)->waitNumber1) {
+		if ((g_icList + i)->GSort != GS_NONE && (g_icList + i)->waitNumber1) {
 			// Someone really must be waiting for this one
 			for (j = 0; j < NUM_INTERPRET; j++) {
-				if ((icList + j)->GSort != GS_NONE
-				 && (icList + j)->waitNumber2 == (icList + i)->waitNumber1) {
+				if ((g_icList + j)->GSort != GS_NONE
+				 && (g_icList + j)->waitNumber2 == (g_icList + i)->waitNumber1) {
 					break;
 				}
 			}

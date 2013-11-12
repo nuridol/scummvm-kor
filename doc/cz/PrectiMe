@@ -1,7 +1,8 @@
 PŘEČTIMĚ ScummVM
 ------------------------------------------------------------------------
 
-Pro více informací, seznamy kompatibility, podrobnosti o dotacích, nejnovější verze, novinky o vývoji a další, prosím navštivte domovskou stránku ScummVM na: http://www.scummvm.org/
+Pro více informací, seznamy kompatibility, podrobnosti o dotacích, nejnovější verze,
+novinky o vývoji a další, prosím navštivte domovskou stránku ScummVM na: http://www.scummvm.org/
 
 
 Obsah:
@@ -53,7 +54,9 @@ Obsah:
  * 7.7 Podpora MIDI serveru TiMidity++
  * 7.8 Použití komprimovaných zvukových souborů (MP3, Ogg Vorbis, Flac)
  * 7.9 Výstupní vzorkovací kmitočet
-8.0) Soubor s nastavením
+8.0) Soubor s nastavením
+ * 8.1 Rozpoznávaná klíčová slova nastavení
+ * 8.2 Vlastní herní volby, které mohou být přepínány pomoci grafického rozhraní
 9.0) Sestavení
 
 
@@ -179,13 +182,18 @@ Hry AGOS od Adventuresoft/Horrorsoft:
      The Feeble Files                            [feeble]
 
 Hry GOB od Coktel Vision:
+     Bambou le sauveur de la jungle              [bambou]
      Bargon Attack                               [bargon]
+     Fascination                                 [fascination]
+     Geisha                                      [geisha]
      Gobliiins                                   [gob1]
      Gobliins 2                                  [gob2]
      Goblins 3                                   [gob3]
      Lost in Time                                [lostintime]
+     Once Upon A Time: Little Red Riding Hood    [littlered]
      The Bizarre Adventures of Woodruff
          and the Schnibble                       [woodruff]
+     Urban Runner                                [urban]
      Ween: The Prophecy                          [ween]
 
 Hry MADE od Activision:
@@ -203,10 +211,15 @@ Další hry:
      Discworld 2: Missing Presumed ...!?         [dw2]
      Dragon History                              [draci]
      Drascula: The Vampire Strikes Back          [drascula]
+     Eye of the Beholder                         [eob]
+     Eye of the Beholder II: The Legend of 
+         Darkmoon                                [eob2]
      Flight of the Amazon Queen                  [queen]
      Future Wars                                 [fw]
      Inherit the Earth: Quest for the Orb        [ite]
      Nippon Safes Inc.                           [nippon]
+     Lands of Lore: The Throne of Chaos          [lol]
+     The Journeyman Project: Pegasus Prime       [pegasus]
      The Legend of Kyrandia                      [kyra1]
      The Legend of Kyrandia: The Hand of Fate    [kyra2]
      The Legend of Kyrandia: Malcolm's Revenge   [kyra3]
@@ -216,6 +229,7 @@ Další hry:
 Hry SCUMM od Humongous Entertainment:
      Backyard Baseball                           [baseball]
      Backyard Baseball 2001                      [baseball2001]
+     Backyard Baseball 2003                      [baseball2003]
      Backyard Football                           [football]
      Big Thinkers First Grade                    [thinker1]
      Big Thinkers Kindergarten                   [thinkerk]
@@ -284,7 +298,6 @@ Hry Living Books:
 Následující hry by měly jít spustit, ale zatím nejsou úplně hratelné. Hrajte je pouze na vlastní riziko a prosíme, abyste pro tyto hry nenahlašovali chyby.
 Pokud chcete mít nejnovější zprávy o kompatibilitách her, navštivte naší stránku a prohlédněte si tabulku kompatibilit.
 
-     Backyard Baseball 2003                      [baseball2003]
      Backyard Football 2002                      [football2002]
      Backyard Soccer                             [soccer]
      Backyard Soccer MLS                         [soccermls]
@@ -308,21 +321,24 @@ V některých případech ScummVM přesto zobrazí obrazovku ochrany proti kop�
 
 ScummVM přeskakuje ochranu v následujících hrách:
 
-  * Maniac Mansion
-  * Zak McKracken and the Alien Mindbenders
-  * Loom (EGA)
-  * The Secret of Monkey Island (VGA)
-  * Monkey Island 2: LeChuck's Revenge
   * Beneath a Steel Sky
       -- potlačeno s laskavým svolením Revolution Software.
+  * Dreamweb
+      -- seznam dostupných příkazů v terminálech ve hře je nyní zobrazen
+         když hráč použije příkaz 'help'
   * Inherit the Earth: Quest for the Orb (Floppy version)
       -- potlačeno s laskavým svolením Wyrmkeep Entertainment,
          protože byla potlačena ve všech vydáních hry na CD.
+  * Loom (EGA DOS)
+  * Maniac Mansion
+  * Monkey Island 2: LeChuck's Revenge
   * Simon the Sorcerer 1 (Floppy version)
   * Simon the Sorcerer 2 (Floppy version)
       -- potlačeno s laskavým svolením from Adventure Soft,
          protože byla potlačena ve všech vydáních hry na CD.
+  * The Secret of Monkey Island (VGA)
   * Waxworks
+  * Zak McKracken and the Alien Mindbenders
 
 
 3.2) Poznámky ke hrám Commodore64:
@@ -387,6 +403,10 @@ Pokyny pro hry Broken Sword jsou pro verze od Sold-Out Software, kde každá hra
 ------ -------------------------
 Videa pro hry Broken Sword mají v sobě trochu historie (viz další oddíl, pokud jste zvědaví), ale obecně jediné, co potřebujete udělat, je zkopírovat soubory .SMK ze složek "SMACKS" nebo "SMACKSHI" na CD do stejné složky jako ostatní datové soubory hry. (Broken Sword má také složku "SMACKSLO" se stejnými videi, ale ty jsou nižší kvality.) Můžete je umístit do podsložky s názvem "video", pokud Vám to přijde hezčí.
 
+Ve verzích pro PlayStation, můžete původní videa vypsat z disku. Každý soubor, který má příponu "STR", byste měli vypsat jako *čist* sektory z disku (všech 2352 bajtů na sektor). Můžete také míst toho použít přeformátovaná videa, která jsou zmíněna níže, ale to nebude fungovat pro všechny videa v Broken Sword II. Pro více informací si prohlédněte:
+
+  http://wiki.scummvm.org/index.php/HOWTO-PlayStation_Videos
+
 Některá vydání hry, a také verze pro PlayStation, Smacker videa nemají. Revolution Software nám laskavě dovolilo poskytovat přeformátovaná videa ke stažení na naší stránce:
 
   http://www.scummvm.org/downloads.php
@@ -395,7 +415,7 @@ Tato videa jsou poskytována ve formátu DXA se zvukem ve formátu FLAC. Jejich 
 
 Pro systémy, které jsou příliš pomalé, aby zvládli dekódovat formát FLAC byl zvuk videí také poskytnut odděleně ve formátu OGG Vorbis audio. Toto vyžaduje, aby verze ScummVM byla sestavena s podporou libVorbis a zlib.
 
-Pro Broken Sword také poskytujeme přídavek pro titulky. Jednoduše ho rozbalte a následujte pokyny v souboru readme.txt. (Broken Sword II již titulky má; není třeba další práce pro jejich přidání.)
+Pro Broken Sword také poskytujeme přídavek pro titulky. Jednoduše ho rozbalte a následujte pokyny v souboru readme.txt. Balíček v současnosti nefunguje ve videích na PlayStation. (Broken Sword II již titulky má; není třeba další práce pro jejich přidání.)
 
 
 3.7.2) Videa her Broken Sword ve zpětném pohledu:
@@ -1474,6 +1494,8 @@ Vzorový soubor s nastavením vypadá takto:
     path=C:\amiga_mi2\
     music_driver=windows
 
+8.1) Rozpoznávaná klíčová slova nastavení
+---- ------------------------------------ 
 Jsou rozpoznávána následující klíčová slova:
 
     path              řetězec Cesta, kde jsou umístěny datové soubory hry
@@ -1490,7 +1512,6 @@ Jsou rozpoznávána následující klíčová slova:
     talkspeed          číslo    Zpoždění textu v hrách SCUMM, nebo rychlost textu v jiných hrách.
     fullscreen         boolean  Režim celé obrazovky
     aspect_ratio       boolean  Povolit korekci poměru stran
-    disable_dithering  boolean  Odstranit artefakty chvění v některých hrách EGA
     gfx_mode           řetězec  Grafický režim (normální, 2x, 3x, 2xsai, super2xsai, supereagle, advmame2x, advmame3x,hq2x, hq3x, tv2x, dotmatrix)
     confirm_exit       boolean  Zeptat se uživatele na potvrzení před ukončením (pouze jádro SDL).
     console            boolean  Povolit okno konzole (výchozí: zapnuto) (pouze Windows).
@@ -1501,7 +1522,7 @@ Jsou rozpoznávána následující klíčová slova:
     output_rate        číslo    Který výstupní vzorkovací kmitočet použít v Hz. Rozumné hodnoty jsou 11025, 22050 a 44100.
     alsa_port          řetězec  Který port použít pro výstup při použití hudebního ovladače ALSA.
     music_volume       číslo    Nastavení hlasitosti hudby (0-255)
-    multi_midi         boolean  Pokud true, je povoleno smíšený AdLib a přirozený MIDI.
+    multi_midi         boolean  Pokud true, jsou povoleny smíšený AdLib a původní MIDI.
     soundfont          řetězec  Který SoundFont použít pro přehrávání MIDI. (Podporováno pouze některými ovladači MIDI.)
     native_mt32        boolean  Pokud true, zakáže emulaci GM a předpokládá, že je dostupný pravý Roland MT-32.
     enable_gs          boolean  Pokud true, povolí funkce určené pro Roland GS ke zlepšení emulace GM. Pokud je native_mt32 také nastaven na true, zařízení GS zvolí mapu MT-32 pro přehrávání správných instrumentů.
@@ -1514,6 +1535,16 @@ Jsou rozpoznávána následující klíčová slova:
     alt_intro          boolean  Použít alternativní úvod pro CD verze Beneath a Steel Sky a Flight of the Amazon Queen
     boot_param         číslo    Předá toto číslo zaváděcímu skriptu
 
+Hry Sierra používající jádro AGI přidávají následující nestandardní klíčové slovo:
+
+originalsaveload       boolean  Pokud true, jsou použity původní obrazovky nahrávání/uložení místo vylepšených ze ScummVM
+
+Hry Sierra používající jádro SCI přidávají následující nestandardní klíčová slova:
+
+    disable_dithering  boolean  Odstranit artefakty chvění v některých hrách EGA
+    prefer_digitalsfx  boolean  Pokud true, jsou upřednostňovány digitální zvukové efekty před syntetizovanými
+    originalsaveload   boolean  Pokud true, jsou použity původní obrazovky nahrávání/uložení místo vylepšených ze ScummVM
+    native_fb01        bool     Pokud true, je ovladač hudby pro kartu IBM Music Feature nebo modul syntetizátoru Yahama FB-01 FM použit jako výstup MIDI
 Broken Sword II přidává následující nestandardní klíčová slova:
 
     gfx_details        číslo    Nastavení grafických detailů (0-3)
@@ -1522,15 +1553,28 @@ Broken Sword II přidává následující nestandardní klíčová slova:
     reverse_stereo     boolean  Pokud true, kanály stereo jsou obráceny
     sfx_mute           boolean  Pokud true, zvukové efekty jsou ztlumeny
 
-Flight of the Amazon Queen přidává následující nestandardní klíčová slova
+Flight of the Amazon Queen přidává následující nestandardní klíčová slova:
 
     music_mute         boolean  Pokud true, hudba je ztlumena
     sfx_mute           boolean  Pokud true, zvukové efekty jsou ztlumeny
 
-King's Quest VI Windows přidává následující nestandardní klíčová slova:
+Jones in the Fast Lane přidává následující nestandardní klíčové slovo:
+
+    music_mute         boolean  Pokud true, je použito CD audio místo zvuků ve hře 
+
+King's Quest VI Windows přidává následující nestandardní klíčové slovo:
 
     windows_cursors    boolean  Pokud true, jsou použity původní černobílé kurzory místo kurzorů z DOS. Pokud false, jsou ve verzi Windows použity kurzory DOS, zvětšené, aby se shodovaly se zbytkem zvětšené grafiky
+
+Lands of Lore: The Throne of Chaos přidává následující nestandardní klíčová slova:
+
+    smooth_scrolling   boolean  Pokud true, je posunování při změně z jedné obrazovky na druhou plynulejší
+    floating_cursors   boolean  Pokud true, je kurzor změněn na směrovou šipku při najetí na okraj obrazovky. Hráč pak může kliknout pro pohyb v tomto směru.
+
+Space Quest IV CD přidává následující nestandardní klíčové slovo:
     
+    silver_cursors     boolean  Pokud true, je místo původních zlatých kurzorů použita alternativní sada stříbrných
+        
 Simon the Sorcerer 1 a 2 přidává následující nestandardní klíčová slova:
 
     music_mute         boolean  Pokud true, hudba je ztlumena
@@ -1539,10 +1583,34 @@ Simon the Sorcerer 1 a 2 přidává následující nestandardní klíčová slov
 The Legend of Kyrandia přidává následující nestandardní klíčové slovo:
 
     walkspeed          celé číslo      Rychlost chůze (0-4)
+
+The Legend of Kyrandia: The Hand of Fate přidává následující nestandardní klíčové slovo:
+
+    walkspeed          číslo    Rychlost chůze (3 nebo 5, což znamená
+                                rychle nebo pomalu)
     
+The Legend of Kyrandia: Malcolm's Revenge přidává následující nestandardní klíčová slova:
+
+    walkspeed          číslo    Rychlost chůze (3 nebo 5, což znamená
+                                rychle nebo pomalu)
+    studio_audience    boolean  Pokud true, je slyšet potlesk a smích kdykoliv Malcolm provede něco vtipného
+    skip_support       boolean  Pokud true, hráč může přeskakovat text a scény hry
+    helium_mode        boolean  Pokud true, lidé znějí tak, jakoby se nadýchali hélia
+
 The 7th Guest přidává následující nestandardní klíčové slovo:
 
-    t7g_speed          řetězec   Rychlost přehrávání videa (normal - normální, tweaked - upravená, im_an_ios - jsem na ios)
+    fast_movie_speed   boolean  Pokud true, jsou videa přehrávána při zvýšené
+                                rychlosti, stejné jako ve verzi pro iOS.
+                                Videa bez zvuku jsou stále přehrávána při
+                                normální rychlosti, aby nedošlo k desynchronizaci
+                                hudby
+
+8.2) Vlastní herní volby, které mohou být přepínány pomoci grafického 
+---- ----------------------------------------------------------------
+rozhraní
+--------
+Mnoho vlastních herních voleb v předchozí části může být přepnuto přes grafické rozhraní. Pokud je takováto volba pro určitou hru dostupná, objeví se karta "Jádro" při přidávání nebo úpravě nastavení této hry.
+Pokud vlastní možnosti nejsou zobrazeny, musí být konkrétní hry spuštěny jednou nebo znovu přidány do seznamu her spouštěče ScummVM. Toto aktualizuje nastavení každé položky, čímž umožní zobrazení vlastních voleb.
 
 9.0) Sestavení:
 ---- ----------
@@ -1614,4 +1682,7 @@ Hodně Štěstí a Šťastné Adventurování!
 Tým ScummVM.
 http://www.scummvm.org/
 ------------------------------------------------------------------------
+
+
+
 

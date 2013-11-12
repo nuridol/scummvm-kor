@@ -41,22 +41,28 @@ public:
 	void clearCurDim();
 
 	void setMouseCursor(int x, int y, const byte *shape);
+	void setMouseCursor(int x, int y, const byte *shape, const uint8 *ovl);
 
 	void loadFileDataToPage(Common::SeekableReadStream *s, int pageNum, uint32 size);
 
 	void printShadedText(const char *string, int x, int y, int col1, int col2);
-	void loadEoBBitmap(const char *file, const uint8 *ditheringData, int tempPage, int destPage, int copyToPage);
+
+	void loadEoBBitmap(const char *file, const uint8 *cgaMapping, int tempPage, int destPage, int convertToPage);
 	void loadShapeSetBitmap(const char *file, int tempPage, int destPage);
 
-	uint8 *encodeShape(uint16 x, uint16 y, uint16 w, uint16 h, bool no4bitEncoding = false);
+	void convertPage(int srcPage, int dstPage, const uint8 *cgaMapping);
+
+	void setScreenPalette(const Palette &pal);
+	void getRealPalette(int num, uint8 *dst);
+
+	uint8 *encodeShape(uint16 x, uint16 y, uint16 w, uint16 h, bool encode8bit = false, const uint8 *cgaMapping = 0);
 	void drawShape(uint8 pageNum, const uint8 *shapeData, int x, int y, int sd = -1, int flags = 0, ...);
 	const uint8 *scaleShape(const uint8 *shapeData, int blockDistance);
 	const uint8 *scaleShapeStep(const uint8 *shp);
-	void replaceShapePalette(uint8 *shp, const uint8 *pal);
-	void applyShapeOverlay(uint8 *shp, int ovlIndex);
+	const uint8 *generateShapeOverlay(const uint8 *shp, int paletteOverlayIndex);
 
 	void setShapeFrame(int x1, int y1, int x2, int y2);
-	void setShapeFadeMode (uint8 i, bool b);
+	void setShapeFadeMode(uint8 i, bool b);
 
 	void setGfxParameters(int x, int y, int col);
 	void drawExplosion(int scale, int radius, int numElements, int stepSize, int aspectRatio, const uint8 *colorTable, int colorTableSize);
@@ -72,12 +78,23 @@ public:
 	void createFadeTable(uint8 *palData, uint8 *dst, uint8 rootColor, uint8 weight);
 	uint8 *getFadeTable(int index);
 
+	const uint16 *getCGADitheringTable(int index);
+	const uint8 *getEGADitheringTable();
+
 private:
-	void drawShapeSetPixel(uint8 *dst, uint8 c);
-	void scaleShapeProcessLine(uint8 *&dst, const uint8 *&src);
+	void updateDirtyRects();
+	void ditherRect(const uint8 *src, uint8 *dst, int dstPitch, int srcW, int srcH, int colorKey = -1);
+
+	void drawShapeSetPixel(uint8 *dst, uint8 col);
+	void scaleShapeProcessLine2Bit(uint8 *&shpDst, const uint8 *&shpSrc, uint32 transOffsetDst, uint32 transOffsetSrc);
+	void scaleShapeProcessLine4Bit(uint8 *&dst, const uint8 *&src);
 	bool posWithinRect(int posX, int posY, int x1, int y1, int x2, int y2);
 
-	int _dsDiv, _dsRem, _dsScaleTmp;
+	void generateEGADitheringTable(const Palette &pal);
+	void generateCGADitheringTables(const uint8 *mappingData);
+
+	int _dsDiv, _dsRem, _dsScaleTrans;
+	uint8 *_cgaScaleTable;
 	int16 _gfxX, _gfxY;
 	uint8 _gfxCol;
 	const uint8 *_gfxMaxY;
@@ -87,14 +104,22 @@ private:
 	uint16 _shapeFadeInternal;
 	uint8 *_fadeData;
 	int _fadeDataIndex;
+	uint8 _shapeOverlay[16];
 
 	uint8 *_dsTempPage;
 
+	uint16 *_cgaDitheringTables[2];
+	const uint8 *_cgaMappingDefault;
+
+	uint8 *_egaDitheringTable;
+	uint8 *_egaDitheringTempPage;
+
+	static const uint8 _egaMatchTable[];
 	static const ScreenDim _screenDimTable[];
 	static const int _screenDimTableCount;
 };
 
-}	// End of namespace Kyra
+} // End of namespace Kyra
 
 #endif // ENABLE_EOB
 

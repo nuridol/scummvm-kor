@@ -25,18 +25,23 @@
 #ifndef SWORD2_ANIMATION_H
 #define SWORD2_ANIMATION_H
 
-#include "video/dxa_decoder.h"
-#include "video/smk_decoder.h"
-#include "video/video_decoder.h"
-#include "audio/mixer.h"
-
 #include "sword2/screen.h"
+
+namespace Graphics {
+struct Surface;
+}
+
+namespace Video {
+class VideoDecoder;
+}
 
 namespace Sword2 {
 
 enum DecoderType {
 	kVideoDecoderDXA = 0,
-	kVideoDecoderSMK = 1
+	kVideoDecoderSMK = 1,
+	kVideoDecoderPSX = 2,
+	kVideoDecoderMP2 = 3
 };
 
 struct MovieText {
@@ -55,20 +60,9 @@ struct MovieText {
 	}
 };
 
-class DXADecoderWithSound : public Video::DXADecoder {
-public:
-	DXADecoderWithSound(Audio::Mixer *mixer, Audio::SoundHandle *bgSoundHandle);
-	~DXADecoderWithSound() {}
-
-	uint32 getElapsedTime() const;
-private:
-	Audio::Mixer *_mixer;
-	Audio::SoundHandle *_bgSoundHandle;
-};
-
 class MoviePlayer {
 public:
-	MoviePlayer(Sword2Engine *vm, Audio::Mixer *snd, OSystem *system, Audio::SoundHandle *bgSoundHandle, Video::VideoDecoder *decoder, DecoderType decoderType);
+	MoviePlayer(Sword2Engine *vm, OSystem *system, Video::VideoDecoder *decoder, DecoderType decoderType);
 	virtual ~MoviePlayer();
 
 	bool load(const char *name);
@@ -76,7 +70,6 @@ public:
 
 protected:
 	Sword2Engine *_vm;
-	Audio::Mixer *_snd;
 	OSystem *_system;
 	MovieText *_movieTexts;
 	uint32 _numMovieTexts;
@@ -87,24 +80,23 @@ protected:
 	DecoderType _decoderType;
 
 	Video::VideoDecoder *_decoder;
-	Audio::SoundHandle *_bgSoundHandle;
-	Audio::AudioStream *_bgSoundStream;
 
 	uint32 _leadOut;
 	int _leadOutFrame;
 
-	void performPostProcessing(byte *screen, uint16 pitch);
+	void performPostProcessing(Graphics::Surface *screen, uint16 pitch);
 	bool playVideo();
+	void drawFramePSX(const Graphics::Surface *frame);
 
 	void openTextObject(uint32 index);
-	void closeTextObject(uint32 index, byte *screen, uint16 pitch);
-	void drawTextObject(uint32 index, byte *screen, uint16 pitch);
+	void closeTextObject(uint32 index, Graphics::Surface *screen, uint16 pitch);
+	void drawTextObject(uint32 index, Graphics::Surface *screen, uint16 pitch);
 
-	byte findBlackPalIndex();
-	byte findWhitePalIndex();
+	uint32 getBlackColor();
+	uint32 getWhiteColor();
 };
 
-MoviePlayer *makeMoviePlayer(const char *name, Sword2Engine *vm, Audio::Mixer *snd, OSystem *system);
+MoviePlayer *makeMoviePlayer(const char *name, Sword2Engine *vm, OSystem *system, uint32 frameCount);
 
 } // End of namespace Sword2
 

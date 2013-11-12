@@ -20,6 +20,7 @@
  *
  */
 
+#include "dreamweb/sound.h"
 #include "dreamweb/dreamweb.h"
 
 namespace DreamWeb {
@@ -48,7 +49,9 @@ uint8 DreamWebEngine::getNextWord(const GraphicsFile &charSet, const uint8 *stri
 			return 0;
 		}
 		firstChar = modifyChar(firstChar);
-		if (firstChar != 255) {
+		// WORKAROUND: Also filter out invalid characters here (refer to the
+		// workaround in printChar() below for more info).
+		if (firstChar >= 32 && firstChar != 255) {
 			uint8 secondChar = *string;
 			uint8 width = charSet._frames[firstChar - 32 + _charShift].width;
 			width = kernChars(firstChar, secondChar, width);
@@ -58,7 +61,11 @@ uint8 DreamWebEngine::getNextWord(const GraphicsFile &charSet, const uint8 *stri
 }
 
 void DreamWebEngine::printChar(const GraphicsFile &charSet, uint16* x, uint16 y, uint8 c, uint8 nextChar, uint8 *width, uint8 *height) {
-	if (c == 255)
+	// WORKAROUND: Some texts contain leftover tab characters, which will cause
+	// OOB memory access when showing a character, as all the printable ones are
+	// from 32 onwards. We compensate for that here by ignoring all the invalid
+	// characters (0 - 31).
+	if (c < 32 || c == 255)
 		return;
 
 	uint8 dummyWidth, dummyHeight;
@@ -197,7 +204,7 @@ uint8 DreamWebEngine::kernChars(uint8 firstChar, uint8 secondChar, uint8 width) 
 uint16 DreamWebEngine::waitFrames() {
 	readMouse();
 	showPointer();
-	vSync();
+	waitForVSync();
 	dumpPointer();
 	delPointer();
 	return _mouseButton;
@@ -210,8 +217,8 @@ const char *DreamWebEngine::monPrint(const char *string) {
 	bool done = false;
 	while (!done) {
 
-		uint16 count = getNumber(_tempCharset, (const uint8 *)iterator, 166, false, &x);
-		do {	
+		uint16 count = getNumber(_monitorCharset, (const uint8 *)iterator, 166, false, &x);
+		do {
 			char c = *iterator++;
 			if (c == ':')
 				break;
@@ -226,12 +233,12 @@ const char *DreamWebEngine::monPrint(const char *string) {
 				break;
 			}
 			c = modifyChar(c);
-			printChar(_tempCharset, &x, _monAdY, c, 0, NULL, NULL);
+			printChar(_monitorCharset, &x, _monAdY, c, 0, NULL, NULL);
 			_cursLocX = x;
 			_cursLocY = _monAdY;
 			_mainTimer = 1;
 			printCurs();
-			vSync();
+			waitForVSync();
 			lockMon();
 			delCurs();
 		} while (--count);
@@ -246,10 +253,9 @@ const char *DreamWebEngine::monPrint(const char *string) {
 }
 
 void DreamWebEngine::rollEndCreditsGameWon() {
-	playChannel0(16, 255);
-	_volume = 7;
-	_volumeTo = 0;
-	_volumeDirection = -1;
+	_sound->playChannel0(16, 255);
+	_sound->volumeSet(7);
+	_sound->volumeChange(0, -1);
 
 	multiGet(_mapStore, 75, 20, 160, 160);
 
@@ -261,9 +267,9 @@ void DreamWebEngine::rollEndCreditsGameWon() {
 		// then move it up one pixel until we shifted it by a complete
 		// line of text.
 		for (int j = 0; j < linespacing; ++j) {
-			vSync();
+			waitForVSync();
 			multiPut(_mapStore, 75, 20, 160, 160);
-			vSync();
+			waitForVSync();
 
 			// Output up to 18 lines of text
 			uint16 y = 10 - j;
@@ -273,7 +279,7 @@ void DreamWebEngine::rollEndCreditsGameWon() {
 				y += linespacing;
 			}
 
-			vSync();
+			waitForVSync();
 			multiDump(75, 20, 160, 160);
 		}
 
@@ -300,9 +306,9 @@ void DreamWebEngine::rollEndCreditsGameLost() {
 		// then move it up one pixel until we shifted it by a complete
 		// line of text.
 		for (int j = 0; j < linespacing; ++j) {
-			vSync();
+			waitForVSync();
 			multiPut(_mapStore, 25, 20, 160, 160);
-			vSync();
+			waitForVSync();
 
 			// Output up to 18 lines of text
 			uint16 y = 10 - j;
@@ -312,10 +318,10 @@ void DreamWebEngine::rollEndCreditsGameLost() {
 				y += linespacing;
 			}
 
-			vSync();
+			waitForVSync();
 			multiDump(25, 20, 160, 160);
 
-			if (_lastHardKey == 1)
+			if (_lastHardKey == Common::KEYCODE_ESCAPE)
 				return;
 		}
 
@@ -325,7 +331,7 @@ void DreamWebEngine::rollEndCreditsGameLost() {
 			c = *string++;
 		} while (c != ':' && c != 0);
 
-		if (_lastHardKey == 1)
+		if (_lastHardKey == Common::KEYCODE_ESCAPE)
 			return;
 	}
 

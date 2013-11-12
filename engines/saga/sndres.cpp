@@ -105,6 +105,12 @@ SndRes::SndRes(SagaEngine *vm) : _vm(vm), _sfxContext(NULL), _voiceContext(NULL)
 }
 
 SndRes::~SndRes() {
+#ifdef ENABLE_IHNM
+	if (_vm->getGameId() == GID_IHNM && _vm->isMacResources()) {
+		// Delete the dummy voice context. See setVoiceBank()
+		delete _voiceContext;
+	}
+#endif
 }
 
 void SndRes::setVoiceBank(int serial) {
@@ -243,11 +249,11 @@ bool SndRes::load(ResourceContext *context, uint32 resourceId, SoundBuffer &buff
 
 		if (!memcmp(header, "Creative", 8)) {
 			resourceType = kSoundVOC;
-		} else if (!memcmp(header, "RIFF", 4) != 0) {
+		} else if (!memcmp(header, "RIFF", 4)) {
 			resourceType = kSoundWAV;
-		} else if (!memcmp(header, "FORM", 4) != 0) {
+		} else if (!memcmp(header, "FORM", 4)) {
 			resourceType = kSoundAIFF;
-		} else if (!memcmp(header, "ajkg", 4) != 0) {
+		} else if (!memcmp(header, "ajkg", 4)) {
 			resourceType = kSoundShorten;
 		}
 

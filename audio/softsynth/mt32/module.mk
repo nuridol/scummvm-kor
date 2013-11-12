@@ -1,20 +1,19 @@
 MODULE := audio/softsynth/mt32
 
 MODULE_OBJS := \
-	AReverbModel.o \
-	DelayReverb.o \
-	FreeverbModel.o \
+	BReverbModel.o \
 	LA32Ramp.o \
+	LA32WaveGenerator.o \
 	Part.o \
 	Partial.o \
 	PartialManager.o \
 	Poly.o \
+	ROMInfo.o \
 	Synth.o \
+	Tables.o \
 	TVA.o \
 	TVF.o \
-	TVP.o \
-	Tables.o \
-	freeverb.o
+	TVP.o
 
 # Include common rules
 include $(srcdir)/rules.mk

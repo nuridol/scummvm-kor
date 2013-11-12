@@ -27,16 +27,25 @@
 
 #include "common/config-manager.h"
 #include "engines/advancedDetector.h"
+#include "engines/metaengine.h"
 #include "common/system.h"
 #include "common/file.h"
 #include "common/fs.h"
 #include "common/savefile.h"
 #include "common/textconsole.h"
+#include "common/translation.h"
 
 #include "engines/metaengine.h"
 
 static const PlainGameDescriptor skySetting =
 	{"sky", "Beneath a Steel Sky" };
+
+static const ExtraGuiOption skyExtraGuiOption = {
+	_s("Floppy intro"),
+	_s("Use the floppy version's intro (CD version only)"),
+	"alt_intro",
+	false
+};
 
 struct SkyVersion {
 	int dinnerTableEntries;
@@ -68,6 +77,7 @@ public:
 
 	virtual bool hasFeature(MetaEngineFeature f) const;
 	virtual GameList getSupportedGames() const;
+	virtual const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const;
 	virtual GameDescriptor findGame(const char *gameid) const;
 	virtual GameList detectGames(const Common::FSList &fslist) const;
 
@@ -104,6 +114,25 @@ GameList SkyMetaEngine::getSupportedGames() const {
 	GameList games;
 	games.push_back(skySetting);
 	return games;
+}
+
+const ExtraGuiOptions SkyMetaEngine::getExtraGuiOptions(const Common::String &target) const {
+	Common::String guiOptions;
+	ExtraGuiOptions options;
+
+	if (target.empty()) {
+		options.push_back(skyExtraGuiOption);
+		return options;
+	}
+
+	if (ConfMan.hasKey("guioptions", target)) {
+		guiOptions = ConfMan.get("guioptions", target);
+		guiOptions = parseGameGUIOptions(guiOptions);
+	}
+
+	if (!guiOptions.contains(GUIO_NOSPEECH))
+		options.push_back(skyExtraGuiOption);
+	return options;
 }
 
 GameDescriptor SkyMetaEngine::findGame(const char *gameid) const {
@@ -206,7 +235,7 @@ SaveStateList SkyMetaEngine::listSaves(const char *target) const {
 		// Extract the extension
 		Common::String ext = file->c_str() + file->size() - 3;
 		ext.toUppercase();
-		if (isdigit(static_cast<unsigned char>(ext[0])) && isdigit(static_cast<unsigned char>(ext[1])) && isdigit(static_cast<unsigned char>(ext[2]))){
+		if (Common::isDigit(ext[0]) && Common::isDigit(ext[1]) && Common::isDigit(ext[2])) {
 			int slotNum = atoi(ext.c_str());
 			Common::InSaveFile *in = saveFileMan->openForLoading(*file);
 			if (in) {

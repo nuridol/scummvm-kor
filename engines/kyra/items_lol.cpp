@@ -29,7 +29,7 @@ namespace Kyra {
 
 LoLObject *LoLEngine::findObject(uint16 index) {
 	if (index & 0x8000)
-		return &_monsters[index & 0x7fff];
+		return &_monsters[index & 0x7FFF];
 	else
 		return &_itemsInPlay[index];
 }
@@ -221,7 +221,7 @@ Item LoLEngine::makeItem(int itemType, int curFrame, int flags) {
 	memset(&_itemsInPlay[slot], 0, sizeof(LoLItem));
 
 	_itemsInPlay[slot].itemPropertyIndex = itemType;
-	_itemsInPlay[slot].shpCurFrame_flg = (curFrame & 0x1fff) | flags;
+	_itemsInPlay[slot].shpCurFrame_flg = (curFrame & 0x1FFF) | flags;
 	_itemsInPlay[slot].level = -1;
 
 	return slot;
@@ -265,6 +265,7 @@ bool LoLEngine::addItemToInventory(Item itemIndex) {
 		gui_drawInventory();
 	}
 
+	assert(pos > 0 && pos < 48);
 	_inventory[pos] = itemIndex;
 	gui_drawInventory();
 
@@ -292,7 +293,7 @@ void LoLEngine::runItemScript(int charNum, Item item, int flags, int next, int r
 	memset(&scriptState, 0, sizeof(EMCState));
 
 	uint8 func = item ? _itemProperties[_itemsInPlay[item].itemPropertyIndex].itemScriptFunc : 3;
-	if (func == 0xff)
+	if (func == 0xFF)
 		return;
 
 	_emc->init(&scriptState, &_itemScript);
@@ -351,8 +352,8 @@ bool LoLEngine::itemEquipped(int charNum, uint16 itemType) {
 
 void LoLEngine::setItemPosition(Item item, uint16 x, uint16 y, int flyingHeight, int moveable) {
 	if (!flyingHeight) {
-		x = (x & 0xffc0) | 0x40;
-		y = (y & 0xffc0) | 0x40;
+		x = (x & 0xFFC0) | 0x40;
+		y = (y & 0xFFC0) | 0x40;
 	}
 
 	uint16 block = calcBlockIndex(x, y);
@@ -364,7 +365,7 @@ void LoLEngine::setItemPosition(Item item, uint16 x, uint16 y, int flyingHeight,
 	if (moveable)
 		_itemsInPlay[item].shpCurFrame_flg |= 0x4000;
 	else
-		_itemsInPlay[item].shpCurFrame_flg &= 0xbfff;
+		_itemsInPlay[item].shpCurFrame_flg &= 0xBFFF;
 
 
 	assignItemToBlock(&_levelBlockProperties[block].assignedObjects, item);
@@ -429,9 +430,9 @@ bool LoLEngine::launchObject(int objectType, Item item, int startX, int startY, 
 
 	if (attackerId != -1) {
 		if (attackerId & 0x8000) {
-			t->flags &= 0xfd;
+			t->flags &= 0xFD;
 		} else {
-			t->flags &= 0xfb;
+			t->flags &= 0xFB;
 			increaseExperience(attackerId, 1, 2);
 		}
 	}
@@ -441,22 +442,22 @@ bool LoLEngine::launchObject(int objectType, Item item, int startX, int startY, 
 	return true;
 }
 
-void LoLEngine::endObjectFlight(FlyingObject *t, int x, int y, int collisionObject) {
+void LoLEngine::endObjectFlight(FlyingObject *t, int x, int y, int collisionType) {
 	int cx = x;
 	int cy = y;
 	uint16 block = calcBlockIndex(t->x, t->y);
 	removeAssignedObjectFromBlock(&_levelBlockProperties[block], t->item);
 	removeDrawObjectFromBlock(&_levelBlockProperties[block], t->item);
 
-	if (collisionObject == 1) {
+	if (collisionType == 1) {
 		cx = t->x;
 		cy = t->y;
 	}
 
 	if (t->objectType == 0 || t->objectType == 1) {
-		objectFlightProcessHits(t, cx, cy, collisionObject);
-		t->x = (cx & 0xffc0) | 0x40;
-		t->y = (cy & 0xffc0) | 0x40;
+		objectFlightProcessHits(t, cx, cy, collisionType);
+		t->x = (cx & 0xFFC0) | 0x40;
+		t->y = (cy & 0xFFC0) | 0x40;
 		t->flyingHeight = 0;
 		updateObjectFlightPosition(t);
 	}
@@ -488,27 +489,23 @@ void LoLEngine::updateObjectFlightPosition(FlyingObject *t) {
 	}
 }
 
-void LoLEngine::objectFlightProcessHits(FlyingObject *t, int x, int y, int objectOnNextBlock) {
-	uint16 r = 0;
-
-	if (objectOnNextBlock == 1) {
+void LoLEngine::objectFlightProcessHits(FlyingObject *t, int x, int y, int collisionType) {
+	if (collisionType == 1) {
 		runLevelScriptCustom(calcNewBlockPosition(_itemsInPlay[t->item].block, t->direction >> 1), 0x8000, -1, t->item, 0, 0);
 
-	} else if (objectOnNextBlock == 2) {
+	} else if (collisionType == 2) {
 		if (_itemProperties[_itemsInPlay[t->item].itemPropertyIndex].flags & 0x4000) {
-			int o = _levelBlockProperties[_itemsInPlay[t->item].block].assignedObjects;
-			while (o & 0x8000) {
-				LoLObject *i = findObject(o);
-				o = i->nextAssignedObject;
-				runItemScript(t->attackerId, t->item, 0x8000, o, 0);
+			uint16 obj = _levelBlockProperties[_itemsInPlay[t->item].block].assignedObjects;
+			while (obj & 0x8000) {
+				runItemScript(t->attackerId, t->item, 0x8000, obj, 0);
+				obj = findObject(obj)->nextAssignedObject;
 			}
 
 		} else {
-			r = getNearestMonsterFromPos(x, y);
-			runItemScript(t->attackerId, t->item, 0x8000, r, 0);
+			runItemScript(t->attackerId, t->item, 0x8000, getNearestMonsterFromPos(x, y), 0);
 		}
 
-	} else if (objectOnNextBlock == 4) {
+	} else if (collisionType == 4) {
 		_partyAwake = true;
 		if (_itemProperties[_itemsInPlay[t->item].itemPropertyIndex].flags & 0x4000) {
 			for (int i = 0; i < 4; i++) {
@@ -516,8 +513,7 @@ void LoLEngine::objectFlightProcessHits(FlyingObject *t, int x, int y, int objec
 					runItemScript(t->attackerId, t->item, 0x8000, i, 0);
 			}
 		} else {
-			r = getNearestPartyMemberFromPos(x, y);
-			runItemScript(t->attackerId, t->item, 0x8000, r, 0);
+			runItemScript(t->attackerId, t->item, 0x8000, getNearestPartyMemberFromPos(x, y), 0);
 		}
 	}
 }
@@ -543,9 +539,9 @@ void LoLEngine::updateFlyingObject(FlyingObject *t) {
 	middle of a block (or making the monsters align to the middle before casting them) wouldn't help here
 	(and wouldn't be faithful to the original either).
 	*/
-	int objectOnNextBlock = checkBlockBeforeObjectPlacement(x, y, /*_itemProperties[_itemsInPlay[t->item].itemPropertyIndex].flags & 0x4000 ? 256 :*/ 63,  t->flags, t->wallFlags);
-	if (objectOnNextBlock) {
-		endObjectFlight(t, x, y, objectOnNextBlock);
+	int collisionType = checkBlockBeforeObjectPlacement(x, y, /*_itemProperties[_itemsInPlay[t->item].itemPropertyIndex].flags & 0x4000 ? 256 :*/ 63,  t->flags, t->wallFlags);
+	if (collisionType) {
+		endObjectFlight(t, x, y, collisionType);
 	} else {
 		if (--t->distance) {
 			processObjectFlight(t, x, y);
@@ -567,16 +563,16 @@ void LoLEngine::assignItemToBlock(uint16 *assignedBlockObjects, int id) {
 	*assignedBlockObjects = id;
 }
 
-int LoLEngine::checkDrawObjectSpace(int itemX, int itemY, int partyX, int partyY) {
-	int a = itemX - partyX;
-	if (a < 0)
-		a = -a;
+int LoLEngine::checkDrawObjectSpace(int x1, int y1, int x2, int y2) {
+	int dx = x1 - x2;
+	if (dx < 0)
+		dx = -dx;
 
-	int b = itemY - partyY;
-	if (b < 0)
-		b = -b;
+	int dy = y1 - y2;
+	if (dy < 0)
+		dy = -dy;
 
-	return a + b;
+	return dx + dy;
 }
 
 int LoLEngine::checkSceneForItems(uint16 *blockDrawObjects, int color) {

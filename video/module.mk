@@ -5,6 +5,7 @@ MODULE_OBJS := \
 	coktel_decoder.o \
 	dxa_decoder.o \
 	flic_decoder.o \
+	psx_decoder.o \
 	qt_decoder.o \
 	smk_decoder.o \
 	video_decoder.o \
@@ -17,11 +18,22 @@ MODULE_OBJS := \
 	codecs/qtrle.o \
 	codecs/rpza.o \
 	codecs/smc.o \
+	codecs/svq1.o \
 	codecs/truemotion1.o
 
 ifdef USE_BINK
 MODULE_OBJS += \
 	bink_decoder.o
+endif
+
+ifdef USE_THEORADEC
+MODULE_OBJS += \
+	theora_decoder.o
+endif
+
+ifdef USE_MPEG2
+MODULE_OBJS += \
+	codecs/mpeg.o
 endif
 
 # Include common rules

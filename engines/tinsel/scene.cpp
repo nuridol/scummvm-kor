@@ -86,8 +86,8 @@ struct SCENE_STRUC {
 	SCNHANDLE hTaggedActor;	// handle to table of tagged actors
 	int32 numProcess;	// number of processes in this scene
 	SCNHANDLE hProcess;	// handle to table of processes
-	SCNHANDLE hMusicScript;	// handle to music script data
-	SCNHANDLE hMusicSegment;// handle to music segments
+	SCNHANDLE hMusicScript;	// handle to music script data - Tinsel 2 only
+	SCNHANDLE hMusicSegment;// handle to music segments - Tinsel 2 only
 } PACKED_STRUCT;
 
 /** entrance structure - one per entrance */
@@ -107,15 +107,15 @@ struct ENTRANCE_STRUC {
 // FIXME: Avoid non-const global vars
 
 #ifdef DEBUG
-static bool ShowPosition = false;	// Set when showpos() has been called
+static bool g_ShowPosition = false;	// Set when showpos() has been called
 #endif
 
-int sceneCtr = 0;
-static int initialMyEscape;
+int g_sceneCtr = 0;
+static int g_initialMyEscape;
 
-static SCNHANDLE SceneHandle = 0;	// Current scene handle - stored in case of Save_Scene()
+static SCNHANDLE g_SceneHandle = 0;	// Current scene handle - stored in case of Save_Scene()
 
-SCENE_STRUC tempStruc;
+SCENE_STRUC g_tempStruc;
 
 struct TP_INIT {
 	SCNHANDLE hTinselCode;		// Code
@@ -128,18 +128,18 @@ const SCENE_STRUC *GetSceneStruc(const byte *pStruc) {
 
 	// Copy appropriate fields into tempStruc, and return a pointer to it
 	const byte *p = pStruc;
-	memset(&tempStruc, 0, sizeof(SCENE_STRUC));
+	memset(&g_tempStruc, 0, sizeof(SCENE_STRUC));
 
-	tempStruc.numEntrance = READ_UINT32(p); p += sizeof(uint32);
-	tempStruc.numPoly = READ_UINT32(p); p += sizeof(uint32);
-	tempStruc.numTaggedActor = READ_UINT32(p); p += sizeof(uint32);
-	tempStruc.defRefer = READ_UINT32(p); p += sizeof(uint32);
-	tempStruc.hSceneScript = READ_UINT32(p); p += sizeof(uint32);
-	tempStruc.hEntrance = READ_UINT32(p); p += sizeof(uint32);
-	tempStruc.hPoly = READ_UINT32(p); p += sizeof(uint32);
-	tempStruc.hTaggedActor = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numEntrance    = READ_32(p); p += sizeof(uint32);
+	g_tempStruc.numPoly        = READ_32(p); p += sizeof(uint32);
+	g_tempStruc.numTaggedActor = READ_32(p); p += sizeof(uint32);
+	g_tempStruc.defRefer       = READ_32(p); p += sizeof(uint32);
+	g_tempStruc.hSceneScript   = READ_32(p); p += sizeof(uint32);
+	g_tempStruc.hEntrance      = READ_32(p); p += sizeof(uint32);
+	g_tempStruc.hPoly          = READ_32(p); p += sizeof(uint32);
+	g_tempStruc.hTaggedActor   = READ_32(p); p += sizeof(uint32);
 
-	return &tempStruc;
+	return &g_tempStruc;
 }
 
 
@@ -157,8 +157,10 @@ static void SceneTinselProcess(CORO_PARAM, const void *param) {
 	CORO_BEGIN_CODE(_ctx);
 
 	// The following myEscape value setting is used for enabling title screen skipping in DW1
-	if (TinselV1 && (sceneCtr == 1)) initialMyEscape = GetEscEvents();
-	_ctx->myEscape = (TinselV1 && (sceneCtr < 4)) ? initialMyEscape : 0;
+	if (TinselV1 && (g_sceneCtr == 1)) g_initialMyEscape = GetEscEvents();
+	// DW1 PSX has its own scene skipping script code for scenes 2 and 3 (bug #3541542).
+	// Same goes for DW1 Mac.
+	_ctx->myEscape = (TinselV1 && (g_sceneCtr < ((TinselV1PSX || TinselV1Mac) ? 2 : 4))) ? g_initialMyEscape : 0;
 
 	// get the stuff copied to process when it was created
 	_ctx->pInit = (const TP_INIT *)param;
@@ -166,7 +168,7 @@ static void SceneTinselProcess(CORO_PARAM, const void *param) {
 	assert(_ctx->pInit->hTinselCode);		// Must have some code to run
 
 	_ctx->pic = InitInterpretContext(GS_SCENE,
-		READ_LE_UINT32(&_ctx->pInit->hTinselCode),
+		_ctx->pInit->hTinselCode,
 		TinselV2 ? _ctx->pInit->event : NOEVENT,
 		NOPOLY,			// No polygon
 		0,				// No actor
@@ -184,8 +186,8 @@ static void SceneTinselProcess(CORO_PARAM, const void *param) {
 void SendSceneTinselProcess(TINSEL_EVENT event) {
 	SCENE_STRUC	*ss;
 
-	if (SceneHandle != (SCNHANDLE)NULL) {
-		ss = (SCENE_STRUC *) FindChunk(SceneHandle, CHUNK_SCENE);
+	if (g_SceneHandle != 0) {
+		ss = (SCENE_STRUC *) FindChunk(g_SceneHandle, CHUNK_SCENE);
 
 		if (ss->hSceneScript) {
 			TP_INIT	init;
@@ -193,7 +195,7 @@ void SendSceneTinselProcess(TINSEL_EVENT event) {
 			init.event = event;
 			init.hTinselCode = ss->hSceneScript;
 
-			g_scheduler->createProcess(PID_TCODE, SceneTinselProcess, &init, sizeof(init));
+			CoroScheduler.createProcess(PID_TCODE, SceneTinselProcess, &init, sizeof(init));
 		}
 	}
 }
@@ -208,21 +210,21 @@ void SendSceneTinselProcess(TINSEL_EVENT event) {
  */
 
 static void LoadScene(SCNHANDLE scene, int entry) {
-	uint	i;
+	int32	i;
 	TP_INIT init;
 	const SCENE_STRUC	*ss;
 	const ENTRANCE_STRUC	*es;
 
 	// Scene handle
-	SceneHandle = scene;		// Save scene handle in case of Save_Scene()
-	LockMem(SceneHandle);		// Make sure scene is loaded
-	LockScene(SceneHandle);		// Prevent current scene from being discarded
+	g_SceneHandle = scene;		// Save scene handle in case of Save_Scene()
+	LockMem(g_SceneHandle);		// Make sure scene is loaded
+	LockScene(g_SceneHandle);		// Prevent current scene from being discarded
 
 	if (TinselV2) {
 		// CdPlay() stuff
 		byte *cptr = FindChunk(scene, CHUNK_CDPLAY_FILENUM);
 		assert(cptr);
-		i = READ_LE_UINT32(cptr);
+		i = READ_32(cptr);
 		assert(i < 512);
 		cptr = FindChunk(scene, CHUNK_CDPLAY_FILENAME);
 		assert(cptr);
@@ -237,18 +239,17 @@ static void LoadScene(SCNHANDLE scene, int entry) {
 		// Music stuff
 		char *cptr = (char *)FindChunk(scene, CHUNK_MUSIC_FILENAME);
 		assert(cptr);
-		_vm->_pcmMusic->setMusicSceneDetails(FROM_LE_32(ss->hMusicScript),
-			FROM_LE_32(ss->hMusicSegment), cptr);
+		_vm->_pcmMusic->setMusicSceneDetails(ss->hMusicScript, ss->hMusicSegment, cptr);
 	}
 
 	if (entry == NO_ENTRY_NUM) {
 		// Restoring scene
 
 		// Initialize all the polygons for this scene
-		InitPolygons(FROM_LE_32(ss->hPoly), FROM_LE_32(ss->numPoly), true);
+		InitPolygons(ss->hPoly, ss->numPoly, true);
 
 		// Initialize the actors for this scene
-		StartTaggedActors(FROM_LE_32(ss->hTaggedActor), FROM_LE_32(ss->numTaggedActor), false);
+		StartTaggedActors(ss->hTaggedActor, ss->numTaggedActor, false);
 
 		if (TinselV2)
 			// Returning from cutscene
@@ -258,20 +259,20 @@ static void LoadScene(SCNHANDLE scene, int entry) {
 		// Genuine new scene
 
 		// Initialize all the polygons for this scene
-		InitPolygons(FROM_LE_32(ss->hPoly), FROM_LE_32(ss->numPoly), false);
+		InitPolygons(ss->hPoly, ss->numPoly, false);
 
 		// Initialize the actors for this scene
-		StartTaggedActors(FROM_LE_32(ss->hTaggedActor), FROM_LE_32(ss->numTaggedActor), true);
+		StartTaggedActors(ss->hTaggedActor, ss->numTaggedActor, true);
 
 		// Run the appropriate entrance code (if any)
-		es = (const ENTRANCE_STRUC *)LockMem(FROM_LE_32(ss->hEntrance));
-		for (i = 0; i < FROM_LE_32(ss->numEntrance); i++) {
-			if (FROM_LE_32(es->eNumber) == (uint)entry) {
+		es = (const ENTRANCE_STRUC *)LockMem(ss->hEntrance);
+		for (i = 0; i < ss->numEntrance; i++) {
+			if (FROM_32(es->eNumber) == (uint)entry) {
 				if (es->hScript) {
 					init.event = STARTUP;
-					init.hTinselCode = es->hScript;
+					init.hTinselCode = FROM_32(es->hScript);
 
-					g_scheduler->createProcess(PID_TCODE, SceneTinselProcess, &init, sizeof(init));
+					CoroScheduler.createProcess(PID_TCODE, SceneTinselProcess, &init, sizeof(init));
 				}
 				break;
 			}
@@ -284,22 +285,22 @@ static void LoadScene(SCNHANDLE scene, int entry) {
 
 		}
 
-		if (i == FROM_LE_32(ss->numEntrance))
-			error("Non-existant scene entry number");
+		if (i == ss->numEntrance)
+			error("Non-existent scene entry number");
 
 		if (ss->hSceneScript) {
 			init.event = STARTUP;
 			init.hTinselCode = ss->hSceneScript;
 
-			g_scheduler->createProcess(PID_TCODE, SceneTinselProcess, &init, sizeof(init));
+			CoroScheduler.createProcess(PID_TCODE, SceneTinselProcess, &init, sizeof(init));
 		}
 	}
 
 	// Default refer type
-	SetDefaultRefer(FROM_LE_32(ss->defRefer));
+	SetDefaultRefer(ss->defRefer);
 
 	// Scene's processes
-	SceneProcesses(FROM_LE_32(ss->numProcess), FROM_LE_32(ss->hProcess));
+	SceneProcesses(ss->numProcess, ss->hProcess);
 }
 
 
@@ -307,9 +308,9 @@ static void LoadScene(SCNHANDLE scene, int entry) {
  * Wrap up the last scene.
  */
 void EndScene() {
-	if (SceneHandle != 0) {
-		UnlockScene(SceneHandle);
-		SceneHandle = 0;
+	if (g_SceneHandle != 0) {
+		UnlockScene(g_SceneHandle);
+		g_SceneHandle = 0;
 	}
 
 	KillInventory();	// Close down any open inventory
@@ -344,7 +345,7 @@ void EndScene() {
 	KillAllObjects();
 
 	// kill all destructable process
-	g_scheduler->killMatchingProcess(PID_DESTROY, PID_DESTROY);
+	CoroScheduler.killMatchingProcess(PID_DESTROY, PID_DESTROY);
 }
 
 /**
@@ -405,16 +406,16 @@ void PrimeScene() {
 	if (!TinselV2)
 		EnableTags();		// Next scene with tags enabled
 
-	g_scheduler->createProcess(PID_SCROLL, ScrollProcess, NULL, 0);
-	g_scheduler->createProcess(PID_SCROLL, EffectPolyProcess, NULL, 0);
+	CoroScheduler.createProcess(PID_SCROLL, ScrollProcess, NULL, 0);
+	CoroScheduler.createProcess(PID_SCROLL, EffectPolyProcess, NULL, 0);
 
 #ifdef DEBUG
-	if (ShowPosition)
-		g_scheduler->createProcess(PID_POSITION, CursorPositionProcess, NULL, 0);
+	if (g_ShowPosition)
+		CoroScheduler.createProcess(PID_POSITION, CursorPositionProcess, NULL, 0);
 #endif
 
-	g_scheduler->createProcess(PID_TAG, TagProcess, NULL, 0);
-	g_scheduler->createProcess(PID_TAG, PointProcess, NULL, 0);
+	CoroScheduler.createProcess(PID_TAG, TagProcess, NULL, 0);
+	CoroScheduler.createProcess(PID_TAG, PointProcess, NULL, 0);
 
 	// init the current background
 	PrimeBackground();
@@ -445,7 +446,7 @@ void StartNewScene(SCNHANDLE scene, int entry) {
  */
 
 void setshowpos() {
-	ShowPosition = true;
+	g_ShowPosition = true;
 }
 #endif
 
@@ -454,7 +455,7 @@ void setshowpos() {
  */
 
 SCNHANDLE GetSceneHandle() {
-	return SceneHandle;
+	return g_SceneHandle;
 }
 
 /**
@@ -471,7 +472,7 @@ void DoHailScene(SCNHANDLE scene) {
 		init.event = NOEVENT;
 		init.hTinselCode = ss->hSceneScript;
 
-		g_scheduler->createProcess(PID_TCODE, SceneTinselProcess, &init, sizeof(init));
+		CoroScheduler.createProcess(PID_TCODE, SceneTinselProcess, &init, sizeof(init));
 	}
 }
 

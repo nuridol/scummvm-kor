@@ -20,49 +20,49 @@
  *
  */
 
+#include "dreamweb/sound.h"
 #include "dreamweb/dreamweb.h"
 #include "engines/util.h"
 
 namespace DreamWeb {
 
 void DreamWebEngine::endGame() {
-	loadTempText("DREAMWEB.T83");
+	loadTempText("T83");
 	monkSpeaking();
 	if (_quitRequested)
 		return;
 	gettingShot();
 	getRidOfTempText();
-	_volumeTo = 7;
-	_volumeDirection = 1;
+	_sound->volumeChange(7, 1);
 	hangOn(200);
 }
 
 void DreamWebEngine::monkSpeaking() {
 	_roomsSample = 35;
-	loadRoomsSample();
-	loadIntoTemp("DREAMWEB.G15");
+	_sound->loadRoomsSample(_roomsSample);
+	GraphicsFile graphics;
+	loadGraphicsFile(graphics, "G15");
 	clearWork();
-	showFrame(_tempGraphics, 160, 72, 0, 128);	// show monk
+	showFrame(graphics, 160, 72, 0, 128);	// show monk
 	workToScreen();
-	_volume = 7;
-	_volumeDirection = -1;
-	_volumeTo = hasSpeech() ? 5 : 0;
-	playChannel0(12, 255);
+	_sound->volumeSet(7);
+	_sound->volumeChange(hasSpeech() ? 5 : 0, -1);
+	_sound->playChannel0(12, 255);
 	fadeScreenUps();
 	hangOn(300);
 
 	// TODO: Subtitles+speech mode
 	if (hasSpeech()) {
 		for (int i = 40; i < 48; i++) {
-			loadSpeech('T', 83, 'T', i);
+			_speechLoaded = _sound->loadSpeech('T', 83, 'T', i);
 
-			playChannel1(50 + 12);
+			_sound->playChannel1(62);
 
 			do {
 				waitForVSync();
 				if (_quitRequested)
 					return;
-			} while (_channel1Playing != 255);
+			} while (_sound->isChannel1Playing());
 		}
 	} else {
 		for (int i = 40; i <= 44; i++) {
@@ -74,7 +74,7 @@ void DreamWebEngine::monkSpeaking() {
 				printResult = printDirect(&string, 36, &y, 239, 239 & 1);
 				workToScreen();
 				clearWork();
-				showFrame(_tempGraphics, 160, 72, 0, 128);	// show monk
+				showFrame(graphics, 160, 72, 0, 128);	// show monk
 				hangOnP(240);
 				if (_quitRequested)
 					return;
@@ -82,11 +82,10 @@ void DreamWebEngine::monkSpeaking() {
 		}
 	}
 
-	_volumeDirection = 1;
-	_volumeTo = 7;
+	_sound->volumeChange(7, 1);
 	fadeScreenDowns();
 	hangOn(300);
-	getRidOfTemp();
+	graphics.clear();
 }
 
 void DreamWebEngine::gettingShot() {
@@ -94,8 +93,7 @@ void DreamWebEngine::gettingShot() {
 	clearPalette();
 	loadIntroRoom();
 	fadeScreenUps();
-	_volumeTo = 0;
-	_volumeDirection = -1;
+	_sound->volumeChange(0, -1);
 	runEndSeq();
 	clearBeforeLoad();
 }
@@ -103,58 +101,57 @@ void DreamWebEngine::gettingShot() {
 void DreamWebEngine::bibleQuote() {
 	initGraphics(640, 480, true);
 
-	showPCX("DREAMWEB.I00");
+	showPCX("I00");
 	fadeScreenUps();
 
 	hangOne(80);
-	if (_lastHardKey == 1) {
-		_lastHardKey = 0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "biblequotearly"
 	}
 
 	hangOne(560);
-	if (_lastHardKey == 1) {
-		_lastHardKey = 0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "biblequotearly"
 	}
 
 	fadeScreenDowns();
 
 	hangOne(200);
-	if (_lastHardKey == 1) {
-		_lastHardKey = 0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "biblequotearly"
 	}
 
-	cancelCh0();
+	_sound->cancelCh0();
 
-	_lastHardKey = 0;
+	_lastHardKey = Common::KEYCODE_INVALID;
 }
 
 void DreamWebEngine::hangOne(uint16 delay) {
 	do {
-		vSync();
-		if (_lastHardKey == 1)
+		waitForVSync();
+		if (_lastHardKey == Common::KEYCODE_ESCAPE)
 			return; // "hangonearly"
 	} while	(--delay);
 }
 
 void DreamWebEngine::intro() {
-	loadTempText("DREAMWEB.T82");
+	loadTempText("T82");
 	loadPalFromIFF();
 	setMode();
 	_newLocation = 50;
 	clearPalette();
 	loadIntroRoom();
-	_volume = 7;
-	_volumeDirection = -1;
-	_volumeTo = hasSpeech() ? 4 : 0;
-	playChannel0(12, 255);
+	_sound->volumeSet(7);
+	_sound->volumeChange(hasSpeech() ? 4 : 0, -1);
+	_sound->playChannel0(12, 255);
 	fadeScreenUps();
 	runIntroSeq();
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "introearly"
 	}
 
@@ -163,8 +160,8 @@ void DreamWebEngine::intro() {
 	loadIntroRoom();
 	runIntroSeq();
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "introearly"
 	}
 
@@ -173,8 +170,8 @@ void DreamWebEngine::intro() {
 	loadIntroRoom();
 	runIntroSeq();
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "introearly"
 	}
 
@@ -184,30 +181,30 @@ void DreamWebEngine::intro() {
 	loadIntroRoom();
 	runIntroSeq();
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "introearly"
 	}
 
 	getRidOfTempText();
 	clearBeforeLoad();
 
-	_lastHardKey =  0;
+	_lastHardKey = Common::KEYCODE_INVALID;
 }
 
 void DreamWebEngine::runIntroSeq() {
 	_getBack = 0;
 
 	do {
-		vSync();
+		waitForVSync();
 
-		if (_lastHardKey == 1)
+		if (_lastHardKey == Common::KEYCODE_ESCAPE)
 			break;
 
 		spriteUpdate();
-		vSync();
+		waitForVSync();
 
-		if (_lastHardKey == 1)
+		if (_lastHardKey == Common::KEYCODE_ESCAPE)
 			break;
 
 		delEverything();
@@ -215,22 +212,22 @@ void DreamWebEngine::runIntroSeq() {
 		reelsOnScreen();
 		afterIntroRoom();
 		useTimedText();
-		vSync();
+		waitForVSync();
 
-		if (_lastHardKey == 1)
+		if (_lastHardKey == Common::KEYCODE_ESCAPE)
 			break;
 
 		dumpMap();
 		dumpTimedText();
-		vSync();
+		waitForVSync();
 
-		if (_lastHardKey == 1)
+		if (_lastHardKey == Common::KEYCODE_ESCAPE)
 			break;
 
 	} while (_getBack != 1);
 
 
-	if (_lastHardKey == 1) {
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
 		getRidOfTempText();
 		clearBeforeLoad();
 	}
@@ -246,18 +243,18 @@ void DreamWebEngine::runEndSeq() {
 	_getBack = 0;
 
 	do {
-		vSync();
+		waitForVSync();
 		spriteUpdate();
-		vSync();
+		waitForVSync();
 		delEverything();
 		printSprites();
 		reelsOnScreen();
 		afterIntroRoom();
 		useTimedText();
-		vSync();
+		waitForVSync();
 		dumpMap();
 		dumpTimedText();
-		vSync();
+		waitForVSync();
 	} while (_getBack != 1 && !_quitRequested);
 }
 
@@ -269,7 +266,7 @@ void DreamWebEngine::loadIntroRoom() {
 	_mapOffsetY = 16;
 	clearSprites();
 	_vars._throughDoor = 0;
-	_currentKey = '0';
+	_currentKey = 0;
 	_mainMode = 0;
 	clearWork();
 	_vars._newObs = 1;
@@ -285,159 +282,159 @@ void DreamWebEngine::set16ColPalette() {
 
 void DreamWebEngine::realCredits() {
 	_roomsSample = 33;
-	loadRoomsSample();
-	_volume = 0;
+	_sound->loadRoomsSample(_roomsSample);
+	_sound->volumeSet(0);
 
 	initGraphics(640, 480, true);
 	hangOn(35);
 
-	showPCX("DREAMWEB.I01");
-	playChannel0(12, 0);
+	showPCX("I01");
+	_sound->playChannel0(12, 0);
 
 	hangOne(2);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	allPalette();
 	hangOne(80);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	fadeScreenDowns();
 	hangOne(256);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
-	showPCX("DREAMWEB.I02");
-	playChannel0(12, 0);
+	showPCX("I02");
+	_sound->playChannel0(12, 0);
 	hangOne(2);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	allPalette();
 	hangOne(80);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	fadeScreenDowns();
 	hangOne(256);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
-	showPCX("DREAMWEB.I03");
-	playChannel0(12, 0);
+	showPCX("I03");
+	_sound->playChannel0(12, 0);
 	hangOne(2);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	allPalette();
 	hangOne(80);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	fadeScreenDowns();
 	hangOne(256);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
-	showPCX("DREAMWEB.I04");
-	playChannel0(12, 0);
+	showPCX("I04");
+	_sound->playChannel0(12, 0);
 	hangOne(2);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	allPalette();
 	hangOne(80);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	fadeScreenDowns();
 	hangOne(256);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
-	showPCX("DREAMWEB.I05");
-	playChannel0(12, 0);
+	showPCX("I05");
+	_sound->playChannel0(12, 0);
 	hangOne(2);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	allPalette();
 	hangOne(80);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	fadeScreenDowns();
 	hangOne(256);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
-	showPCX("DREAMWEB.I06");
+	showPCX("I06");
 	fadeScreenUps();
 	hangOne(60);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
-	playChannel0(13, 0);
+	_sound->playChannel0(13, 0);
 	hangOne(350);
 
-	if (_lastHardKey == 1) {
-		_lastHardKey =  0;
+	if (_lastHardKey == Common::KEYCODE_ESCAPE) {
+		_lastHardKey = Common::KEYCODE_INVALID;
 		return; // "realcreditsearly"
 	}
 
 	fadeScreenDowns();
 	hangOne(256);
 
-	_lastHardKey =  0;
+	_lastHardKey = Common::KEYCODE_INVALID;
 }
 
 } // End of namespace DreamWeb

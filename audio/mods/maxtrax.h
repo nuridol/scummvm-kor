@@ -20,11 +20,8 @@
  *
  */
 
-// see if all engines using this class are DISABLED
-#if !defined(ENABLE_KYRA)
-
-// normal Header Guard
-#elif !defined AUDIO_MODS_MAXTRAX_H
+// Only compiled if Kyra is built-in or we're building for dynamic modules
+#if !defined(AUDIO_MODS_MAXTRAX_H) && (defined(ENABLE_KYRA) || defined(DYNAMIC_MODULES))
 #define AUDIO_MODS_MAXTRAX_H
 
 // #define MAXTRAX_HAS_MODULATION
@@ -217,6 +214,6 @@ private:
 	static void outPutEvent(const Event &ev, int num = -1);
 	static void outPutScore(const Score &sc, int num = -1);
 };
-}	// End of namespace Audio
+} // End of namespace Audio
 
-#endif // !defined AUDIO_MODS_MAXTRAX_H
+#endif // !defined(AUDIO_MODS_MAXTRAX_H)

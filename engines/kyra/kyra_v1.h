@@ -28,8 +28,9 @@
 #include "common/array.h"
 #include "common/error.h"
 #include "common/events.h"
-#include "common/random.h"
 #include "common/hashmap.h"
+#include "common/random.h"
+#include "common/rendermode.h"
 
 #include "audio/mixer.h"
 
@@ -118,7 +119,7 @@ struct GameFlags {
 	bool useAltShapeHeader    : 1;    // alternative shape header (uses 2 bytes more, those are unused though)
 	bool isTalkie             : 1;
 	bool isOldFloppy          : 1;
-	bool useHiResOverlay      : 1;
+	bool useHiRes             : 1;
 	bool use16ColorMode       : 1;
 	bool useDigSound          : 1;
 	bool useInstallerPackage  : 1;
@@ -139,14 +140,6 @@ enum {
 	GI_EOB2 = 6
 };
 
-struct AudioDataStruct {
-	const char *const *fileList;
-	int fileListLen;
-	const void *cdaTracks;
-	int cdaNumTracks;
-	int extraOffset;
-};
-
 // TODO: this is just the start of makeing the debug output of the kyra engine a bit more useable
 // in the future we maybe merge some flags  and/or create new ones
 enum DebugLevels {
@@ -163,7 +156,7 @@ enum DebugLevels {
 	kDebugLevelTimer       = 1 << 10  ///< debug level for "TimerManager" functions
 };
 
-enum MusicDataID {
+enum AudioResourceSet {
 	kMusicIntro = 0,
 	kMusicIngame,
 	kMusicFinale
@@ -187,6 +180,7 @@ friend class GUI;
 friend class GUI_v1;
 friend class GUI_EoB;
 friend class SoundMidiPC;    // For _eventMan
+friend class SeqPlayer_HOF; // For skipFlag()
 friend class TransferPartyWiz; // For save state API
 public:
 	KyraEngine_v1(OSystem *system, const GameFlags &flags);
@@ -210,7 +204,7 @@ public:
 
 	// input
 	void setMousePos(int x, int y);
-	Common::Point getMousePos() const;
+	Common::Point getMousePos();
 
 	// config specific
 	bool speechEnabled();
@@ -305,6 +299,8 @@ protected:
 	int _configMusic;
 	bool _configSounds;
 	uint8 _configVoice;
+
+	Common::RenderMode _configRenderMode;
 
 	// game speed
 	virtual bool skipFlag() const;
@@ -412,14 +408,14 @@ protected:
 		Graphics::Surface *thumbnail;
 	};
 
-	enum kReadSaveHeaderError {
+	enum ReadSaveHeaderError {
 		kRSHENoError = 0,
 		kRSHEInvalidType = 1,
 		kRSHEInvalidVersion = 2,
 		kRSHEIoError = 3
 	};
 
-	static kReadSaveHeaderError readSaveHeader(Common::SeekableReadStream *file, bool loadThumbnail, SaveHeader &header);
+	static ReadSaveHeaderError readSaveHeader(Common::SeekableReadStream *file, bool loadThumbnail, SaveHeader &header);
 
 	void loadGameStateCheck(int slot);
 	virtual Common::Error loadGameState(int slot) = 0;

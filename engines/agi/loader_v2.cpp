@@ -178,7 +178,7 @@ int AgiLoader_v2::loadResource(int t, int n) {
 	uint8 *data = NULL;
 
 	debugC(3, kDebugLevelResources, "(t = %d, n = %d)", t, n);
-	if (n > MAX_DIRS)
+	if (n >= MAX_DIRS)
 		return errBadResource;
 
 	switch (t) {
@@ -230,7 +230,7 @@ int AgiLoader_v2::loadResource(int t, int n) {
 
 		if (data != NULL) {
 			// Freeing of the raw resource from memory is delegated to the createFromRawResource-function
-			_vm->_game.sounds[n] = AgiSound::createFromRawResource(data, _vm->_game.dirSound[n].len, n, *_vm->_sound, _vm->_soundemu);
+			_vm->_game.sounds[n] = AgiSound::createFromRawResource(data, _vm->_game.dirSound[n].len, n, _vm->_soundemu);
 			_vm->_game.dirSound[n].flags |= RES_LOADED;
 		} else {
 			ec = errBadResource;

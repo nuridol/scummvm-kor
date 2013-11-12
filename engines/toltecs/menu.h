@@ -29,14 +29,6 @@
 
 namespace Toltecs {
 
-enum MenuID {
-	kMenuIdNone,
-	kMenuIdMain,
-	kMenuIdSave,
-	kMenuIdLoad,
-	kMenuIdVolumes
-};
-
 enum ItemID {
 	kItemIdNone,
 	// Main menu
@@ -85,13 +77,14 @@ public:
 	MenuSystem(ToltecsEngine *vm);
 	~MenuSystem();
 
-	int run();
+	int run(MenuID menuId);
 	void update();
 	void handleEvents();
-	
+
 protected:
 
 	struct Item {
+		bool enabled;
 		Common::Rect rect;
 		ItemID id;
 		Common::String caption;
@@ -99,7 +92,7 @@ protected:
 		int x, y, w;
 		uint fontNum;
 	};
-	
+
 	struct SavegameItem {
 		int _slotNum;
 		Common::String _description;
@@ -124,9 +117,6 @@ protected:
 
 	Common::Array<Item> _items;
 	Common::Array<SavegameItem> _savegames;
-	
-	bool _cfgText, _cfgVoices;
-	int _cfgMasterVolume, _cfgVoicesVolume, _cfgMusicVolume, _cfgSoundFXVolume,	_cfgBackgroundVolume;
 
 	void addClickTextItem(ItemID id, int x, int y, int w, uint fontNum, const char *caption, byte defaultColor, byte activeColor);
 
@@ -134,13 +124,16 @@ protected:
 	void handleMouseMove(int x, int y);
 	void handleMouseClick(int x, int y);
 	void handleKeyDown(const Common::KeyState& kbd);
-	
+
 	ItemID findItemAt(int x, int y);
 	Item *getItem(ItemID id);
 	void setItemCaption(Item *item, const char *caption);
 
 	void initMenu(MenuID menuID);
-	
+
+	void enableItem(ItemID id);
+	void disableItem(ItemID id);
+
 	void enterItem(ItemID id);
 	void leaveItem(ItemID id);
 	void clickItem(ItemID id);
@@ -152,7 +145,7 @@ protected:
 	SavegameItem *getSavegameItemByID(ItemID id);
 
 	int loadSavegamesList();
-	void setSavegameCaptions();
+	void setSavegameCaptions(bool scrollToBottom);
 	void scrollSavegames(int delta);
 	void clickSavegameItem(ItemID id);
 	void setCfgText(bool value, bool active);

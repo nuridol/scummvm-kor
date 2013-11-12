@@ -124,8 +124,6 @@ int ScummEngine_v60he::convertFilePath(byte *dst, int dstSize) {
 	} else if (dst[0] == '.' && dst[1] == '/') { // Game Data Path
 		// The default game data path is set to './' by ScummVM
 		r = 2;
-	} else if (dst[2] == 'b' && dst[5] == 'k') { // Backyard Basketball INI
-		r = 13;
 	} else if (dst[0] == '*' && dst[1] == '/') { // Save Game Path (Windows HE72 - HE100)
 		// The default save game path is set to '*/' by ScummVM
 		r = 2;
@@ -806,7 +804,7 @@ void ScummEngine_v60he::o60_readFile() {
 	int val;
 
 	// Fatty Bear uses positive values
-	if (_game.platform == Common::kPlatformPC && _game.id == GID_FBEAR)
+	if (_game.platform == Common::kPlatformDOS && _game.id == GID_FBEAR)
 		size = -size;
 
 	assert(_hInFileTable[slot]);
@@ -836,7 +834,7 @@ void ScummEngine_v60he::o60_writeFile() {
 	int slot = pop();
 
 	// Fatty Bear uses positive values
-	if (_game.platform == Common::kPlatformPC && _game.id == GID_FBEAR)
+	if (_game.platform == Common::kPlatformDOS && _game.id == GID_FBEAR)
 		size = -size;
 
 	assert(_hOutFileTable[slot]);

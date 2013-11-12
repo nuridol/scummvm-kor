@@ -421,8 +421,8 @@ void ScummEngine::initVirtScreen(VirtScreenNumber slot, int top, int width, int 
 	}
 
 	_res->createResource(rtBuffer, slot + 1, size);
-	vs->pixels = getResourceAddress(rtBuffer, slot + 1);
-	memset(vs->pixels, 0, size);	// reset background
+	vs->setPixels(getResourceAddress(rtBuffer, slot + 1));
+	memset(vs->getBasePtr(0, 0), 0, size);	// reset background
 
 	if (twobufs) {
 		vs->backBuf = _res->createResource(rtBuffer, slot + 5, size);
@@ -612,7 +612,7 @@ void ScummEngine::drawStripToScreen(VirtScreen *vs, int x, int width, int top, i
 	// Some paranoia checks
 	assert(top >= 0 && bottom <= vs->h);
 	assert(x >= 0 && width <= vs->pitch);
-	assert(_textSurface.pixels);
+	assert(_textSurface.getPixels());
 
 	// Perform some clipping
 	if (width > vs->w - x)
@@ -680,11 +680,10 @@ void ScummEngine::drawStripToScreen(VirtScreen *vs, int x, int width, int top, i
 				srcPtr += vsPitch;
 				textPtr += _textSurface.pitch - width * m;
 			}
-		}
+		} else {
 #ifdef USE_ARM_GFX_ASM
-		asmDrawStripToScreen(height, width, text, src, _compositeBuf, vs->pitch, width, _textSurface.pitch);
+			asmDrawStripToScreen(height, width, text, src, _compositeBuf, vs->pitch, width, _textSurface.pitch);
 #else
-		else {
 			// We blit four pixels at a time, for improved performance.
 			const uint32 *src32 = (const uint32 *)src;
 			uint32 *dst32 = (uint32 *)_compositeBuf;
@@ -715,8 +714,8 @@ void ScummEngine::drawStripToScreen(VirtScreen *vs, int x, int width, int top, i
 				src32 += vsPitch;
 				text32 += textPitch;
 			}
-		}
 #endif
+		}
 		src = _compositeBuf;
 		pitch = width * vs->format.bytesPerPixel;
 
@@ -756,7 +755,7 @@ void ScummEngine::drawStripToScreen(VirtScreen *vs, int x, int width, int top, i
 					memset(blackbuf, 0, 16 * 240); // Prepare a buffer 16px wide and 240px high, to fit on a lateral strip
 
 					width = 240; // Fix right strip
-					_system->copyRectToScreen((const byte *)blackbuf, 16, 0, 0, 16, 240); // Fix left strip
+					_system->copyRectToScreen(blackbuf, 16, 0, 0, 16, 240); // Fix left strip
 				}
 			}
 
@@ -764,7 +763,7 @@ void ScummEngine::drawStripToScreen(VirtScreen *vs, int x, int width, int top, i
 	}
 
 	// Finally blit the whole thing to the screen
-	_system->copyRectToScreen((const byte *)src, pitch, x, y, width, height);
+	_system->copyRectToScreen(src, pitch, x, y, width, height);
 }
 
 // CGA
@@ -1136,7 +1135,7 @@ void ScummEngine::clearTextSurface() {
 		_townsScreen->fillLayerRect(1, 0, 0, _textSurface.w, _textSurface.h, 0);
 #endif
 
-	fill((byte *)_textSurface.pixels,  _textSurface.pitch,
+	fill((byte *)_textSurface.getPixels(),  _textSurface.pitch,
 #ifndef DISABLE_TOWNS_DUAL_LAYER_MODE
 		_game.platform == Common::kPlatformFMTowns ? 0 :
 #endif
@@ -1591,7 +1590,7 @@ void GdiV2::prepareDrawBitmap(const byte *ptr, VirtScreen *vs,
 	if (vs->hasTwoBuffers)
 		dst = vs->backBuf + y * vs->pitch + x * 8;
 	else
-		dst = (byte *)vs->pixels + y * vs->pitch + x * 8;
+		dst = (byte *)vs->getBasePtr(x * 8, y);
 
 	mask_ptr = getMaskBuffer(x, y, 1);
 
@@ -1770,11 +1769,8 @@ void Gdi::drawBitmap(const byte *ptr, VirtScreen *vs, int x, const int y, const 
 	// Check whether lights are turned on or not
 	const bool lightsOn = _vm->isLightOn();
 
-	if (_vm->_game.features & GF_SMALL_HEADER) {
+	if ((_vm->_game.features & GF_SMALL_HEADER) || _vm->_game.version == 8) {
 		smap_ptr = ptr;
-	} else if (_vm->_game.version == 8) {
-		// Skip to the BSTR->WRAP->OFFS chunk
-		smap_ptr = ptr + 24;
 	} else {
 		smap_ptr = _vm->findResource(MKTAG('S','M','A','P'), ptr);
 		assert(smap_ptr);
@@ -1828,7 +1824,7 @@ void Gdi::drawBitmap(const byte *ptr, VirtScreen *vs, int x, const int y, const 
 		if (vs->hasTwoBuffers)
 			dstPtr = vs->backBuf + y * vs->pitch + (x * 8 * vs->format.bytesPerPixel);
 		else
-			dstPtr = (byte *)vs->pixels + y * vs->pitch + (x * 8 * vs->format.bytesPerPixel);
+			dstPtr = (byte *)vs->getBasePtr(x * 8, y);
 
 		transpStrip = drawStrip(dstPtr, vs, x, y, width, height, stripnr, smap_ptr);
 
@@ -1837,7 +1833,7 @@ void Gdi::drawBitmap(const byte *ptr, VirtScreen *vs, int x, const int y, const 
 			transpStrip = true;
 
 		if (vs->hasTwoBuffers) {
-			byte *frontBuf = (byte *)vs->pixels + y * vs->pitch + (x * 8 * vs->format.bytesPerPixel);
+			byte *frontBuf = (byte *)vs->getBasePtr(x * 8, y);
 			if (lightsOn)
 				copy8Col(frontBuf, vs->pitch, dstPtr, height, vs->format.bytesPerPixel);
 			else
@@ -1888,8 +1884,14 @@ bool Gdi::drawStrip(byte *dstPtr, VirtScreen *vs, int x, int y, const int width,
 		smapLen = READ_LE_UINT32(smap_ptr);
 		if (stripnr * 4 + 4 < smapLen)
 			offset = READ_LE_UINT32(smap_ptr + stripnr * 4 + 4);
+	} else if (_vm->_game.version == 8) {
+		smapLen = READ_BE_UINT32(smap_ptr + 4);
+		// Skip to the BSTR->WRAP->OFFS chunk
+		smap_ptr += 24;
+		if (stripnr * 4 + 8 < smapLen)
+			offset = READ_LE_UINT32(smap_ptr + stripnr * 4 + 8);
 	} else {
-		smapLen = READ_BE_UINT32(smap_ptr);
+		smapLen = READ_BE_UINT32(smap_ptr + 4);
 		if (stripnr * 4 + 8 < smapLen)
 			offset = READ_LE_UINT32(smap_ptr + stripnr * 4 + 8);
 	}
@@ -2263,7 +2265,7 @@ void Gdi::resetBackground(int top, int bottom, int strip) {
 		vs->bdirty[strip] = bottom;
 
 	bgbak_ptr = (byte *)vs->backBuf + top * vs->pitch + (strip + vs->xstart/8) * 8 * vs->format.bytesPerPixel;
-	backbuff_ptr = (byte *)vs->pixels + top * vs->pitch + (strip + vs->xstart/8) * 8 * vs->format.bytesPerPixel;
+	backbuff_ptr = (byte *)vs->getBasePtr((strip + vs->xstart/8) * 8, top);
 
 	numLinesToProcess = bottom - top;
 	if (numLinesToProcess) {
@@ -3610,7 +3612,7 @@ void Gdi::unkDecode9(byte *dst, int dstPitch, const byte *src, int height) const
 	int i;
 	uint buffer = 0, mask = 128;
 	int h = height;
-	i = run = 0;
+	run = 0;
 
 	int x = 8;
 	for (;;) {

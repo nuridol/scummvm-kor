@@ -204,24 +204,6 @@ static const MohawkGameDescription gameDescriptions[] = {
 	},
 
 	// Myst Masterpiece Edition
-	// English Windows
-	// From clone2727
-	{
-		{
-			"myst",
-			"Masterpiece Edition",
-			AD_ENTRY1("MYST.DAT", "c4cae9f143b5947262e6cb2397e1617e"),
-			Common::EN_ANY,
-			Common::kPlatformMacintosh,
-			ADGF_UNSTABLE,
-			GUIO1(GUIO_NOASPECT)
-		},
-		GType_MYST,
-		GF_ME,
-		0,
-	},
-
-	// Myst Masterpiece Edition
 	// German Windows
 	// From DrMcCoy (Included in "Myst: Die Trilogie")
 	{
@@ -248,6 +230,24 @@ static const MohawkGameDescription gameDescriptions[] = {
 			"Masterpiece Edition",
 			AD_ENTRY1("MYST.DAT", "aea81633b2d2ae498f09072fb87263b6"),
 			Common::FR_FRA,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GType_MYST,
+		GF_ME,
+		0,
+	},
+
+	// Myst Masterpiece Edition
+	// Polish Windows
+	// From pykman (Included in "Myst: Antologia")
+	{
+		{
+			"myst",
+			"Masterpiece Edition",
+			AD_ENTRY1("MYST.DAT", "4a05771b60f4a69869838d01e85c9e80"),
+			Common::PL_POL,
 			Common::kPlatformWindows,
 			ADGF_UNSTABLE,
 			GUIO1(GUIO_NOASPECT)
@@ -366,6 +366,24 @@ static const MohawkGameDescription gameDescriptions[] = {
 	},
 
 	// Riven: The Sequel to Myst
+	// Version 1.02 (DVD, From "Myst: Antologia")
+	// From pykman
+	{
+		{
+			"riven",
+			"",
+			AD_ENTRY1("a_Data.MHK", "733a710cf5f848b441ec72d988ab8a3d"),
+			Common::PL_POL,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GType_RIVEN,
+		GF_DVD,
+		0,
+	},
+
+	// Riven: The Sequel to Myst
 	// Version ? (Demo, From "Prince of Persia Collector's Edition")
 	// From Clone2727
 	{
@@ -376,7 +394,7 @@ static const MohawkGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformWindows,
 			ADGF_DEMO | ADGF_UNSTABLE,
-			GUIO1(GUIO_NOASPECT)
+			GUIO2(GUIO_NOASPECT, GUIO_NOLAUNCHLOAD)
 		},
 		GType_RIVEN,
 		GF_DEMO,
@@ -1343,6 +1361,23 @@ static const MohawkGameDescription gameDescriptions[] = {
 		"GRANDMA.EXE"
 	},
 
+	// Just Grandma and Me 1.1 Mac
+	// From eisnerguy1 in bug#3610725
+	{
+		{
+			"grandma",
+			"v1.1",
+			AD_ENTRY1("BookOutline", "76eb265ec5fe42bc5b07f2bb418bd871"),
+			Common::EN_ANY,
+			Common::kPlatformMacintosh,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GType_LIVINGBOOKSV1,
+		GF_LB_10,
+		0
+	},
+
 	// from jjnryan in bug #3389857
 	{
 		{
@@ -2114,6 +2149,24 @@ static const MohawkGameDescription gameDescriptions[] = {
 		0
 	},
 
+	// Rugrats Adventure Game
+	// English Windows Demo
+	// From GeorgeQGreg (Rugrats Movie Soundtrack)
+	{
+		{
+			"rugrats",
+			"Demo",
+			AD_ENTRY1("outline", "adbd7ff6c5e1bdb7062c89879a4e39e6"),
+			Common::EN_ANY,
+			Common::kPlatformWindows,
+			ADGF_DEMO | ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GType_LIVINGBOOKSV4,
+		0,
+		0
+	},
+
 	{
 		{
 			"lbsampler",
@@ -2521,6 +2574,24 @@ static const MohawkGameDescription gameDescriptions[] = {
 			GUIO1(GUIO_NOASPECT)
 		},
 		GType_LIVINGBOOKSV2,
+		0,
+		0
+	},
+
+	// Rugrats Print Shop
+	// English Windows Demo
+	// From GeorgeQGreg (Rugrats Movie Soundtrack)
+	{
+		{
+			"rugratsps",
+			"Demo",
+			AD_ENTRY1("outline", "808d5ee8427180ddebdd5dd4199b47cb"),
+			Common::EN_ANY,
+			Common::kPlatformWindows,
+			ADGF_DEMO | ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GType_LIVINGBOOKSV4,
 		0,
 		0
 	},

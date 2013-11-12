@@ -346,6 +346,14 @@ void Scene300::postInit(SceneObjectList *OwnerList) {
 		break;
 	}
 
+	if (BF_GLOBALS.getFlag(onBike) && !BF_GLOBALS.getFlag(onDuty)) {
+		BF_GLOBALS._sound1.play(30);
+	} else if ((BF_GLOBALS._dayNumber == 2) && (BF_GLOBALS._bookmark < bEndDayOne)) {
+		BF_GLOBALS._sound1.changeSound(49);
+	} else if (BF_GLOBALS._sceneManager._previousScene != 190) {
+		BF_GLOBALS._sound1.changeSound(33);
+	}
+
 	_item10.setDetails(4, 300, 7, 13, 16, 1);
 	_item11.setDetails(2, 300, 9, 13, 18, 1);
 	_item12.setDetails(5, 300, 10, 13, 19, 1);
@@ -945,7 +953,7 @@ void Scene315::Action1::signal() {
 			T2_GLOBALS._uiElements.addScore(30);
 			BF_INVENTORY.setObjectScene(INV_MUG_SHOT, 1);
 			//HACK: This has to be checked wether or not it occurs in the original.
-			//When the _sceneMode is set to 3169, the value desn't change. 
+			//When the _sceneMode is set to 3169, the value desn't change.
 			//If you show the forest rapsheet, it gives points (and again... and again...)
 			scene->_sceneMode = 3154;
 		}
@@ -969,6 +977,11 @@ Scene315::Scene315() {
 	_doorOpened = false;
 	_invGreenCount = _bookGreenCount = 0;
 	_invGangCount = _bookGangCount = 0;
+
+	_field1390 = 0;
+	_stripNumber = 0;
+	_field1398 = 0;
+	_currentCursor = INV_NONE;
 }
 
 void Scene315::synchronize(Serializer &s) {
@@ -1391,7 +1404,7 @@ bool Scene325::Item1::startAction(CursorType action, Event &event) {
 void Scene325::postInit(SceneObjectList *OwnerList) {
 	SceneExt::postInit();
 	loadScene(325);
-	BF_GLOBALS._interfaceY = 200;
+	BF_GLOBALS._interfaceY = SCREEN_HEIGHT;
 	BF_GLOBALS.clearFlag(fCanDrawGun);
 
 	if (BF_GLOBALS._dayNumber == 0)
@@ -4509,12 +4522,12 @@ void Scene360::signal() {
 		break;
 	case 3607:
 	case 3609:
-		// Original game was only using at this place visage 1363. 
+		// Original game was only using at this place visage 1363.
 		// This workaround allow Harrison to keep his gun handy
 		// when entering the romm (if required)
 		if (! BF_GLOBALS.getFlag(gunDrawn))
 			_harrison.setVisage(1363);
-		else 
+		else
 			_harrison.setVisage(363);
 		BF_GLOBALS._player.enableControl();
 		break;
@@ -5365,7 +5378,7 @@ bool Scene385::Jim::startAction(CursorType action, Event &event) {
 	} else if (action < CURSOR_WALK)
 		// Any other inventory item
 		return false;
-	else 
+	else
 		return NamedObject::startAction(action, event);
 }
 

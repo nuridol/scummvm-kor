@@ -98,8 +98,6 @@ KyraEngine_LoK::KyraEngine_LoK(OSystem *system, const GameFlags &flags)
 
 	_malcolmFrame = 0;
 	_malcolmTimer1 = _malcolmTimer2 = 0;
-
-	_soundFiles = 0;
 }
 
 KyraEngine_LoK::~KyraEngine_LoK() {
@@ -122,8 +120,6 @@ KyraEngine_LoK::~KyraEngine_LoK() {
 	delete _sprites;
 	delete _animator;
 	delete _seq;
-
-	delete[] _soundFiles;
 
 	delete[] _characterList;
 
@@ -167,7 +163,7 @@ KyraEngine_LoK::~KyraEngine_LoK() {
 }
 
 Common::Error KyraEngine_LoK::init() {
-	if (_flags.platform == Common::kPlatformPC98 && _flags.useHiResOverlay && ConfMan.getBool("16_color"))
+	if (Common::parseRenderMode(ConfMan.get("render_mode")) == Common::kRenderPC9801)
 		_screen = new Screen_LoK_16(this, _system);
 	else
 		_screen = new Screen_LoK(this, _system);
@@ -194,7 +190,7 @@ Common::Error KyraEngine_LoK::init() {
 
 	initStaticResource();
 
-	_sound->setSoundList(&_soundData[kMusicIntro]);
+	_sound->selectAudioResourceSet(kMusicIntro);
 
 	if (_flags.platform == Common::kPlatformAmiga) {
 		_trackMap = _amigaTrackMap;
@@ -349,7 +345,7 @@ void KyraEngine_LoK::startup() {
 	static const uint8 colorMap[] = { 0, 0, 0, 0, 12, 12, 12, 0, 0, 0, 0, 0 };
 	_screen->setTextColorMap(colorMap);
 
-	_sound->setSoundList(&_soundData[kMusicIngame]);
+	_sound->selectAudioResourceSet(kMusicIngame);
 	if (_flags.platform == Common::kPlatformPC98)
 		_sound->loadSoundFile("SE.DAT");
 	else
@@ -454,10 +450,8 @@ void KyraEngine_LoK::mainLoop() {
 		if (_deathHandler != -1) {
 			snd_playWanderScoreViaMap(0, 1);
 			snd_playSoundEffect(49);
-			_screen->hideMouse();
 			_screen->setMouseCursor(1, 1, _shapes[0]);
 			removeHandItem();
-			_screen->showMouse();
 			_gui->buttonMenuCallback(0);
 			_deathHandler = -1;
 		}
@@ -706,7 +700,6 @@ int KyraEngine_LoK::processInputHelper(int xpos, int ypos) {
 	uint8 item = findItemAtPos(xpos, ypos);
 	if (item != 0xFF) {
 		if (_itemInHand == kItemNone) {
-			_screen->hideMouse();
 			_animator->animRemoveGameItem(item);
 			snd_playSoundEffect(53);
 			assert(_currentCharacter->sceneId < _roomTableSize);
@@ -717,7 +710,6 @@ int KyraEngine_LoK::processInputHelper(int xpos, int ypos) {
 			assert(_itemList && _takenList);
 			updateSentenceCommand(_itemList[getItemListIndex(item2)], _takenList[0], 179);
 			_itemInHand = item2;
-			_screen->showMouse();
 			clickEventHandler2();
 			return 1;
 		} else {
@@ -834,21 +826,17 @@ void KyraEngine_LoK::updateMousePointer(bool forceUpdate) {
 
 	if ((newMouseState && _mouseState != newMouseState) || (newMouseState && forceUpdate)) {
 		_mouseState = newMouseState;
-		_screen->hideMouse();
 		_screen->setMouseCursor(newX, newY, _shapes[shape]);
-		_screen->showMouse();
 	}
 
 	if (!newMouseState) {
 		if (_mouseState != _itemInHand || forceUpdate) {
 			if (mouse.y > 158 || (mouse.x >= 12 && mouse.x < 308 && mouse.y < 136 && mouse.y >= 12) || forceUpdate) {
 				_mouseState = _itemInHand;
-				_screen->hideMouse();
 				if (_itemInHand == kItemNone)
 					_screen->setMouseCursor(1, 1, _shapes[0]);
 				else
 					_screen->setMouseCursor(8, 15, _shapes[216 + _itemInHand]);
-				_screen->showMouse();
 			}
 		}
 	}
@@ -960,9 +948,6 @@ void KyraEngine_LoK::registerDefaultSettings() {
 	// Most settings already have sensible defaults. This one, however, is
 	// specific to the Kyra engine.
 	ConfMan.registerDefault("walkspeed", 2);
-
-	if (_flags.platform == Common::kPlatformPC98 && _flags.useHiResOverlay)
-		ConfMan.registerDefault("16_color", false);
 }
 
 void KyraEngine_LoK::readSettings() {

@@ -23,6 +23,7 @@
 #include "sci/sci.h"
 #include "sci/engine/script.h"
 #include "sci/engine/state.h"
+#include "sci/engine/features.h"
 
 #include "common/util.h"
 
@@ -58,11 +59,63 @@ struct SciScriptSignature {
 //  - rinse and repeat
 
 // ===========================================================================
+// Conquests of Camelot
+// At the bazaar in Jerusalem, it's possible to see a girl taking a shower.
+//  If you get too close, you get warned by the father - if you don't get away,
+//  he will kill you.
+// Instead of walking there manually, it's also possible to enter "look window"
+//  and ego will automatically walk to the window. It seems that this is something
+//  that wasn't properly implemented, because instead of getting killed, you will
+//  get an "Oops" message in Sierra SCI.
+//
+// This is caused by peepingTom in script 169 not getting properly initialized.
+// peepingTom calls the object behind global b9h. This global variable is
+//  properly initialized, when walking there manually (method fawaz::doit).
+// When you instead walk there automatically (method fawaz::handleEvent), that
+//  global isn't initialized, which then results in the Oops-message in Sierra SCI
+//  and an error message in ScummVM/SCI.
+//
+// We fix the script by patching in a jump to the proper code inside fawaz::doit.
+// Responsible method: fawaz::handleEvent
+// Fixes bug #3614969
+const byte camelotSignaturePeepingTom[] = {
+	5,
+	0x72, 0x7e, 0x07,  // lofsa fawaz <-- start of proper initializion code
+	0xa1, 0xb9,        // sag b9h
+	+255, 0,
+	+255, 0,
+	+61, 19,           // skip 571 bytes
+	0x39, 0x7a,        // pushi 7a <-- initialization code when walking automatically
+	0x78,              // push1
+	0x7a,              // push2
+	0x38, 0xa9, 0x00,  // pushi 00a9 - script 169
+	0x78,              // push1
+	0x43, 0x02, 0x04,  // call kScriptID
+	0x36,              // push
+	0x81, 0x00,        // lag 00
+	0x4a, 0x06,        // send 06
+	0x32, 0x20, 0x05,  // jmp [end of fawaz::handleEvent]
+	0
+};
+
+const uint16 camelotPatchPeepingTom[] = {
+	PATCH_ADDTOOFFSET | +576,
+	0x32, 0xbd, 0xfd,  // jmp to fawaz::doit / properly init peepingTom code
+	PATCH_END
+};
+
+//    script, description,                                      magic DWORD,                                 adjust
+const SciScriptSignature camelotSignatures[] = {
+	{    62, "fix peepingTom Sierra bug", 1, PATCH_MAGICDWORD(0x7e, 0x07, 0xa1, 0xb9), -1, camelotSignaturePeepingTom, camelotPatchPeepingTom },
+	SCI_SIGNATUREENTRY_TERMINATOR
+};
+
+// ===========================================================================
 // stayAndHelp::changeState (0) is called when ego swims to the left or right
 //  boundaries of room 660. Normally a textbox is supposed to get on screen
 //  but the call is wrong, so not only do we get an error message the script
 //  is also hanging because the cue won't get sent out
-//  This also happens in sierra sci - ffs. bug #3038387
+//  This also happens in sierra sci - refer to bug #3038387
 const byte ecoquest1SignatureStayAndHelp[] = {
 	40,
 	0x3f, 0x01,        // link 01
@@ -128,7 +181,7 @@ const SciScriptSignature ecoquest1Signatures[] = {
 //  ecorder. This is done by reusing temp-space, that was filled on state 1.
 //  this worked in sierra sci just by accident. In our sci, the temp space
 //  is resetted every time, which means the previous text isn't available
-//  anymore. We have to patch the code because of that ffs. bug #3035386
+//  anymore. We have to patch the code because of that - bug #3035386
 const byte ecoquest2SignatureEcorder[] = {
 	35,
 	0x31, 0x22,        // bnt [next state]
@@ -363,10 +416,42 @@ const uint16 freddypharkasPatchLadderEvent[] = {
 	PATCH_END
 };
 
+// In the Macintosh version of Freddy Pharkas, kRespondsTo is broken for
+// property selectors. They hacked the script to work around the issue,
+// so we revert the script back to using the values of the DOS script.
+const byte freddypharkasSignatureMacInventory[] = {
+	10,
+	0x39, 0x23,       // pushi 23
+	0x39, 0x74,       // pushi 74
+	0x78,             // push1
+	0x38, 0x01, 0x74, // pushi 0174
+	0x85, 0x15,       // lat 15
+	0
+};
+
+const uint16 freddypharkasPatchMacInventory[] = {
+	0x39, 0x02,       // pushi 02 (now matches the DOS version)
+	0x39, 0x74,       // pushi 74
+	0x78,             // push1
+	0x38, 0x01, 0x74, // pushi 0174
+	0x85, 0x15,       // lat 15
+	0x4a, 0x06,       // send 06
+	0x31, 0x08,       // bnt 08
+	0x38, 0x01, 0x74, // pushi 0174
+	0x76,             // push0
+	0x85, 0x15,       // lat 15
+	0x4a, 0x04,       // send 04
+	0x02,             // add
+	0xa5, 0x12,       // sat 12
+	0x39, 0x04,       // pushi 04 (now matches the DOS version)
+	PATCH_END
+};
+
 //    script, description,                                      magic DWORD,                                  adjust
 const SciScriptSignature freddypharkasSignatures[] = {
 	{      0, "CD: score early disposal",                    1, PATCH_MAGICDWORD(0x39, 0x0d, 0x43, 0x75),    -3, freddypharkasSignatureScoreDisposal, freddypharkasPatchScoreDisposal },
-	{    235, "CD: canister pickup hang",                   3, PATCH_MAGICDWORD(0x39, 0x07, 0x39, 0x08),     -4, freddypharkasSignatureCanisterHang,  freddypharkasPatchCanisterHang },
+	{     15, "Mac: broken inventory",                       1, PATCH_MAGICDWORD(0x39, 0x23, 0x39, 0x74),     0, freddypharkasSignatureMacInventory,  freddypharkasPatchMacInventory },
+	{    235, "CD: canister pickup hang",                    3, PATCH_MAGICDWORD(0x39, 0x07, 0x39, 0x08),    -4, freddypharkasSignatureCanisterHang,  freddypharkasPatchCanisterHang },
 	{    320, "ladder event issue",                          2, PATCH_MAGICDWORD(0x6d, 0x76, 0x38, 0xf5),    -1, freddypharkasSignatureLadderEvent,   freddypharkasPatchLadderEvent },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
@@ -590,10 +675,45 @@ const uint16 kq5PatchWitchCageInit[] = {
 	PATCH_END
 };
 
+
+// In the final battle, the DOS version uses signals in the music to handle
+// timing, while in the Windows version another method is used and the GM
+// tracks do not contain these signals.
+// The original kq5 interpreter used global 400 to distinguish between
+// Windows (1) and DOS (0) versions.
+// We replace the 4 relevant checks for global 400 by a fixed true when
+// we use these GM tracks.
+//
+// Instead, we could have set global 400, but this has the possibly unwanted
+// side effects of switching to black&white cursors (which also needs complex
+// changes to GameFeatures::detectsetCursorType() ) and breaking savegame
+// compatibilty between the DOS and Windows CD versions of KQ5.
+// TODO: Investigate these side effects more closely.
+const byte kq5SignatureWinGMSignals[] = {
+	9,
+	0x80, 0x90, 0x01, // lag 0x190
+	0x18,             // not
+	0x30, 0x1b, 0x00, // bnt +0x001B
+	0x89, 0x57,       // lsg 0x57
+	0
+};
+
+const uint16 kq5PatchWinGMSignals[] = {
+	0x34, 0x01, 0x00, // ldi 0x0001
+	PATCH_END
+};
+
 //    script, description,                                      magic DWORD,                                 adjust
 const SciScriptSignature kq5Signatures[] = {
 	{      0, "CD: harpy volume change",                     1, PATCH_MAGICDWORD(0x80, 0x91, 0x01, 0x18),     0, kq5SignatureCdHarpyVolume, kq5PatchCdHarpyVolume },
 	{    200, "CD: witch cage init",                         1, PATCH_MAGICDWORD(0x7a, 0x00, 0xc8, 0x00),   -10, kq5SignatureWitchCageInit, kq5PatchWitchCageInit },
+	SCI_SIGNATUREENTRY_TERMINATOR
+};
+
+const SciScriptSignature kq5WinGMSignatures[] = {
+	{      0, "CD: harpy volume change",                     1, PATCH_MAGICDWORD(0x80, 0x91, 0x01, 0x18),     0, kq5SignatureCdHarpyVolume, kq5PatchCdHarpyVolume },
+	{    200, "CD: witch cage init",                         1, PATCH_MAGICDWORD(0x7a, 0x00, 0xc8, 0x00),   -10, kq5SignatureWitchCageInit, kq5PatchWitchCageInit },
+	{    124, "Win: GM Music signal checks",                 4, PATCH_MAGICDWORD(0x80, 0x90, 0x01, 0x18),     0, kq5SignatureWinGMSignals, kq5PatchWinGMSignals },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -621,9 +741,77 @@ const uint16 kq6PatchDuplicateBabyCry[] = {
 	PATCH_END
 };
 
+// The inventory of King's Quest 6 (CD) is buggy. When it grows too large,
+//  it will get split into 2 pages. Switching between those pages will
+//  grow the stack, because it's calling itself per switch.
+// Which means after a while ScummVM will bomb out because the stack frame
+//  will be too large. This patch fixes the buggy script.
+// Responsible method: KqInv::showSelf
+// Fixes bug #3293954
+const byte kq6SignatureInventoryStackFix[] = {
+	46,
+	0x67, 0x30,       // pTos state
+	0x34, 0x00, 0x20, // ldi 2000
+	0x12,             // and
+	0x18,             // not
+	0x31, 0x04,       // bnt [not first refresh]
+	0x35, 0x00,       // ldi 00
+	0x65, 0x1e,       // aTop curIcon
+	0x67, 0x30,       // pTos state
+	0x34, 0xff, 0xdf, // ldi dfff
+	0x12,             // and
+	0x65, 0x30,       // aTop state
+	0x38, 0xe1, 0x00, // pushi 00e1
+	0x78,             // push1
+	0x87, 0x00,       // lap param[0]
+	0x31, 0x04,       // bnt [use global for show]
+	0x87, 0x01,       // lap param[1]
+	0x33, 0x02,       // jmp [use param for show]
+	0x81, 0x00,       // lag global[0]
+	0x36,             // push
+	0x54, 0x06,       // self 06 (KqInv::show)
+	0x31, 0x08,       // bnt [exit menu code]
+	0x39, 0x39,       // pushi 39
+	0x76,             // push0
+	0x54, 0x04,       // self 04 (KqInv::doit)
+	0x32,             // jmp [ret] (2 bytes not listed)
+	0
+};
+
+const uint16 kq6PatchInventoryStackFix[] = {
+	0x67, 0x30,       // pTos state
+	0x3c,             // dup (1 more byte, needed for patch)
+	0x3c,             // dup (1 more byte, saves 1 byte later)
+	0x34, 0x00, 0x20, // ldi 2000
+	0x12,             // and
+	0x2f, 0x02,       // bt [not first refresh] - saves 3 bytes in total
+	0x65, 0x1e,       // aTop curIcon
+	0x34, 0xff, 0xdf, // ldi dfff
+	0x12,             // and
+	0x65, 0x30,       // aTop state
+	0x38, 0xe1, 0x00, // pushi e1
+	0x78,             // push1
+	0x87, 0x00,       // lap param[0]
+	0x31, 0x04,       // bnt [call show using global 0]
+	0x8f, 0x01,       // lsp param[1], save 1 byte total with lsg global[0] combined
+	0x33, 0x02,       // jmp [call show using param 1]
+	0x89, 0x00,       // lsg global[0], save 1 byte total, see above
+	0x54, 0x06,       // self 06 (call x::show)
+	0x31, 0x0c,       // bnt [menu exit code]
+	0x34, 0x00, 0x20, // ldi 2000
+	0x12,             // and
+	0x2f, 0x05,       // bt [to return]
+	0x39, 0x39,       // pushi 39
+	0x76,             // push0
+	0x54, 0x04,       // self 04 (self::doit)
+	0x48,             // ret (saves 2 bytes)
+	PATCH_END
+};
+
 //    script, description,                                      magic DWORD,                                 adjust
 const SciScriptSignature kq6Signatures[] = {
 	{    481, "duplicate baby cry",                          1, PATCH_MAGICDWORD(0x83, 0x00, 0x31, 0x1e),     0, kq6SignatureDuplicateBabyCry, kq6PatchDuplicateBabyCry },
+	{    907, "inventory stack fix",                         1, PATCH_MAGICDWORD(0x30, 0x34, 0xff, 0xdf),   -14, kq6SignatureInventoryStackFix, kq6PatchInventoryStackFix },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -670,6 +858,48 @@ const uint16 longbowPatchShowHandCode[] = {
 //    script, description,                                      magic DWORD,                                  adjust
 const SciScriptSignature longbowSignatures[] = {
 	{    210, "hand code crash",                             5, PATCH_MAGICDWORD(0x02, 0x38, 0x1c, 0x01),   -14, longbowSignatureShowHandCode, longbowPatchShowHandCode },
+	SCI_SIGNATUREENTRY_TERMINATOR
+};
+
+// ===========================================================================
+// Leisure Suit Larry 2
+// On the plane, Larry is able to wear the parachute. This grants 4 points.
+// In early versions of LSL2, it was possible to get "unlimited" points by
+//  simply wearing it multiple times.
+// They fixed it in later versions by remembering, if the parachute was already
+//  used before.
+// But instead of adding it properly, it seems they hacked the script / forgot
+//  to replace script 0 as well, which holds information about how many global
+//  variables are allocated at the start of the game.
+// The script tries to read an out-of-bounds global variable, which somewhat
+//  "worked" in SSCI, but ScummVM/SCI doesn't allow that.
+// That's why those points weren't granted here at all.
+// We patch the script to use global 90, which seems to be unused in the whole game.
+// Responsible method: rm63Script::handleEvent
+// Fixes bug #3614419
+const byte larry2SignatureWearParachutePoints[] = {
+	16,
+	0x35, 0x01,       // ldi 01
+	0xa1, 0x8e,       // sag 8e
+	0x80, 0xe0, 0x01, // lag 1e0
+	0x18,             // not
+	0x30, 0x0f, 0x00, // bnt [don't give points]
+	0x35, 0x01,       // ldi 01
+	0xa0, 0xe0, 0x01, // sag 1e0
+	0
+};
+
+const uint16 larry2PatchWearParachutePoints[] = {
+	PATCH_ADDTOOFFSET | +4,
+	0x80, 0x5a, 0x00, // lag 5a (global 90)
+	PATCH_ADDTOOFFSET | +6,
+	0xa0, 0x5a, 0x00, // sag 5a (global 90)
+	PATCH_END
+};
+
+//    script, description,                                      magic DWORD,                                  adjust
+const SciScriptSignature larry2Signatures[] = {
+	{     63, "plane: no points for wearing plane",          1, PATCH_MAGICDWORD(0x8e, 0x80, 0xe0, 0x01),    -3, larry2SignatureWearParachutePoints, larry2PatchWearParachutePoints },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -775,7 +1005,7 @@ const uint16 mothergoose256PatchReplay[] = {
 	PATCH_END
 };
 
-// when saving, it also checks if the savegame-id is below 13.
+// when saving, it also checks if the savegame ID is below 13.
 //  we change this to check if below 113 instead
 const byte mothergoose256SignatureSaveLimit[] = {
 	5,
@@ -796,6 +1026,68 @@ const SciScriptSignature mothergoose256Signatures[] = {
 	{      0, "replay save issue",                           1, PATCH_MAGICDWORD(0x20, 0x04, 0xa1, 0xb3),    -2, mothergoose256SignatureReplay,    mothergoose256PatchReplay },
 	{      0, "save limit dialog (SCI1.1)",                  1, PATCH_MAGICDWORD(0xb3, 0x35, 0x0d, 0x20),    -1, mothergoose256SignatureSaveLimit, mothergoose256PatchSaveLimit },
 	{    994, "save limit dialog (SCI1)",                    1, PATCH_MAGICDWORD(0xb3, 0x35, 0x0d, 0x20),    -1, mothergoose256SignatureSaveLimit, mothergoose256PatchSaveLimit },
+	SCI_SIGNATUREENTRY_TERMINATOR
+};
+
+// ===========================================================================
+// Police Quest 1 VGA
+// When at the police station, you can put or get your gun from your locker.
+// The script, that handles this, is buggy. It disposes the gun as soon as
+//  you click, but then waits 2 seconds before it also closes the locker.
+// Problem is that it's possible to click again, which then results in a
+//  disposed object getting accessed. This happened to work by pure luck in
+//  SSCI.
+// This patch changes the code, so that the gun is actually given away
+//  when the 2 seconds have passed and the locker got closed.
+// Responsible method: putGun::changeState (script 341)
+// Fixes bug #3036933 / #3303802
+const byte pq1vgaSignaturePutGunInLockerBug[] = {
+	5,
+	0x35, 0x00,       // ldi 00
+	0x1a,             // eq?
+	0x31, 0x25,       // bnt [next state check]
+	+22, 29,          // [skip 22 bytes]
+	0x38, 0x5f, 0x01, // pushi 15fh
+	0x78,             // push1
+	0x76,             // push0
+	0x81, 0x00,       // lag 00
+	0x4a, 0x06,       // send 06 - ego::put(0)
+	0x35, 0x02,       // ldi 02
+	0x65, 0x1c,       // aTop 1c (set timer to 2 seconds)
+	0x33, 0x0e,       // jmp [end of method]
+	0x3c,             // dup --- next state check target
+	0x35, 0x01,       // ldi 01
+	0x1a,             // eq?
+	0x31, 0x08,       // bnt [end of method]
+	0x39, 0x6f,       // pushi 6fh
+	0x76,             // push0
+	0x72, 0x88, 0x00, // lofsa 0088
+	0x4a, 0x04,       // send 04 - locker::dispose
+	0
+};
+
+const uint16 pq1vgaPatchPutGunInLockerBug[] = {
+	PATCH_ADDTOOFFSET | +3,
+	0x31, 0x1c,       // bnt [next state check]
+	PATCH_ADDTOOFFSET | +22,
+	0x35, 0x02,       // ldi 02
+	0x65, 0x1c,       // aTop 1c (set timer to 2 seconds)
+	0x33, 0x17,       // jmp [end of method]
+	0x3c,             // dup --- next state check target
+	0x35, 0x01,       // ldi 01
+	0x1a,             // eq?
+	0x31, 0x11,       // bnt [end of method]
+	0x38, 0x5f, 0x01, // pushi 15fh
+	0x78,             // push1
+	0x76,             // push0
+	0x81, 0x00,       // lag 00
+	0x4a, 0x06,       // send 06 - ego::put(0)
+	PATCH_END
+};
+
+//    script, description,                                      magic DWORD,                                  adjust
+const SciScriptSignature pq1vgaSignatures[] = {
+	{    341, "put gun in locker bug",                       1, PATCH_MAGICDWORD(0x38, 0x5f, 0x01, 0x78),   -27, pq1vgaSignaturePutGunInLockerBug, pq1vgaPatchPutGunInLockerBug },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -848,10 +1140,154 @@ const uint16 qfg1vgaPatchFightEvents[] = {
 	PATCH_END
 };
 
+// Script 814 of QFG1VGA is responsible for showing dialogs. However, the death
+// screen message shown when the hero dies in room 64 (ghost room) is too large
+// (254 chars long). Since the window header and main text are both stored in
+// temp space, this is an issue, as the scripts read the window header, then the
+// window text, which erases the window header text because of its length. To
+// fix that, we allocate more temp space and move the pointer used for the
+// window header a little bit, wherever it's used in script 814.
+// Fixes bug #3568431.
+
+// Patch 1: Increase temp space
+const byte qfg1vgaSignatureTempSpace[] = {
+	4,
+	0x3f, 0xba,       // link 0xba
+	0x87, 0x00,       // lap 0
+	0
+};
+
+const uint16 qfg1vgaPatchTempSpace[] = {
+	0x3f, 0xca,       // link 0xca
+	PATCH_END
+};
+
+// Patch 2: Move the pointer used for the window header a little bit
+const byte qfg1vgaSignatureDialogHeader[] = {
+	4,
+	0x5b, 0x04, 0x80,  // lea temp[0x80]
+	0x36,              // push
+	0
+};
+
+const uint16 qfg1vgaPatchDialogHeader[] = {
+	0x5b, 0x04, 0x90,  // lea temp[0x90]
+	PATCH_END
+};
+
+// When clicking on the crusher in room 331, Ego approaches him to talk to him,
+// an action that is handled by moveToCrusher::changeState in script 331. The
+// scripts set Ego to move close to the crusher, but when Ego is sneaking instead
+// of walking, the target coordinates specified by script 331 are never reached,
+// as Ego is making larger steps, and never reaches the required spot. This is an
+// edge case that can occur when Ego is set to sneak. Normally, when clicking on
+// the crusher, ego is supposed to move close to position 79, 165. We change it
+// to 85, 165, which is not an edge case thus the freeze is avoided.
+// Fixes bug #3585189.
+const byte qfg1vgaSignatureMoveToCrusher[] = {
+	9,
+	0x51, 0x1f,       // class Motion
+	0x36,             // push
+	0x39, 0x4f,       // pushi 4f (79 - x)
+	0x38, 0xa5, 0x00, // pushi 00a5 (165 - y)
+	0x7c,             // pushSelf
+	0
+};
+
+const uint16 qfg1vgaPatchMoveToCrusher[] = {
+	PATCH_ADDTOOFFSET | +3,
+	0x39, 0x55,       // pushi 55 (85 - x)
+	PATCH_END
+};
+
+// Same pathfinding bug as above, where Ego is set to move to an impossible
+// spot when sneaking. In GuardsTrumpet::changeState, we change the final
+// location where Ego is moved from 111, 111 to 114, 114. Fixes bug #3604939.
+const byte qfg1vgaSignatureMoveToCastleGate[] = {
+	7,
+	0x51, 0x1f,       // class MoveTo
+	0x36,             // push
+	0x39, 0x6f,       // pushi 6f (111 - x)
+	0x3c,             // dup (111 - y)
+	0x7c,             // pushSelf
+	0
+};
+
+const uint16 qfg1vgaPatchMoveToCastleGate[] = {
+	PATCH_ADDTOOFFSET | +3,
+	0x39, 0x72,       // pushi 72 (114 - x)
+	PATCH_END
+};
+
+// Typo in the original Sierra scripts
+// Looking at a cheetaur resulted in a text about a Saurus Rex
+// The code treats both monster types the same.
+// Responsible method: smallMonster::doVerb
+// Fixes bug #3604943.
+const byte qfg1vgaSignatureCheetaurDescription[] = {
+	16,
+	0x34, 0xb8, 0x01, // ldi 01b8
+	0x1a,             // eq?
+	0x31, 0x16,       // bnt 16
+	0x38, 0x27, 0x01, // pushi 0127
+	0x39, 0x06,       // pushi 06
+	0x39, 0x03,       // pushi 03
+	0x78,             // push1
+	0x39, 0x12,       // pushi 12 -> monster type Saurus Rex
+	0
+};
+
+const uint16 qfg1vgaPatchCheetaurDescription[] = {
+	PATCH_ADDTOOFFSET | +14,
+	0x39, 0x11,       // pushi 11 -> monster type cheetaur
+	PATCH_END
+};
+
+// In the "funny" room (Yorick's room) in QfG1 VGA, pulling the chain and
+//  then pressing the button on the right side of the room results in
+//  a broken game. This also happens in SSCI.
+// Problem is that the Sierra programmers forgot to disable the door, that
+//  gets opened by pulling the chain. So when ego falls down and then
+//  rolls through the door, one method thinks that the player walks through
+//  it and acts that way and the other method is still doing the roll animation.
+// Local 5 of that room is a timer, that closes the door (object door11).
+// Setting it to 1 during happyFace::changeState(0) stops door11::doit from
+//  calling goTo6::init, so the whole issue is stopped from happening.
+// Responsible method: happyFace::changeState, door11::doit
+// Fixes bug #3585793
+const byte qfg1vgaSignatureFunnyRoomFix[] = {
+	14,
+	0x65, 0x14,       // aTop 14 (state)
+	0x36,             // push
+	0x3c,             // dup
+	0x35, 0x00,       // ldi 00
+	0x1a,             // eq?
+	0x30, 0x25, 0x00, // bnt 0025 [-> next state]
+	0x35, 0x01,       // ldi 01
+	0xa3, 0x4e,       // sal 4e
+	0
+};
+
+const uint16 qfg1vgaPatchFunnyRoomFix[] = {
+	PATCH_ADDTOOFFSET | +3,
+	0x2e, 0x29, 0x00, // bt 0029 [-> next state] - saves 4 bytes
+	0x35, 0x01,       // ldi 01
+	0xa3, 0x4e,       // sal 4e
+	0xa3, 0x05,       // sal 05 (sets local 5 to 1)
+	0xa3, 0x05,       // and again to make absolutely sure (actually to waste 2 bytes)
+	PATCH_END
+};
+
 //    script, description,                                      magic DWORD,                                  adjust
 const SciScriptSignature qfg1vgaSignatures[] = {
-	{    215, "fight event issue",                           1, PATCH_MAGICDWORD(0x6d, 0x76, 0x51, 0x07),    -1, qfg1vgaSignatureFightEvents,       qfg1vgaPatchFightEvents },
-	{    216, "weapon master event issue",                   1, PATCH_MAGICDWORD(0x6d, 0x76, 0x51, 0x07),    -1, qfg1vgaSignatureFightEvents,       qfg1vgaPatchFightEvents },
+	{    215, "fight event issue",                           1, PATCH_MAGICDWORD(0x6d, 0x76, 0x51, 0x07),    -1, qfg1vgaSignatureFightEvents,         qfg1vgaPatchFightEvents },
+	{    216, "weapon master event issue",                   1, PATCH_MAGICDWORD(0x6d, 0x76, 0x51, 0x07),    -1, qfg1vgaSignatureFightEvents,         qfg1vgaPatchFightEvents },
+	{    814, "window text temp space",                      1, PATCH_MAGICDWORD(0x3f, 0xba, 0x87, 0x00),     0, qfg1vgaSignatureTempSpace,           qfg1vgaPatchTempSpace },
+	{    814, "dialog header offset",                        3, PATCH_MAGICDWORD(0x5b, 0x04, 0x80, 0x36),     0, qfg1vgaSignatureDialogHeader,        qfg1vgaPatchDialogHeader },
+	{    331, "moving to crusher",                           1, PATCH_MAGICDWORD(0x51, 0x1f, 0x36, 0x39),     0, qfg1vgaSignatureMoveToCrusher,       qfg1vgaPatchMoveToCrusher },
+	{     41, "moving to castle gate",                       1, PATCH_MAGICDWORD(0x51, 0x1f, 0x36, 0x39),     0, qfg1vgaSignatureMoveToCastleGate,    qfg1vgaPatchMoveToCastleGate },
+	{    210, "cheetaur description fixed",                  1, PATCH_MAGICDWORD(0x34, 0xb8, 0x01, 0x1a),     0, qfg1vgaSignatureCheetaurDescription, qfg1vgaPatchCheetaurDescription },
+	{     96, "funny room script bug fixed",                 1, PATCH_MAGICDWORD(0x35, 0x01, 0xa3, 0x4e),   -10, qfg1vgaSignatureFunnyRoomFix,        qfg1vgaPatchFunnyRoomFix },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -915,9 +1351,53 @@ const uint16 qfg3PatchImportDialog[] = {
 	PATCH_END
 };
 
+
+
+// ===========================================================================
+// Patch for the Woo dialog option in Uhura's conversation. Bug #3040722
+// Problem: The Woo dialog option (0xffb5) is negative, and therefore
+// treated as an option opening a submenu. This leads to uhuraTell::doChild
+// being called, which calls hero::solvePuzzle and then proceeds with
+// Teller::doChild to open the submenu. However, there is no actual submenu
+// defined for option -75 since -75 does not show up in uhuraTell::keys.
+// This will cause Teller::doChild to run out of bounds while scanning through
+// uhuraTell::keys.
+// Strategy: there is another conversation option in uhuraTell::doChild calling
+// hero::solvePuzzle (0xfffc) which does a ret afterwards without going to
+// Teller::doChild. We jump to this call of hero::solvePuzzle to get that same
+// behaviour.
+
+const byte qfg3SignatureWooDialog[] = {
+	30,
+	0x67, 0x12,       // pTos 12 (query)
+	0x35, 0xb6,       // ldi b6
+	0x1a,             // eq?
+	0x2f, 0x05,       // bt 05
+	0x67, 0x12,       // pTos 12 (query)
+	0x35, 0x9b,       // ldi 9b
+	0x1a,             // eq?
+	0x31, 0x0c,       // bnt 0c
+	0x38, 0x97, 0x02, // pushi 0297
+	0x7a,             // push2
+	0x38, 0x0c, 0x01, // pushi 010c
+	0x7a,             // push2
+	0x81, 0x00,       // lag 00
+	0x4a, 0x08,       // send 08
+	0x67, 0x12,       // pTos 12 (query)
+	0x35, 0xb5,       // ldi b5
+	0
+};
+
+const uint16 qfg3PatchWooDialog[] = {
+	PATCH_ADDTOOFFSET | +0x29,
+	0x33, 0x11, // jmp to 0x6a2, the call to hero::solvePuzzle for 0xFFFC
+	PATCH_END
+};
+
 //    script, description,                                      magic DWORD,                                  adjust
 const SciScriptSignature qfg3Signatures[] = {
 	{    944, "import dialog continuous calls",                 1, PATCH_MAGICDWORD(0x2a, 0x31, 0x0b, 0x7a),  -1, qfg3SignatureImportDialog,         qfg3PatchImportDialog },
+	{    440, "dialog crash when asking about Woo",             1, PATCH_MAGICDWORD(0x67, 0x12, 0x35, 0xb5),  -26, qfg3SignatureWooDialog,         qfg3PatchWooDialog },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -927,7 +1407,7 @@ const SciScriptSignature qfg3Signatures[] = {
 //   adds it to nest::x. The problem is that the script also checks if x exceeds
 //   we never reach that of course, so the pterodactyl-flight will go endlessly
 //   we could either calculate property count differently somehow fixing this
-//   but I think just patching it out is cleaner (ffs. bug #3037938)
+//   but I think just patching it out is cleaner (bug #3037938)
 const byte sq4FloppySignatureEndlessFlight[] = {
 	8,
 	0x39, 0x04,       // pushi 04 (selector x)
@@ -938,7 +1418,7 @@ const byte sq4FloppySignatureEndlessFlight[] = {
 	0
 };
 
-// Similar to the above, for the German version (ffs. bug #3110215)
+// Similar to the above, for the German version (bug #3110215)
 const byte sq4FloppySignatureEndlessFlightGerman[] = {
 	8,
 	0x39, 0x04,       // pushi 04 (selector x)
@@ -978,7 +1458,27 @@ const uint16 sq4CdPatchTextOptionsButton[] = {
 	PATCH_END
 };
 
-// Patch 2: Add the ability to toggle among the three available options,
+// Patch 2: Adjust a check in babbleIcon::init, which handles the babble icon
+// (e.g. the two guys from Andromeda) shown when dying/quitting.
+// Fixes bug #3538418.
+const byte sq4CdSignatureBabbleIcon[] = {
+	7,
+	0x89, 0x5a,      // lsg 5a
+	0x35, 0x02,      // ldi 02
+	0x1a,            // eq?
+	0x31, 0x26,      // bnt 26  [02a7]
+	0
+};
+
+const uint16 sq4CdPatchBabbleIcon[] = {
+	0x89, 0x5a,      // lsg 5a
+	0x35, 0x01,      // ldi 01
+	0x1a,            // eq?
+	0x2f, 0x26,      // bt 26  [02a7]
+	PATCH_END
+};
+
+// Patch 3: Add the ability to toggle among the three available options,
 // when the text options button is clicked: "Speech", "Text" and "Both".
 // Refer to the patch above for additional details.
 // iconTextSwitch::doit (called when the text options button is clicked)
@@ -1030,8 +1530,35 @@ const SciScriptSignature sq4Signatures[] = {
 	{    298, "Floppy: endless flight",                      1, PATCH_MAGICDWORD(0x67, 0x08, 0x63, 0x44),    -3,       sq4FloppySignatureEndlessFlight, sq4FloppyPatchEndlessFlight },
 	{    298, "Floppy (German): endless flight",             1, PATCH_MAGICDWORD(0x67, 0x08, 0x63, 0x4c),    -3, sq4FloppySignatureEndlessFlightGerman, sq4FloppyPatchEndlessFlight },
 	{    818, "CD: Speech and subtitles option",             1, PATCH_MAGICDWORD(0x89, 0x5a, 0x3c, 0x35),     0,             sq4CdSignatureTextOptions,       sq4CdPatchTextOptions },
+	{      0, "CD: Babble icon speech and subtitles fix",    1, PATCH_MAGICDWORD(0x89, 0x5a, 0x35, 0x02),     0,              sq4CdSignatureBabbleIcon,        sq4CdPatchBabbleIcon },
 	{    818, "CD: Speech and subtitles option button",      1, PATCH_MAGICDWORD(0x35, 0x01, 0xa1, 0x53),     0,       sq4CdSignatureTextOptionsButton, sq4CdPatchTextOptionsButton },
 	SCI_SIGNATUREENTRY_TERMINATOR
+};
+
+// ===========================================================================
+// When you leave Ulence Flats, another timepod is supposed to appear.
+// On fast machines, that timepod appears fully immediately and then
+//  starts to appear like it should be. That first appearance is caused
+//  by the scripts setting an invalid cel number and the machine being
+//  so fast that there is no time for another script to actually fix
+//  the cel number. On slower machines, the cel number gets fixed
+//  by the cycler and that's why only fast machines are affected.
+//  The same issue happens in Sierra SCI.
+// We simply set the correct starting cel number to fix the bug.
+// Responsible method: robotIntoShip::changeState(9)
+const byte sq1vgaSignatureUlenceFlatsTimepodGfxGlitch[] = {
+	8,
+	0x39, 0x07,       // pushi 07 (ship::cel)
+	0x78,             // push1
+	0x39, 0x0a,       // pushi 0x0a (set ship::cel to 10)
+	0x38, 0xa0, 0x00, // pushi 0x00a0 (ship::setLoop)
+	0
+};
+
+const uint16 sq1vgaPatchUlenceFlatsTimepodGfxGlitch[] = {
+	PATCH_ADDTOOFFSET | +3,
+	0x39, 0x09,       // pushi 0x09 (set ship::cel to 9)
+	PATCH_END
 };
 
 const byte sq1vgaSignatureEgoShowsCard[] = {
@@ -1051,7 +1578,8 @@ const byte sq1vgaSignatureEgoShowsCard[] = {
 	0x36,             // push      (wrong, acc clobbered by class, above)
 	0x35, 0x03,       // ldi 0x03
 	0x22,             // lt?
-	0};
+	0
+};
 
 // Note that this script patch is merely a reordering of the
 // instructions in the original script.
@@ -1071,13 +1599,14 @@ const uint16 sq1vgaPatchEgoShowsCard[] = {
 	0x4a, 0x06,       // send 0x06 (set timesShownID)
 	0x35, 0x03,       // ldi 0x03
 	0x22,             // lt?
-	PATCH_END};
+	PATCH_END
+};
 
 
 //    script, description,                                      magic DWORD,                                  adjust
 const SciScriptSignature sq1vgaSignatures[] = {
-	{   58, "Sarien armory droid zapping ego first time", 1, PATCH_MAGICDWORD( 0x72, 0x88, 0x15, 0x36 ), -70,
-		sq1vgaSignatureEgoShowsCard, sq1vgaPatchEgoShowsCard },
+	{     45, "Ulence Flats: timepod graphic glitch",        1, PATCH_MAGICDWORD( 0x07, 0x78, 0x39, 0x0a ),  -1,       sq1vgaSignatureUlenceFlatsTimepodGfxGlitch, sq1vgaPatchUlenceFlatsTimepodGfxGlitch },
+	{     58, "Sarien armory droid zapping ego first time",  1, PATCH_MAGICDWORD( 0x72, 0x88, 0x15, 0x36 ), -70,       sq1vgaSignatureEgoShowsCard, sq1vgaPatchEgoShowsCard },
 
 	SCI_SIGNATUREENTRY_TERMINATOR};
 
@@ -1173,6 +1702,9 @@ int32 Script::findSignature(const SciScriptSignature *signature, const byte *scr
 void Script::matchSignatureAndPatch(uint16 scriptNr, byte *scriptData, const uint32 scriptSize) {
 	const SciScriptSignature *signatureTable = NULL;
 	switch (g_sci->getGameId()) {
+	case GID_CAMELOT:
+		signatureTable = camelotSignatures;
+		break;
 	case GID_ECOQUEST:
 		signatureTable = ecoquest1Signatures;
 		break;
@@ -1189,7 +1721,11 @@ void Script::matchSignatureAndPatch(uint16 scriptNr, byte *scriptData, const uin
 		signatureTable = gk1Signatures;
 		break;
 	case GID_KQ5:
-		signatureTable = kq5Signatures;
+		// See the explanation in the kq5SignatureWinGMSignals comment
+		if (g_sci->_features->useAltWinGMSound())
+			signatureTable = kq5WinGMSignatures;
+		else
+			signatureTable = kq5Signatures;
 		break;
 	case GID_KQ6:
 		signatureTable = kq6Signatures;
@@ -1200,11 +1736,17 @@ void Script::matchSignatureAndPatch(uint16 scriptNr, byte *scriptData, const uin
 	case GID_LONGBOW:
 		signatureTable = longbowSignatures;
 		break;
+	case GID_LSL2:
+		signatureTable = larry2Signatures;
+		break;
 	case GID_LSL6:
 		signatureTable = larry6Signatures;
 		break;
 	case GID_MOTHERGOOSE256:
 		signatureTable = mothergoose256Signatures;
+		break;
+	case GID_PQ1:
+		signatureTable = pq1vgaSignatures;
 		break;
 	case GID_QFG1VGA:
 		signatureTable = qfg1vgaSignatures;

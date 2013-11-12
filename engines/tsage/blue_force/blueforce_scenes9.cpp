@@ -35,7 +35,7 @@ namespace BlueForce {
  *
  *--------------------------------------------------------------------------*/
 
-bool Scene900::Item1::startAction(CursorType action, Event &event) {
+bool Scene900::Exterior::startAction(CursorType action, Event &event) {
 	if (action == CURSOR_LOOK) {
 		SceneItem::display2(900, 6);
 		return true;
@@ -44,7 +44,7 @@ bool Scene900::Item1::startAction(CursorType action, Event &event) {
 	}
 }
 
-bool Scene900::Item4::startAction(CursorType action, Event &event) {
+bool Scene900::WestExit::startAction(CursorType action, Event &event) {
 	Scene900 *scene = (Scene900 *)BF_GLOBALS._sceneManager._scene;
 
 	BF_GLOBALS._player.disableControl();
@@ -386,7 +386,7 @@ void Scene900::Action3::signal() {
 		break;
 	default:
 		break;
-	} 
+	}
 }
 
 void Scene900::Action4::signal() {
@@ -458,7 +458,7 @@ void Scene900::postInit(SceneObjectList *OwnerList) {
 	_stripManager.addSpeaker(&_jakeJacketSpeaker);
 	_stripManager.addSpeaker(&_lyleHatSpeaker);
 
-	_item4.setDetails(Rect(0, 85, 20, 130), 900, -1, -1, -1, 1, 0);
+	_westExit.setDetails(Rect(0, 85, 20, 130), 900, -1, -1, -1, 1, 0);
 	BF_GLOBALS._player.postInit();
 
 	_dog.postInit();
@@ -540,7 +540,7 @@ void Scene900::postInit(SceneObjectList *OwnerList) {
 				_lyle.setDetails(900, 19, 20, 21, ANIM_MODE_1, (SceneItem *)NULL);
 				_lyle.animate(ANIM_MODE_1, NULL);
 				_lyle.setObjectWrapper(new SceneObjectWrapper());
-			} 
+			}
 
 			_sceneMode = 9000;
 			setAction(&_sequenceManager1, this, 9000, &BF_GLOBALS._player, NULL);
@@ -559,11 +559,11 @@ void Scene900::postInit(SceneObjectList *OwnerList) {
 			setAction(&_sequenceManager1, this, 9002, &BF_GLOBALS._player, &_door, NULL);
 	}
 
-	_gate.setDetails(900, 0, -1, 1, 1, 0);
-	_door.setDetails(900, 2, -1, 5, 1, 0);
+	_gate.setDetails(900, 0, -1, 1, 1, (SceneItem *)NULL);
+	_door.setDetails(900, 2, -1, 5, 1, (SceneItem *)NULL);
 	_item2.setDetails(Rect(0, 0, 225, 21), 666, 25, -1, -1, 1, NULL);
 	_item3.setDetails(Rect(37, 21, 324, 50), 666, 26, -1, -1, 1, NULL);
-	_item1.setDetails(Rect(0, 0, 960, 200), 900, 7, -1, -1, 1, NULL);
+	_exterior.setDetails(Rect(0, 0, 960, 200), 900, 7, -1, -1, 1, NULL);
 }
 
 void Scene900::signal() {
@@ -692,7 +692,7 @@ void Scene900::process(Event &event) {
 	SceneExt::process(event);
 
 	if (BF_GLOBALS._player._enabled && !_focusObject && (event.mousePos.y < (UI_INTERFACE_Y - 1))) {
-		if (_item4.contains(event.mousePos)) {
+		if (_westExit.contains(event.mousePos)) {
 			GfxSurface surface = _cursorVisage.getFrame(EXITFRAME_W);
 			BF_GLOBALS._events.setCursor(surface);
 		} else {
@@ -704,6 +704,10 @@ void Scene900::process(Event &event) {
 
 void Scene900::dispatch() {
 	SceneExt::dispatch();
+
+	// WORKAROUND:: Fix for invalid data in the Blue Force floppy version when opening gate
+	if (_sceneMode == 9006 && (g_vm->getFeatures() & GF_FLOPPY) && BF_GLOBALS._player._endFrame == 8)
+		BF_GLOBALS._player._endFrame = 6;
 
 	if (BF_GLOBALS.getFlag(fWithLyle) && _lyle.isNoMover()) {
 		_lyle.updateAngle(BF_GLOBALS._player._position);
@@ -794,12 +798,12 @@ bool Scene910::Lyle::startAction(CursorType action, Event &event) {
 	Scene910 *scene = (Scene910 *)BF_GLOBALS._sceneManager._scene;
 
 	if (action == CURSOR_USE) {
-		if (BF_GLOBALS._v4CEE2 == 0)
+		if (BF_GLOBALS._nico910State == 0)
 			return NamedObject::startAction(action, event);
 		else
 			return false;
 	} else if (action == CURSOR_TALK) {
-		if ((BF_GLOBALS._hiddenDoorStatus != 0) || (BF_GLOBALS._v4CEE2 != 0)) {
+		if ((BF_GLOBALS._hiddenDoorStatus != 0) || (BF_GLOBALS._nico910State != 0)) {
 			scene->_stripManager.start(9100 + _field90, &BF_GLOBALS._stripProxy);
 			if (_field90 < 1)
 				_field90++;
@@ -833,7 +837,7 @@ bool Scene910::Nico::startAction(CursorType action, Event &event) {
 		return true;
 		break;
 	case CURSOR_TALK:
-		if (BF_GLOBALS._v4CEE2 >= 4)
+		if (BF_GLOBALS._nico910State >= 4)
 			return NamedObject::startAction(action, event);
 
 		if (BF_GLOBALS._v4CEE6 < 4)
@@ -847,8 +851,8 @@ bool Scene910::Nico::startAction(CursorType action, Event &event) {
 		return true;
 		break;
 	case INV_COLT45:
-		if (BF_GLOBALS._v4CEE2 > 1) {
-			if (BF_GLOBALS._v4CEE2 != 4) {
+		if (BF_GLOBALS._nico910State > 1) {
+			if (BF_GLOBALS._nico910State != 4) {
 				if ((BF_GLOBALS.getFlag(gunDrawn)) && (BF_GLOBALS.getFlag(fGunLoaded)) && (BF_GLOBALS.getHasBullets())) {
 					if (scene->_field2DE0 == 0) {
 						BF_GLOBALS._player.disableControl();
@@ -880,7 +884,7 @@ bool Scene910::Nico::startAction(CursorType action, Event &event) {
 		break;
 	case INV_BADGE:
 	case INV_ID:
-		if (BF_GLOBALS._v4CEE2 >= 4)
+		if (BF_GLOBALS._nico910State >= 4)
 			return NamedObject::startAction(action, event);
 
 		if (BF_GLOBALS._v4CEE6 < 4)
@@ -895,11 +899,12 @@ bool Scene910::Nico::startAction(CursorType action, Event &event) {
 		return true;
 		break;
 	case INV_YELLOW_CORD:
-		if (BF_GLOBALS._v4CEE2 < 4) {
+		if (BF_GLOBALS._nico910State < 4) {
 			BF_GLOBALS._player.disableControl();
 			scene->_yellowCord.fixPriority(121);
 			scene->_sceneSubMode = 10;
 			scene->_sceneMode = 9123;
+			BF_GLOBALS._nico910State = 3;
 			if (BF_GLOBALS._player._visage == 1911)
 				scene->setAction(&scene->_sequenceManager1, scene, 9123, &BF_GLOBALS._player, NULL);
 			else
@@ -995,7 +1000,7 @@ bool Scene910::Stuart::startAction(CursorType action, Event &event) {
 			return true;
 		} else {
 			BF_GLOBALS._player.disableControl();
-			if (BF_GLOBALS._v4CEE2 == 4) {
+			if (BF_GLOBALS._nico910State == 4) {
 				scene->_sceneSubMode = 11;
 				scene->_sceneMode = 9123;
 				if (BF_GLOBALS._player._visage == 1911)
@@ -1136,7 +1141,7 @@ bool Scene910::BreakerBox::startAction(CursorType action, Event &event) {
 			SceneItem::display2(910, 62);
 			return true;
 		} else if (scene->_sceneMode != 9120) {
-			if (BF_GLOBALS._v4CEE2 == 1) {
+			if (BF_GLOBALS._nico910State == 1) {
 				BF_GLOBALS._player.disableControl();
 				scene->_sceneMode = 9118;
 				scene->setAction(&scene->_sequenceManager1, scene, 9118, &BF_GLOBALS._player, &scene->_nico, NULL);
@@ -1285,13 +1290,13 @@ bool Scene910::Object13::startAction(CursorType action, Event &event) {
 		}
 
 		if (_mode != 1)
-			BF_GLOBALS._breakerBoxStatusArr[_state - 1] = (_state + 251) % 256;
+			BF_GLOBALS._breakerBoxStatusArr[_state - 1] = (_frame + 251) % 256;
 		else
-			BF_GLOBALS._breakerBoxStatusArr[_state - 1] = _state;
+			BF_GLOBALS._breakerBoxStatusArr[_state - 1] = _frame;
 
 		switch (_state) {
 		case 1:
-			if (BF_GLOBALS._v4CEE2 < 1) {
+			if (BF_GLOBALS._nico910State < 1) {
 				if (_frame == 2) {
 					if (!BF_GLOBALS.getFlag(fGotPointsForClosingDoor)) {
 						T2_GLOBALS._uiElements.addScore(30);
@@ -1299,7 +1304,7 @@ bool Scene910::Object13::startAction(CursorType action, Event &event) {
 					}
 					scene->_sceneMode = 0;
 					if (BF_GLOBALS._dayNumber == 5) {
-						if (BF_GLOBALS._v4CEE2 == 0) {
+						if (BF_GLOBALS._nico910State == 0) {
 							scene->_breakerBoxInset.remove();
 							// _objectList.draw();
 							BF_GLOBALS._player.disableControl();
@@ -1309,7 +1314,7 @@ bool Scene910::Object13::startAction(CursorType action, Event &event) {
 							scene->_nico.postInit();
 							scene->_sceneMode = 9129;
 							scene->setAction(&scene->_sequenceManager1, scene, 9129, &BF_GLOBALS._player, &scene->_nico, NULL);
-						} else if (BF_GLOBALS._v4CEE2 == 2) {
+						} else if (BF_GLOBALS._nico910State == 2) {
 							scene->_breakerBoxInset.remove();
 							// _objectList.draw();
 							BF_GLOBALS._player.disableControl();
@@ -1415,6 +1420,10 @@ void Scene910::Object13::setupBreaker(int x, int y, int mode, int8 frameNumber) 
 	fixPriority(252);
 	setPosition(Common::Point(x, y));
 	BF_GLOBALS._sceneItems.push_front(this);
+}
+
+Scene910::Object25::Object25() {
+	_field90 = _field92 = 0;
 }
 
 void Scene910::Object25::synchronize(Serializer &s) {
@@ -1612,7 +1621,7 @@ bool Scene910::BlackPlug::startAction(CursorType action, Event &event) {
 				SET_EXT_FGCOLOR, 13, LIST_END);
 			return true;
 		}
-		if (BF_GLOBALS._v4CEE2 == 3) {
+		if (BF_GLOBALS._nico910State == 3) {
 			SceneItem::display(910, 84, SET_WIDTH, 312,
 				SET_X, GLOBALS._sceneManager._scene->_sceneBounds.left + 4,
 				SET_Y, GLOBALS._sceneManager._scene->_sceneBounds.top + UI_INTERFACE_Y + 2,
@@ -1830,7 +1839,7 @@ bool Scene910::Generator::startAction(CursorType action, Event &event) {
 				SET_Y, GLOBALS._sceneManager._scene->_sceneBounds.top + UI_INTERFACE_Y + 2,
 				SET_FONT, 4, SET_BG_COLOR, 1, SET_FG_COLOR, 19, SET_EXT_BGCOLOR, 9,
 				SET_EXT_FGCOLOR, 13, LIST_END);
-		else if (BF_GLOBALS._v4CEE2 == 1) {
+		else if (BF_GLOBALS._nico910State == 1) {
 			BF_GLOBALS._player.disableControl();
 			scene->_sceneMode = 9118;
 			scene->setAction(&scene->_sequenceManager1, scene, 9118, &BF_GLOBALS._player, &scene->_nico, NULL);
@@ -1869,7 +1878,7 @@ bool Scene910::Item2::startAction(CursorType action, Event &event) {
 bool Scene910::Item3::startAction(CursorType action, Event &event) {
 	Scene910 *scene = (Scene910 *)BF_GLOBALS._sceneManager._scene;
 
-	if ((action == CURSOR_TALK) && (BF_GLOBALS._v4CEE2 == 4) && (BF_GLOBALS._v4CEE4 == 0)) {
+	if ((action == CURSOR_TALK) && (BF_GLOBALS._nico910State == 4) && (BF_GLOBALS._v4CEE4 == 0)) {
 		BF_GLOBALS._player.disableControl();
 		scene->_sceneMode = 15;
 		scene->_stripManager.start(9102, scene);
@@ -1907,7 +1916,7 @@ bool Scene910::Item15::startAction(CursorType action, Event &event) {
 bool Scene910::Item16::startAction(CursorType action, Event &event) {
 	Scene910 *scene = (Scene910 *)BF_GLOBALS._sceneManager._scene;
 
-	if ((BF_GLOBALS._hiddenDoorStatus == 0) || (BF_GLOBALS._v4CEE2 != 0))
+	if ((BF_GLOBALS._hiddenDoorStatus == 0) || (BF_GLOBALS._nico910State != 0))
 		return false;
 
 	if (BF_GLOBALS._player._visage == 1911) {
@@ -2016,7 +2025,7 @@ void Scene910::postInit(SceneObjectList *OwnerList) {
 	if (BF_GLOBALS._dayNumber < 5)
 		_item17.setDetails(Rect(0, 149, 29, 167), 910, -1, -1, -1, 1, NULL);
 
-	if (BF_GLOBALS._v4CEE2 == 0)
+	if (BF_GLOBALS._nico910State == 0)
 		_item16.setDetails(Rect(265, 18, 319, 102), 910, -1, -1, -1, 1, NULL);
 
 	_breakerBox.setDetails(910, 6, -1, -1, 1, (SceneItem *)NULL);
@@ -2048,7 +2057,7 @@ void Scene910::postInit(SceneObjectList *OwnerList) {
 		|| (BF_GLOBALS._sceneManager._previousScene == 190)
 		|| (BF_GLOBALS._sceneManager._previousScene == 300)) {
 		BF_GLOBALS._sceneManager._previousScene = 900;
-		BF_GLOBALS._v4CEE2 = 0;
+		BF_GLOBALS._nico910State = 0;
 		BF_GLOBALS._v4CEE4 = 0;
 	}
 
@@ -2125,7 +2134,7 @@ void Scene910::postInit(SceneObjectList *OwnerList) {
 		_lyle.setFrame(3);
 		_lyle._field90 = 1;
 		_lyle.setDetails(910, 69, 70 ,71 , 5, &_item4);
-	
+
 		BF_GLOBALS._walkRegions.disableRegion(15);
 		BF_GLOBALS._walkRegions.disableRegion(16);
 		BF_GLOBALS._walkRegions.disableRegion(14);
@@ -2142,7 +2151,7 @@ void Scene910::postInit(SceneObjectList *OwnerList) {
 		_nico.setPosition(Common::Point(262, 124));
 		_nico.setStrip(6);
 		BF_GLOBALS._v4CEE6 = 0;
-		BF_GLOBALS._v4CEE2 = 1;
+		BF_GLOBALS._nico910State = 1;
 		_nico.setDetails(910, 63, 64, 67, 5, &_item4);
 		BF_GLOBALS._v4CECA = 2;
 		if (BF_GLOBALS._v4CECC == 0)
@@ -2157,7 +2166,7 @@ void Scene910::postInit(SceneObjectList *OwnerList) {
 		BF_GLOBALS._player.disableControl();
 	}
 
-	if ((BF_GLOBALS._dayNumber == 5) && (BF_GLOBALS._v4CEE2 == 0)){
+	if ((BF_GLOBALS._dayNumber == 5) && (BF_GLOBALS._nico910State == 0)){
 		_shadow.postInit();
 		_shadow.setAction(&_action2);
 	}
@@ -2209,7 +2218,7 @@ void Scene910::postInit(SceneObjectList *OwnerList) {
 		_fakeWall.hide();
 		if (BF_GLOBALS._v4CECC != 2)
 			_yellowCord.setPosition(Common::Point(291, -30));
-		BF_GLOBALS._walkRegions.disableRegion(10);
+		BF_GLOBALS._walkRegions.enableRegion(10);
 	}
 
 	if (BF_GLOBALS._breakerBoxStatusArr[17] != 0) {
@@ -2297,7 +2306,7 @@ void Scene910::signal() {
 	case 13:
 		BF_GLOBALS._player.disableControl();
 		BF_GLOBALS._player.setAction(&_sequenceManager2, NULL, 9117, &_nico, NULL);
-		BF_GLOBALS._v4CEE2 = 2;
+		BF_GLOBALS._nico910State = 2;
 	// No break on purpose
 	case 15:
 		_stuart.postInit();
@@ -2314,7 +2323,7 @@ void Scene910::signal() {
 		_lyle._field90 = 1;
 		_sceneMode = 10;
 		addFader((const byte *)&black, 2, this);
-		BF_GLOBALS._v4CEE2 = 1;
+		BF_GLOBALS._nico910State = 1;
 		BF_GLOBALS._walkRegions.disableRegion(16);
 		BF_GLOBALS._walkRegions.disableRegion(14);
 		BF_GLOBALS._sceneItems.remove(&_item16);
@@ -2324,7 +2333,7 @@ void Scene910::signal() {
 		BF_GLOBALS._player._frame = 1;
 		if (_field2DE2 == 0) {
 			_field2DE2 = 1;
-			if (BF_GLOBALS._v4CEE2 == 4) {
+			if (BF_GLOBALS._nico910State == 4) {
 				_sceneMode = 9149;
 				setAction(&_sequenceManager1, this, 9149, &BF_GLOBALS._player, NULL);
 			} else {
@@ -2452,7 +2461,7 @@ void Scene910::signal() {
 		break;
 	case 9114:
 		_fakeWall.hide();
-		if ((BF_GLOBALS._dayNumber == 5) && (BF_GLOBALS._v4CEE2 == 0)) {
+		if ((BF_GLOBALS._dayNumber == 5) && (BF_GLOBALS._nico910State == 0)) {
 			BF_GLOBALS._player.disableControl();
 			_nico.postInit();
 			_nico.setDetails(910, 63, 64, 65, 5, &_item4);
@@ -2496,7 +2505,7 @@ void Scene910::signal() {
 	case 9121:
 		_item3.setDetails(7, 910, 96, 60, 61, 3);
 		BF_GLOBALS._v4CEE4 = 2;
-		if (BF_GLOBALS._v4CEE2 == 4) {
+		if (BF_GLOBALS._nico910State == 4) {
 			_sceneMode = 20;
 			_stripManager.start(9115, this);
 		} else {
@@ -2527,7 +2536,7 @@ void Scene910::signal() {
 			setAction(&_sequenceManager1, this, 9111, &BF_GLOBALS._player, &_blackCord, NULL);
 			break;
 		case 5:
-			switch (BF_GLOBALS._v4CEE2 - 1) {
+			switch (BF_GLOBALS._nico910State - 1) {
 			case 0:
 				_sceneMode = 9118;
 				setAction(&_sequenceManager1, this, 9118, &BF_GLOBALS._player, &_nico, NULL);
@@ -2598,7 +2607,7 @@ void Scene910::signal() {
 		break;
 	case 9125:
 		BF_GLOBALS.setFlag(fBackupAt340);
-		BF_GLOBALS._v4CEE2 = 4;
+		BF_GLOBALS._nico910State = 4;
 		_stuart.postInit();
 		_nico.setDetails(910, 72, 73, 74, 3, (SceneItem *)NULL);
 		_stuart.setDetails(910, 66, 67, 68, 5, &_nico);
@@ -2645,7 +2654,7 @@ void Scene910::signal() {
 		}
 		_lyle.setAction(&_sequenceManager2, NULL, 9131, &_lyle, NULL);
 		BF_GLOBALS._walkRegions.enableRegion(16);
-		if (BF_GLOBALS._v4CEE2 == 4)
+		if (BF_GLOBALS._nico910State == 4)
 			BF_INVENTORY.setObjectScene(INV_YELLOW_CORD, 0);
 		else
 			BF_INVENTORY.setObjectScene(INV_HALF_YELLOW_CORD, 910);
@@ -2679,7 +2688,7 @@ void Scene910::signal() {
 		}
 		break;
 	case 9143:
-		if (BF_GLOBALS._v4CEE2 == 0) {
+		if (BF_GLOBALS._nico910State == 0) {
 			BF_GLOBALS._v51C44 = 1;
 			BF_GLOBALS._sceneManager.changeScene(920);
 		} else {
@@ -2730,7 +2739,7 @@ void Scene910::process(Event &event) {
 		if (_item17._bounds.contains(event.mousePos)) {
 				GfxSurface surface = _cursorVisage.getFrame(EXITFRAME_SW);
 				BF_GLOBALS._events.setCursor(surface);
-		} else if ((BF_GLOBALS._hiddenDoorStatus == 0) || (BF_GLOBALS._v4CEE2 != 0)) {
+		} else if ((BF_GLOBALS._hiddenDoorStatus == 0) || (BF_GLOBALS._nico910State != 0)) {
 			CursorType cursorId = BF_GLOBALS._events.getCursor();
 			BF_GLOBALS._events.setCursor(cursorId);
 		} else if (!_item16._bounds.contains(event.mousePos)) {
@@ -2755,7 +2764,7 @@ void Scene910::process(Event &event) {
 			_sceneMode = 9123;
 			setAction(&_sequenceManager1, this, 9123, &BF_GLOBALS._player, NULL);
 			event.handled = true;
-		} else if (BF_GLOBALS._v4CEE2 <= 1) {
+		} else if (BF_GLOBALS._nico910State <= 1) {
 			if (BF_GLOBALS.getFlag(fCanDrawGun)) {
 				BF_GLOBALS._player.addMover(NULL);
 				BF_GLOBALS._player.disableControl();
@@ -2776,7 +2785,7 @@ void Scene910::process(Event &event) {
 		event.handled = true;
 		break;
 	case CURSOR_WALK:
-		if (BF_GLOBALS._v4CEE2 == 1) {
+		if (BF_GLOBALS._nico910State == 1) {
 			BF_GLOBALS._player.disableControl();
 			if (BF_GLOBALS._player._visage == 1911) {
 				BF_GLOBALS._player.disableControl();
@@ -2826,7 +2835,7 @@ void Scene910::dispatch() {
 			_sceneSubMode = 3;
 			_sceneMode = 9123;
 			setAction(&_sequenceManager1, this, 9123, &BF_GLOBALS._player, NULL);
-		} else if (BF_GLOBALS._v4CEE2 == 0) {
+		} else if (BF_GLOBALS._nico910State == 0) {
 			_sceneMode = 9143;
 			setAction(&_sequenceManager1, this, 9143, &BF_GLOBALS._player, NULL);
 		} else {
@@ -2840,7 +2849,7 @@ void Scene910::dispatch() {
 		}
 	}
 
-	if ((BF_GLOBALS._dayNumber == 5) && (BF_GLOBALS._player._position.x > 250) && (_sceneMode != 9135) && (_sceneMode != 11) && (BF_GLOBALS._hiddenDoorStatus != 0) && (BF_GLOBALS._v4CEE2 == 0)) {
+	if ((BF_GLOBALS._dayNumber == 5) && (BF_GLOBALS._player._position.x > 250) && (_sceneMode != 9135) && (_sceneMode != 11) && (BF_GLOBALS._hiddenDoorStatus != 0) && (BF_GLOBALS._nico910State == 0)) {
 		BF_GLOBALS._player.disableControl();
 		_shadow.remove();
 		_nico.remove();
@@ -2853,7 +2862,7 @@ void Scene910::dispatch() {
 }
 
 void Scene910::checkGun() {
-	if ((BF_GLOBALS._dayNumber == 5) && (BF_GLOBALS._v4CEE2 == 0) && (BF_GLOBALS._hiddenDoorStatus != 0))
+	if ((BF_GLOBALS._dayNumber == 5) && (BF_GLOBALS._nico910State == 0) && (BF_GLOBALS._hiddenDoorStatus != 0))
 		SceneItem::display(910, 70, SET_WIDTH, 312,
 				SET_X, GLOBALS._sceneManager._scene->_sceneBounds.left + 4,
 				SET_Y, GLOBALS._sceneManager._scene->_sceneBounds.top + UI_INTERFACE_Y + 2,
@@ -2900,7 +2909,7 @@ void Scene910::closeHiddenDoor() {
 			setAction(&_sequenceManager1, this, 9115, &_fakeWall, &_object5, NULL);
 	}
 
-	if ((BF_GLOBALS._dayNumber == 5) && (BF_GLOBALS._v4CEE2 == 0)) {
+	if ((BF_GLOBALS._dayNumber == 5) && (BF_GLOBALS._nico910State == 0)) {
 		// _objectList.draw();
 		if (BF_GLOBALS._sceneObjects->contains(&_breakerBoxInset))
 			_breakerBoxInset.remove();
@@ -3375,6 +3384,7 @@ void Scene930::postInit(SceneObjectList *OwnerList) {
 	BF_GLOBALS._player.fixPriority(80);
 	BF_GLOBALS._player.changeZoom(-1);
 	BF_GLOBALS._player.enableControl();
+	BF_GLOBALS._events.setCursor(CURSOR_WALK);
 
 	_item1.setDetails(  1, 930,  0,  1,  2, 1);
 	_item2.setDetails(  2, 930,  4,  5,  6, 1);
@@ -3571,7 +3581,7 @@ void Scene935::postInit(SceneObjectList *OwnerList) {
 	PalettedScene::postInit();
 	loadScene(935);
 
-	BF_GLOBALS._interfaceY = 200;
+	BF_GLOBALS._interfaceY = SCREEN_HEIGHT;
 	BF_GLOBALS._player.disableControl();
 	_visualSpeaker._textMode = ALIGN_CENTER;
 	_visualSpeaker._hideObjects = false;
@@ -3806,7 +3816,7 @@ void Scene940::postInit(SceneObjectList *OwnerList) {
 
 	BF_GLOBALS._sound1.play(115);
 	BF_GLOBALS._dayNumber = 6;
-	BF_GLOBALS._interfaceY = 200;
+	BF_GLOBALS._interfaceY = SCREEN_HEIGHT;
 	T2_GLOBALS._uiElements._active = false;
 
 	_gameTextSpeaker2._speakerName = "SENTTEXT";

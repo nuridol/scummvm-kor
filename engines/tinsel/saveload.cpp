@@ -55,8 +55,7 @@ namespace Tinsel {
  * only saves/loads those which are valid for the version of the savegame
  * which is being loaded/saved currently.
  */
-#define CURRENT_VER 1
-// TODO: Not yet used
+#define CURRENT_VER 2
 
 /**
  * An auxillary macro, used to specify savegame versions. We use this instead
@@ -68,9 +67,9 @@ namespace Tinsel {
 
 //----------------- GLOBAL GLOBAL DATA --------------------
 
-int	thingHeld = 0;
-int	restoreCD = 0;
-SRSTATE SRstate = SR_IDLE;
+int	g_thingHeld = 0;
+int	g_restoreCD = 0;
+SRSTATE g_SRstate = SR_IDLE;
 
 //----------------- EXTERN FUNCTIONS --------------------
 
@@ -83,9 +82,9 @@ extern void syncGlobInfo(Common::Serializer &s);
 // in POLYGONS.C
 extern void syncPolyInfo(Common::Serializer &s);
 
-extern int sceneCtr;
+extern int g_sceneCtr;
 
-extern bool ASceneIsSaved;
+extern bool g_ASceneIsSaved;
 
 //----------------- LOCAL DEFINES --------------------
 
@@ -97,12 +96,13 @@ struct SaveGameHeader {
 	TimeDate dateTime;
 	bool scnFlag;
 	byte language;
+	uint16 numInterpreters;			// Savegame version 2 or later only
 };
 
 enum {
 	DW1_SAVEGAME_ID = 0x44575399,	// = 'DWSc' = "DiscWorld 1 ScummVM"
 	DW2_SAVEGAME_ID = 0x44573253,	// = 'DW2S' = "DiscWorld 2 ScummVM"
-	SAVEGAME_HEADER_SIZE = 4 + 4 + 4 + SG_DESC_LEN + 7 + 1 + 1
+	SAVEGAME_HEADER_SIZE = 4 + 4 + 4 + SG_DESC_LEN + 7 + 1 + 1 + 2
 };
 
 #define SAVEGAME_ID (TinselV2 ? (uint32)DW2_SAVEGAME_ID : (uint32)DW1_SAVEGAME_ID)
@@ -123,21 +123,23 @@ struct SFILES {
 
 // FIXME: Avoid non-const global vars
 
-static int	numSfiles = 0;
-static SFILES	savedFiles[MAX_SAVED_FILES];
+static int	g_numSfiles = 0;
+static SFILES	g_savedFiles[MAX_SAVED_FILES];
 
-static bool NeedLoad = true;
+static bool g_NeedLoad = true;
 
-static SAVED_DATA *srsd = 0;
-static int RestoreGameNumber = 0;
-static char *SaveSceneName = 0;
-static const char *SaveSceneDesc = 0;
-static int *SaveSceneSsCount = 0;
-static SAVED_DATA *SaveSceneSsData = 0;	// points to 'SAVED_DATA ssdata[MAX_NEST]'
+static SAVED_DATA *g_srsd = 0;
+static int g_RestoreGameNumber = 0;
+static char *g_SaveSceneName = 0;
+static const char *g_SaveSceneDesc = 0;
+static int *g_SaveSceneSsCount = 0;
+static SAVED_DATA *g_SaveSceneSsData = 0;	// points to 'SAVED_DATA ssdata[MAX_NEST]'
 
 //------------- SAVE/LOAD SUPPORT METHODS ----------------
 
-void setNeedLoad() { NeedLoad = true; }
+void setNeedLoad() {
+	g_NeedLoad = true;
+}
 
 static void syncTime(Common::Serializer &s, TimeDate &t) {
 	s.syncAsUint16LE(t.tm_year);
@@ -182,6 +184,15 @@ static bool syncSaveGameHeader(Common::Serializer &s, SaveGameHeader &hdr) {
 					(hdr.language != _vm->_config->_language))
 				return false;
 		}
+	}
+
+	// Handle the number of interpreter contexts that will be saved in the savegame
+	if (tmp >= 2) {
+		tmp -= 2;
+		hdr.numInterpreters = NUM_INTERPRET;
+		s.syncAsUint16LE(hdr.numInterpreters);
+	} else {
+		hdr.numInterpreters = (TinselV2 ? 70 : 64) - 20;
 	}
 
 	// Skip over any extra bytes
@@ -260,7 +271,7 @@ static void syncSoundReel(Common::Serializer &s, SOUNDREELS &sr) {
 	s.syncAsSint32LE(sr.actorCol);
 }
 
-static void syncSavedData(Common::Serializer &s, SAVED_DATA &sd) {
+static void syncSavedData(Common::Serializer &s, SAVED_DATA &sd, int numInterp) {
 	s.syncAsUint32LE(sd.SavedSceneHandle);
 	s.syncAsUint32LE(sd.SavedBgroundHandle);
 	for (int i = 0; i < MAX_MOVERS; ++i)
@@ -271,7 +282,7 @@ static void syncSavedData(Common::Serializer &s, SAVED_DATA &sd) {
 	s.syncAsSint32LE(sd.NumSavedActors);
 	s.syncAsSint32LE(sd.SavedLoffset);
 	s.syncAsSint32LE(sd.SavedToffset);
-	for (int i = 0; i < NUM_INTERPRET; ++i)
+	for (int i = 0; i < numInterp; ++i)
 		sd.SavedICInfo[i].syncWithSerializer(s);
 	for (int i = 0; i < MAX_POLY; ++i)
 		s.syncAsUint32LE(sd.SavedDeadPolys[i]);
@@ -345,18 +356,18 @@ static int cmpTimeDate(const TimeDate &a, const TimeDate &b) {
 int getList(Common::SaveFileManager *saveFileMan, const Common::String &target) {
 	// No change since last call?
 	// TODO/FIXME: Just always reload this data? Be careful about slow downs!!!
-	if (!NeedLoad)
-		return numSfiles;
+	if (!g_NeedLoad)
+		return g_numSfiles;
 
 	int i;
 
 	const Common::String pattern = target +  ".???";
 	Common::StringArray files = saveFileMan->listSavefiles(pattern);
 
-	numSfiles = 0;
+	g_numSfiles = 0;
 
 	for (Common::StringArray::const_iterator file = files.begin(); file != files.end(); ++file) {
-		if (numSfiles >= MAX_SAVED_FILES)
+		if (g_numSfiles >= MAX_SAVED_FILES)
 			break;
 
 		const Common::String &fname = *file;
@@ -376,63 +387,63 @@ int getList(Common::SaveFileManager *saveFileMan, const Common::String &target) 
 			// "incompatible version".
 		}
 
-		i = numSfiles;
+		i = g_numSfiles;
 #ifndef DISABLE_SAVEGAME_SORTING
-		for (i = 0; i < numSfiles; i++) {
-			if (cmpTimeDate(hdr.dateTime, savedFiles[i].dateTime) > 0) {
-				Common::copy_backward(&savedFiles[i], &savedFiles[numSfiles], &savedFiles[numSfiles + 1]);
+		for (i = 0; i < g_numSfiles; i++) {
+			if (cmpTimeDate(hdr.dateTime, g_savedFiles[i].dateTime) > 0) {
+				Common::copy_backward(&g_savedFiles[i], &g_savedFiles[g_numSfiles], &g_savedFiles[g_numSfiles + 1]);
 				break;
 			}
 		}
 #endif
 
-		Common::strlcpy(savedFiles[i].name, fname.c_str(), FNAMELEN);
-		Common::strlcpy(savedFiles[i].desc, hdr.desc, SG_DESC_LEN);
-		savedFiles[i].dateTime = hdr.dateTime;
+		Common::strlcpy(g_savedFiles[i].name, fname.c_str(), FNAMELEN);
+		Common::strlcpy(g_savedFiles[i].desc, hdr.desc, SG_DESC_LEN);
+		g_savedFiles[i].dateTime = hdr.dateTime;
 
-		++numSfiles;
+		++g_numSfiles;
 	}
 
 	// Next getList() needn't do its stuff again
-	NeedLoad = false;
+	g_NeedLoad = false;
 
-	return numSfiles;
+	return g_numSfiles;
 }
 
 int getList() {
 	// No change since last call?
 	// TODO/FIXME: Just always reload this data? Be careful about slow downs!!!
-	if (!NeedLoad)
-		return numSfiles;
+	if (!g_NeedLoad)
+		return g_numSfiles;
 
 	return getList(_vm->getSaveFileMan(), _vm->getTargetName());
 }
 
 char *ListEntry(int i, letype which) {
 	if (i == -1)
-		i = numSfiles;
+		i = g_numSfiles;
 
 	assert(i >= 0);
 
-	if (i < numSfiles)
-		return which == LE_NAME ? savedFiles[i].name : savedFiles[i].desc;
+	if (i < g_numSfiles)
+		return which == LE_NAME ? g_savedFiles[i].name : g_savedFiles[i].desc;
 	else
 		return NULL;
 }
 
-static void DoSync(Common::Serializer &s) {
+static bool DoSync(Common::Serializer &s, int numInterp) {
 	int	sg = 0;
 
 	if (TinselV2) {
 		if (s.isSaving())
-			restoreCD = GetCurrentCD();
-		s.syncAsSint16LE(restoreCD);
+			g_restoreCD = GetCurrentCD();
+		s.syncAsSint16LE(g_restoreCD);
 	}
 
 	if (TinselV2 && s.isLoading())
 		HoldItem(INV_NOICON);
 
-	syncSavedData(s, *srsd);
+	syncSavedData(s, *g_srsd, numInterp);
 	syncGlobInfo(s);		// Glitter globals
 	syncInvInfo(s);			// Inventory data
 
@@ -441,8 +452,12 @@ static void DoSync(Common::Serializer &s) {
 		sg = WhichItemHeld();
 	s.syncAsSint32LE(sg);
 	if (s.isLoading()) {
+		if (sg != -1 && !GetIsInvObject(sg))
+			// Not a valid inventory object, so return false
+			return false;
+
 		if (TinselV2)
-			thingHeld = sg;
+			g_thingHeld = sg;
 		else
 			HoldItem(sg);
 	}
@@ -452,28 +467,30 @@ static void DoSync(Common::Serializer &s) {
 		syncPolyInfo(s);		// Dead polygon data
 	syncSCdata(s);			// Hook Scene and delayed scene
 
-	s.syncAsSint32LE(*SaveSceneSsCount);
+	s.syncAsSint32LE(*g_SaveSceneSsCount);
 
-	if (*SaveSceneSsCount != 0) {
-		SAVED_DATA *sdPtr = SaveSceneSsData;
-		for (int i = 0; i < *SaveSceneSsCount; ++i, ++sdPtr)
-			syncSavedData(s, *sdPtr);
+	if (*g_SaveSceneSsCount != 0) {
+		SAVED_DATA *sdPtr = g_SaveSceneSsData;
+		for (int i = 0; i < *g_SaveSceneSsCount; ++i, ++sdPtr)
+			syncSavedData(s, *sdPtr, numInterp);
 
 		// Flag that there is a saved scene to return to. Note that in this context 'saved scene'
 		// is a stored scene to return to from another scene, such as from the Summoning Book close-up
 		// in Discworld 1 to whatever scene Rincewind was in prior to that
-		ASceneIsSaved = true;
+		g_ASceneIsSaved = true;
 	}
 
 	if (!TinselV2)
 		syncAllActorsAlive(s);
+
+	return true;
 }
 
 /**
  * DoRestore
  */
 static bool DoRestore() {
-	Common::InSaveFile *f =  _vm->getSaveFileMan()->openForLoading(savedFiles[RestoreGameNumber].name);
+	Common::InSaveFile *f =  _vm->getSaveFileMan()->openForLoading(g_savedFiles[g_RestoreGameNumber].name);
 
 	if (f == NULL) {
 		return false;
@@ -486,7 +503,22 @@ static bool DoRestore() {
 		return false;
 	}
 
-	DoSync(s);
+	// Load in the data. For older savegame versions, we potentially need to load the data twice, once
+	// for pre 1.5 savegames, and if that fails, a second time for 1.5 savegames
+	int numInterpreters = hdr.numInterpreters;
+	int32 currentPos = f->pos();
+	for (int tryNumber = 0; tryNumber < ((hdr.ver >= 2) ? 1 : 2); ++tryNumber) {
+		// If it's the second loop iteration, try with the 1.5 savegame number of interpreter contexts
+		if (tryNumber == 1) {
+			f->seek(currentPos);
+			numInterpreters = 80;
+		}
+
+		// Load the savegame data
+		if (DoSync(s, numInterpreters))
+			// Data load was successful (or likely), so break out of loop
+			break;
+	}
 
 	uint32 id = f->readSint32LE();
 	if (id != (uint32)0xFEEDFACE)
@@ -507,9 +539,9 @@ static bool DoRestore() {
 static void SaveFailure(Common::OutSaveFile *f) {
 	if (f) {
 		delete f;
-		_vm->getSaveFileMan()->removeSavefile(SaveSceneName);
-		SaveSceneName = NULL;	// Invalidate save name
+		_vm->getSaveFileMan()->removeSavefile(g_SaveSceneName);
 	}
+	g_SaveSceneName = NULL;	// Invalidate save name
 	GUI::MessageDialog dialog(_("Failed to save game state to file."));
 	dialog.runModal();
 }
@@ -522,9 +554,9 @@ static void DoSave() {
 	char tmpName[FNAMELEN];
 
 	// Next getList() must do its stuff again
-	NeedLoad = true;
+	g_NeedLoad = true;
 
-	if (SaveSceneName == NULL) {
+	if (g_SaveSceneName == NULL) {
 		// Generate a new unique save name
 		int	i;
 		int	ano = 1;	// Allocated number
@@ -533,23 +565,23 @@ static void DoSave() {
 			Common::String fname = _vm->getSavegameFilename(ano);
 			strcpy(tmpName, fname.c_str());
 
-			for (i = 0; i < numSfiles; i++)
-				if (!strcmp(savedFiles[i].name, tmpName))
+			for (i = 0; i < g_numSfiles; i++)
+				if (!strcmp(g_savedFiles[i].name, tmpName))
 					break;
 
-			if (i == numSfiles)
+			if (i == g_numSfiles)
 				break;
 			ano++;
 		}
 
-		SaveSceneName = tmpName;
+		g_SaveSceneName = tmpName;
 	}
 
 
-	if (SaveSceneDesc[0] == 0)
-		SaveSceneDesc = "unnamed";
+	if (g_SaveSceneDesc[0] == 0)
+		g_SaveSceneDesc = "unnamed";
 
-	f = _vm->getSaveFileMan()->openForSaving(SaveSceneName);
+	f = _vm->getSaveFileMan()->openForSaving(g_SaveSceneName);
 	Common::Serializer s(0, f);
 
 	if (f == NULL) {
@@ -562,7 +594,7 @@ static void DoSave() {
 	hdr.id = SAVEGAME_ID;
 	hdr.size = SAVEGAME_HEADER_SIZE;
 	hdr.ver = CURRENT_VER;
-	memcpy(hdr.desc, SaveSceneDesc, SG_DESC_LEN);
+	memcpy(hdr.desc, g_SaveSceneDesc, SG_DESC_LEN);
 	hdr.desc[SG_DESC_LEN - 1] = 0;
 	g_system->getTimeAndDate(hdr.dateTime);
 	hdr.scnFlag = _vm->getFeatures() & GF_SCNFILES;
@@ -573,7 +605,7 @@ static void DoSave() {
 		return;
 	}
 
-	DoSync(s);
+	DoSync(s, hdr.numInterpreters);
 
 	// Write out the special Id for Discworld savegames
 	f->writeUint32LE(0xFEEDFACE);
@@ -584,28 +616,29 @@ static void DoSave() {
 
 	f->finalize();
 	delete f;
-	SaveSceneName = NULL;	// Invalidate save name
+	g_SaveSceneName = NULL;	// Invalidate save name
 }
 
 /**
  * ProcessSRQueue
  */
 void ProcessSRQueue() {
-	switch (SRstate) {
+	switch (g_SRstate) {
 	case SR_DORESTORE:
 		// If a load has been done directly from title screens, set a larger value for scene ctr so the
 		// code used to skip the title screens in Discworld 1 gets properly disabled
-		if (sceneCtr < 10) sceneCtr = 10;
+		if (g_sceneCtr < 10)
+			g_sceneCtr = 10;
 
 		if (DoRestore()) {
-			DoRestoreScene(srsd, false);
+			DoRestoreScene(g_srsd, false);
 		}
-		SRstate = SR_IDLE;
+		g_SRstate = SR_IDLE;
 		break;
 
 	case SR_DOSAVE:
 		DoSave();
-		SRstate = SR_IDLE;
+		g_SRstate = SR_IDLE;
 		break;
 	default:
 		break;
@@ -614,14 +647,14 @@ void ProcessSRQueue() {
 
 
 void RequestSaveGame(char *name, char *desc, SAVED_DATA *sd, int *pSsCount, SAVED_DATA *pSsData) {
-	assert(SRstate == SR_IDLE);
+	assert(g_SRstate == SR_IDLE);
 
-	SaveSceneName = name;
-	SaveSceneDesc = desc;
-	SaveSceneSsCount = pSsCount;
-	SaveSceneSsData = pSsData;
-	srsd = sd;
-	SRstate = SR_DOSAVE;
+	g_SaveSceneName = name;
+	g_SaveSceneDesc = desc;
+	g_SaveSceneSsCount = pSsCount;
+	g_SaveSceneSsData = pSsData;
+	g_srsd = sd;
+	g_SRstate = SR_DOSAVE;
 }
 
 void RequestRestoreGame(int num, SAVED_DATA *sd, int *pSsCount, SAVED_DATA *pSsData) {
@@ -630,17 +663,17 @@ void RequestRestoreGame(int num, SAVED_DATA *sd, int *pSsCount, SAVED_DATA *pSsD
 			return;
 		else if (num == -2) {
 			// From CD change for restore
-			num = RestoreGameNumber;
+			num = g_RestoreGameNumber;
 		}
 	}
 
 	assert(num >= 0);
 
-	RestoreGameNumber = num;
-	SaveSceneSsCount = pSsCount;
-	SaveSceneSsData = pSsData;
-	srsd = sd;
-	SRstate = SR_DORESTORE;
+	g_RestoreGameNumber = num;
+	g_SaveSceneSsCount = pSsCount;
+	g_SaveSceneSsData = pSsData;
+	g_srsd = sd;
+	g_SRstate = SR_DORESTORE;
 }
 
 /**

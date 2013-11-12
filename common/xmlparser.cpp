@@ -20,15 +20,11 @@
  *
  */
 
-// FIXME: Avoid using fprintf
-#define FORBIDDEN_SYMBOL_EXCEPTION_fprintf
-#define FORBIDDEN_SYMBOL_EXCEPTION_stderr
-
-
 #include "common/xmlparser.h"
 #include "common/archive.h"
 #include "common/fs.h"
 #include "common/memstream.h"
+#include "common/system.h"
 
 namespace Common {
 
@@ -123,17 +119,19 @@ bool XMLParser::parserError(const String &errStr) {
 			keyClosing = currentPosition;
 	}
 
-	fprintf(stderr, "\n  File <%s>, line %d:\n", _fileName.c_str(), lineCount);
+	Common::String errorMessage = Common::String::format("\n  File <%s>, line %d:\n", _fileName.c_str(), lineCount);
 
 	currentPosition = (keyClosing - keyOpening);
 	_stream->seek(keyOpening, SEEK_SET);
 
 	while (currentPosition--)
-		fprintf(stderr, "%c", _stream->readByte());
+		errorMessage += (char)_stream->readByte();
 
-	fprintf(stderr, "\n\nParser error: ");
-	fprintf(stderr, "%s", errStr.c_str());
-	fprintf(stderr, "\n\n");
+	errorMessage += "\n\nParser error: ";
+	errorMessage += errStr;
+	errorMessage += "\n\n";
+
+	g_system->logMessage(LogMessageType::kError, errorMessage.c_str());
 
 	return false;
 }
@@ -263,7 +261,7 @@ bool XMLParser::vparseIntegerKey(const char *key, int count, va_list args) {
 	int *num_ptr;
 
 	while (count--) {
-		while (isspace(static_cast<unsigned char>(*key)))
+		while (isSpace(*key))
 			key++;
 
 		num_ptr = va_arg(args, int*);
@@ -271,7 +269,7 @@ bool XMLParser::vparseIntegerKey(const char *key, int count, va_list args) {
 
 		key = parseEnd;
 
-		while (isspace(static_cast<unsigned char>(*key)))
+		while (isSpace(*key))
 			key++;
 
 		if (count && *key++ != ',')
@@ -300,7 +298,7 @@ bool XMLParser::closeKey() {
 
 bool XMLParser::parse() {
 	if (_stream == 0)
-		return parserError("XML stream not ready for reading.");
+		return false;
 
 	// Make sure we are at the start of the stream.
 	_stream->seek(0, SEEK_SET);
@@ -463,10 +461,10 @@ bool XMLParser::parse() {
 }
 
 bool XMLParser::skipSpaces() {
-	if (!isspace(static_cast<unsigned char>(_char)))
+	if (!isSpace(_char))
 		return false;
 
-	while (_char && isspace(static_cast<unsigned char>(_char)))
+	while (_char && isSpace(_char))
 		_char = _stream->readByte();
 
 	return true;
@@ -516,7 +514,7 @@ bool XMLParser::parseToken() {
 		_char = _stream->readByte();
 	}
 
-	return isspace(static_cast<unsigned char>(_char)) != 0 || _char == '>' || _char == '=' || _char == '/';
+	return isSpace(_char) != 0 || _char == '>' || _char == '=' || _char == '/';
 }
 
 } // End of namespace Common

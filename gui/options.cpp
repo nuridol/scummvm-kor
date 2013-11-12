@@ -30,6 +30,8 @@
 
 #include "common/fs.h"
 #include "common/config-manager.h"
+#include "common/gui_options.h"
+#include "common/rendermode.h"
 #include "common/system.h"
 #include "common/textconsole.h"
 #include "common/translation.h"
@@ -73,13 +75,19 @@ enum {
 };
 #endif
 
+#ifdef USE_FLUIDSYNTH
+enum {
+	kFluidSynthSettingsCmd		= 'flst'
+};
+#endif
+
 static const char *savePeriodLabels[] = { _s("Never"), _s("every 5 mins"), _s("every 10 mins"), _s("every 15 mins"), _s("every 30 mins"), 0 };
 static const int savePeriodValues[] = { 0, 5 * 60, 10 * 60, 15 * 60, 30 * 60, -1 };
 static const char *outputRateLabels[] = { _s("<default>"), _s("8 kHz"), _s("11kHz"), _s("22 kHz"), _s("44 kHz"), _s("48 kHz"), 0 };
 static const int outputRateValues[] = { 0, 8000, 11025, 22050, 44100, 48000, -1 };
 
 OptionsDialog::OptionsDialog(const Common::String &domain, int x, int y, int w, int h)
-	: Dialog(x, y, w, h), _domain(domain), _graphicsTabId(-1), _tabWidget(0) {
+	: Dialog(x, y, w, h), _domain(domain), _graphicsTabId(-1), _midiTabId(-1), _pathsTabId(-1), _tabWidget(0) {
 	init();
 }
 
@@ -100,7 +108,6 @@ void OptionsDialog::init() {
 	_renderModePopUpDesc = 0;
 	_fullscreenCheckbox = 0;
 	_aspectCheckbox = 0;
-	_disableDitheringCheckbox = 0;
 	_enableAudioSettings = false;
 	_midiPopUp = 0;
 	_midiPopUpDesc = 0;
@@ -191,9 +198,9 @@ void OptionsDialog::open() {
 			int sel = 0;
 			for (int i = 0; p->code; ++p, ++i) {
 				if (renderMode == p->id)
-					sel = i + 2;
+					sel = p->id;
 			}
-			_renderModePopUp->setSelected(sel);
+			_renderModePopUp->setSelectedTag(sel);
 		}
 
 #ifdef SMALL_SCREEN_DEVICE
@@ -215,14 +222,6 @@ void OptionsDialog::open() {
 		}
 #endif // SMALL_SCREEN_DEVICE
 
-		// EGA undithering setting
-		if (_guioptions.contains(GUIO_EGAUNDITHER)  || _domain == Common::ConfigManager::kApplicationDomain) {
-			_disableDitheringCheckbox->setEnabled(true);
-			_disableDitheringCheckbox->setState(ConfMan.getBool("disable_dithering", _domain));
-		} else {
-			_disableDitheringCheckbox->setState(false);
-			_disableDitheringCheckbox->setEnabled(false);
-		}
 	}
 
 	// Audio options
@@ -331,7 +330,6 @@ void OptionsDialog::close() {
 
 				ConfMan.setBool("fullscreen", _fullscreenCheckbox->getState(), _domain);
 				ConfMan.setBool("aspect_ratio", _aspectCheckbox->getState(), _domain);
-				ConfMan.setBool("disable_dithering", _disableDitheringCheckbox->getState(), _domain);
 
 				bool isSet = false;
 
@@ -357,7 +355,6 @@ void OptionsDialog::close() {
 			} else {
 				ConfMan.removeKey("fullscreen", _domain);
 				ConfMan.removeKey("aspect_ratio", _domain);
-				ConfMan.removeKey("disable_dithering", _domain);
 				ConfMan.removeKey("gfx_mode", _domain);
 				ConfMan.removeKey("render_mode", _domain);
 			}
@@ -615,10 +612,6 @@ void OptionsDialog::setGraphicSettingsState(bool enabled) {
 	else
 		_aspectCheckbox->setEnabled(enabled);
 #endif
-	if (_guioptions.contains(GUIO_EGAUNDITHER) && enabled)
-		_disableDitheringCheckbox->setEnabled(true);
-	else
-		_disableDitheringCheckbox->setEnabled(false);
 }
 
 void OptionsDialog::setAudioSettingsState(bool enabled) {
@@ -748,13 +741,18 @@ void OptionsDialog::addGraphicControls(GuiObject *boss, const Common::String &pr
 	}
 
 	// RenderMode popup
+	const Common::String allFlags = Common::allRenderModesGUIOs();
+	bool renderingTypeDefined = (strpbrk(_guioptions.c_str(), allFlags.c_str()) != NULL);
+
 	_renderModePopUpDesc = new StaticTextWidget(boss, prefix + "grRenderPopupDesc", _("Render mode:"), _("Special dithering modes supported by some games"));
 	_renderModePopUp = new PopUpWidget(boss, prefix + "grRenderPopup", _("Special dithering modes supported by some games"));
 	_renderModePopUp->appendEntry(_("<default>"), Common::kRenderDefault);
 	_renderModePopUp->appendEntry("");
 	const Common::RenderModeDescription *rm = Common::g_renderModes;
 	for (; rm->code; ++rm) {
-		_renderModePopUp->appendEntry(_c(rm->description, context), rm->id);
+		Common::String renderGuiOption = Common::renderMode2GUIO(rm->id);
+		if ((_domain == Common::ConfigManager::kApplicationDomain) || (_domain != Common::ConfigManager::kApplicationDomain && !renderingTypeDefined) || (_guioptions.contains(renderGuiOption)))
+			_renderModePopUp->appendEntry(_c(rm->description, context), rm->id);
 	}
 
 	// Fullscreen checkbox
@@ -762,7 +760,6 @@ void OptionsDialog::addGraphicControls(GuiObject *boss, const Common::String &pr
 
 	// Aspect ratio checkbox
 	_aspectCheckbox = new CheckboxWidget(boss, prefix + "grAspectCheckbox", _("Aspect ratio correction"), _("Correct aspect ratio for 320x200 games"));
-	_disableDitheringCheckbox = new CheckboxWidget(boss, prefix + "grDisableDitheringCheckbox", _("EGA undithering"), _("Enable undithering in EGA games that support it"));
 
 	_enableGraphicSettings = true;
 }
@@ -872,6 +869,10 @@ void OptionsDialog::addMIDIControls(GuiObject *boss, const Common::String &prefi
 	_midiGainSlider->setMaxValue(1000);
 	_midiGainLabel = new StaticTextWidget(boss, prefix + "mcMidiGainLabel", "1.00");
 
+#ifdef USE_FLUIDSYNTH
+	new ButtonWidget(boss, prefix + "mcFluidSynthSettings", _("FluidSynth Settings"), 0, kFluidSynthSettingsCmd);
+#endif
+
 	_enableMIDISettings = true;
 }
 
@@ -886,7 +887,7 @@ void OptionsDialog::addMT32Controls(GuiObject *boss, const Common::String &prefi
 		_mt32Checkbox = new CheckboxWidget(boss, prefix + "mcMt32Checkbox", _c("True Roland MT-32 (no GM emulation)", "lowres"), _("Check if you want to use your real hardware Roland-compatible sound device connected to your computer"));
 
 	// GS Extensions setting
-	_enableGSCheckbox = new CheckboxWidget(boss, prefix + "mcGSCheckbox", _("Enable Roland GS Mode"), _("Turns off General MIDI mapping for games with Roland MT-32 soundtrack"));
+	_enableGSCheckbox = new CheckboxWidget(boss, prefix + "mcGSCheckbox", _("Roland GS Device (enable MT-32 mappings)"), _("Check if you want to enable patch mappings to emulate an MT-32 on a Roland GS device"));
 
 	const MusicPlugin::List p = MusicMan.getPlugins();
 	// Make sure the null device is the first one in the list to avoid undesired
@@ -990,6 +991,22 @@ void OptionsDialog::addVolumeControls(GuiObject *boss, const Common::String &pre
 	_enableVolumeSettings = true;
 }
 
+void OptionsDialog::addEngineControls(GuiObject *boss, const Common::String &prefix, const ExtraGuiOptions &engineOptions) {
+	// Note: up to 7 engine options can currently fit on screen (the most that
+	// can fit in a 320x200 screen with the classic theme).
+	// TODO: Increase this number by including the checkboxes inside a scroll
+	// widget. The appropriate number of checkboxes will need to be added to
+	// the theme files.
+
+	uint i = 1;
+	ExtraGuiOptions::const_iterator iter;
+	for (iter = engineOptions.begin(); iter != engineOptions.end(); ++iter, ++i) {
+		Common::String id = Common::String::format("%d", i);
+		_engineCheckboxes.push_back(new CheckboxWidget(boss,
+			prefix + "customOption" + id + "Checkbox", _(iter->label), _(iter->tooltip)));
+	}
+}
+
 bool OptionsDialog::loadMusicDeviceSetting(PopUpWidget *popup, Common::String setting, MusicType preferredType) {
 	if (!popup || !popup->isEnabled())
 		return true;
@@ -1003,7 +1020,7 @@ bool OptionsDialog::loadMusicDeviceSetting(PopUpWidget *popup, Common::String se
 			for (MusicDevices::iterator d = i.begin(); d != i.end(); ++d) {
 				if (setting.empty() ? (preferredType == d->getMusicType()) : (drv == d->getCompleteId())) {
 					popup->setSelectedTag(d->getHandle());
-					return popup->getSelected() == -1 ? false : true;
+					return popup->getSelected() != -1;
 				}
 			}
 		}
@@ -1090,7 +1107,7 @@ GlobalOptionsDialog::GlobalOptionsDialog()
 	//
 	// 3) The MIDI tab
 	//
-	tab->addTab(_("MIDI"));
+	_midiTabId = tab->addTab(_("MIDI"));
 	addMIDIControls(tab, "GlobalOptions_MIDI.");
 
 	//
@@ -1103,9 +1120,9 @@ GlobalOptionsDialog::GlobalOptionsDialog()
 	// 5) The Paths tab
 	//
 	if (g_system->getOverlayWidth() > 320)
-		tab->addTab(_("Paths"));
+		_pathsTabId = tab->addTab(_("Paths"));
 	else
-		tab->addTab(_c("Paths", "lowres"));
+		_pathsTabId = tab->addTab(_c("Paths", "lowres"));
 
 #if !( defined(__DC__) || defined(__GP32__) )
 	// These two buttons have to be extra wide, or the text will be
@@ -1224,11 +1241,19 @@ GlobalOptionsDialog::GlobalOptionsDialog()
 #ifdef SMALL_SCREEN_DEVICE
 	_keysDialog = new KeysDialog();
 #endif
+
+#ifdef USE_FLUIDSYNTH
+	_fluidSynthSettingsDialog = new FluidSynthSettingsDialog();
+#endif
 }
 
 GlobalOptionsDialog::~GlobalOptionsDialog() {
 #ifdef SMALL_SCREEN_DEVICE
 	delete _keysDialog;
+#endif
+
+#ifdef USE_FLUIDSYNTH
+	delete _fluidSynthSettingsDialog;
 #endif
 }
 
@@ -1459,9 +1484,49 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 		_keysDialog->runModal();
 		break;
 #endif
+#ifdef USE_FLUIDSYNTH
+	case kFluidSynthSettingsCmd:
+		_fluidSynthSettingsDialog->runModal();
+		break;
+#endif
 	default:
 		OptionsDialog::handleCommand(sender, cmd, data);
 	}
+}
+
+void GlobalOptionsDialog::reflowLayout() {
+	int activeTab = _tabWidget->getActiveTab();
+
+	if (_midiTabId != -1) {
+		_tabWidget->setActiveTab(_midiTabId);
+
+		_tabWidget->removeWidget(_soundFontClearButton);
+		_soundFontClearButton->setNext(0);
+		delete _soundFontClearButton;
+		_soundFontClearButton = addClearButton(_tabWidget, "GlobalOptions_MIDI.mcFontClearButton", kClearSoundFontCmd);
+	}
+
+	if (_pathsTabId != -1) {
+		_tabWidget->setActiveTab(_pathsTabId);
+
+		_tabWidget->removeWidget(_savePathClearButton);
+		_savePathClearButton->setNext(0);
+		delete _savePathClearButton;
+		_savePathClearButton = addClearButton(_tabWidget, "GlobalOptions_Paths.SavePathClearButton", kSavePathClearCmd);
+
+		_tabWidget->removeWidget(_themePathClearButton);
+		_themePathClearButton->setNext(0);
+		delete _themePathClearButton;
+		_themePathClearButton = addClearButton(_tabWidget, "GlobalOptions_Paths.ThemePathClearButton", kThemePathClearCmd);
+
+		_tabWidget->removeWidget(_extraPathClearButton);
+		_extraPathClearButton->setNext(0);
+		delete _extraPathClearButton;
+		_extraPathClearButton = addClearButton(_tabWidget, "GlobalOptions_Paths.ExtraPathClearButton", kExtraPathClearCmd);
+	}
+
+	_tabWidget->setActiveTab(activeTab);
+	OptionsDialog::reflowLayout();
 }
 
 } // End of namespace GUI

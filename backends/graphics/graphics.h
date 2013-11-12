@@ -37,6 +37,27 @@ class GraphicsManager : public PaletteManager {
 public:
 	virtual ~GraphicsManager() {}
 
+	/**
+	 * Makes this graphics manager active. That means it should be ready to
+	 * process inputs now. However, even without being active it should be
+	 * able to query the supported modes and other bits.
+	 *
+	 * HACK: Actually this is specific to SdlGraphicsManager subclasses.
+	 * But sadly we cannot cast from GraphicsManager to SdlGraphicsManager
+	 * because there is no relation between these two.
+	 */
+	virtual void activateManager() {}
+
+	/**
+	 * Makes this graphics manager inactive. This should allow another
+	 * graphics manager to become active again.
+	 *
+	 * HACK: Actually this is specific to SdlGraphicsManager subclasses.
+	 * But sadly we cannot cast from GraphicsManager to SdlGraphicsManager
+	 * because there is no relation between these two.
+	 */
+	virtual void deactivateManager() {}
+
 	virtual bool hasFeature(OSystem::Feature f) = 0;
 	virtual void setFeatureState(OSystem::Feature f, bool enable) = 0;
 	virtual bool getFeatureState(OSystem::Feature f) = 0;
@@ -60,7 +81,7 @@ public:
 	virtual int16 getWidth() = 0;
 	virtual void setPalette(const byte *colors, uint start, uint num) = 0;
 	virtual void grabPalette(byte *colors, uint start, uint num) = 0;
-	virtual void copyRectToScreen(const byte *buf, int pitch, int x, int y, int w, int h) = 0;
+	virtual void copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) = 0;
 	virtual Graphics::Surface *lockScreen() = 0;
 	virtual void unlockScreen() = 0;
 	virtual void fillScreen(uint32 col) = 0;
@@ -73,14 +94,14 @@ public:
 	virtual void hideOverlay() = 0;
 	virtual Graphics::PixelFormat getOverlayFormat() const = 0;
 	virtual void clearOverlay() = 0;
-	virtual void grabOverlay(OverlayColor *buf, int pitch) = 0;
-	virtual void copyRectToOverlay(const OverlayColor *buf, int pitch, int x, int y, int w, int h)= 0;
+	virtual void grabOverlay(void *buf, int pitch) = 0;
+	virtual void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h)= 0;
 	virtual int16 getOverlayHeight() = 0;
 	virtual int16 getOverlayWidth() = 0;
 
 	virtual bool showMouse(bool visible) = 0;
 	virtual void warpMouse(int x, int y) = 0;
-	virtual void setMouseCursor(const byte *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, int cursorTargetScale = 1, const Graphics::PixelFormat *format = NULL) = 0;
+	virtual void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale = false, const Graphics::PixelFormat *format = NULL) = 0;
 	virtual void setCursorPalette(const byte *colors, uint start, uint num) = 0;
 
 	virtual void displayMessageOnOSD(const char *msg) {}

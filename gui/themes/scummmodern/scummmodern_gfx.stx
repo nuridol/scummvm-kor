@@ -38,6 +38,14 @@
 				rgb = '203, 126, 107'
 		/>
 
+		<color name = 'brightredborder'
+				rgb = '238, 213, 207'
+		/>
+
+		<color name = 'darkredborder'
+				rgb = '30, 7, 1'
+		/>
+
 		<!-- Disabled button/slider -->
 		<color name = 'darkeneddarkred'
 				rgb = '120, 28, 0'
@@ -73,7 +81,7 @@
 				rgb = '255, 255, 255'
 		/>
 		<color name = 'shadowcolor'
-				rgb = '63, 60, 17'
+				rgb = '105, 101, 86'
 		/>
 		<color name = 'darkgray'
 				rgb = '176, 168, 144'
@@ -100,6 +108,17 @@
 		<bitmap filename = 'logo_small.bmp'/>
 		<bitmap filename = 'search.bmp'/>
 		<bitmap filename = 'eraser.bmp'/>
+		<bitmap filename = 'delbtn.bmp'/>
+		<bitmap filename = 'list.bmp'/>
+		<bitmap filename = 'grid.bmp'/>
+		<bitmap filename = 'stopbtn.bmp'/>
+		<bitmap filename = 'editbtn.bmp'/>
+		<bitmap filename = 'switchbtn.bmp'/>
+		<bitmap filename = 'fastreplay.bmp'/>
+		<bitmap filename = 'stopbtn_small.bmp'/>
+		<bitmap filename = 'editbtn_small.bmp'/>
+		<bitmap filename = 'switchbtn_small.bmp'/>
+		<bitmap filename = 'fastreplay_small.bmp'/>
 	</bitmaps>
 
 	<fonts>
@@ -125,7 +144,7 @@
 		/>
 		<font	id = 'text_normal'
 				file = 'helvb12.bdf'
-				scalable_file = 'FreeSansBold.ttf'
+				scalable_file = 'FreeSans.ttf'
 		/>
 		<font	resolution = 'y<400'
 		   		id = 'text_normal'
@@ -152,13 +171,17 @@
 		/>
 
 		<text_color	id = 'color_normal_disabled'
-				color = '192, 192, 192'
+				color = '96, 96, 96'
 		/>
 
 		<text_color	id = 'color_alternative'
 				color = '128, 128, 128'
 		/>
 
+		<text_color	id = 'color_button_hover'
+				color = 'white'
+		/>
+	
 		<text_color	id = 'color_alternative_inverted'
 				color = 'white'
 		/>
@@ -175,10 +198,6 @@
 				color = 'white'
 		/>
 
-		<text_color	id = 'color_button_hover'
-				color = '255, 214, 84'
-		/>
-
 		<text_color	id = 'color_button_disabled'
 				color = '192, 192, 192'
 		/>
@@ -186,8 +205,8 @@
 
 	<!-- <defaults fill = 'gradient' fg_color = 'white'/> -->
 
-	<cursor file = 'cursor.bmp' hotspot = '0, 0' scale = '3'/>
-	<cursor resolution = 'y<400' file = 'cursor_small.bmp' hotspot = '0, 0' scale = '3'/>
+	<cursor file = 'cursor.bmp' hotspot = '0, 0'/>
+	<cursor resolution = 'y<400' file = 'cursor_small.bmp' hotspot = '0, 0'/>
 
 	<!-- Selection (text or list items) -->
 	<drawdata id = 'text_selection' cache = 'false'>
@@ -221,7 +240,7 @@
 					stroke = '0'
 					gradient_start = 'darkorange'
 					gradient_end = 'brightorange'
-					shadow = '3'
+					shadow = '7'
 					gradient_factor = '3'
 		/>
 	</drawdata>
@@ -335,9 +354,13 @@
 	<drawdata id = 'scrollbar_button_hover' cache = 'false' resolution = 'y<400'>
 		<drawstep	func = 'roundedsq'
 					radius = '10'
-					fill = 'none'
-					fg_color = 'darkgray'
+					fill = 'gradient'
+					gradient_start = 'brightpink'
+					gradient_end = 'darkpink'
 					stroke = '1'
+					fg_color = 'darkred'
+					bevel = '1'
+					bevel_color = 'brightred'
 		/>
 		<drawstep	func = 'triangle'
 					fg_color = 'shadowcolor'
@@ -346,7 +369,7 @@
 					height = '5'
 					xpos = 'right'
 					ypos = 'center'
-					padding = '0,0,2,0'
+					padding = '0,0,1,0'
 					orientation = 'top'
 		/>
 	</drawdata>
@@ -451,7 +474,7 @@
 					fg_color = 'lightgray2'
 					fill = 'background'
 					bg_color = 'xtrabrightred'
-					shadow = '2'
+					shadow = '1'
 		/>
 	
 		<drawstep	func = 'triangle'
@@ -490,7 +513,7 @@
 					fg_color = 'lightgray2'
 					fill = 'background'
 					bg_color = 'xtrabrightred'
-					shadow = '2'
+					shadow = '1'
 		/>
 	
 		<drawstep	func = 'triangle'
@@ -648,7 +671,7 @@
 					fg_color = 'lightgray2'
 					fill = 'background'
 					bg_color = 'xtrabrightred'
-					shadow = '2'
+					shadow = '1'
 		/>
 	
 		<drawstep	func = 'triangle'
@@ -701,7 +724,7 @@
 					gradient_start = 'blandyellow'
 					gradient_end = 'xtrabrightred'
 					fill = 'gradient'
-					shadow = '3'
+					shadow = '7'
 		/>
 	</drawdata>
 
@@ -722,7 +745,7 @@
 					gradient_start = 'blandyellow'
 					gradient_end = 'xtrabrightred'
 					gradient_factor = '4'
-					shadow = '3'
+					shadow = '7'
 		/>
 	</drawdata>
 
@@ -734,6 +757,27 @@
 					shadow = '3'
 		/>
 	</drawdata>
+
+	<!-- Pressed button -->
+	<drawdata id = 'button_pressed' cache = 'false'>
+		<text	font = 'text_button'
+				text_color = 'color_button'
+				vertical_align = 'center'
+				horizontal_align = 'center'
+		/>
+		<drawstep	func = 'roundedsq'
+					radius = '5'
+					stroke = '1'
+					fill = 'foreground'
+					shadow = '0'
+					factor = '0'
+					fg_color = '120, 40, 16'
+					gradient_start = '255, 0, 0'
+					gradient_end = '255, 0, 0'
+					bevel = '1'
+					bevel_color = 'black'
+		/>
+	</drawdata> 
 
 	<!-- Idle button -->
 	<drawdata id = 'button_idle' cache = 'false'>
@@ -747,18 +791,18 @@
 					stroke = '1'
 					fill = 'gradient'
 					shadow = '0'
-					fg_color = 'shadowcolor'
+					fg_color = 'darkredborder'
 					gradient_start = 'brightred'
 					gradient_end = 'darkred'
 					bevel = '1'
-					bevel_color = '237, 169, 72'
+					bevel_color = 'brightredborder'
 		/>
 	</drawdata>
 
 	<!-- Hovered button -->
 	<drawdata id = 'button_hover' cache = 'false'>
 		<text	font = 'text_button'
-				text_color = 'color_button_hover'
+				text_color = 'color_button'
 				vertical_align = 'center'
 				horizontal_align = 'center'
 		/>
@@ -767,11 +811,11 @@
 					stroke = '1'
 					fill = 'gradient'
 					shadow = '0'
-					fg_color = 'shadowcolor'
+					fg_color = 'darkredborder'
 					gradient_start = 'brightpink'
 					gradient_end = 'darkpink'
 					bevel = '1'
-					bevel_color = 'xtrabrightred'
+					bevel_color = 'brightredborder'
 		/>
 	</drawdata>
 
@@ -879,7 +923,7 @@
 					gradient_factor = '6'
 					fill = 'gradient'
 					bg_color = 'xtrabrightred'
-					shadow = '3'
+					shadow = '7'
 		/>
 	</drawdata>
 

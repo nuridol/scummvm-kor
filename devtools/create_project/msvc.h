@@ -32,6 +32,8 @@ public:
 	MSVCProvider(StringList &global_warnings, std::map<std::string, StringList> &project_warnings, const int version);
 
 protected:
+	StringList _enableLanguageExtensions;
+	StringList _disableEditAndContinue;
 
 	void createWorkspace(const BuildSetup &setup);
 
@@ -68,7 +70,7 @@ protected:
 	 * @param isWin32         Bitness of property file
 	 * @param enableAnalysis  PREfast support
 	 */
-	virtual void createBuildProp(const BuildSetup &setup, bool isRelease, bool isWin32, bool enableAnalysis) = 0;
+	virtual void createBuildProp(const BuildSetup &setup, bool isRelease, bool isWin32, std::string configuration) = 0;
 
 	/**
 	 * Get the file extension for property files
@@ -84,6 +86,13 @@ protected:
 	 * Get the command line for the revision tool (shared between all Visual Studio based providers)
 	 */
 	std::string getPreBuildEvent() const;
+
+	/**
+	* Get the command line for the test generator
+	*
+	* @param setup Description of the desired build setup.
+	*/
+	std::string getTestPreBuildEvent(const BuildSetup &setup) const;
 
 	/**
 	 * Get the command line for copying data files to the build directory.

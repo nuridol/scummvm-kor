@@ -28,6 +28,7 @@
 #include "common/util.h"
 #include "common/file.h"
 #include "common/rect.h"
+#include "common/rendermode.h"
 #include "common/stack.h"
 #include "common/system.h"
 
@@ -42,6 +43,7 @@
 #include "agi/logic.h"
 #include "agi/sound.h"
 
+#include "gui/predictivedialog.h"
 
 namespace Common {
 class RandomSource;
@@ -888,6 +890,9 @@ public:
 	int saveGameSimple();
 	int loadGameDialog();
 	int loadGameSimple();
+	int doSave(int slot, const Common::String &desc);
+	int doLoad(int slot, bool showMessages);
+	int scummVMSaveLoadDialog(bool isSave);
 
 	uint8 *_intobj;
 	InputMode _oldMode;
@@ -937,7 +942,7 @@ public:
 	void setvar(int, int);
 	void decrypt(uint8 *mem, int len);
 	void releaseSprites();
-	int mainCycle();
+	int mainCycle(bool onlyCheckForEvents = false);
 	int viewPictures();
 	int runGame();
 	void inventory();
@@ -1077,26 +1082,14 @@ public:
 	void clearPrompt(bool useBlackBg = false);
 	void clearLines(int, int, int);
 	void flushLines(int, int);
-	bool predictiveDialog();
 
 private:
 	void printStatus(const char *message, ...) GCC_PRINTF(2, 3);
 	void printText2(int l, const char *msg, int foff, int xoff, int yoff, int len, int fg, int bg, bool checkerboard = false);
 	void blitTextbox(const char *p, int y, int x, int len);
 	void eraseTextbox();
-	void loadDict();
 	bool matchWord();
 
-	// Predictive dialog
-	// TODO: Move this to a separate class
-	char *_predictiveDictText;
-	char **_predictiveDictLine;
-	int32 _predictiveDictLineCount;
-	char *_predictiveDictActLine;
-	Common::String _currentCode;
-	Common::String _currentWord;
-	int _wordNumber;
-	bool _predictiveDialogRunning;
 public:
 	char _predictiveResult[40];
 

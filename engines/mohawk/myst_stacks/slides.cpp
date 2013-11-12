@@ -22,8 +22,8 @@
 
 #include "mohawk/cursors.h"
 #include "mohawk/myst.h"
-#include "mohawk/graphics.h"
 #include "mohawk/myst_areas.h"
+#include "mohawk/myst_graphics.h"
 #include "mohawk/sound.h"
 #include "mohawk/video.h"
 #include "mohawk/myst_stacks/slides.h"
@@ -63,7 +63,7 @@ void Slides::runPersistentScripts() {
 		// Used on Cards...
 		if (_vm->_system->getMillis() > _nextCardTime) {
 			_vm->_gfx->fadeToBlack();
-			_vm->changeToCard(_nextCardID, false);
+			_vm->changeToCard(_nextCardID, kNoTransition);
 			_vm->_gfx->fadeFromBlack();
 		}
 	}

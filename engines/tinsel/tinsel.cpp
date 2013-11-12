@@ -66,7 +66,7 @@ namespace Tinsel {
 // In BG.CPP
 extern void SetDoFadeIn(bool tf);
 extern void DropBackground();
-extern const BACKGND *pCurBgnd;
+extern const BACKGND *g_pCurBgnd;
 
 // In CURSOR.CPP
 extern void CursorProcess(CORO_PARAM, const void *);
@@ -85,16 +85,16 @@ void SetNewScene(SCNHANDLE scene, int entrance, int transition);
 
 // FIXME: Avoid non-const global vars
 
-bool bRestart = false;
-bool bHasRestarted = false;
-bool loadingFromGMM = false;
+bool g_bRestart = false;
+bool g_bHasRestarted = false;
+bool g_loadingFromGMM = false;
 
-static bool bCuttingScene = false;
+static bool g_bCuttingScene = false;
 
-static bool bChangingForRestore = false;
+static bool g_bChangingForRestore = false;
 
 #ifdef DEBUG
-bool bFast;		// set to make it go ludicrously fast
+bool g_bFast;		// set to make it go ludicrously fast
 #endif
 
 //----------------- LOCAL GLOBAL DATA --------------------
@@ -105,14 +105,14 @@ struct Scene {
 	int	trans;		// Transition - not yet used
 };
 
-static Scene NextScene = { 0, 0, 0 };
-static Scene HookScene = { 0, 0, 0 };
-static Scene DelayedScene = { 0, 0, 0 };
+static Scene g_NextScene = { 0, 0, 0 };
+static Scene g_HookScene = { 0, 0, 0 };
+static Scene g_DelayedScene = { 0, 0, 0 };
 
-static PROCESS *pMouseProcess = 0;
-static PROCESS *pKeyboardProcess = 0;
+static Common::PROCESS *g_pMouseProcess = 0;
+static Common::PROCESS *g_pKeyboardProcess = 0;
 
-static SCNHANDLE hCdChangeScene;
+static SCNHANDLE g_hCdChangeScene;
 
 //----------------- LOCAL PROCEDURES --------------------
 
@@ -324,7 +324,7 @@ static void MouseProcess(CORO_PARAM, const void *) {
 
 				if (TinselV2) {
 					// Kill off the button process and fire off the action command
-					g_scheduler->killMatchingProcess(PID_BTN_CLICK, -1);
+					CoroScheduler.killMatchingProcess(PID_BTN_CLICK, -1);
 					PlayerEvent(PLR_ACTION, _ctx->clickPos);
 				} else {
 					// signal left drag start
@@ -368,7 +368,7 @@ static void MouseProcess(CORO_PARAM, const void *) {
 				// will activate a single button click
 				if (TinselV2 && ControlIsOn()) {
 					_ctx->clickPos = mousePos;
-					g_scheduler->createProcess(PID_BTN_CLICK, SingleLeftProcess, &_ctx->clickPos, sizeof(Common::Point));
+					CoroScheduler.createProcess(PID_BTN_CLICK, SingleLeftProcess, &_ctx->clickPos, sizeof(Common::Point));
 				}
 			} else
 				_ctx->lastLeftClick -= _vm->_config->_dclickSpeed;
@@ -430,6 +430,14 @@ static void MouseProcess(CORO_PARAM, const void *) {
 				ProcessButEvent(PLR_DRAG2_END);
 			break;
 
+		case Common::EVENT_WHEELUP:
+			PlayerEvent(PLR_WHEEL_UP, mousePos);
+			break;
+
+		case Common::EVENT_WHEELDOWN:
+			PlayerEvent(PLR_WHEEL_DOWN, mousePos);
+			break;
+
 		default:
 			break;
 		}
@@ -457,49 +465,49 @@ static void MasterScriptProcess(CORO_PARAM, const void *) {
  * Store the facts pertaining to a scene change.
  */
 void SetNewScene(SCNHANDLE scene, int entrance, int transition) {
-	if (!bCuttingScene && TinselV2)
+	if (!g_bCuttingScene && TinselV2)
 		WrapScene();
 
 	// If we're loading from the GMM, load the scene as a delayed one
-	if (loadingFromGMM) {
-		DelayedScene.scene = scene;
-		DelayedScene.entry = entrance;
-		DelayedScene.trans = transition;
-		loadingFromGMM = false;
+	if (g_loadingFromGMM) {
+		g_DelayedScene.scene = scene;
+		g_DelayedScene.entry = entrance;
+		g_DelayedScene.trans = transition;
+		g_loadingFromGMM = false;
 		return;
 	}
 
 	// If CD change will be required, stick in the scene change scene
 	if (CdNumber(scene) != GetCurrentCD()) {
 		// This scene gets delayed
-		DelayedScene.scene = scene;
-		DelayedScene.entry = entrance;
-		DelayedScene.trans = transition;
+		g_DelayedScene.scene = scene;
+		g_DelayedScene.entry = entrance;
+		g_DelayedScene.trans = transition;
 
-		NextScene.scene = hCdChangeScene;
-		NextScene.entry = CdNumber(scene) - '0';
-		NextScene.trans = TRANS_FADE;
+		g_NextScene.scene = g_hCdChangeScene;
+		g_NextScene.entry = CdNumber(scene) - '0';
+		g_NextScene.trans = TRANS_FADE;
 
 		return;
 	}
 
-	if (HookScene.scene == 0 || bCuttingScene) {
+	if (g_HookScene.scene == 0 || g_bCuttingScene) {
 		// This scene comes next
-		NextScene.scene = scene;
-		NextScene.entry = entrance;
-		NextScene.trans = transition;
+		g_NextScene.scene = scene;
+		g_NextScene.entry = entrance;
+		g_NextScene.trans = transition;
 	} else {
 		// This scene gets delayed
-		DelayedScene.scene = scene;
-		DelayedScene.entry = entrance;
-		DelayedScene.trans = transition;
+		g_DelayedScene.scene = scene;
+		g_DelayedScene.entry = entrance;
+		g_DelayedScene.trans = transition;
 
 		// The hooked scene comes next
-		NextScene.scene = HookScene.scene;
-		NextScene.entry = HookScene.entry;
-		NextScene.trans = HookScene.trans;
+		g_NextScene.scene = g_HookScene.scene;
+		g_NextScene.entry = g_HookScene.entry;
+		g_NextScene.trans = g_HookScene.trans;
 
-		HookScene.scene = 0;
+		g_HookScene.scene = 0;
 	}
 
 	// Workaround for "Missing Red Dragon in square" bug in Discworld 1 PSX, act IV.
@@ -509,10 +517,10 @@ void SetNewScene(SCNHANDLE scene, int entrance, int transition) {
 	// I'm forcing the load of the right scene by checking that the player has (or has not) the
 	// right items: player must have Mambo the swamp dragon, and mustn't have fireworks (used on
 	// the swamp dragon previously to "load it up").
-	if (TinselV1PSX && NextScene.scene == 0x1800000 && NextScene.entry == 2) {
+	if (TinselV1PSX && g_NextScene.scene == 0x1800000 && g_NextScene.entry == 2) {
 		if ((IsInInventory(261, INV_1) || IsInInventory(261, INV_2)) &&
 			(!IsInInventory(232, INV_1) && !IsInInventory(232, INV_2)))
-			NextScene.entry = 1;
+			g_NextScene.entry = 1;
 	}
 }
 
@@ -520,72 +528,72 @@ void SetNewScene(SCNHANDLE scene, int entrance, int transition) {
  * Store a scene as hooked
  */
 void SetHookScene(SCNHANDLE scene, int entrance, int transition) {
-	assert(HookScene.scene == 0); // scene already hooked
+	assert(g_HookScene.scene == 0); // scene already hooked
 
-	HookScene.scene = scene;
-	HookScene.entry = entrance;
-	HookScene.trans = transition;
+	g_HookScene.scene = scene;
+	g_HookScene.entry = entrance;
+	g_HookScene.trans = transition;
 }
 
 /**
  * Hooked scene is over, trigger a change to the delayed scene
  */
 void UnHookScene() {
-	assert(DelayedScene.scene != 0); // no scene delayed
+	assert(g_DelayedScene.scene != 0); // no scene delayed
 
 	// The delayed scene can go now
-	NextScene.scene = DelayedScene.scene;
-	NextScene.entry = DelayedScene.entry;
-	NextScene.trans = DelayedScene.trans;
+	g_NextScene.scene = g_DelayedScene.scene;
+	g_NextScene.entry = g_DelayedScene.entry;
+	g_NextScene.trans = g_DelayedScene.trans;
 
-	DelayedScene.scene = 0;
+	g_DelayedScene.scene = 0;
 }
 
 void SuspendHook() {
-	bCuttingScene = true;
+	g_bCuttingScene = true;
 }
 
 void CdHasChanged() {
-	if (bChangingForRestore) {
-		bChangingForRestore = false;
+	if (g_bChangingForRestore) {
+		g_bChangingForRestore = false;
 		RestoreGame(-2);
 	} else {
-		assert(DelayedScene.scene != 0);
+		assert(g_DelayedScene.scene != 0);
 
 		WrapScene();
 
 		// The delayed scene can go now
-		NextScene.scene = DelayedScene.scene;
-		NextScene.entry = DelayedScene.entry;
-		NextScene.trans = DelayedScene.trans;
+		g_NextScene.scene = g_DelayedScene.scene;
+		g_NextScene.entry = g_DelayedScene.entry;
+		g_NextScene.trans = g_DelayedScene.trans;
 
-		DelayedScene.scene = 0;
+		g_DelayedScene.scene = 0;
 	}
 }
 
 void SetCdChangeScene(SCNHANDLE hScene) {
-	hCdChangeScene = hScene;
+	g_hCdChangeScene = hScene;
 }
 
 void CDChangeForRestore(int cdNumber) {
-	NextScene.scene = hCdChangeScene;
-	NextScene.entry = cdNumber;
-	NextScene.trans = TRANS_FADE;
-	bChangingForRestore = true;
+	g_NextScene.scene = g_hCdChangeScene;
+	g_NextScene.entry = cdNumber;
+	g_NextScene.trans = TRANS_FADE;
+	g_bChangingForRestore = true;
 }
 
 void UnSuspendHook() {
-	bCuttingScene = false;
+	g_bCuttingScene = false;
 }
 
 void syncSCdata(Common::Serializer &s) {
-	s.syncAsUint32LE(HookScene.scene);
-	s.syncAsSint32LE(HookScene.entry);
-	s.syncAsSint32LE(HookScene.trans);
+	s.syncAsUint32LE(g_HookScene.scene);
+	s.syncAsSint32LE(g_HookScene.entry);
+	s.syncAsSint32LE(g_HookScene.trans);
 
-	s.syncAsUint32LE(DelayedScene.scene);
-	s.syncAsSint32LE(DelayedScene.entry);
-	s.syncAsSint32LE(DelayedScene.trans);
+	s.syncAsUint32LE(g_DelayedScene.scene);
+	s.syncAsSint32LE(g_DelayedScene.entry);
+	s.syncAsSint32LE(g_DelayedScene.trans);
 }
 
 
@@ -616,11 +624,11 @@ static void RestoredProcess(CORO_PARAM, const void *param) {
 }
 
 void RestoreProcess(INT_CONTEXT *pic) {
-	g_scheduler->createProcess(PID_TCODE, RestoredProcess, &pic, sizeof(pic));
+	CoroScheduler.createProcess(PID_TCODE, RestoredProcess, &pic, sizeof(pic));
 }
 
 void RestoreMasterProcess(INT_CONTEXT *pic) {
-	g_scheduler->createProcess(PID_MASTER_SCR, RestoredProcess, &pic, sizeof(pic));
+	CoroScheduler.createProcess(PID_MASTER_SCR, RestoredProcess, &pic, sizeof(pic));
 }
 
 // FIXME: CountOut is used by ChangeScene
@@ -640,16 +648,16 @@ bool ChangeScene(bool bReset) {
 	// Prevent attempt to fade-out when restarting game
 	if (bReset) {
 		CountOut = 1;	// immediate start of first scene again
-		DelayedScene.scene = HookScene.scene = 0;
+		g_DelayedScene.scene = g_HookScene.scene = 0;
 		return false;
 	}
 
 	if (IsRestoringScene())
 		return true;
 
-	if (NextScene.scene != 0) {
+	if (g_NextScene.scene != 0) {
 		if (!CountOut) {
-			switch (NextScene.trans) {
+			switch (g_NextScene.trans) {
 			case TRANS_CUT:
 				CountOut = 1;
 				break;
@@ -658,7 +666,7 @@ bool ChangeScene(bool bReset) {
 			default:
 				// Trigger pre-load and fade and start countdown
 				CountOut = COUNTOUT_COUNT;
-				FadeOutFast(NULL);
+				FadeOutFast();
 				if (TinselV2)
 					_vm->_pcmMusic->startFadeOut(COUNTOUT_COUNT);
 				break;
@@ -667,10 +675,10 @@ bool ChangeScene(bool bReset) {
 			if (!TinselV2)
 				ClearScreen();
 
-			StartNewScene(NextScene.scene, NextScene.entry);
-			NextScene.scene = 0;
+			StartNewScene(g_NextScene.scene, g_NextScene.entry);
+			g_NextScene.scene = 0;
 
-			switch (NextScene.trans) {
+			switch (g_NextScene.trans) {
 			case TRANS_CUT:
 				SetDoFadeIn(false);
 				break;
@@ -691,7 +699,7 @@ bool ChangeScene(bool bReset) {
  * CuttingScene
  */
 void CuttingScene(bool bCutting) {
-	bCuttingScene = bCutting;
+	g_bCuttingScene = bCutting;
 
 	if (!bCutting)
 		WrapScene();
@@ -722,21 +730,20 @@ void LoadBasicChunks() {
 
 	cptr = FindChunk(INV_OBJ_SCNHANDLE, CHUNK_OBJECTS);
 
-#ifdef SCUMM_BIG_ENDIAN
-	//convert to native endianness
+	// Convert to native endianness
 	INV_OBJECT *io = (INV_OBJECT *)cptr;
 	for (int i = 0; i < numObjects; i++, io++) {
-		io->id        = FROM_LE_32(io->id);
-		io->hIconFilm = FROM_LE_32(io->hIconFilm);
-		io->hScript   = FROM_LE_32(io->hScript);
-		io->attribute = FROM_LE_32(io->attribute);
+		io->id        = FROM_32(io->id);
+		io->hIconFilm = FROM_32(io->hIconFilm);
+		io->hScript   = FROM_32(io->hScript);
+		io->attribute = FROM_32(io->attribute);
 	}
-#endif
 
 	RegisterIcons(cptr, numObjects);
 
 	cptr = FindChunk(MASTER_SCNHANDLE, CHUNK_TOTAL_POLY);
-	if (cptr != NULL)
+	// Max polygons are 0 in DW1 Mac (both in the demo and the full version)
+	if (cptr != NULL && *cptr != 0)
 		MaxPolygons(*cptr);
 
 	if (TinselV2) {
@@ -861,9 +868,6 @@ TinselEngine::TinselEngine(OSystem *syst, const TinselGameDescription *gameDesc)
 }
 
 TinselEngine::~TinselEngine() {
-	if (_bmv->MoviePlaying())
-		_bmv->FinishBMV();
-
 	_system->getAudioCDManager()->stop();
 	delete _bmv;
 	delete _sound;
@@ -878,7 +882,6 @@ TinselEngine::~TinselEngine() {
 	FreeObjectList();
 	FreeGlobalProcesses();
 	FreeGlobals();
-	delete _scheduler;
 
 	delete _config;
 
@@ -905,7 +908,7 @@ Common::Error TinselEngine::run() {
 
 	_console = new Console();
 
-	_scheduler = new Scheduler();
+	CoroScheduler.reset();
 
 	InitSysVars();
 
@@ -927,7 +930,7 @@ Common::Error TinselEngine::run() {
 	RebootTimers();
 	RebootScalingReels();
 
-	DelayedScene.scene = HookScene.scene = 0;
+	g_DelayedScene.scene = g_HookScene.scene = 0;
 #endif
 
 	// Load in text strings
@@ -957,7 +960,7 @@ Common::Error TinselEngine::run() {
 
 	if (ConfMan.hasKey("save_slot")) {
 		if (loadGameState(ConfMan.getInt("save_slot")).getCode() == Common::kNoError)
-			loadingFromGMM = true;
+			g_loadingFromGMM = true;
 	}
 
 	// Foreground loop
@@ -973,10 +976,10 @@ Common::Error TinselEngine::run() {
 			NextGameCycle();
 		}
 
-		if (bRestart) {
+		if (g_bRestart) {
 			RestartGame();
-			bRestart = false;
-			bHasRestarted = true;	// Set restarted flag
+			g_bRestart = false;
+			g_bHasRestarted = true;	// Set restarted flag
 		}
 
 		// Save/Restore scene file transfers
@@ -986,7 +989,7 @@ Common::Error TinselEngine::run() {
 		_bmv->FettleBMV();
 
 #ifdef DEBUG
-		if (bFast)
+		if (g_bFast)
 			continue;		// run flat-out
 #endif
 		// Loop processing events while there are any pending
@@ -1001,11 +1004,14 @@ Common::Error TinselEngine::run() {
 			g_system->delayMillis(10);
 	}
 
+	if (_bmv->MoviePlaying())
+		_bmv->FinishBMV();
+
 	// Write configuration
 	_vm->_config->writeToDisk();
 
 	EndScene();
-	pCurBgnd = NULL;
+	g_pCurBgnd = NULL;
 
 	return Common::kNoError;
 }
@@ -1022,7 +1028,7 @@ void TinselEngine::NextGameCycle() {
 	ResetEcount();
 
 	// schedule process
-	_scheduler->schedule();
+	CoroScheduler.schedule();
 
 	if (_bmv->MoviePlaying())
 		_bmv->CopyMovieToScreen();
@@ -1047,6 +1053,8 @@ bool TinselEngine::pollEvent() {
 	case Common::EVENT_LBUTTONUP:
 	case Common::EVENT_RBUTTONDOWN:
 	case Common::EVENT_RBUTTONUP:
+	case Common::EVENT_WHEELUP:
+	case Common::EVENT_WHEELDOWN:
 		// Add button to queue for the mouse process
 		_mouseButtons.push_back(event.type);
 		break;
@@ -1054,7 +1062,7 @@ bool TinselEngine::pollEvent() {
 	case Common::EVENT_MOUSEMOVE:
 		{
 			// This fragment takes care of Tinsel 2 when it's been compiled with
-			// blank areas at the top and bottom of thes creen
+			// blank areas at the top and bottom of the screen
 			int ySkip = TinselV2 ? (g_system->getHeight() - _vm->screen().h) / 2 : 0;
 			if ((event.mouse.y >= ySkip) && (event.mouse.y < (g_system->getHeight() - ySkip)))
 				_mousePos = Common::Point(event.mouse.x, event.mouse.y - ySkip);
@@ -1078,11 +1086,11 @@ bool TinselEngine::pollEvent() {
  */
 void TinselEngine::CreateConstProcesses() {
 	// Process to run the master script
-	_scheduler->createProcess(PID_MASTER_SCR, MasterScriptProcess, NULL, 0);
+	CoroScheduler.createProcess(PID_MASTER_SCR, MasterScriptProcess, NULL, 0);
 
 	// Processes to run the cursor and inventory,
-	_scheduler->createProcess(PID_CURSOR, CursorProcess, NULL, 0);
-	_scheduler->createProcess(PID_INVENTORY, InventoryProcess, NULL, 0);
+	CoroScheduler.createProcess(PID_CURSOR, CursorProcess, NULL, 0);
+	CoroScheduler.createProcess(PID_INVENTORY, InventoryProcess, NULL, 0);
 }
 
 /**
@@ -1106,7 +1114,7 @@ void TinselEngine::RestartGame() {
 	RebootTimers();
 	RebootScalingReels();
 
-	DelayedScene.scene = HookScene.scene = 0;
+	g_DelayedScene.scene = g_HookScene.scene = 0;
 
 	// remove keyboard, mouse and joystick drivers
 	ChopDrivers();
@@ -1132,11 +1140,11 @@ void TinselEngine::RestartDrivers() {
 	KillAllObjects();
 
 	// init the process scheduler
-	_scheduler->reset();
+	CoroScheduler.reset();
 
 	// init the event handlers
-	pMouseProcess = _scheduler->createProcess(PID_MOUSE, MouseProcess, NULL, 0);
-	pKeyboardProcess = _scheduler->createProcess(PID_KEYBOARD, KeyboardProcess, NULL, 0);
+	g_pMouseProcess = CoroScheduler.createProcess(PID_MOUSE, MouseProcess, NULL, 0);
+	g_pKeyboardProcess = CoroScheduler.createProcess(PID_KEYBOARD, KeyboardProcess, NULL, 0);
 
 	// open MIDI files
 	OpenMidiFiles();
@@ -1164,8 +1172,8 @@ void TinselEngine::ChopDrivers() {
 	DeleteMidiBuffer();
 
 	// remove event drivers
-	_scheduler->killProcess(pMouseProcess);
-	_scheduler->killProcess(pKeyboardProcess);
+	CoroScheduler.killProcess(g_pMouseProcess);
+	CoroScheduler.killProcess(g_pKeyboardProcess);
 }
 
 /**

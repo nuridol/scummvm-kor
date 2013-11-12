@@ -34,6 +34,8 @@ static const TinselGameDescription gameDescriptions[] = {
 	// TINSEL_V2: The Discworld 2 game used this updated version of the Tinsel 1 engine,
 	//   and as far as we know there aren't any variations of this engine.
 
+	// ==== Discworld 1 early (TinselV0) entries ==============================
+
 	{	// Floppy Demo V0 from http://www.adventure-treff.de/specials/dl_demos.php
 		{
 			"dw",
@@ -41,15 +43,17 @@ static const TinselGameDescription gameDescriptions[] = {
 			AD_ENTRY1s("dw.gra", "ce1b57761ba705221bcf70955b827b97", 441192),
 			//AD_ENTRY1s("dw.scn", "ccd72f02183d0e96b6e7d8df9492cda8", 23308),
 			Common::EN_ANY,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_DEMO,
 			GUIO3(GUIO_NOSPEECH, GUIO_NOSFX, GUIO_NOMUSIC)
 		},
 		GID_DW1,
 		0,
-		GF_DEMO,
+		0,
 		TINSEL_V0,
 	},
+
+	// ==== Discworld 1 entries ===============================================
 
 	{	// CD Demo V1 version, with *.gra files
 		{
@@ -60,16 +64,16 @@ static const TinselGameDescription gameDescriptions[] = {
 				{"english.smp", 0, NULL, -1},
 			},
 			Common::EN_ANY,
-			Common::kPlatformPC,
-			ADGF_DEMO,
+			Common::kPlatformDOS,
+			ADGF_DEMO | ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD,
+		0,
 		TINSEL_V1,
 	},
-#if 0
+
 	{	// Macintosh CD Demo V1 version, with *.scn files, see tracker #3110936
 		{
 			"dw",
@@ -81,15 +85,15 @@ static const TinselGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformMacintosh,
-			ADGF_DEMO,
+			ADGF_DEMO | ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_SCNFILES | GF_BIG_ENDIAN,
+		GF_SCNFILES,
 		TINSEL_V1,
 	},
-#endif
+
 	{	// Multilingual Floppy V1 with *.gra files.
 		// Note: It contains no english subtitles.
 		{
@@ -104,13 +108,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::FR_FRA,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_DROPLANGUAGE,
 			GUIO1(GUIO_NOSPEECH)
 		},
 		GID_DW1,
 		0,
-		GF_FLOPPY | GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -127,13 +131,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::DE_DEU,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_DROPLANGUAGE,
 			GUIO1(GUIO_NOSPEECH)
 		},
 		GID_DW1,
 		0,
-		GF_FLOPPY | GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -150,13 +154,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::IT_ITA,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_DROPLANGUAGE,
 			GUIO1(GUIO_NOSPEECH)
 		},
 		GID_DW1,
 		0,
-		GF_FLOPPY | GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -173,13 +177,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::ES_ESP,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_DROPLANGUAGE,
 			GUIO1(GUIO_NOSPEECH)
 		},
 		GID_DW1,
 		0,
-		GF_FLOPPY | GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -189,13 +193,13 @@ static const TinselGameDescription gameDescriptions[] = {
 			"Floppy",
 			AD_ENTRY1s("dw.gra", "c8808ccd988d603dd35dff42013ae7fd", 781656),
 			Common::EN_ANY,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOSPEECH)
 		},
 		GID_DW1,
 		0,
-		GF_FLOPPY | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -208,13 +212,48 @@ static const TinselGameDescription gameDescriptions[] = {
 				{"english.smp", 0, NULL, -1},
 			},
 			Common::EN_ANY,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_ENHANCED_AUDIO_SUPPORT,
+		TINSEL_V1,
+	},
+
+	{	// Polish fan translation CD V1 version, with *.gra files (same as the floppy one, with english.smp)
+		{
+			"dw",
+			"CD",
+			{
+				{"dw.gra", 0, "ef05bbd2a754bd11a2e87bcd84ab5ccf", 781864},
+				{"english.smp", 0, NULL, -1},
+			},
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_CD,
+			GUIO_NONE
+		},
+		GID_DW1,
+		0,
+		GF_ENHANCED_AUDIO_SUPPORT,
+		TINSEL_V1,
+	},
+
+	{	// Polish fan translaction floppy V1 version, with *.gra files
+		{
+			"dw",
+			"Floppy",
+			AD_ENTRY1s("dw.gra", "ef05bbd2a754bd11a2e87bcd84ab5ccf", 781864),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+			GUIO_NOSPEECH
+		},
+		GID_DW1,
+		0,
+		GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -230,13 +269,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::IT_ITA,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_DROPLANGUAGE | ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -255,13 +294,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::FR_FRA,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_DROPLANGUAGE | ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -279,13 +318,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::DE_DEU,
-			Common::kPlatformPC,
-			ADGF_DROPLANGUAGE | ADGF_CD,
+			Common::kPlatformDOS,
+			ADGF_DROPLANGUAGE,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 	{
@@ -302,13 +341,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::IT_ITA,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_DROPLANGUAGE | ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 	{
@@ -325,13 +364,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::ES_ESP,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_DROPLANGUAGE | ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_USE_4FLAGS | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -345,13 +384,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::EN_ANY,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -365,13 +404,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::HE_ISR,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
@@ -390,14 +429,14 @@ static const TinselGameDescription gameDescriptions[] = {
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
 	{	// multilanguage PSX demo
 		{
 			"dw",
-			"CD demo",
+			"CD Demo",
 			{
 				{"french.txt", 0, "e7020d35f58d0d187052ac406d86cc87", 273914},
 				{"german.txt", 0, "52f0a01e0ff0d340b02a36fd5109d705", 263942},
@@ -408,12 +447,12 @@ static const TinselGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformPSX,
-			ADGF_DEMO,
+			ADGF_CD | ADGF_DEMO,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_SCNFILES,
+		GF_SCNFILES,
 		TINSEL_V1,
 	},
 
@@ -428,18 +467,37 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::EN_ANY,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 #endif
 
-#if 0
+	{	// Mac English CD, see tracker #3614864
+		{
+			"dw",
+			"CD",
+			{
+				{"dw.scn", 0, "114643df0d1f1530a0a9c5d4e38917bc", 1268553},
+				{"english.smp", 0, NULL, -1},
+				{NULL, 0, NULL, 0}
+			},
+			Common::EN_ANY,
+			Common::kPlatformMacintosh,
+			ADGF_CD,
+			GUIO0()
+		},
+		GID_DW1,
+		0,
+		GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
+		TINSEL_V1,
+	},
+
 	{	// Mac multilanguage CD
 		{
 			"dw",
@@ -456,11 +514,9 @@ static const TinselGameDescription gameDescriptions[] = {
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT | GF_BIG_ENDIAN,
+		GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
-
-#endif
 
 	{	// German CD re-release "Neon Edition"
 		// Note: This release has ENGLISH.TXT (with german content) instead of GERMAN.TXT
@@ -469,13 +525,13 @@ static const TinselGameDescription gameDescriptions[] = {
 			"CD",
 			AD_ENTRY1s("dw.scn", "6182c7986eaec893c62fb6ea13a9f225", 774556),
 			Common::DE_DEU,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_CD,
 			GUIO0()
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT | GF_ALT_MIDI,
+		GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT | GF_ALT_MIDI,
 		TINSEL_V1,
 	},
 
@@ -490,17 +546,41 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::RU_RUS,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_CD,
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_DW1,
 		0,
-		GF_CD | GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
+		GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
 		TINSEL_V1,
 	},
 
-	{	// English DW2 demo
+	{	// Polish fan translaction Discworld 1
+		{
+			"dw",
+			"CD",
+			{
+				{"dw.scn", 0, "fa169d2c98660215ebd84b49c1899eef", 776396},
+				{"english.txt", 0, "c1a53eb7ec812689dab70e2bb22cf2ab", 224151},
+				{"english.smp", 0, NULL, -1},
+				{NULL, 0, NULL, 0}
+			},
+			Common::PL_POL,
+			Common::kPlatformDOS,
+			ADGF_CD,
+			GUIO_NONE
+		},
+		GID_DW1,
+		0,
+		GF_SCNFILES | GF_ENHANCED_AUDIO_SUPPORT,
+		TINSEL_V1,
+	},
+
+	// ==== Discworld 2 entries ===============================================
+	// Note: All Discworld 2 versions are CD only, therefore we don't add the ADGF_CD flag
+
+	{	// English Discworld 2 demo
 		{
 			"dw2",
 			"Demo",
@@ -510,13 +590,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::EN_ANY,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_DEMO,
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_DW2,
 		0,
-		GF_CD | GF_SCNFILES | GF_DEMO,
+		GF_SCNFILES,
 		TINSEL_V2,
 	},
 
@@ -530,13 +610,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::EN_GRB,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_DW2,
 		0,
-		GF_CD | GF_SCNFILES,
+		GF_SCNFILES,
 		TINSEL_V2,
 	},
 
@@ -550,13 +630,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::EN_USA,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_DW2,
 		0,
-		GF_CD | GF_SCNFILES,
+		GF_SCNFILES,
 		TINSEL_V2,
 	},
 
@@ -570,13 +650,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::FR_FRA,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_DW2,
 		0,
-		GF_CD | GF_SCNFILES,
+		GF_SCNFILES,
 		TINSEL_V2,
 	},
 
@@ -590,13 +670,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::DE_DEU,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_DW2,
 		0,
-		GF_CD | GF_SCNFILES,
+		GF_SCNFILES,
 		TINSEL_V2,
 	},
 
@@ -611,13 +691,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::IT_ITA,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_DW2,
 		0,
-		GF_CD | GF_SCNFILES,
+		GF_SCNFILES,
 		TINSEL_V2,
 	},
 	{
@@ -631,13 +711,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::ES_ESP,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_DW2,
 		0,
-		GF_CD | GF_SCNFILES,
+		GF_SCNFILES,
 		TINSEL_V2,
 	},
 
@@ -652,13 +732,13 @@ static const TinselGameDescription gameDescriptions[] = {
 				{NULL, 0, NULL, 0}
 			},
 			Common::RU_RUS,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_DW2,
 		0,
-		GF_CD | GF_SCNFILES,
+		GF_SCNFILES,
 		TINSEL_V2,
 	},
 

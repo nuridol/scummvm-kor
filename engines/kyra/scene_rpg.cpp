@@ -51,7 +51,7 @@ void KyraRpgEngine::setLevelShapesDim(int index, int16 &x1, int16 &x2, int dim) 
 				if (t > x1) {
 					x1 = t;
 					if (!(a & 0x10))
-						scaleLevelShapesDim(index, y1, y2, -1);
+						setDoorShapeDim(index, y1, y2, -1);
 				}
 
 				t = _dscDim2[((m + i) << 1) + 1];
@@ -59,7 +59,7 @@ void KyraRpgEngine::setLevelShapesDim(int index, int16 &x1, int16 &x2, int dim) 
 				if (t < x2) {
 					x2 = t;
 					if (!(a & 0x10))
-						scaleLevelShapesDim(index, y1, y2, -1);
+						setDoorShapeDim(index, y1, y2, -1);
 				}
 			} else {
 				int t = _dscDim1[m + i];
@@ -100,17 +100,20 @@ void KyraRpgEngine::setLevelShapesDim(int index, int16 &x1, int16 &x2, int dim) 
 	drawLevelModifyScreenDim(dim, x1, 0, x2, 15);
 }
 
-void KyraRpgEngine::scaleLevelShapesDim(int index, int16 &y1, int16 &y2, int dim) {
-	static const int8 dscY1[] = { 0x1E, 0x18, 0x10, 0x00 };
-	static const int8 dscY2[] = { 0x3B, 0x47, 0x56, 0x78 };
-
+void KyraRpgEngine::setDoorShapeDim(int index, int16 &y1, int16 &y2, int dim) {
 	uint8 a = _dscDimMap[index];
 
-	if (dim == -1 && a != 3)
+	if (_flags.gameID != GI_EOB1 && dim == -1 && a != 3)
 		a++;
 
-	y1 = dscY1[a];
-	y2 = dscY2[a];
+	uint8 b = a;
+	if (_flags.gameID == GI_EOB1) {
+		a += _dscDoorFrameIndex1[_currentLevel - 1];
+		b += _dscDoorFrameIndex2[_currentLevel - 1];
+	}
+
+	y1 = _dscDoorFrameY1[a];
+	y2 = _dscDoorFrameY2[b];
 
 	if (dim == -1)
 		return;
@@ -130,7 +133,7 @@ void KyraRpgEngine::generateBlockDrawingBuffer() {
 	_sceneDrawVarLeft = _dscBlockMap[_currentDirection + 8];
 
 	/*******************************************
-    *             _visibleBlocks map           *
+	*             _visibleBlocks map           *
 	*                                          *
 	*     |     |     |     |     |     |      *
 	*  00 |  01 |  02 |  03 |  04 |  05 |  06  *
@@ -148,7 +151,7 @@ void KyraRpgEngine::generateBlockDrawingBuffer() {
 
 	memset(_blockDrawingBuffer, 0, 660 * sizeof(uint16));
 
-	_wllProcessFlag = ((_currentBlock >> 5) + (_currentBlock & 0x1f) + _currentDirection) & 1;
+	_wllProcessFlag = ((_currentBlock >> 5) + (_currentBlock & 0x1F) + _currentDirection) & 1;
 
 	if (_wllProcessFlag) // floor and ceiling
 		generateVmpTileDataFlipped(0, 15, 1, -330, 22, 15);
@@ -315,7 +318,7 @@ bool KyraRpgEngine::hasWall(int index) {
 
 void KyraRpgEngine::assignVisibleBlocks(int block, int direction) {
 	for (int i = 0; i < 18; i++) {
-		uint16 t = (block + _dscBlockIndex[direction * 18 + i]) & 0x3ff;
+		uint16 t = (block + _dscBlockIndex[direction * 18 + i]) & 0x3FF;
 		_visibleBlockIndex[i] = t;
 
 		_visibleBlocks[i] = &_levelBlockProperties[t];
@@ -334,7 +337,7 @@ bool KyraRpgEngine::checkSceneUpdateNeed(int block) {
 		}
 	}
 
-	if (_currentBlock == block){
+	if (_currentBlock == block) {
 		_sceneUpdateRequired = true;
 		return true;
 	}
@@ -349,22 +352,21 @@ void KyraRpgEngine::drawVcnBlocks() {
 	for (int y = 0; y < 15; y++) {
 		for (int x = 0; x < 22; x++) {
 			bool horizontalFlip = false;
-			int remainder = 0;
-
 			uint16 vcnOffset = *bdb++;
+			uint16 vcnExtraOffsetWll = 0;
 			int wllVcnOffset = 0;
 			int wllVcnRmdOffset = 0;
 
 			if (vcnOffset & 0x8000) {
 				// this renders a wall block over the transparent pixels of a floor/ceiling block
-				remainder = vcnOffset - 0x8000;
+				vcnExtraOffsetWll = vcnOffset - 0x8000;
 				vcnOffset = 0;
 				wllVcnRmdOffset = _wllVcnOffset;
 			}
 
 			if (vcnOffset & 0x4000) {
 				horizontalFlip = true;
-				vcnOffset &= 0x3fff;
+				vcnOffset &= 0x3FFF;
 			}
 
 			uint8 *src = 0;
@@ -376,7 +378,7 @@ void KyraRpgEngine::drawVcnBlocks() {
 				vcnOffset = bdb[329];
 				if (vcnOffset & 0x4000) {
 					horizontalFlip = true;
-					vcnOffset &= 0x3fff;
+					vcnOffset &= 0x3FFF;
 				}
 
 				src = (_vcfBlocks ? _vcfBlocks : _vcnBlocks) + (vcnOffset << 5);
@@ -388,9 +390,9 @@ void KyraRpgEngine::drawVcnBlocks() {
 				for (int blockY = 0; blockY < 8; blockY++) {
 					src += 3;
 					for (int blockX = 0; blockX < 4; blockX++) {
-						uint8 t = *src--;
-						*d++ = _vcnExpTable[((t & 0x0f) + wllVcnOffset) | shift];
-						*d++ = _vcnExpTable[((t >> 4) + wllVcnOffset) | shift];
+						uint8 bl = *src--;
+						*d++ = _vcnColTable[((bl & 0x0F) + wllVcnOffset) | shift];
+						*d++ = _vcnColTable[((bl >> 4) + wllVcnOffset) | shift];
 					}
 					src += 5;
 					d += 168;
@@ -398,54 +400,71 @@ void KyraRpgEngine::drawVcnBlocks() {
 			} else {
 				for (int blockY = 0; blockY < 8; blockY++) {
 					for (int blockX = 0; blockX < 4; blockX++) {
-						uint8 t = *src++;
-						*d++ = _vcnExpTable[((t >> 4) + wllVcnOffset) | shift];
-						*d++ = _vcnExpTable[((t & 0x0f) + wllVcnOffset) | shift];
+						uint8 bl = *src++;
+						*d++ = _vcnColTable[((bl >> 4) + wllVcnOffset) | shift];
+						*d++ = _vcnColTable[((bl & 0x0F) + wllVcnOffset) | shift];
 					}
 					d += 168;
 				}
 			}
 			d -= 1400;
 
-			if (remainder) {
+			if (vcnExtraOffsetWll) {
 				d -= 8;
 				horizontalFlip = false;
 
-				if (remainder & 0x4000) {
-					remainder &= 0x3fff;
+				if (vcnExtraOffsetWll & 0x4000) {
+					vcnExtraOffsetWll &= 0x3FFF;
 					horizontalFlip = true;
 				}
 
-				shift = _vcnShift ? _vcnShift[remainder] : _blockBrightness;
-				src = &_vcnBlocks[remainder << 5];
+				shift = _vcnShift ? _vcnShift[vcnExtraOffsetWll] : _blockBrightness;
+				src = &_vcnBlocks[vcnExtraOffsetWll << 5];
+				uint8 *maskTable = _vcnTransitionMask ? &_vcnTransitionMask[vcnExtraOffsetWll << 5] : 0;
 
 				if (horizontalFlip) {
 					for (int blockY = 0; blockY < 8; blockY++) {
 						src += 3;
+						maskTable += 3;
 						for (int blockX = 0; blockX < 4; blockX++) {
-							uint8 t = *src--;
-							uint8 h = _vcnExpTable[((t & 0x0f) + wllVcnRmdOffset) | shift];
-							uint8 l = _vcnExpTable[((t >> 4) + wllVcnRmdOffset) | shift];
-							if (h)
+							uint8 bl = *src--;
+							uint8 mask = _vcnTransitionMask ? *maskTable-- : 0;
+							uint8 h = _vcnColTable[((bl & 0x0F) + wllVcnRmdOffset) | shift];
+							uint8 l = _vcnColTable[((bl >> 4) + wllVcnRmdOffset) | shift];
+
+							if (_vcnTransitionMask)
+								*d = (*d & (mask & 0x0F)) | h;
+							else if (h)
 								*d = h;
 							d++;
-							if (l)
+
+							if (_vcnTransitionMask)
+								*d = (*d & (mask >> 4)) | l;
+							else if (l)
 								*d = l;
 							d++;
 						}
 						src += 5;
+						maskTable += 5;
 						d += 168;
 					}
 				} else {
 					for (int blockY = 0; blockY < 8; blockY++) {
 						for (int blockX = 0; blockX < 4; blockX++) {
-							uint8 t = *src++;
-							uint8 h = _vcnExpTable[((t >> 4) + wllVcnRmdOffset) | shift];
-							uint8 l = _vcnExpTable[((t & 0x0f) + wllVcnRmdOffset) | shift];
-							if (h)
+							uint8 bl = *src++;
+							uint8 mask = _vcnTransitionMask ? *maskTable++ : 0;
+							uint8 h = _vcnColTable[((bl >> 4) + wllVcnRmdOffset) | shift];
+							uint8 l = _vcnColTable[((bl & 0x0F) + wllVcnRmdOffset) | shift];
+
+							if (_vcnTransitionMask)
+								*d = (*d & (mask >> 4)) | h;
+							else if (h)
 								*d = h;
 							d++;
-							if (l)
+
+							if (_vcnTransitionMask)
+								*d = (*d & (mask & 0x0F)) | l;
+							else if (l)
 								*d = l;
 							d++;
 						}
@@ -463,7 +482,7 @@ void KyraRpgEngine::drawVcnBlocks() {
 
 uint16 KyraRpgEngine::calcNewBlockPosition(uint16 curBlock, uint16 direction) {
 	static const int16 blockPosTable[] = { -32, 1, 32, -1 };
-	return (curBlock + blockPosTable[direction]) & 0x3ff;
+	return (curBlock + blockPosTable[direction]) & 0x3FF;
 }
 
 int KyraRpgEngine::clickedWallShape(uint16 block, uint16 direction) {
@@ -544,9 +563,9 @@ void KyraRpgEngine::openCloseDoor(int block, int openClose) {
 
 	int c = (_wllWallFlags[_levelBlockProperties[block].walls[0]] & 8) ? 0 : 1;
 	int v = _levelBlockProperties[block].walls[c];
-	int flg = (openClose == 1) ? 0x10 : (openClose == -1 ? 0x20 : 0);
+	int flg = (_flags.gameID == GI_EOB1) ? 1 : ((openClose == 1) ? 0x10 : (openClose == -1 ? 0x20 : 0));
 
-	if (_wllWallFlags[v] & flg)
+	if ((_flags.gameID == GI_EOB1 && openClose == -1 && !(_wllWallFlags[v] & flg)) || (!(_flags.gameID == GI_EOB1 && openClose == -1) && (_wllWallFlags[v] & flg)))
 		return;
 
 	for (int i = 0; i < 3; i++) {
@@ -603,7 +622,7 @@ void KyraRpgEngine::completeDoorOperations() {
 		do {
 			_levelBlockProperties[b].walls[_openDoorState[i].wall] += _openDoorState[i].state;
 			_levelBlockProperties[b].walls[_openDoorState[i].wall ^ 2] += _openDoorState[i].state;
-		} while	(!(_wllWallFlags[_levelBlockProperties[b].walls[_openDoorState[i].wall]] & 0x30));
+		} while (!(_wllWallFlags[_levelBlockProperties[b].walls[_openDoorState[i].wall]] & 0x30));
 
 		_openDoorState[i].block = 0;
 	}

@@ -46,9 +46,11 @@
 #include "scumm/smush/smush_player.h"
 
 #include "scumm/insane/insane.h"
+
 #ifdef SCUMMVMKOR
 #include "scumm/korean.h"
 #endif
+
 #include "audio/mixer.h"
 #include "audio/decoders/mp3.h"
 #include "audio/decoders/raw.h"
@@ -92,13 +94,13 @@ public:
 			assert(def_end != NULL);
 
 			char *id_end = def_end;
-			while (id_end >= def_start && !isdigit(static_cast<unsigned char>(*(id_end-1)))) {
+			while (id_end >= def_start && !Common::isDigit(*(id_end-1))) {
 				id_end--;
 			}
 
 			assert(id_end > def_start);
 			char *id_start = id_end;
-			while (isdigit(static_cast<unsigned char>(*(id_start - 1)))) {
+			while (Common::isDigit(*(id_start - 1))) {
 				id_start--;
 			}
 
@@ -614,10 +616,12 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 	if (_vm->_game.id == GID_CMI && string2[0] != 0) {
 		str = string2;
 	}
+
 #ifdef SCUMMVMKOR
 	char kr_color = (color != -1) ? color : 1;
 	const char *strKorean = str;
 #endif
+
 	// flags:
 	// bit 0 - center       1
 	// bit 1 - not used     2
@@ -626,8 +630,8 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 	switch (flags & 9) {
 	case 0:
 #ifdef SCUMMVMKOR
-            if (_koreanMode) strKorean = convertToKorean(str, 0);
-            sf->drawString(strKorean, _dst, _width, _height, pos_x, pos_y, false);
+        if (_koreanMode) strKorean = convertToKorean(str, 0);
+        sf->drawString(strKorean, _dst, _width, _height, pos_x, pos_y, false);
 #else
 		sf->drawString(str, _dst, _width, _height, pos_x, pos_y, false);
 #endif
@@ -639,7 +643,7 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 #else
 		sf->drawString(str, _dst, _width, _height, pos_x, MAX(pos_y, top), true);
 #endif
-        break;
+		break;
 	case 8:
 		// FIXME: Is 'right' the maximum line width here, just
 		// as it is in the next case? It's used several times
@@ -650,9 +654,9 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
             if (_koreanMode) strKorean = convertToKorean(str, 0);
             sf->drawStringWrap(strKorean, _dst, _width, _height, pos_x, MAX(pos_y, top), left, right, false);
 #else
-            sf->drawStringWrap(str, _dst, _width, _height, pos_x, MAX(pos_y, top), left, right, false);
+		sf->drawStringWrap(str, _dst, _width, _height, pos_x, MAX(pos_y, top), left, right, false);
 #endif
-            break;
+		break;
 	case 9:
 		// In this case, the 'right' parameter is actually the
 		// maximum line width. This explains why it's sometimes
@@ -666,7 +670,7 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 #else
 		sf->drawStringWrap(str, _dst, _width, _height, pos_x, MAX(pos_y, top), left, MIN(left + right, _width), true);
 #endif
-            break;
+		break;
 	default:
 		error("SmushPlayer::handleTextResource. Not handled flags: %d", flags);
 	}
@@ -945,7 +949,7 @@ void SmushPlayer::handleAnimHeader(int32 subSize, Common::SeekableReadStream &b)
 
 void SmushPlayer::setupAnim(const char *file) {
 	if (_insanity) {
-		if (!((_vm->_game.features & GF_DEMO) && (_vm->_game.platform == Common::kPlatformPC)))
+		if (!((_vm->_game.features & GF_DEMO) && (_vm->_game.platform == Common::kPlatformDOS)))
 			readString("mineroad.trs");
 	} else
 		readString(file);
@@ -958,7 +962,7 @@ SmushFont *SmushPlayer::getFont(int font) {
 		return _sf[font];
 
 	if (_vm->_game.id == GID_FT) {
-		if (!((_vm->_game.features & GF_DEMO) && (_vm->_game.platform == Common::kPlatformPC))) {
+		if (!((_vm->_game.features & GF_DEMO) && (_vm->_game.platform == Common::kPlatformDOS))) {
 			const char *ft_fonts[] = {
 				"scummfnt.nut",
 				"techfnt.nut",

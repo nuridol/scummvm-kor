@@ -88,6 +88,12 @@ void SciMusic::init() {
 	uint32 dev = MidiDriver::detectDevice(deviceFlags);
 	_musicType = MidiDriver::getMusicType(dev);
 
+	if (g_sci->_features->useAltWinGMSound() && _musicType != MT_GM) {
+		warning("A Windows CD version with an alternate MIDI soundtrack has been chosen, "
+				"but no MIDI music device has been selected. Reverting to the DOS soundtrack");
+		g_sci->_features->forceDOSTracks();
+	}
+
 	switch (_musicType) {
 	case MT_ADLIB:
 		// FIXME: There's no Amiga sound option, so we hook it up to AdLib
@@ -119,7 +125,13 @@ void SciMusic::init() {
 		_pMidiDrv->setTimerCallback(this, &miditimerCallback);
 		_dwTempo = _pMidiDrv->getBaseTempo();
 	} else {
-		error("Failed to initialize sound driver");
+		if (g_sci->getGameId() == GID_FUNSEEKER) {
+			// HACK: The Fun Seeker's Guide demo doesn't have patch 3 and the version
+			// of the Adlib driver (adl.drv) that it includes is unsupported. That demo
+			// doesn't have any sound anyway, so this shouldn't be fatal.
+		} else {
+			error("Failed to initialize sound driver");
+		}
 	}
 
 	// Find out what the first possible channel is (used, when doing channel
@@ -473,6 +485,8 @@ void SciMusic::soundPlay(MusicEntry *pSnd) {
 				// Stop any in progress music fading, as that will reset the
 				// volume of the sound channels that the faded song occupies..
 				// Fixes bug #3266480 and partially fixes bug #3041738.
+				// CHECKME: Is this the right thing to do? Are these
+				// overlapping channels not a deeper underlying problem?
 				for (uint i = 0; i < playListCount; i++) {
 					// Is another MIDI song being faded down? If yes, stop it
 					// immediately instead
@@ -483,6 +497,7 @@ void SciMusic::soundPlay(MusicEntry *pSnd) {
 						_playList[i]->pMidiParser->stop();
 						freeChannels(_playList[i]);
 						_playList[i]->fadeStep = 0;
+						_playList[i]->fadeCompleted = true;
 					}
 				}
 			}
@@ -504,9 +519,10 @@ void SciMusic::soundPlay(MusicEntry *pSnd) {
 
 			if (pSnd->status == kSoundStopped)
 				pSnd->pMidiParser->jumpToTick(0);
-			else
+			else {
 				// Fast forward to the last position and perform associated events when loading
 				pSnd->pMidiParser->jumpToTick(pSnd->ticker, true, true, true);
+			}
 
 			// Restore looping and hold
 			pSnd->loop = prevLoop;

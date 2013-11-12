@@ -33,9 +33,10 @@
 #include "base/version.h"
 
 #include "common/config-manager.h"
+#include "common/fs.h"
+#include "common/rendermode.h"
 #include "common/system.h"
 #include "common/textconsole.h"
-#include "common/fs.h"
 
 #include "gui/ThemeEngine.h"
 
@@ -67,7 +68,7 @@ static const char HELP_STRING[] =
 	"  -z, --list-games         Display list of supported games and exit\n"
 	"  -t, --list-targets       Display list of configured targets and exit\n"
 	"  --list-saves=TARGET      Display a list of savegames for the game (TARGET) specified\n"
-#if defined (WIN32) && !defined(_WIN32_WCE) && !defined(__SYMBIAN32__)
+#if defined(WIN32) && !defined(_WIN32_WCE) && !defined(__SYMBIAN32__)
 	"  --console                Enable the console window (default:enabled)\n"
 #endif
 	"\n"
@@ -117,6 +118,13 @@ static const char HELP_STRING[] =
 	"  --aspect-ratio           Enable aspect ratio correction\n"
 	"  --render-mode=MODE       Enable additional render modes (cga, ega, hercGreen,\n"
 	"                           hercAmber, amiga)\n"
+#ifdef ENABLE_EVENTRECORDER
+	"  --record-mode=MODE       Specify record mode for event recorder (record, playback,\n"
+	"                           passthrough [default])\n"
+	"  --record-file-name=FILE  Specify record file name\n"
+	"  --disable-display        Disable any gfx output. Used for headless events\n"
+	"                           playback by Event Recorder\n"
+#endif
 	"\n"
 #if defined(ENABLE_SKY) || defined(ENABLE_QUEEN)
 	"  --alt-intro              Use alternative intro for CD versions of Beneath a\n"
@@ -144,7 +152,7 @@ static const char HELP_STRING[] =
 
 static const char *s_appName = "scummvm";
 
-static void usage(const char *s, ...) GCC_PRINTF(1, 2);
+static void NORETURN_PRE usage(const char *s, ...) GCC_PRINTF(1, 2) NORETURN_POST;
 
 static void usage(const char *s, ...) {
 	char buf[STRINGBUFLEN];
@@ -154,7 +162,7 @@ static void usage(const char *s, ...) {
 	vsnprintf(buf, STRINGBUFLEN, s, va);
 	va_end(va);
 
-#if !(defined(__GP32__) || defined (__SYMBIAN32__) || defined(__DS__))
+#if !(defined(__GP32__) || defined(__SYMBIAN32__) || defined(__DS__))
 	printf(USAGE_STRING, s_appName, buf, s_appName, s_appName);
 #endif
 	exit(1);
@@ -168,7 +176,6 @@ void registerDefaults() {
 	// Graphics
 	ConfMan.registerDefault("fullscreen", false);
 	ConfMan.registerDefault("aspect_ratio", false);
-	ConfMan.registerDefault("disable_dithering", false);
 	ConfMan.registerDefault("gfx_mode", "normal");
 	ConfMan.registerDefault("render_mode", "default");
 	ConfMan.registerDefault("desired_screen_aspect_ratio", "auto");
@@ -198,7 +205,7 @@ void registerDefaults() {
 
 	// Game specific
 	ConfMan.registerDefault("path", "");
-	ConfMan.registerDefault("platform", Common::kPlatformPC);
+	ConfMan.registerDefault("platform", Common::kPlatformDOS);
 	ConfMan.registerDefault("language", "en");
 	ConfMan.registerDefault("subtitles", false);
 	ConfMan.registerDefault("boot_param", 0);
@@ -232,17 +239,42 @@ void registerDefaults() {
 	ConfMan.registerDefault("confirm_exit", false);
 	ConfMan.registerDefault("disable_sdl_parachute", false);
 
+	ConfMan.registerDefault("disable_display", false);
 	ConfMan.registerDefault("record_mode", "none");
 	ConfMan.registerDefault("record_file_name", "record.bin");
-	ConfMan.registerDefault("record_temp_file_name", "record.tmp");
-	ConfMan.registerDefault("record_time_file_name", "record.time");
+
+	ConfMan.registerDefault("gui_saveload_chooser", "grid");
+	ConfMan.registerDefault("gui_saveload_last_pos", "0");
+
+	ConfMan.registerDefault("gui_browser_show_hidden", false);
+
+#ifdef USE_FLUIDSYNTH
+	// The settings are deliberately stored the same way as in Qsynth. The
+	// FluidSynth music driver is responsible for transforming them into
+	// their appropriate values.
+	ConfMan.registerDefault("fluidsynth_chorus_activate", true);
+	ConfMan.registerDefault("fluidsynth_chorus_nr", 3);
+	ConfMan.registerDefault("fluidsynth_chorus_level", 100);
+	ConfMan.registerDefault("fluidsynth_chorus_speed", 30);
+	ConfMan.registerDefault("fluidsynth_chorus_depth", 80);
+	ConfMan.registerDefault("fluidsynth_chorus_waveform", "sine");
+
+	ConfMan.registerDefault("fluidsynth_reverb_activate", true);
+	ConfMan.registerDefault("fluidsynth_reverb_roomsize", 20);
+	ConfMan.registerDefault("fluidsynth_reverb_damping", 0);
+	ConfMan.registerDefault("fluidsynth_reverb_width", 1);
+	ConfMan.registerDefault("fluidsynth_reverb_level", 90);
+
+	ConfMan.registerDefault("fluidsynth_misc_interpolation", "4th");
+#endif
 
 #ifdef SCUMMVMKOR
-    ConfMan.registerDefault("language", "kr");
-    ConfMan.registerDefault("subtitles", true);
-    ConfMan.registerDefault("v1_korean_mode", false);
-    ConfMan.registerDefault("v1_korean_only", false);
+	ConfMan.registerDefault("language", "kr");
+	ConfMan.registerDefault("subtitles", true);
+	ConfMan.registerDefault("v1_korean_mode", false);
+	ConfMan.registerDefault("v1_korean_only", false);
 #endif
+
 }
 
 //
@@ -282,12 +314,12 @@ void registerDefaults() {
 // Use this for boolean options; this distinguishes between "-x" and "-X",
 // resp. between "--some-option" and "--no-some-option".
 #define DO_OPTION_BOOL(shortCmd, longCmd) \
-	if (isLongCmd ? (!strcmp(s+2, longCmd) || !strcmp(s+2, "no-"longCmd)) : (tolower(s[1]) == shortCmd)) { \
-		bool boolValue = (islower(static_cast<unsigned char>(s[1])) != 0); \
+	if (isLongCmd ? (!strcmp(s+2, longCmd) || !strcmp(s+2, "no-" longCmd)) : (tolower(s[1]) == shortCmd)) { \
+		bool boolValue = (Common::isLower(s[1]) != 0); \
 		s += 2; \
 		if (isLongCmd) { \
 			boolValue = !strcmp(s, longCmd); \
-			s += boolValue ? (sizeof(longCmd) - 1) : (sizeof("no-"longCmd) - 1); \
+			s += boolValue ? (sizeof(longCmd) - 1) : (sizeof("no-" longCmd) - 1); \
 		} \
 		if (*s != '\0') goto unknownOption; \
 		const char *option = boolValue ? "true" : "false"; \
@@ -314,12 +346,19 @@ void registerDefaults() {
 		continue; \
 	}
 
+// End an option handler
+#define END_COMMAND \
+	}
+
 
 Common::String parseCommandLine(Common::StringMap &settings, int argc, const char * const *argv) {
 	const char *s, *s2;
 
+	if (!argv)
+		return Common::String();
+
 	// argv[0] contains the name of the executable.
-	if (argv && argv[0]) {
+	if (argv[0]) {
 		s = strrchr(argv[0], '/');
 		s_appName = s ? (s+1) : argv[0];
 	}
@@ -345,27 +384,27 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			bool isLongCmd = (s[0] == '-' && s[1] == '-');
 
 			DO_COMMAND('h', "help")
-			END_OPTION
+			END_COMMAND
 
 			DO_COMMAND('v', "version")
-			END_OPTION
+			END_COMMAND
 
 			DO_COMMAND('t', "list-targets")
-			END_OPTION
+			END_COMMAND
 
 			DO_COMMAND('z', "list-games")
-			END_OPTION
+			END_COMMAND
 
 #ifdef DETECTOR_TESTING_HACK
 			// HACK FIXME TODO: This command is intentionally *not* documented!
 			DO_LONG_COMMAND("test-detector")
-			END_OPTION
+			END_COMMAND
 #endif
 
 #ifdef UPGRADE_ALL_TARGETS_HACK
 			// HACK FIXME TODO: This command is intentionally *not* documented!
 			DO_LONG_COMMAND("upgrade-targets")
-			END_OPTION
+			END_COMMAND
 #endif
 
 			DO_LONG_OPTION("list-saves")
@@ -391,13 +430,24 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_OPTION
 
 			DO_LONG_COMMAND("list-audio-devices")
-			END_OPTION
+			END_COMMAND
 
 			DO_LONG_OPTION_INT("output-rate")
 			END_OPTION
 
 			DO_OPTION_BOOL('f', "fullscreen")
 			END_OPTION
+
+#ifdef ENABLE_EVENTRECORDER
+			DO_LONG_OPTION_INT("disable-display")
+			END_OPTION
+
+			DO_LONG_OPTION("record-mode")
+			END_OPTION
+
+			DO_LONG_OPTION("record-file-name")
+			END_OPTION
+#endif
 
 			DO_LONG_OPTION("opl-driver")
 			END_OPTION
@@ -521,7 +571,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_OPTION
 
 			DO_LONG_COMMAND("list-themes")
-			END_OPTION
+			END_COMMAND
 
 			DO_LONG_OPTION("target-md5")
 			END_OPTION
@@ -544,25 +594,13 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_OPTION
 #endif
 
-			DO_LONG_OPTION("record-mode")
-			END_OPTION
-
-			DO_LONG_OPTION("record-file-name")
-			END_OPTION
-
-			DO_LONG_OPTION("record-temp-file-name")
-			END_OPTION
-
-			DO_LONG_OPTION("record-time-file-name")
-			END_OPTION
-
 #ifdef IPHONE
 			// This is automatically set when launched from the Springboard.
 			DO_LONG_OPTION_OPT("launchedFromSB", 0)
 			END_OPTION
 #endif
 
-#if defined (WIN32) && !defined(_WIN32_WCE) && !defined(__SYMBIAN32__)
+#if defined(WIN32) && !defined(_WIN32_WCE) && !defined(__SYMBIAN32__)
 			// Optional console window on Windows (default: enabled)
 			DO_LONG_OPTION_BOOL("console")
 			END_OPTION
@@ -583,8 +621,7 @@ static void listGames() {
 	       "-------------------- ------------------------------------------------------\n");
 
 	const EnginePlugin::List &plugins = EngineMan.getPlugins();
-	EnginePlugin::List::const_iterator iter = plugins.begin();
-	for (iter = plugins.begin(); iter != plugins.end(); ++iter) {
+	for (EnginePlugin::List::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
 		GameList list = (**iter)->getSupportedGames();
 		for (GameList::iterator v = list.begin(); v != list.end(); ++v) {
 			printf("%-20s %s\n", v->gameid().c_str(), v->description().c_str());
@@ -798,9 +835,8 @@ void upgradeTargets() {
 
 	printf("Upgrading all your existing targets\n");
 
-	Common::ConfigManager::DomainMap &domains = ConfMan.getGameDomains();
-	Common::ConfigManager::DomainMap::iterator iter = domains.begin();
-	for (iter = domains.begin(); iter != domains.end(); ++iter) {
+	Common::ConfigManager::DomainMap::iterator iter = ConfMan.beginGameDomains();
+	for (; iter != ConfMan.endGameDomains(); ++iter) {
 		Common::ConfigManager::Domain &dom = iter->_value;
 		Common::String name(iter->_key);
 		Common::String gameid(dom.getVal("gameid"));

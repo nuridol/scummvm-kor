@@ -29,22 +29,21 @@
 namespace Kyra {
 
 DarkMoonEngine::DarkMoonEngine(OSystem *system, const GameFlags &flags) : EoBCoreEngine(system, flags) {
-	_seqIntro = _seqFinale = 0;
+	_animIntro = _animFinale = 0;
 	_shapesIntro = _shapesFinale = 0;
 	_dscDoorType5Offs = 0;
 	_numSpells = 70;
 	_menuChoiceInit = 4;
 
 	_introStrings = _cpsFilesIntro = _cpsFilesFinale = _finaleStrings = _kheldranStrings = _npcStrings[0] = _npcStrings[1] = _hornStrings = 0;
-	_seqIntro = _seqFinale = 0;
 	_shapesIntro = _shapesFinale = 0;
 	_creditsData = _npcShpData = _dscDoorType5Offs = _hornSounds = 0;
 	_dreamSteps = 0;
 }
 
 DarkMoonEngine::~DarkMoonEngine() {
-	delete[] _seqIntro;
-	delete[] _seqFinale;
+	delete[] _animIntro;
+	delete[] _animFinale;
 	delete[] _shapesIntro;
 	delete[] _shapesFinale;
 }
@@ -57,6 +56,15 @@ Common::Error DarkMoonEngine::init() {
 	initStaticResource();
 
 	_monsterProps = new EoBMonsterProperty[10];
+
+	if (_configRenderMode == Common::kRenderEGA) {
+		Palette pal(16);
+		_screen->loadPalette(_egaDefaultPalette, pal, 16);
+		_screen->setScreenPalette(pal);
+	}
+
+	_screen->loadPalette("PALETTE.COL", _screen->getPalette(0));
+	_screen->setScreenPalette(_screen->getPalette(0));
 
 	return Common::kNoError;
 }
@@ -128,7 +136,7 @@ void DarkMoonEngine::updateUsedCharacterHandItem(int charIndex, int slot) {
 	if (itm->type == 48 || itm->type == 62) {
 		if (itm->value == 5)
 			return;
-		int charges = itm->flags & 0x3f;
+		int charges = itm->flags & 0x3F;
 		if (--charges)
 			--itm->flags;
 		else
@@ -151,7 +159,6 @@ void DarkMoonEngine::generateMonsterPalettes(const char *file, int16 monsterInde
 
 		for (int ii = 0; ii < 16; ii++) {
 			uint8 col = _screen->getPagePixel(_screen->_curPage, colx, 184 + ii);
-
 			int iii = 0;
 			for (; iii < 16; iii++) {
 				if (tmpPal[iii] == col) {
@@ -236,6 +243,17 @@ void DarkMoonEngine::replaceMonster(int unit, uint16 block, int pos, int dir, in
 		if (_monsters[i].flags & 0x40)
 			continue;
 
+		// WORKAROUND for bug #3611077 (Dran's dragon transformation sequence triggered prematurely):
+		// The boss level and the mindflayer level share the same monster data. If you hang around
+		// long enough in the mindflayer level all 30 monster slots will be used up. When this
+		// happens it will trigger the dragon transformation sequence when Dran is moved around by script.
+		// We avoid removing Dran here by prefering monster slots occupied by monsters from another
+		// sub level.
+		if (_monsters[i].sub != _currentSub) {
+			index = i;
+			break;
+		}
+
 		int dist = getBlockDistance(_monsters[i].block, _currentBlock);
 
 		if (dist > maxDist) {
@@ -254,7 +272,10 @@ void DarkMoonEngine::replaceMonster(int unit, uint16 block, int pos, int dir, in
 }
 
 bool DarkMoonEngine::killMonsterExtra(EoBMonsterInPlay *m) {
-	if (_currentLevel == 16 && _currentSub == 1 && (_monsterProps[m->type].capsFlags & 4)) {
+	// WORKAROUND for bug #3611077 (see DarkMoonEngine::replaceMonster())
+	// The mindflayers have monster type 0, just like Dran. Using a monster slot occupied by a mindflayer would trigger the dragon transformation
+	// sequence when all 30 monster slots are used up. We avoid this by checking for m->sub == 1.
+	if (_currentLevel == 16 && _currentSub == 1 && m->sub == 1 && (_monsterProps[m->type].capsFlags & 4)) {
 		if (m->type) {
 			_playFinale = true;
 			_runFlag = false;
@@ -443,7 +464,7 @@ void DarkMoonEngine::characterLevelGain(int charIndex) {
 	int s = _numLevelsPerClass[c->cClass];
 	for (int i = 0; i < s; i++) {
 		uint32 er = getRequiredExperience(c->cClass, i, c->level[i] + 1);
-		if (er == 0xffffffff)
+		if (er == 0xFFFFFFFF)
 			continue;
 
 		increaseCharacterExperience(charIndex, er - c->experience[i] + 1);

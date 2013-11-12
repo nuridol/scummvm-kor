@@ -20,6 +20,7 @@
  *
  */
 
+#include "dreamweb/sound.h"
 #include "dreamweb/dreamweb.h"
 
 namespace DreamWeb {
@@ -54,11 +55,11 @@ void DreamWebEngine::useMon() {
 	showIcon();
 	drawFloor();
 	getRidOfAll();
-	loadIntoTemp("DREAMWEB.G03"); // mon. graphic name
+	loadGraphicsFile(_monitorGraphics, "G03"); // mon. graphic name
 	loadPersonal();
 	loadNews();
 	loadCart();
-	loadTempCharset("DREAMWEB.C01"); // character set 2
+	loadGraphicsFile(_monitorCharset, "C01"); // character set 2
 	printOuterMon();
 	initialMonCols();
 	printLogo();
@@ -89,29 +90,90 @@ void DreamWebEngine::useMon() {
 		if (_quitRequested) //TODO : Check why it crashes when put before the execcommand
 			break;
 	} while (!stop);
-	getRidOfTemp();
-	getRidOfTempCharset();
+	_monitorGraphics.clear();
+	_monitorCharset.clear();
 
 	_textFile1.clear();
 	_textFile2.clear();
 	_textFile3.clear();
 
 	_getBack = 1;
-	playChannel1(26);
+	_sound->playChannel1(26);
 	_manIsOffScreen = 0;
 	restoreAll();
 	redrawMainScrn();
 	workToScreenM();
 }
 
+int DreamWebEngine::findCommand(const char *const cmdList[]) {
+	// Loop over all commands in the list and see if we get a match
+	int cmd = 0;
+	while (cmdList[cmd] != NULL) {
+		const char *cmdStr = cmdList[cmd];
+		const char *inputStr = _inputLine;
+		// Compare the command, char by char, to see if we get a match.
+		// We only care about the prefix matching, though.
+		char inputChar, cmdChar;
+		do {
+			inputChar = *inputStr; inputStr += 2;
+			cmdChar = *cmdStr++;
+			if (cmdChar == 0)
+				return cmd;
+		} while (inputChar == cmdChar);
+		++cmd;
+	}
+	return -1;
+}
+
 bool DreamWebEngine::execCommand() {
-	static const char *comlist[] = {
+	static const char *const comlist[] = {
 		"EXIT",
 		"HELP",
 		"LIST",
 		"READ",
 		"LOGON",
-		"KEYS"
+		"KEYS",
+		NULL
+	};
+
+	static const char *const comlistFR[] = {
+		"SORTIR",
+		"AIDE",
+		"LISTE",
+		"LIRE",
+		"CONNEXION",
+		"TOUCHES", // should be CLES but it is translated as TOUCHES in the game...
+		NULL
+	};
+
+	static const char *const comlistDE[] = {
+		"ENDE",
+		"HILF",
+		"LISTE",
+		"LIES",
+		"ZUGRIFF",
+		"DATEN",
+		NULL
+	};
+
+	static const char *const comlistIT[] = {
+		"ESCI",
+		"AIUTO",
+		"ELENCA",
+		"LEGGI",
+		"ACCEDI",
+		"CHIAVI",
+		NULL
+	};
+
+	static const char *const comlistES[] = {
+		"SALIR",
+		"AYUDA",
+		"LISTA",
+		"LEER",
+		"ACCESO",
+		"CLAVES",
+		NULL
 	};
 
 	if (_inputLine[0] == 0) {
@@ -120,26 +182,25 @@ bool DreamWebEngine::execCommand() {
 		return false;
 	}
 
-	int cmd;
-	bool done = false;
-	// Loop over all commands in the list and see if we get a match
-	for (cmd = 0; cmd < ARRAYSIZE(comlist); ++cmd) {
-		const char *cmdStr = comlist[cmd];
-		const char *inputStr = _inputLine;
-		// Compare the command, char by char, to see if we get a match.
-		// We only care about the prefix matching, though.
-		char inputChar, cmdChar;
-		do {
-			inputChar = *inputStr; inputStr += 2;
-			cmdChar = *cmdStr++;
-			if (cmdChar == 0) {
-				done = true;
-				break;
-			}
-		} while (inputChar == cmdChar);
-
-		if (done)
+	int cmd = findCommand(comlist);
+	if (cmd == -1) {
+		// This did not match an english command. Try to find a localized one.
+		switch (getLanguage()) {
+		case Common::FR_FRA:
+			cmd = findCommand(comlistFR);
 			break;
+		case Common::DE_DEU:
+			cmd = findCommand(comlistDE);
+			break;
+		case Common::IT_ITA:
+			cmd = findCommand(comlistIT);
+			break;
+		case Common::ES_ESP:
+			cmd = findCommand(comlistES);
+			break;
+		default:
+			break;
+		}
 	}
 
 	// Execute the selected command
@@ -148,6 +209,27 @@ bool DreamWebEngine::execCommand() {
 		return true;
 	case 1:
 		monMessage(6);
+		// An extra addition in ScummVM: available commands.
+		// Since the reference to the game manual is a form of copy protection,
+		// this extra text is wrapped around the common copy protection check,
+		// to keep it faithful to the original, if requested.
+		if (!_copyProtection) {
+			switch (getLanguage()) {
+			case Common::FR_FRA:
+				monPrint("LES COMMANDES VALIDES SONT SORTIR, AIDE, LISTE, LIRE, CONNEXION, TOUCHES");
+				break;
+			case Common::DE_DEU:
+				monPrint("G\232LTIGE BEFEHLE SIND ENDE, HILFE, LISTE, LIES, ZUGRIFF, DATEN");
+				break;
+			case Common::IT_ITA:
+				monPrint("I COMANDI VALIDI SONO ESCI, AIUTO, ELENCA, LEGGI, ACCEDI, CHIAVI");
+				break;
+			case Common::ES_ESP:
+			default:
+				monPrint("VALID COMMANDS ARE EXIT, HELP, LIST, READ, LOGON, KEYS");
+				break;
+			}
+		}
 		break;
 	case 2:
 		dirCom();
@@ -169,7 +251,6 @@ bool DreamWebEngine::execCommand() {
 }
 
 
-
 void DreamWebEngine::monitorLogo() {
 	if (_logoNum != _oldLogoNum) {
 		_oldLogoNum = _logoNum;
@@ -180,7 +261,7 @@ void DreamWebEngine::monitorLogo() {
 		printLogo();
 		//fadeUpMon(); // FIXME: Commented out in ASM
 		printLogo();
-		playChannel1(26);
+		_sound->playChannel1(26);
 		randomAccess(20);
 	} else {
 		printLogo();
@@ -188,21 +269,21 @@ void DreamWebEngine::monitorLogo() {
 }
 
 void DreamWebEngine::printLogo() {
-	showFrame(_tempGraphics, 56, 32, 0, 0);
+	showFrame(_monitorGraphics, 56, 32, 0, 0);
 	showCurrentFile();
 }
 
 void DreamWebEngine::input() {
-	memset(_inputLine, 0, 64);
+	memset(_inputLine, 0, sizeof(_inputLine));
 	_curPos = 0;
-	printChar(_tempCharset, _monAdX, _monAdY, '>', 0, NULL, NULL);
+	printChar(_monitorCharset, _monAdX, _monAdY, '>', 0, NULL, NULL);
 	multiDump(_monAdX, _monAdY, 6, 8);
 	_monAdX += 6;
 	_cursLocX = _monAdX;
 	_cursLocY = _monAdY;
 	while (true) {
 		printCurs();
-		vSync();
+		waitForVSync();
 		delCurs();
 		readKey();
 		if (_quitRequested)
@@ -227,7 +308,7 @@ void DreamWebEngine::input() {
 			continue;
 		multiGet(_mapStore + _curPos * 256, _monAdX, _monAdY, 8, 8);
 		uint8 charWidth;
-		printChar(_tempCharset, _monAdX, _monAdY, currentKey, 0, &charWidth, NULL);
+		printChar(_monitorCharset, _monAdX, _monAdY, currentKey, 0, &charWidth, NULL);
 		_inputLine[_curPos * 2 + 1] = charWidth;
 		_monAdX += charWidth;
 		++_curPos;
@@ -266,7 +347,7 @@ void DreamWebEngine::printCurs() {
 	multiGet(_textUnder, x, y, 6, height);
 	++_mainTimer;
 	if ((_mainTimer & 16) == 0)
-		showFrame(_tempCharset, x, y, '/' - 32, 0);
+		showFrame(_monitorCharset, x, y, '/' - 32, 0);
 	multiDump(x - 6, y, 12, height);
 }
 
@@ -288,7 +369,7 @@ void DreamWebEngine::scrollMonitor() {
 	printLogo();
 	printUnderMonitor();
 	workToScreen();
-	playChannel1(25);
+	_sound->playChannel1(25);
 }
 
 void DreamWebEngine::showCurrentFile() {
@@ -302,25 +383,25 @@ void DreamWebEngine::showCurrentFile() {
 	while (*currentFile) {
 		char c = *currentFile++;
 		c = modifyChar(c);
-		printChar(_tempCharset, &x, 37, c, 0, NULL, NULL);
+		printChar(_monitorCharset, &x, 37, c, 0, NULL, NULL);
 	}
 }
 
 void DreamWebEngine::accessLightOn() {
-	showFrame(_tempGraphics, 74, 182, 8, 0);
+	showFrame(_monitorGraphics, 74, 182, 8, 0);
 	multiDump(74, 182, 12, 8);
 }
 
 void DreamWebEngine::accessLightOff() {
-	showFrame(_tempGraphics, 74, 182, 7, 0);
+	showFrame(_monitorGraphics, 74, 182, 7, 0);
 	multiDump(74, 182, 12, 8);
 }
 
 void DreamWebEngine::randomAccess(uint16 count) {
 	for (uint16 i = 0; i < count; ++i) {
-		vSync();
-		vSync();
-		uint16 v = randomNumber() & 15;
+		waitForVSync();
+		waitForVSync();
+		uint16 v = _rnd.getRandomNumber(15);
 		if (v < 10)
 			accessLightOff();
 		else
@@ -345,27 +426,27 @@ void DreamWebEngine::netError() {
 }
 
 void DreamWebEngine::powerLightOn() {
-	showFrame(_tempGraphics, 257+4, 182, 6, 0);
+	showFrame(_monitorGraphics, 257+4, 182, 6, 0);
 	multiDump(257+4, 182, 12, 8);
 }
 
 void DreamWebEngine::powerLightOff() {
-	showFrame(_tempGraphics, 257+4, 182, 5, 0);
+	showFrame(_monitorGraphics, 257+4, 182, 5, 0);
 	multiDump(257+4, 182, 12, 8);
 }
 
 void DreamWebEngine::lockLightOn() {
-	showFrame(_tempGraphics, 56, 182, 10, 0);
+	showFrame(_monitorGraphics, 56, 182, 10, 0);
 	multiDump(58, 182, 12, 8);
 }
 
 void DreamWebEngine::lockLightOff() {
-	showFrame(_tempGraphics, 56, 182, 9, 0);
+	showFrame(_monitorGraphics, 56, 182, 9, 0);
 	multiDump(58, 182, 12, 8);
 }
 
 void DreamWebEngine::turnOnPower() {
-	for (size_t i = 0; i < 3; ++i) {
+	for (uint i = 0; i < 3; ++i) {
 		powerLightOn();
 		hangOn(30);
 		powerLightOff();
@@ -375,29 +456,29 @@ void DreamWebEngine::turnOnPower() {
 }
 
 void DreamWebEngine::printOuterMon() {
-	showFrame(_tempGraphics, 40, 32, 1, 0);
-	showFrame(_tempGraphics, 264, 32, 2, 0);
-	showFrame(_tempGraphics, 40, 12, 3, 0);
-	showFrame(_tempGraphics, 40, 164, 4, 0);
+	showFrame(_monitorGraphics, 40, 32, 1, 0);
+	showFrame(_monitorGraphics, 264, 32, 2, 0);
+	showFrame(_monitorGraphics, 40, 12, 3, 0);
+	showFrame(_monitorGraphics, 40, 164, 4, 0);
 }
 
 void DreamWebEngine::loadPersonal() {
 	if (_vars._location == 0 || _vars._location == 42)
-		loadTextFile(_textFile1, "DREAMWEB.T01"); // monitor file 1
+		loadTextFile(_textFile1, "T01"); // monitor file 1
 	else
-		loadTextFile(_textFile1, "DREAMWEB.T02"); // monitor file 2
+		loadTextFile(_textFile1, "T02"); // monitor file 2
 }
 
 void DreamWebEngine::loadNews() {
 	// textfile2 holds information accessible by anyone
 	if (_vars._newsItem == 0)
-		loadTextFile(_textFile2, "DREAMWEB.T10"); // monitor file 10
+		loadTextFile(_textFile2, "T10"); // monitor file 10
 	else if (_vars._newsItem == 1)
-		loadTextFile(_textFile2, "DREAMWEB.T11"); // monitor file 11
+		loadTextFile(_textFile2, "T11"); // monitor file 11
 	else if (_vars._newsItem == 2)
-		loadTextFile(_textFile2, "DREAMWEB.T12"); // monitor file 12
+		loadTextFile(_textFile2, "T12"); // monitor file 12
 	else
-		loadTextFile(_textFile2, "DREAMWEB.T13"); // monitor file 13
+		loadTextFile(_textFile2, "T13"); // monitor file 13
 }
 
 void DreamWebEngine::loadCart() {
@@ -408,15 +489,15 @@ void DreamWebEngine::loadCart() {
 		cartridgeId = getExAd(cartridgeIndex)->objId[3] + 1;
 
 	if (cartridgeId == 0)
-		loadTextFile(_textFile3, "DREAMWEB.T20"); // monitor file 20
+		loadTextFile(_textFile3, "T20"); // monitor file 20
 	else if (cartridgeId == 1)
-		loadTextFile(_textFile3, "DREAMWEB.T21"); // monitor file 21
+		loadTextFile(_textFile3, "T21"); // monitor file 21
 	else if (cartridgeId == 2)
-		loadTextFile(_textFile3, "DREAMWEB.T22"); // monitor file 22
+		loadTextFile(_textFile3, "T22"); // monitor file 22
 	else if (cartridgeId == 3)
-		loadTextFile(_textFile3, "DREAMWEB.T23"); // monitor file 23
+		loadTextFile(_textFile3, "T23"); // monitor file 23
 	else
-		loadTextFile(_textFile3, "DREAMWEB.T24"); // monitor file 24
+		loadTextFile(_textFile3, "T24"); // monitor file 24
 }
 
 void DreamWebEngine::showKeys() {
@@ -626,15 +707,12 @@ void DreamWebEngine::signOn() {
 	_monAdX = prevX;
 	_monAdY = prevY;
 
-	inputLine = (const char *)_inputLine;
-	inputLine.toUppercase();
-
 	// The entered line has zeroes in-between each character
 	uint32 len = strlen(monitorKeyEntries[foundIndex].password);
 	bool found = true;
 
 	for (uint32 i = 0; i < len; i++) {
-		if (monitorKeyEntries[foundIndex].password[i] != inputLine[i * 2]) {
+		if (monitorKeyEntries[foundIndex].password[i] != _inputLine[i * 2]) {
 			found = false;
 			break;
 		}
@@ -667,7 +745,7 @@ void DreamWebEngine::searchForFiles(const char *filesString) {
 const char *DreamWebEngine::parser() {
 	char *output = _operand1;
 
-	memset(output, 0, 14);
+	memset(output, 0, sizeof(_operand1));
 
 	*output++ = '=';
 

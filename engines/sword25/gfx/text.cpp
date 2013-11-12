@@ -45,7 +45,7 @@
 namespace Sword25 {
 
 namespace {
-const uint AUTO_WRAP_THRESHOLD_DEFAULT = 300;
+const uint32 AUTO_WRAP_THRESHOLD_DEFAULT = 300;
 }
 
 Text::Text(RenderObjectPtr<RenderObject> parentPtr) :
@@ -91,13 +91,15 @@ bool Text::setFont(const Common::String &font) {
 }
 
 void Text::setText(const Common::String &text) {
-	_text = text;
-	updateFormat();
-	forceRefresh();
+	if (_text != text) {
+		_text = text;
+		updateFormat();
+		forceRefresh();
+	}
 }
 
-void Text::setColor(uint modulationColor) {
-	uint newModulationColor = (modulationColor & 0x00ffffff) | (_modulationColor & 0xff000000);
+void Text::setColor(uint32 modulationColor) {
+	uint32 newModulationColor = (modulationColor & 0x00ffffff) | (_modulationColor & 0xff000000);
 	if (newModulationColor != _modulationColor) {
 		_modulationColor = newModulationColor;
 		forceRefresh();
@@ -106,7 +108,7 @@ void Text::setColor(uint modulationColor) {
 
 void Text::setAlpha(int alpha) {
 	assert(alpha >= 0 && alpha < 256);
-	uint newModulationColor = (_modulationColor & 0x00ffffff) | alpha << 24;
+	uint32 newModulationColor = (_modulationColor & 0x00ffffff) | alpha << 24;
 	if (newModulationColor != _modulationColor) {
 		_modulationColor = newModulationColor;
 		forceRefresh();
@@ -121,7 +123,7 @@ void Text::setAutoWrap(bool autoWrap) {
 	}
 }
 
-void Text::setAutoWrapThreshold(uint autoWrapThreshold) {
+void Text::setAutoWrapThreshold(uint32 autoWrapThreshold) {
 	if (autoWrapThreshold != _autoWrapThreshold) {
 		_autoWrapThreshold = autoWrapThreshold;
 		updateFormat();
@@ -129,7 +131,7 @@ void Text::setAutoWrapThreshold(uint autoWrapThreshold) {
 	}
 }
 
-bool Text::doRender() {
+bool Text::doRender(RectangleList *updateRects) {
 	// Font-Resource locken.
 	FontResource *fontPtr = lockFontResource();
 	if (!fontPtr)
@@ -171,7 +173,7 @@ bool Text::doRender() {
 
 			Common::Rect renderRect(curX, curY, curX + curRect.width(), curY + curRect.height());
 			renderRect.translate(curRect.left - curX, curRect.top - curY);
-			result = charMapPtr->blit(curX, curY, Image::FLIP_NONE, &renderRect, _modulationColor);
+			result = charMapPtr->blit(curX, curY, Image::FLIP_NONE, &renderRect, _modulationColor, -1, -1, updateRects);
 			if (!result)
 				break;
 
@@ -349,7 +351,7 @@ bool Text::unpersist(InputPersistenceBlock &reader) {
 	reader.read(autoWrap);
 	setAutoWrap(autoWrap);
 
-	uint autoWrapThreshold;
+	uint32 autoWrapThreshold;
 	reader.read(autoWrapThreshold);
 	setAutoWrapThreshold(autoWrapThreshold);
 

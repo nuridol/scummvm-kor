@@ -2,11 +2,26 @@
 # included by the default (main) Makefile.
 #
 
-
 #
 # POSIX specific
 #
 install:
+	$(INSTALL) -d "$(DESTDIR)$(bindir)"
+	$(INSTALL) -c -m 755 "./$(EXECUTABLE)" "$(DESTDIR)$(bindir)/$(EXECUTABLE)"
+	$(INSTALL) -d "$(DESTDIR)$(mandir)/man6/"
+	$(INSTALL) -c -m 644 "$(srcdir)/dists/scummvm.6" "$(DESTDIR)$(mandir)/man6/scummvm.6"
+	$(INSTALL) -d "$(DESTDIR)$(datarootdir)/pixmaps/"
+	$(INSTALL) -c -m 644 "$(srcdir)/icons/scummvm.xpm" "$(DESTDIR)$(datarootdir)/pixmaps/scummvm.xpm"
+	$(INSTALL) -d "$(DESTDIR)$(docdir)"
+	$(INSTALL) -c -m 644 $(DIST_FILES_DOCS) "$(DESTDIR)$(docdir)"
+	$(INSTALL) -d "$(DESTDIR)$(datadir)"
+	$(INSTALL) -c -m 644 $(DIST_FILES_THEMES) $(DIST_FILES_ENGINEDATA) "$(DESTDIR)$(datadir)/"
+ifdef DYNAMIC_MODULES
+	$(INSTALL) -d "$(DESTDIR)$(libdir)/scummvm/"
+	$(INSTALL) -c -m 644 $(PLUGINS) "$(DESTDIR)$(libdir)/scummvm/"
+endif
+
+install-strip:
 	$(INSTALL) -d "$(DESTDIR)$(bindir)"
 	$(INSTALL) -c -s -m 755 "./$(EXECUTABLE)" "$(DESTDIR)$(bindir)/$(EXECUTABLE)"
 	$(INSTALL) -d "$(DESTDIR)$(mandir)/man6/"
@@ -71,17 +86,26 @@ endif
 	cp $(srcdir)/dists/iphone/icon.png $(bundle_name)/
 	cp $(srcdir)/dists/iphone/icon-72.png $(bundle_name)/
 	cp $(srcdir)/dists/iphone/Default.png $(bundle_name)/
+	# Binary patch workaround for Iphone 5/IPad 4 "Illegal instruction: 4" toolchain issue (http://code.google.com/p/iphone-gcc-full/issues/detail?id=6)
+	cp scummvm scummvm-iph5
+	sed -i'' 's/\x00\x30\x93\xe4/\x00\x30\x93\xe5/g;s/\x00\x30\xd3\xe4/\x00\x30\xd3\xe5/g;' scummvm-iph5
+	ldid -S scummvm-iph5
+	chmod 755 scummvm-iph5
+	cp scummvm-iph5 $(bundle_name)/ScummVM-iph5
 
 # Location of static libs for the iPhone
 ifneq ($(BACKEND), iphone)
 # Static libaries, used for the scummvm-static and iphone targets
 OSX_STATIC_LIBS := `$(STATICLIBPATH)/bin/sdl-config --static-libs`
+ifdef USE_FREETYPE2
+OSX_STATIC_LIBS += /opt/local/lib/libfreetype.a $(STATICLIBPATH)/lib/libbz2.a
+endif
 endif
 
 ifdef USE_VORBIS
 OSX_STATIC_LIBS += \
-		$(STATICLIBPATH)/lib/libvorbisfile.a \
-		$(STATICLIBPATH)/lib/libvorbis.a \
+		/opt/local/lib/libvorbisfile.a \
+		/opt/local/lib/libvorbis.a \
 		$(STATICLIBPATH)/lib/libogg.a
 endif
 
@@ -93,8 +117,14 @@ ifdef USE_FLAC
 OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libFLAC.a
 endif
 
+ifdef USE_FLUIDSYNTH
+OSX_STATIC_LIBS += \
+                -framework CoreAudio \
+                $(STATICLIBPATH)/lib/libfluidsynth.a
+endif
+
 ifdef USE_MAD
-OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libmad.a
+OSX_STATIC_LIBS += /opt/local/lib/libmad.a
 endif
 
 ifdef USE_PNG
@@ -107,6 +137,14 @@ endif
 
 ifdef USE_FAAD
 OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libfaad.a
+endif
+
+ifdef USE_MPEG2
+OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libmpeg2.a
+endif
+
+ifdef USE_JPEG
+OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libjpeg.a
 endif
 
 ifdef USE_ZLIB
@@ -147,7 +185,9 @@ osxsnap: bundle
 	$(srcdir)/devtools/credits.pl --text > $(srcdir)/AUTHORS
 	cp $(srcdir)/AUTHORS ./ScummVM-snapshot/Authors
 	cp $(srcdir)/COPYING ./ScummVM-snapshot/License\ \(GPL\)
+	cp $(srcdir)/COPYING.BSD ./ScummVM-snapshot/License\ \(BSD\)
 	cp $(srcdir)/COPYING.LGPL ./ScummVM-snapshot/License\ \(LGPL\)
+	cp $(srcdir)/COPYING.FREEFONT ./ScummVM-snapshot/License\ \(FREEFONT\)
 	cp $(srcdir)/COPYRIGHT ./ScummVM-snapshot/Copyright\ Holders
 	cp $(srcdir)/NEWS ./ScummVM-snapshot/News
 	cp $(srcdir)/README ./ScummVM-snapshot/ScummVM\ ReadMe
@@ -155,6 +195,8 @@ osxsnap: bundle
 	cp $(srcdir)/doc/QuickStart ./ScummVM-snapshot/doc/QuickStart
 	mkdir ScummVM-snapshot/doc/cz
 	cp $(srcdir)/doc/cz/PrectiMe ./ScummVM-snapshot/doc/cz/PrectiMe
+	mkdir ScummVM-snapshot/doc/da
+	cp $(srcdir)/doc/da/HurtigStart ./ScummVM-snapshot/doc/da/HurtigStart
 	mkdir ScummVM-snapshot/doc/de
 	cp $(srcdir)/doc/de/Liesmich ./ScummVM-snapshot/doc/de/Liesmich
 	cp $(srcdir)/doc/de/Schnellstart ./ScummVM-snapshot/doc/de/Schnellstart
@@ -171,6 +213,7 @@ osxsnap: bundle
 	cp $(srcdir)/doc/se/Snabbstart ./ScummVM-snapshot/doc/se/Snabbstart
 	/Developer/Tools/SetFile -t ttro -c ttxt ./ScummVM-snapshot/*
 	xattr -w "com.apple.TextEncoding" "utf-8;134217984" ./ScummVM-snapshot/doc/cz/*
+	xattr -w "com.apple.TextEncoding" "utf-8;134217984" ./ScummVM-snapshot/doc/da/*
 	xattr -w "com.apple.TextEncoding" "utf-8;134217984" ./ScummVM-snapshot/doc/de/*
 	xattr -w "com.apple.TextEncoding" "utf-8;134217984" ./ScummVM-snapshot/doc/es/*
 	xattr -w "com.apple.TextEncoding" "utf-8;134217984" ./ScummVM-snapshot/doc/fr/*
@@ -201,6 +244,7 @@ win32dist: $(EXECUTABLE)
 	mkdir -p $(WIN32PATH)/graphics
 	mkdir -p $(WIN32PATH)/doc
 	mkdir -p $(WIN32PATH)/doc/cz
+	mkdir -p $(WIN32PATH)/doc/da
 	mkdir -p $(WIN32PATH)/doc/de
 	mkdir -p $(WIN32PATH)/doc/es
 	mkdir -p $(WIN32PATH)/doc/fr
@@ -209,11 +253,9 @@ win32dist: $(EXECUTABLE)
 	mkdir -p $(WIN32PATH)/doc/se
 	$(STRIP) $(EXECUTABLE) -o $(WIN32PATH)/$(EXECUTABLE)
 	cp $(DIST_FILES_THEMES) $(WIN32PATH)
-ifdef DIST_FILES_ENGINEDATA
-	cp $(DIST_FILES_ENGINEDATA) $(WIN32PATH)
-endif
 	cp $(srcdir)/AUTHORS $(WIN32PATH)/AUTHORS.txt
 	cp $(srcdir)/COPYING $(WIN32PATH)/COPYING.txt
+	cp $(srcdir)/COPYING.BSD $(WIN32PATH)/COPYING.BSD.txt
 	cp $(srcdir)/COPYING.LGPL $(WIN32PATH)/COPYING.LGPL.txt
 	cp $(srcdir)/COPYING.FREEFONT $(WIN32PATH)/COPYING.FREEFONT.txt
 	cp $(srcdir)/COPYRIGHT $(WIN32PATH)/COPYRIGHT.txt
@@ -225,6 +267,7 @@ endif
 	cp $(srcdir)/doc/fr/DemarrageRapide $(WIN32PATH)/doc/fr/DemarrageRapide.txt
 	cp $(srcdir)/doc/it/GuidaRapida $(WIN32PATH)/doc/it/GuidaRapida.txt
 	cp $(srcdir)/doc/no-nb/HurtigStart $(WIN32PATH)/doc/no-nb/HurtigStart.txt
+	cp $(srcdir)/doc/da/HurtigStart $(WIN32PATH)/doc/da/HurtigStart.txt
 	cp $(srcdir)/doc/de/Schnellstart $(WIN32PATH)/doc/de/Schnellstart.txt
 	cp $(srcdir)/doc/se/Snabbstart $(WIN32PATH)/doc/se/Snabbstart.txt
 	cp $(srcdir)/README $(WIN32PATH)/README.txt
@@ -240,6 +283,7 @@ endif
 	unix2dos $(WIN32PATH)/*.txt
 	unix2dos $(WIN32PATH)/doc/*.txt
 	unix2dos $(WIN32PATH)/doc/cz/*.txt
+	unix2dos $(WIN32PATH)/doc/da/*.txt
 	unix2dos $(WIN32PATH)/doc/de/*.txt
 	unix2dos $(WIN32PATH)/doc/es/*.txt
 	unix2dos $(WIN32PATH)/doc/fr/*.txt
@@ -281,6 +325,8 @@ endif
 	@cd $(srcdir)/dists/msvc9 && ../../devtools/create_project/create_project ../.. --msvc --msvc-version 9 >/dev/null && git add -f *.sln *.vcproj *.vsprops
 	@echo Creating MSVC10 project files...
 	@cd $(srcdir)/dists/msvc10 && ../../devtools/create_project/create_project ../.. --msvc --msvc-version 10 >/dev/null && git add -f *.sln *.vcxproj *.vcxproj.filters *.props
+	@echo Creating MSVC11 project files...
+	@cd $(srcdir)/dists/msvc11 && ../../devtools/create_project/create_project ../.. --msvc --msvc-version 11 >/dev/null && git add -f *.sln *.vcxproj *.vcxproj.filters *.props
 	@echo
 	@echo All is done.
 	@echo Now run
@@ -293,8 +339,10 @@ endif
 # Special target to create an AmigaOS snapshot installation
 aos4dist: $(EXECUTABLE)
 	mkdir -p $(AOS4PATH)
+	mkdir -p $(AOS4PATH)/themes
+	mkdir -p $(AOS4PATH)/extras
 	$(STRIP) $(EXECUTABLE) -o $(AOS4PATH)/$(EXECUTABLE)
-	cp icons/scummvm.info $(AOS4PATH)/$(EXECUTABLE).info
+	cp ${srcdir}/icons/scummvm.info $(AOS4PATH)/$(EXECUTABLE).info
 	cp $(DIST_FILES_THEMES) $(AOS4PATH)/themes/
 ifdef DIST_FILES_ENGINEDATA
 	cp $(DIST_FILES_ENGINEDATA) $(AOS4PATH)/extras/
@@ -322,7 +370,6 @@ endif
 	cp $(srcdir)/dists/ps3/PIC1.PNG ps3pkg/
 	sfo.py -f $(srcdir)/dists/ps3/sfo.xml ps3pkg/PARAM.SFO
 	pkg.py --contentid UP0001-SCUM12000_00-0000000000000000 ps3pkg/ scummvm-ps3.pkg
-	package_finalize scummvm-ps3.pkg
 
 ps3run: $(EXECUTABLE)
 	$(STRIP) $(EXECUTABLE)
@@ -331,4 +378,4 @@ ps3run: $(EXECUTABLE)
 	ps3load $(EXECUTABLE).self
 
 # Mark special targets as phony
-.PHONY: deb bundle osxsnap win32dist install uninstall ps3pkg
+.PHONY: deb bundle osxsnap win32dist install uninstall ps3pkg ps3run

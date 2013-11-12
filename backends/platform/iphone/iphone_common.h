@@ -23,6 +23,8 @@
 #ifndef BACKENDS_PLATFORM_IPHONE_IPHONE_COMMON_H
 #define BACKENDS_PLATFORM_IPHONE_IPHONE_COMMON_H
 
+#include "graphics/surface.h"
+
 enum InputEvent {
 	kInputMouseDown,
 	kInputMouseUp,
@@ -30,9 +32,6 @@ enum InputEvent {
 	kInputMouseSecondDragged,
 	kInputMouseSecondDown,
 	kInputMouseSecondUp,
-#ifdef SCUMMVMKOR
-	kInputKeyboardChanged,
-#endif
 	kInputOrientationChanged,
 	kInputKeyPressed,
 	kInputApplicationSuspended,
@@ -53,49 +52,54 @@ enum UIViewSwipeDirection {
 	kUIViewSwipeRight = 8
 };
 
-typedef enum {
+enum GraphicsModes {
 	kGraphicsModeLinear = 0,
 	kGraphicsModeNone = 1
-} GraphicsModes;
+};
 
-typedef enum {
-    kAspectRatioCorrection
-} iPhoneFeature;
+struct VideoContext {
+	VideoContext() : asprectRatioCorrection(), screenWidth(), screenHeight(), overlayVisible(false),
+	                 overlayWidth(), overlayHeight(), mouseX(), mouseY(),
+	                 mouseHotspotX(), mouseHotspotY(), mouseWidth(), mouseHeight(),
+	                 mouseIsVisible(), graphicsMode(kGraphicsModeLinear), shakeOffsetY() {
+	}
 
-#ifdef IPHONE_OFFICIAL
-//void iphone_main(int argc, char **argv);
-#endif
+	// Game screen state
+	bool asprectRatioCorrection;
+	uint screenWidth, screenHeight;
+	Graphics::Surface screenTexture;
 
-// We need this to be able to call functions from/in Objective-C.
-#ifdef  __cplusplus
-extern "C" {
-#endif
+	// Overlay state
+	bool overlayVisible;
+	uint overlayWidth, overlayHeight;
+	Graphics::Surface overlayTexture;
 
-// On the C++ side
-//#ifndef IPHONE_OFFICIAL
-void iphone_main(int argc, char *argv[]);
-//#endif
+	// Mouse cursor state
+	uint mouseX, mouseY;
+	int mouseHotspotX, mouseHotspotY;
+	uint mouseWidth, mouseHeight;
+	bool mouseIsVisible;
+	Graphics::Surface mouseTexture;
+
+	// Misc state
+	GraphicsModes graphicsMode;
+	int shakeOffsetY;
+};
+
+struct InternalEvent {
+	InternalEvent() : type(), value1(), value2() {}
+	InternalEvent(InputEvent t, int v1, int v2) : type(t), value1(v1), value2(v2) {}
+
+	InputEvent type;
+	int value1, value2;
+};
 
 // On the ObjC side
-void iPhone_setFeatureState(iPhoneFeature f, bool enable);                                
-void iPhone_setGraphicsMode(int mode);
-void iPhone_updateScreen(int mouseX, int mouseY);
-void iPhone_updateScreenRect(unsigned short *screen, int x1, int y1, int x2, int y2);
-void iPhone_updateOverlayRect(unsigned short *screen, int x1, int y1, int x2, int y2);
-void iPhone_initSurface(int width, int height);
-bool iPhone_fetchEvent(int *outEvent, int *outX, int *outY);
+void iPhone_updateScreen();
+bool iPhone_fetchEvent(InternalEvent *event);
 const char *iPhone_getDocumentsDir();
 bool iPhone_isHighResDevice();
-int iPhone_getScreenHeight();
-int iPhone_getScreenWidth();
-void iPhone_enableOverlay(int state);
-void iPhone_showCursor(int state);
-void iPhone_setMouseCursor(unsigned short *buffer, int width, int height, int hotspotX, int hotspotY);
 
 uint getSizeNextPOT(uint size);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

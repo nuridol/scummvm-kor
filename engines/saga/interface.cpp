@@ -723,7 +723,7 @@ void Interface::setStatusText(const char *text, int statusColor) {
 	if (_vm->_render->getFlags() & RF_MAP || _vm->_interface->getMode() == kPanelPlacard)
 		return;
 
-	strncpy(_statusText, text, STATUS_TEXT_LEN);
+	Common::strlcpy(_statusText, text, STATUS_TEXT_LEN);
 	_statusOnceColor = statusColor;
 	drawStatusBar();
 }
@@ -1151,7 +1151,7 @@ void Interface::processStatusTextInput(Common::KeyState keystate) {
 		if (_statusTextInputPos >= STATUS_TEXT_INPUT_MAX) {
 			break;
 		}
-		if (isalnum(keystate.ascii) || (keystate.ascii == ' ')) {
+		if (Common::isAlnum(keystate.ascii) || (keystate.ascii == ' ')) {
 			_statusTextInputString[_statusTextInputPos++] = keystate.ascii;
 			_statusTextInputString[_statusTextInputPos] = 0;
 		}
@@ -1209,7 +1209,7 @@ bool Interface::processTextInput(Common::KeyState keystate) {
 		_textInputPos = _textInputStringLength + 1;
 		break;
 	default:
-		if (((keystate.ascii <= 255) && (isalnum(keystate.ascii))) || (keystate.ascii == ' ') ||
+		if (((keystate.ascii <= 255) && (Common::isAlnum(keystate.ascii))) || (keystate.ascii == ' ') ||
 		    (keystate.ascii == '-') || (keystate.ascii == '_')) {
 			if (_textInputStringLength < save_title_size - 1) {
 				ch[0] = keystate.ascii;
@@ -2420,7 +2420,7 @@ bool Interface::converseAddText(const char *text, int strId, int replyId, byte r
 
 	assert(strlen(text) < CONVERSE_MAX_WORK_STRING);
 
-	strncpy(_converseWorkString, text, CONVERSE_MAX_WORK_STRING);
+	Common::strlcpy(_converseWorkString, text, CONVERSE_MAX_WORK_STRING);
 
 	while (1) {
 		len = strlen(_converseWorkString);

@@ -44,7 +44,7 @@ private:
 	 * and you specialise makeInstance to return an instance of a subclass.
 	 */
 	//template<class T>
-#if defined (_WIN32_WCE) || defined (_MSC_VER) || defined (__WINS__)
+#if defined(_WIN32_WCE) || defined(_MSC_VER) || defined(__WINS__)
 //FIXME evc4 and msvc7 doesn't like it as private member
 public:
 #endif
@@ -97,6 +97,6 @@ protected:
 #define DECLARE_SINGLETON(T) \
 	template<> T *Singleton<T>::_singleton = 0
 
-}	// End of namespace Common
+} // End of namespace Common
 
 #endif

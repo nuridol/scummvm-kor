@@ -1,5 +1,5 @@
 /* Copyright (C) 2003, 2004, 2005, 2006, 2008, 2009 Dean Beeler, Jerome Fisher
- * Copyright (C) 2011 Dean Beeler, Jerome Fisher, Sergey V. Mikayev
+ * Copyright (C) 2011, 2012, 2013 Dean Beeler, Jerome Fisher, Sergey V. Mikayev
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU Lesser General Public License as published by
@@ -20,24 +20,31 @@
 #include "mt32emu.h"
 #include "PartialManager.h"
 
-using namespace MT32Emu;
+namespace MT32Emu {
 
 PartialManager::PartialManager(Synth *useSynth, Part **useParts) {
 	synth = useSynth;
 	parts = useParts;
-	for (int i = 0; i < MT32EMU_MAX_PARTIALS; i++) {
+	partialTable = new Partial *[synth->getPartialCount()];
+	freePolys = new Poly *[synth->getPartialCount()];
+	firstFreePolyIndex = 0;
+	for (unsigned int i = 0; i < synth->getPartialCount(); i++) {
 		partialTable[i] = new Partial(synth, i);
+		freePolys[i] = new Poly();
 	}
 }
 
 PartialManager::~PartialManager(void) {
-	for (int i = 0; i < MT32EMU_MAX_PARTIALS; i++) {
+	for (unsigned int i = 0; i < synth->getPartialCount(); i++) {
 		delete partialTable[i];
+		if (freePolys[i] != NULL) delete freePolys[i];
 	}
+	delete[] partialTable;
+	delete[] freePolys;
 }
 
 void PartialManager::clearAlreadyOutputed() {
-	for (int i = 0; i < MT32EMU_MAX_PARTIALS; i++) {
+	for (unsigned int i = 0; i < synth->getPartialCount(); i++) {
 		partialTable[i]->alreadyOutputed = false;
 	}
 }
@@ -46,12 +53,12 @@ bool PartialManager::shouldReverb(int i) {
 	return partialTable[i]->shouldReverb();
 }
 
-bool PartialManager::produceOutput(int i, float *leftBuf, float *rightBuf, Bit32u bufferLength) {
+bool PartialManager::produceOutput(int i, Sample *leftBuf, Sample *rightBuf, Bit32u bufferLength) {
 	return partialTable[i]->produceOutput(leftBuf, rightBuf, bufferLength);
 }
 
 void PartialManager::deactivateAll() {
-	for (int i = 0; i < MT32EMU_MAX_PARTIALS; i++) {
+	for (unsigned int i = 0; i < synth->getPartialCount(); i++) {
 		partialTable[i]->deactivate();
 	}
 }
@@ -69,7 +76,7 @@ Partial *PartialManager::allocPartial(int partNum) {
 	Partial *outPartial = NULL;
 
 	// Get the first inactive partial
-	for (int partialNum = 0; partialNum < MT32EMU_MAX_PARTIALS; partialNum++) {
+	for (unsigned int partialNum = 0; partialNum < synth->getPartialCount(); partialNum++) {
 		if (!partialTable[partialNum]->isActive()) {
 			outPartial = partialTable[partialNum];
 			break;
@@ -83,7 +90,7 @@ Partial *PartialManager::allocPartial(int partNum) {
 
 unsigned int PartialManager::getFreePartialCount(void) {
 	int count = 0;
-	for (int i = 0; i < MT32EMU_MAX_PARTIALS; i++) {
+	for (unsigned int i = 0; i < synth->getPartialCount(); i++) {
 		if (!partialTable[i]->isActive()) {
 			count++;
 		}
@@ -94,7 +101,7 @@ unsigned int PartialManager::getFreePartialCount(void) {
 // This function is solely used to gather data for debug output at the moment.
 void PartialManager::getPerPartPartialUsage(unsigned int perPartPartialUsage[9]) {
 	memset(perPartPartialUsage, 0, 9 * sizeof(unsigned int));
-	for (unsigned int i = 0; i < MT32EMU_MAX_PARTIALS; i++) {
+	for (unsigned int i = 0; i < synth->getPartialCount(); i++) {
 		if (partialTable[i]->isActive()) {
 			perPartPartialUsage[partialTable[i]->getOwnerPart()]++;
 		}
@@ -148,7 +155,7 @@ bool PartialManager::abortFirstPolyPreferHeldWhereReserveExceeded(int minPart) {
 bool PartialManager::freePartials(unsigned int needed, int partNum) {
 	// CONFIRMED: Barring bugs, this matches the real LAPC-I according to information from Mok.
 
-	// BUG: There's a bug in the LAPC-I implementation: 
+	// BUG: There's a bug in the LAPC-I implementation:
 	// When allocating for rhythm part, or when allocating for a part that is using fewer partials than it has reserved,
 	// held and playing polys on the rhythm part can potentially be aborted before releasing polys on the rhythm part.
 	// This bug isn't present on MT-32.
@@ -189,7 +196,7 @@ bool PartialManager::freePartials(unsigned int needed, int partNum) {
 			break;
 		}
 #endif
-		if (getFreePartialCount() >= needed) {
+		if (synth->isAbortingPoly() || getFreePartialCount() >= needed) {
 			return true;
 		}
 	}
@@ -206,7 +213,7 @@ bool PartialManager::freePartials(unsigned int needed, int partNum) {
 			if (!abortFirstPolyPreferHeldWhereReserveExceeded(partNum)) {
 				break;
 			}
-			if (getFreePartialCount() >= needed) {
+			if (synth->isAbortingPoly() || getFreePartialCount() >= needed) {
 				return true;
 			}
 		}
@@ -222,7 +229,7 @@ bool PartialManager::freePartials(unsigned int needed, int partNum) {
 			if (!abortFirstPolyPreferHeldWhereReserveExceeded(-1)) {
 				break;
 			}
-			if (getFreePartialCount() >= needed) {
+			if (synth->isAbortingPoly() || getFreePartialCount() >= needed) {
 				return true;
 			}
 		}
@@ -233,7 +240,7 @@ bool PartialManager::freePartials(unsigned int needed, int partNum) {
 		if (!parts[partNum]->abortFirstPolyPreferHeld()) {
 			break;
 		}
-		if (getFreePartialCount() >= needed) {
+		if (synth->isAbortingPoly() || getFreePartialCount() >= needed) {
 			return true;
 		}
 	}
@@ -243,8 +250,39 @@ bool PartialManager::freePartials(unsigned int needed, int partNum) {
 }
 
 const Partial *PartialManager::getPartial(unsigned int partialNum) const {
-	if (partialNum > MT32EMU_MAX_PARTIALS - 1) {
+	if (partialNum > synth->getPartialCount() - 1) {
 		return NULL;
 	}
 	return partialTable[partialNum];
+}
+
+Poly *PartialManager::assignPolyToPart(Part *part) {
+	if (firstFreePolyIndex < synth->getPartialCount()) {
+		Poly *poly = freePolys[firstFreePolyIndex];
+		freePolys[firstFreePolyIndex] = NULL;
+		firstFreePolyIndex++;
+		poly->setPart(part);
+		return poly;
+	}
+	return NULL;
+}
+
+void PartialManager::polyFreed(Poly *poly) {
+	if (0 == firstFreePolyIndex) {
+		synth->printDebug("Cannot return freed poly, currently active polys:\n");
+		for (Bit32u partNum = 0; partNum < 9; partNum++) {
+			const Poly *activePoly = synth->getPart(partNum)->getFirstActivePoly();
+			Bit32u polyCount = 0;
+			while (activePoly != NULL) {
+				activePoly->getNext();
+				polyCount++;
+			}
+			synth->printDebug("Part: %i, active poly count: %i\n", partNum, polyCount);
+		}
+	}
+	poly->setPart(NULL);
+	firstFreePolyIndex--;
+	freePolys[firstFreePolyIndex] = poly;
+}
+
 }

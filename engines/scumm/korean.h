@@ -35,7 +35,7 @@ typedef uint16 K_Surface;
 #endif
 
 namespace Scumm {
-    
+
 #ifndef ABS
 #define ABS(x) ((x) >= 0 ? (x) : -(x))
 #endif

@@ -46,47 +46,40 @@ bool OSystem_IPHONE::pollEvent(Common::Event &event) {
 		return true;
 	}
 
-	int eventType;
-	int x, y;
+	InternalEvent internalEvent;
 
-	if (iPhone_fetchEvent(&eventType, &x, &y)) {
-		switch ((InputEvent)eventType) {
+	if (iPhone_fetchEvent(&internalEvent)) {
+		switch (internalEvent.type) {
 		case kInputMouseDown:
-			if (!handleEvent_mouseDown(event, x, y))
+			if (!handleEvent_mouseDown(event, internalEvent.value1, internalEvent.value2))
 				return false;
 			break;
 
 		case kInputMouseUp:
-			if (!handleEvent_mouseUp(event, x, y))
+			if (!handleEvent_mouseUp(event, internalEvent.value1, internalEvent.value2))
 				return false;
 			break;
 
 		case kInputMouseDragged:
-			if (!handleEvent_mouseDragged(event, x, y))
+			if (!handleEvent_mouseDragged(event, internalEvent.value1, internalEvent.value2))
 				return false;
 			break;
 		case kInputMouseSecondDragged:
-			if (!handleEvent_mouseSecondDragged(event, x, y))
+			if (!handleEvent_mouseSecondDragged(event, internalEvent.value1, internalEvent.value2))
 				return false;
 			break;
 		case kInputMouseSecondDown:
 			_secondaryTapped = true;
-			if (!handleEvent_secondMouseDown(event, x, y))
+			if (!handleEvent_secondMouseDown(event, internalEvent.value1, internalEvent.value2))
 				return false;
 			break;
 		case kInputMouseSecondUp:
 			_secondaryTapped = false;
-			if (!handleEvent_secondMouseUp(event, x, y))
+			if (!handleEvent_secondMouseUp(event, internalEvent.value1, internalEvent.value2))
 				return false;
 			break;
-#ifdef SCUMMVMKOR
-        case kInputKeyboardChanged:
-            handleEvent_keyboardChanged(x);
-            return false;
-            break;
-#endif
 		case kInputOrientationChanged:
-			handleEvent_orientationChanged(x);
+			handleEvent_orientationChanged(internalEvent.value1);
 			return false;
 			break;
 
@@ -96,11 +89,11 @@ bool OSystem_IPHONE::pollEvent(Common::Event &event) {
 			break;
 
 		case kInputKeyPressed:
-			handleEvent_keyPressed(event, x);
+			handleEvent_keyPressed(event, internalEvent.value1);
 			break;
 
 		case kInputSwipe:
-			if (!handleEvent_swipe(event, x))
+			if (!handleEvent_swipe(event, internalEvent.value1))
 				return false;
 			break;
 
@@ -128,8 +121,8 @@ bool OSystem_IPHONE::handleEvent_mouseDown(Common::Event &event, int x, int y) {
 
 	if (_mouseClickAndDragEnabled) {
 		event.type = Common::EVENT_LBUTTONDOWN;
-		event.mouse.x = _mouseX;
-		event.mouse.y = _mouseY;
+		event.mouse.x = _videoContext->mouseX;
+		event.mouse.y = _videoContext->mouseY;
 		return true;
 	} else {
 		_lastMouseDown = getMillis();
@@ -146,17 +139,17 @@ bool OSystem_IPHONE::handleEvent_mouseUp(Common::Event &event, int x, int y) {
 			return false;
 	} else if (_mouseClickAndDragEnabled) {
 		event.type = Common::EVENT_LBUTTONUP;
-		event.mouse.x = _mouseX;
-		event.mouse.y = _mouseY;
+		event.mouse.x = _videoContext->mouseX;
+		event.mouse.y = _videoContext->mouseY;
 	} else {
 		if (getMillis() - _lastMouseDown < 250) {
 			event.type = Common::EVENT_LBUTTONDOWN;
-			event.mouse.x = _mouseX;
-			event.mouse.y = _mouseY;
+			event.mouse.x = _videoContext->mouseX;
+			event.mouse.y = _videoContext->mouseY;
 
 			_queuedInputEvent.type = Common::EVENT_LBUTTONUP;
-			_queuedInputEvent.mouse.x = _mouseX;
-			_queuedInputEvent.mouse.y = _mouseY;
+			_queuedInputEvent.mouse.x = _videoContext->mouseX;
+			_queuedInputEvent.mouse.y = _videoContext->mouseY;
 			_lastMouseTap = getMillis();
 			_queuedEventTime = _lastMouseTap + kQueuedInputEventDelay;
 		} else
@@ -173,12 +166,12 @@ bool OSystem_IPHONE::handleEvent_secondMouseDown(Common::Event &event, int x, in
 
 	if (_mouseClickAndDragEnabled) {
 		event.type = Common::EVENT_LBUTTONUP;
-		event.mouse.x = _mouseX;
-		event.mouse.y = _mouseY;
+		event.mouse.x = _videoContext->mouseX;
+		event.mouse.y = _videoContext->mouseY;
 
 		_queuedInputEvent.type = Common::EVENT_RBUTTONDOWN;
-		_queuedInputEvent.mouse.x = _mouseX;
-		_queuedInputEvent.mouse.y = _mouseY;
+		_queuedInputEvent.mouse.x = _videoContext->mouseX;
+		_queuedInputEvent.mouse.y = _videoContext->mouseY;
 	} else
 		return false;
 
@@ -190,7 +183,7 @@ bool OSystem_IPHONE::handleEvent_secondMouseUp(Common::Event &event, int x, int 
 
 	if (curTime - _lastSecondaryDown < 400) {
 		//printf("Right tap!\n");
-		if (curTime - _lastSecondaryTap < 400 && !_overlayVisible) {
+		if (curTime - _lastSecondaryTap < 400 && !_videoContext->overlayVisible) {
 			//printf("Right escape!\n");
 			event.type = Common::EVENT_KEYDOWN;
 			_queuedInputEvent.type = Common::EVENT_KEYUP;
@@ -203,11 +196,11 @@ bool OSystem_IPHONE::handleEvent_secondMouseUp(Common::Event &event, int x, int 
 		} else if (!_mouseClickAndDragEnabled) {
 			//printf("Rightclick!\n");
 			event.type = Common::EVENT_RBUTTONDOWN;
-			event.mouse.x = _mouseX;
-			event.mouse.y = _mouseY;
+			event.mouse.x = _videoContext->mouseX;
+			event.mouse.y = _videoContext->mouseY;
 			_queuedInputEvent.type = Common::EVENT_RBUTTONUP;
-			_queuedInputEvent.mouse.x = _mouseX;
-			_queuedInputEvent.mouse.y = _mouseY;
+			_queuedInputEvent.mouse.x = _videoContext->mouseX;
+			_queuedInputEvent.mouse.y = _videoContext->mouseY;
 			_lastSecondaryTap = curTime;
 			_queuedEventTime = curTime + kQueuedInputEventDelay;
 		} else {
@@ -217,8 +210,8 @@ bool OSystem_IPHONE::handleEvent_secondMouseUp(Common::Event &event, int x, int 
 	}
 	if (_mouseClickAndDragEnabled) {
 		event.type = Common::EVENT_RBUTTONUP;
-		event.mouse.x = _mouseX;
-		event.mouse.y = _mouseY;
+		event.mouse.x = _videoContext->mouseX;
+		event.mouse.y = _videoContext->mouseY;
 	}
 
 	return true;
@@ -240,11 +233,11 @@ bool OSystem_IPHONE::handleEvent_mouseDragged(Common::Event &event, int x, int y
 		_lastPadX = x;
 		_lastPadY = y;
 
-		mouseNewPosX = (int)(_mouseX - deltaX / 0.5f);
-		mouseNewPosY = (int)(_mouseY - deltaY / 0.5f);
+		mouseNewPosX = (int)(_videoContext->mouseX - deltaX / 0.5f);
+		mouseNewPosY = (int)(_videoContext->mouseY - deltaY / 0.5f);
 
-		int widthCap = _overlayVisible ? _overlayWidth : _screenWidth;
-		int heightCap = _overlayVisible ? _overlayHeight : _screenHeight;
+		int widthCap = _videoContext->overlayVisible ? _videoContext->overlayWidth : _videoContext->screenWidth;
+		int heightCap = _videoContext->overlayVisible ? _videoContext->overlayHeight : _videoContext->screenHeight;
 
 		if (mouseNewPosX < 0)
 			mouseNewPosX = 0;
@@ -342,18 +335,6 @@ bool OSystem_IPHONE::handleEvent_mouseSecondDragged(Common::Event &event, int x,
 	return false;
 }
 
-#ifdef SCUMMVMKOR
-void  OSystem_IPHONE::handleEvent_keyboardChanged(int _keyboardShow) {
-	const char *dialogMsg;
-	if (_keyboardShow)
-		dialogMsg = _("Keyboard mode enabled.");
-	else
-		dialogMsg = _("Keyboard mode disabled.");
-	GUI::TimedMessageDialog dialog(dialogMsg, 500);
-	dialog.runModal();
-}
-#endif
-
 void  OSystem_IPHONE::handleEvent_orientationChanged(int orientation) {
 	//printf("Orientation: %i\n", orientation);
 
@@ -375,10 +356,10 @@ void  OSystem_IPHONE::handleEvent_orientationChanged(int orientation) {
 
 	if (_screenOrientation != newOrientation) {
 		_screenOrientation = newOrientation;
-		iPhone_initSurface(_screenWidth, _screenHeight);
+		updateOutputSurface();
 
 		dirtyFullScreen();
-		if (_overlayVisible)
+		if (_videoContext->overlayVisible)
 			dirtyFullOverlayScreen();
 		updateScreen();
 	}
@@ -387,7 +368,6 @@ void  OSystem_IPHONE::handleEvent_orientationChanged(int orientation) {
 void  OSystem_IPHONE::handleEvent_keyPressed(Common::Event &event, int keyPressed) {
 	int ascii = keyPressed;
 	//printf("key: %i\n", keyPressed);
-    warning("key: %i\n", keyPressed);
 
 	// We remap some of the iPhone keyboard keys.
 	// The first ten here are the row of symbols below the numeric keys.

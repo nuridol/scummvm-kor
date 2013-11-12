@@ -25,12 +25,37 @@
 
 namespace Common {
 
-/**
- * Get a cosine table with the specified bit precision
- *
- * @param bits Precision of the table, which must be in range [4, 16]
- */
-const float *getCosineTable(int bits);
+class CosineTable {
+public:
+	/**
+	 * Construct a cosine table with the specified bit precision
+	 *
+	 * @param bitPrecision Precision of the table, which must be in range [4, 16]
+	 */
+	CosineTable(int bitPrecision);
+	~CosineTable();
+
+	/**
+	 * Get pointer to table.
+	 *
+	 * This table contains 2^bitPrecision/2 entries.
+	 * The layout of this table is as follows:
+	 * - Entries 0 up to (excluding) 2^bitPrecision/4:
+	 *           cos(0) till (excluding) cos(1/2*pi)
+	 * - Entries 2^bitPrecision/4 up to (excluding) 2^bitPrecision/2:
+	 *           cos(3/2*pi) till (excluding) cos(2*pi)
+	 */
+	const float *getTable() { return _table; }
+
+	/**
+	 * Get pointer to table
+	 */
+	int getPrecision() { return _bitPrecision; }
+
+private:
+	float *_table;
+	int _bitPrecision;
+};
 
 } // End of namespace Common
 

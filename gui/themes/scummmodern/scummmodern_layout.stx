@@ -39,7 +39,13 @@
 		<def var = 'ShowGlobalMenuLogo' value = '1'/>
 		<def var = 'ShowSearchPic' value = '1'/>
 
+		<def var = 'ShowChooserPics' value = '1'/>
+		<def var = 'ShowChooserPageDisplay' value = '1'/>
+
 		<def var = 'SaveLoadChooser.ExtInfo.Visible' value = '1'/>
+		<def var = 'RecorderDialog.ExtInfo.Visible' value = '1'/>
+
+		<def var = 'OnScreenDialog.ShowPics' value = '1'/>
 
 		<def var = 'KeyMapper.Spacing' value = '10'/>
 		<def var = 'KeyMapper.LabelWidth' value = '100'/>
@@ -48,6 +54,8 @@
 		<def var = 'Tooltip.MaxWidth' value = '200'/>
 		<def var = 'Tooltip.XDelta' value = '16'/> <!-- basically cursor size -->
 		<def var = 'Tooltip.YDelta' value = '32'/>
+
+		<def var = 'Predictive.Button.Width' value = '60' />
 
 		<widget name = 'OptionsLabel'
 				size = '115, Globals.Line.Height'
@@ -59,8 +67,7 @@
 
 		<widget name = 'Button'
 				size = '108, 24'
-		/>
-
+		/>		
 
 		<widget name = 'Slider'
 				size = '128, 18'
@@ -102,6 +109,13 @@
 				size = '15, 18'
 				padding = '0, 3, 4, 0'
 		/>
+
+		<widget name = 'EditRecordLabel'
+				size = '60, 25'
+		/>
+		<widget name = 'EditRecord'
+				size = '220, 25'
+		/>
 	</globals>
 
 	<dialog name = 'Launcher' overlays = 'screen'>
@@ -116,7 +130,7 @@
 						height = '17'
 				/>
 				<widget name = 'Search'
-						width = '230'
+						width = '150'
 						height = 'Globals.Line.Height'
 				/>
 				<widget name = 'SearchClearButton'
@@ -176,17 +190,22 @@
 					height = 'Globals.Line.Height'
 			/>
 			<widget name = 'List'/>
-			<layout type = 'horizontal' padding = '0, 0, 16, 0'>
-				<widget name = 'Up'
-						type = 'Button'
+			<layout type = 'vertical' padding = '0, 0, 16, 0'>
+				<widget name = 'Hidden'
+						type = 'Checkbox'
 				/>
-				<space/>
-				<widget name = 'Cancel'
-						type = 'Button'
-				/>
-				<widget name = 'Choose'
-						type = 'Button'
-				/>
+				<layout type = 'horizontal' padding = '0, 0, 0, 0'>
+					<widget name = 'Up'
+							type = 'Button'
+					/>
+					<space/>
+					<widget name = 'Cancel'
+							type = 'Button'
+					/>
+					<widget name = 'Choose'
+							type = 'Button'
+					/>
+				</layout>
 			</layout>
 		</layout>
 	</dialog>
@@ -228,9 +247,6 @@
 					type = 'Checkbox'
 			/>
 			<widget name = 'grFullscreenCheckbox'
-					type = 'Checkbox'
-			/>
-			<widget name = 'grDisableDitheringCheckbox'
 					type = 'Checkbox'
 			/>
 		</layout>
@@ -372,6 +388,10 @@
 						height = 'Globals.Line.Height'
 				/>
 			</layout>
+			<widget name = 'mcFluidSynthSettings'
+					width = '200'
+					height = 'Globals.Button.Height'
+			/>
 		</layout>
 	</dialog>
 
@@ -648,6 +668,32 @@
 		</layout>
 	</dialog>
 
+	<dialog name = 'GameOptions_Engine' overlays = 'Dialog.GameOptions.TabWidget' shading = 'dim'>
+		<layout type = 'vertical' padding = '16, 16, 16, 16'>
+			<widget name = 'customOption1Checkbox'
+					type = 'Checkbox'
+			/>
+			<widget name = 'customOption2Checkbox'
+					type = 'Checkbox'
+			/>
+			<widget name = 'customOption3Checkbox'
+					type = 'Checkbox'
+			/>
+			<widget name = 'customOption4Checkbox'
+					type = 'Checkbox'
+			/>
+			<widget name = 'customOption5Checkbox'
+					type = 'Checkbox'
+			/>
+			<widget name = 'customOption6Checkbox'
+					type = 'Checkbox'
+			/>
+			<widget name = 'customOption7Checkbox'
+					type = 'Checkbox'
+			/>
+		</layout>
+	</dialog>
+	
 	<dialog name = 'GlobalMenu' overlays = 'screen_center'>
 		<layout type = 'vertical' padding = '16, 16, 16, 16' center = 'true'>
 			<widget name = 'Logo'
@@ -787,11 +833,169 @@
 		</layout>
 	</dialog>
 
+	<dialog name = 'FluidSynthSettings' overlays = 'GlobalOptions' shading = 'dim'>
+		<layout type = 'vertical' padding = '0, 0, 0, 0'>
+			<widget name = 'TabWidget'/>
+			<layout type = 'horizontal' padding = '16, 16, 16, 16'>
+				<space/>
+				<widget name = 'ResetSettings'
+					type = 'Button'
+				/>
+				<widget name = 'Cancel'
+						type = 'Button'
+				/>
+				<widget name = 'Ok'
+						type = 'Button'
+				/>
+			</layout>
+		</layout>
+	</dialog>
+
+	<dialog name = 'FluidSynthSettings_Chorus' overlays = 'Dialog.FluidSynthSettings.TabWidget'>
+		<layout type = 'vertical' padding = '16, 16, 16, 16' spacing = '8'>
+			<widget name = 'EnableTabCheckbox'
+				type = 'Checkbox'
+			/>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'VoiceCountText'
+					type = 'OptionsLabel'
+				/>
+				<widget name = 'VoiceCountSlider'
+					type = 'Slider'
+				/>
+				<widget name = 'VoiceCountLabel'
+					width = '32'
+					height = 'Globals.Line.Height'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'LevelText'
+					type = 'OptionsLabel'
+				/>
+				<widget name = 'LevelSlider'
+					type = 'Slider'
+				/>
+				<widget name = 'LevelLabel'
+					width = '32'
+					height = 'Globals.Line.Height'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'SpeedText'
+					type = 'OptionsLabel'
+				/>
+				<widget name = 'SpeedSlider'
+					type = 'Slider'
+				/>
+				<widget name = 'SpeedLabel'
+					width = '32'
+					height = 'Globals.Line.Height'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'DepthText'
+					type = 'OptionsLabel'
+				/>
+				<widget name = 'DepthSlider'
+					type = 'Slider'
+				/>
+				<widget name = 'DepthLabel'
+					width = '32'
+					height = 'Globals.Line.Height'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'WaveFormTypeText'
+					type = 'OptionsLabel'
+				/>
+				<widget name = 'WaveFormType'
+					type = 'PopUp'
+				/>
+			</layout>
+		</layout>
+	</dialog>
+
+	<dialog name = 'FluidSynthSettings_Reverb' overlays = 'Dialog.FluidSynthSettings.TabWidget'>
+		<layout type = 'vertical' padding = '16, 16, 16, 16' spacing = '8'>
+			<widget name = 'EnableTabCheckbox'
+				type = 'Checkbox'
+			/>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'RoomSizeText'
+					type = 'OptionsLabel'
+				/>
+				<widget name = 'RoomSizeSlider'
+					type = 'Slider'
+				/>
+				<widget name = 'RoomSizeLabel'
+					width = '32'
+					height = 'Globals.Line.Height'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'DampingText'
+					type = 'OptionsLabel'
+				/>
+				<widget name = 'DampingSlider'
+					type = 'Slider'
+				/>
+				<widget name = 'DampingLabel'
+					width = '32'
+					height = 'Globals.Line.Height'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'WidthText'
+					type = 'OptionsLabel'
+				/>
+				<widget name = 'WidthSlider'
+					type = 'Slider'
+				/>
+				<widget name = 'WidthLabel'
+					width = '32'
+					height = 'Globals.Line.Height'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'LevelText'
+					type = 'OptionsLabel'
+				/>
+				<widget name = 'LevelSlider'
+					type = 'Slider'
+				/>
+				<widget name = 'LevelLabel'
+					width = '32'
+					height = 'Globals.Line.Height'
+				/>
+			</layout>
+		</layout>
+	</dialog>
+
+	<dialog name = 'FluidSynthSettings_Misc' overlays = 'Dialog.FluidSynthSettings.TabWidget'>
+		<layout type = 'vertical' padding = '16, 16, 16, 16' spacing = '8'>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'InterpolationText'
+					type = 'OptionsLabel'
+				/>
+				<widget name = 'Interpolation'
+					type = 'PopUp'
+				/>
+			</layout>
+		</layout>
+	</dialog>
+
 	<dialog name = 'SaveLoadChooser' overlays = 'screen' inset = '8' shading = 'dim'>
 		<layout type = 'vertical' padding = '8, 8, 8, 32' center = 'true'>
-			<widget name = 'Title'
-					height = 'Globals.Line.Height'
-			/>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0'>
+				<widget name = 'Title'
+						height = 'Globals.Line.Height'
+				/>
+				<space/>
+				<widget name = 'PageDisplay'
+						width = '200'
+						height = 'Globals.Line.Height'
+				/>
+			</layout>
 			<layout type = 'horizontal' padding = '0, 0, 0, 16' spacing = '16'>
 				<widget name = 'List' />
 				<widget name = 'Thumbnail'
@@ -800,6 +1004,14 @@
 				/>
 			</layout>
 			<layout type = 'horizontal' padding = '0, 0, 0, 0'>
+				<widget name = 'ListSwitch'
+						height = '20'
+						width = '20'
+				/>
+				<widget name = 'GridSwitch'
+						height = '20'
+						width = '20'
+				/>
 				<space/>
 				<widget name = 'Delete'
 						type = 'Button'
@@ -815,6 +1027,147 @@
 		</layout>
 	</dialog>
 
+	<dialog name = 'SavenameDialog' overlays = 'screen_center'>
+		<layout type = 'vertical' padding = '8, 8, 8, 8'>
+			<widget name = 'DescriptionText'
+					width = '320'
+					height = 'Globals.Line.Height'
+			/>
+			<widget name = 'Description'
+					height = '19'
+			/>
+			<layout type = 'horizontal' padding = '0, 0, 16, 0'>
+				<widget name = 'Cancel'
+						type = 'Button'
+				/>
+				<space size = '96'/>
+				<widget name = 'Ok'
+						type = 'Button'
+				/>
+			</layout>
+		</layout>
+	</dialog>
+
+	<dialog name = 'RecorderDialog' overlays = 'screen' inset = '8' shading = 'dim'>
+		<layout type = 'vertical' padding = '8, 8, 8, 32' center = 'true'>
+			<widget name = 'Title'
+					height = 'Globals.Line.Height'
+			/>
+			<layout type = 'horizontal' padding = '0, 0, 0, 16' spacing = '16'>
+				<widget name = 'List' />
+				<layout type = 'vertical' padding = '0, 0, 0, 0'>
+					<widget name = 'Thumbnail'
+							width = '180'
+							height = '170'
+					/>
+					<layout type = 'horizontal' padding = '0, 0, 0, 0'>	
+						<widget name = 'NextScreenShotButton'
+								width = '25'
+								height = '25'
+						/>
+						<widget name = 'currentScreenshot'
+								width = '125'
+								height = '25'
+								textalign = 'center'
+						/>
+						<widget name = 'PreviousScreenShotButton'
+								width = '25'
+								height = '25'
+						/>
+					</layout>
+					<widget name = 'Author' height = 'Globals.Line.Height' />
+					<widget name = 'Notes' height = 'Globals.Line.Height' />
+				</layout>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0'>
+				<space/>
+				<widget name = 'Delete'
+						type = 'Button'
+				/>
+				<space size = '16'/>
+				<widget name = 'Cancel'
+						type = 'Button'
+				/>
+				<space size = '16'/>
+				<widget name = 'Edit'
+						type = 'Button'
+				/>
+				<widget name = 'Record'
+						type = 'Button'
+				/>
+				<widget name = 'Playback'
+						type = 'Button'
+				/>
+			</layout>
+		</layout>
+	</dialog>
+
+	<dialog name = 'OnScreenDialog' overlays = 'screen_center'>
+		<layout type = 'horizontal'  spacing = '5' padding = '5, 3, 5, 3' center = 'true'>
+			<widget name = 'StopButton'
+				width = '32'
+				height = '32'
+			/>
+			<widget name = 'EditButton'
+				width = '32'
+				height = '32'
+			/>
+			<widget name = 'SwitchModeButton'
+				width = '32'
+				height = '32'
+			/>
+			<widget name = 'FastReplayButton'
+				width = '32'
+				height = '32'
+			/>
+			<widget name = 'TimeLabel'
+				width = '50'
+				height = '30'
+			/>
+		</layout>
+	</dialog>
+
+	<dialog name = 'EditRecordDialog' overlays = 'screen_center'>
+		<layout type = 'vertical' padding = '8, 8, 8, 8' center = 'true'>
+			<widget name = 'Title'
+					width = '320'
+					height = 'Globals.Line.Height'
+			/>
+			<layout type = 'horizontal'  spacing = '5' padding = '0, 0, 0, 10'>
+				<widget name = 'AuthorLabel'
+						type = 'EditRecordLabel'
+				/>		
+				<widget name = 'AuthorEdit'
+						type = 'EditRecord'
+				/>		
+			</layout>
+			<layout type = 'horizontal'  spacing = '5' padding = '0, 0, 0, 10'>
+				<widget name = 'NameLabel'
+						type = 'EditRecordLabel'
+				/>		
+				<widget name = 'NameEdit'
+						type = 'EditRecord'
+				/>
+			</layout>
+			<layout type = 'horizontal'  spacing = '5' padding = '0, 0, 0, 10'>
+				<widget name = 'NotesLabel'
+						type = 'EditRecordLabel'
+				/>
+				<widget name = 'NotesEdit'
+						type = 'EditRecord'
+				/>
+			</layout>
+			<layout type = 'horizontal'  spacing = '5' padding = '0, 0, 0, 10'>
+				<widget name = 'Cancel'
+						type = 'Button'
+				/>
+				<widget name = 'OK'
+						type = 'Button'
+				/>			
+			</layout>
+		</layout>
+	</dialog>
+	
 	<dialog name = 'ScummHelp' overlays = 'screen_center'>
 		<layout type = 'vertical' padding = '8, 8, 8, 8' center = 'true'>
 			<widget name = 'Title'
@@ -905,5 +1258,99 @@
 					type = 'Button'
 			/>
 		</layout>
+	</dialog>	
+	<dialog name = 'Predictive' overlays = 'screen_center'>
+		<layout type = 'vertical' padding = '5, 5, 5, 5' center = 'true'>
+			<widget name = 'Headline'
+					height = 'Globals.Line.Height'
+					width = '210'
+					textalign = 'center'
+			/>
+
+			<layout type = 'horizontal' padding = '5, 5, 5, 5'>
+				<widget name = 'Word'
+					width  = '190'
+					height = 'Globals.Button.Height' 
+				/>
+				<widget name = 'Delete'
+					width  = '20'
+					height = 'Globals.Button.Height'
+				/>
+			</layout>
+			<space size = '5' />
+			<layout type = 'horizontal' padding = '3, 3, 3, 3'>
+				<widget name = 'Button1'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+				<widget name = 'Button2'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+				<widget name = 'Button3'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '3, 3, 3, 3'>
+				<widget name = 'Button4'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+				<widget name = 'Button5'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+				<widget name = 'Button6'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '3, 3, 3, 3'>
+				<widget name = 'Button7'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+				<widget name = 'Button8'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+				<widget name = 'Button9'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '3, 3, 3, 3'>
+				<widget name = 'Pre'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+				<widget name = 'Button0'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+				<widget name = 'Next'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+			</layout>
+			<space size = '5' />
+			<layout type = 'horizontal' padding = '3, 3, 3, 3'>
+				<widget name = 'Add'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+				<space size = '22'/>
+				<widget name = 'Cancel'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+				<widget name = 'OK'
+					width  = 'Globals.Predictive.Button.Width'
+					height = 'Globals.Button.Height'
+				/>
+			</layout>
+		</layout>
 	</dialog>
+
 </layout_info>

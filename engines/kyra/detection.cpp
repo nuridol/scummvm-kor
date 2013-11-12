@@ -30,6 +30,7 @@
 #include "common/config-manager.h"
 #include "common/system.h"
 #include "common/savefile.h"
+#include "common/translation.h"
 
 #include "engines/advancedDetector.h"
 
@@ -50,11 +51,95 @@ const char *const directoryGlobs[] = {
 	0
 };
 
+const ADExtraGuiOptionsMap gameGuiOptions[] = {
+	// Kyrandia 3 options
+
+	{
+		GAMEOPTION_KYRA3_AUDIENCE,
+		{
+			// I18N: Studio audience adds an applause and cheering sounds whenever
+			// Malcolm makes a joke.
+			_s("Studio audience"),
+			_s("Enable studio audience"),
+			"studio_audience",
+			true
+		}
+	},
+
+	{
+		GAMEOPTION_KYRA3_SKIP,
+		{
+			// I18N: This option allows the user to skip text and cutscenes.
+			_s("Skip support"),
+			_s("Allow text and cutscenes to be skipped"),
+			"skip_support",
+			true
+		}
+	},
+
+	{
+		GAMEOPTION_KYRA3_HELIUM,
+		{
+			// I18N: Helium mode makes people sound like they've inhaled Helium.
+			_s("Helium mode"),
+			_s("Enable helium mode"),
+			"helium_mode",
+			false
+		}
+	},
+
+#ifdef ENABLE_LOL
+	// LoL options
+
+	{
+		GAMEOPTION_LOL_SCROLLING,
+		{
+			// I18N: When enabled, this option makes scrolling smoother when
+			// changing from one screen to another.
+			_s("Smooth scrolling"),
+			_s("Enable smooth scrolling when walking"),
+			"smooth_scrolling",
+			true
+		}
+	},
+
+	{
+		GAMEOPTION_LOL_CURSORS,
+		{
+			// I18N: When enabled, this option changes the cursor when it floats to the
+			// edge of the screen to a directional arrow. The player can then click to
+			// walk towards that direction.
+			_s("Floating cursors"),
+			_s("Enable floating cursors"),
+			"floating_cursors",
+			false
+		}
+	},
+#endif
+
+#ifdef ENABLE_EOB
+	// EoB options
+
+	{
+		GAMEOPTION_EOB_HPGRAPHS,
+		{
+			// I18N: HP stands for Hit Points
+			_s("HP bar graphs"),
+			_s("Enable hit point bar graphs"),
+			"hpbargraphs",
+			true
+		}
+	},
+#endif
+
+	AD_EXTRA_GUI_OPTIONS_TERMINATOR
+};
+
 } // End of anonymous namespace
 
 class KyraMetaEngine : public AdvancedMetaEngine {
 public:
-	KyraMetaEngine() : AdvancedMetaEngine(adGameDescs, sizeof(KYRAGameDescription), gameList) {
+	KyraMetaEngine() : AdvancedMetaEngine(adGameDescs, sizeof(KYRAGameDescription), gameList, gameGuiOptions) {
 		_md5Bytes = 1024 * 1024;
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
@@ -140,6 +225,8 @@ bool KyraMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGame
 		*engine = new Kyra::EoBEngine(syst, flags);
 		break;
 	case Kyra::GI_EOB2:
+		 if (Common::parseRenderMode(ConfMan.get("render_mode")) == Common::kRenderEGA)
+			 flags.useHiRes = true;
 		*engine = new Kyra::DarkMoonEngine(syst, flags);
 		break;
 #endif // ENABLE_EOB
@@ -211,7 +298,7 @@ SaveStateDescriptor KyraMetaEngine::querySaveMetaInfos(const char *target, int s
 
 	if (in) {
 		Kyra::KyraEngine_v1::SaveHeader header;
-		Kyra::KyraEngine_v1::kReadSaveHeaderError error;
+		Kyra::KyraEngine_v1::ReadSaveHeaderError error;
 
 		error = Kyra::KyraEngine_v1::readSaveHeader(in, true, header);
 		delete in;

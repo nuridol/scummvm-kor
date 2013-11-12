@@ -33,18 +33,14 @@ EoBEngine::EoBEngine(OSystem *system, const GameFlags &flags)
 	_numSpells = 53;
 	_menuChoiceInit = 4;
 
-	_turnUndeadString = _introFilesOpening = _introFilesTower = _introFilesOrb = 0;
-	_introFilesWdEntry = _introFilesKing = _introFilesHands = _introFilesWdExit = 0;
-	_introFilesTunnel = _finBonusStrings = _npcStrings[1] = _npcStrings[2] = 0;
+	_turnUndeadString = 0;
+	_finBonusStrings = _npcStrings[1] = _npcStrings[2] = 0;
 	_npcStrings[3] = _npcStrings[4] = _npcStrings[5] = _npcStrings[6] = 0;
 	_npcStrings[7] = _npcStrings[8] = _npcStrings[9] = _npcStrings[10] = 0;
-	_introOpeningFrmDelay = _introWdEncodeX = _introWdEncodeY = _introWdEncodeWH = 0;
-	_npcShpData = _npcSubShpIndex1 = _npcSubShpIndex2 = _npcSubShpY = _introWdDsY = 0;
-	_introTvlX1 = _introTvlY1 = _introTvlX2 = _introTvlY2 = _introTvlW = _introTvlH = 0;
+	_npcShpData = _npcSubShpIndex1 = _npcSubShpIndex2 = _npcSubShpY = 0;
 	_dscDoorScaleMult4 = _dscDoorScaleMult5 = _dscDoorScaleMult6 = _dscDoorY3 = 0;
 	_dscDoorY4 = _dscDoorY5 = _dscDoorY6 = _dscDoorY7 = _doorShapeEncodeDefs = 0;
 	_doorSwitchShapeEncodeDefs = _doorSwitchCoords = 0;
-	_introWdDsX = 0;
 	_dscDoorCoordsExt = 0;
 }
 
@@ -59,13 +55,22 @@ Common::Error EoBEngine::init() {
 
 	initStaticResource();
 
-	_itemsOverlay = _res->fileData("ITEMRMP.VGA", 0);
+	if (_configRenderMode != Common::kRenderCGA)
+		_itemsOverlay = _res->fileData((_configRenderMode == Common::kRenderEGA) ? "ITEMRMP.EGA" : "ITEMRMP.VGA", 0);
 
 	_screen->modifyScreenDim(7, 0x01, 0xB3, 0x22, 0x12);
 	_screen->modifyScreenDim(9, 0x01, 0x7D, 0x26, 0x3F);
 	_screen->modifyScreenDim(12, 0x01, 0x04, 0x14, 0xA0);
 
 	_scriptTimersCount = 1;
+
+	if (_configRenderMode == Common::kRenderEGA) {
+		Palette pal(16);
+		_screen->loadPalette(_egaDefaultPalette, pal, 16);
+		_screen->setScreenPalette(pal);
+	} else {
+		_screen->loadPalette("PALETTE.COL", _screen->getPalette(0));
+	}
 
 	return Common::kNoError;
 }
@@ -77,6 +82,7 @@ void EoBEngine::startupNew() {
 	_currentBlock = 490;
 	_currentDirection = 0;
 	setHandItem(0);
+
 	EoBCoreEngine::startupNew();
 }
 
@@ -138,7 +144,7 @@ void EoBEngine::drawNpcScene(int npcIndex) {
 void EoBEngine::encodeDrawNpcSeqShape(int npcIndex, int drawX, int drawY) {
 	const uint8 *shpDef = &_npcShpData[npcIndex << 2];
 	_screen->_curPage = 2;
-	const uint8 *shp = _screen->encodeShape(shpDef[0], shpDef[1], shpDef[2], shpDef[3]);
+	const uint8 *shp = _screen->encodeShape(shpDef[0], shpDef[1], shpDef[2], shpDef[3], false, _cgaMappingDefault);
 	_screen->_curPage = 0;
 	_screen->drawShape(0, shp, drawX - (shp[2] << 2), drawY - shp[1], 5);
 	delete[] shp;
@@ -172,13 +178,14 @@ void EoBEngine::runNpcDialogue(int npcIndex) {
 	case 1:
 		if (!checkScriptFlags(0x10000)) {
 			if (checkScriptFlags(0x8000)) {
-				a = 1;
+				a = 13;
 			} else {
 				setScriptFlags(0x8000);
 				r = DLG2(3, 3);
+				a = 4;
 			}
 			if (!r)
-				r = DLG2(a ? 13 : 4, 4);
+				r = DLG2(a, 4);
 
 			if (!r) {
 				for (a = 0; a < 6; a++)
@@ -208,8 +215,8 @@ void EoBEngine::runNpcDialogue(int npcIndex) {
 
 		if (!checkScriptFlags(0x100000)) {
 			if (deletePartyItems(6, -1)) {
-				//_npcSequenceSub = 0;
-				//drawNpcScene(npcIndex);
+				_npcSequenceSub = 0;
+				drawNpcScene(npcIndex);
 				TXT(28);
 				createItemOnCurrentBlock(32);
 				setScriptFlags(0x100000);
@@ -310,7 +317,7 @@ void EoBEngine::runNpcDialogue(int npcIndex) {
 void EoBEngine::updateUsedCharacterHandItem(int charIndex, int slot) {
 	EoBItem *itm = &_items[_characters[charIndex].inventory[slot]];
 	if (itm->type == 48) {
-		int charges = itm->flags & 0x3f;
+		int charges = itm->flags & 0x3F;
 		if (--charges)
 			--itm->flags;
 		else
@@ -330,6 +337,14 @@ void EoBEngine::replaceMonster(int unit, uint16 block, int pos, int dir, int typ
 			break;
 		}
 	}
+}
+
+bool EoBEngine::killMonsterExtra(EoBMonsterInPlay *m) {
+	if (m->type == 21) {
+		_playFinale = true;
+		_runFlag = false;
+	}
+	return true;
 }
 
 void EoBEngine::updateScriptTimersExtra() {
@@ -353,23 +368,23 @@ void EoBEngine::loadDoorShapes(int doorType1, int shapeId1, int doorType2, int s
 	_screen->loadShapeSetBitmap("DOOR", 5, 3);
 	_screen->_curPage = 2;
 
-	if (doorType1 != 0xff) {
+	if (doorType1 != 0xFF) {
 		for (int i = 0; i < 3; i++) {
 			const uint8 *enc = &_doorShapeEncodeDefs[(doorType1 * 3 + i) << 2];
-			_doorShapes[shapeId1 + i] = _screen->encodeShape(enc[0], enc[1], enc[2], enc[3]);
+			_doorShapes[shapeId1 + i] = _screen->encodeShape(enc[0], enc[1], enc[2], enc[3], false, (_flags.gameID == GI_EOB1) ? _cgaMappingLevel[_cgaLevelMappingIndex[_currentLevel - 1]] : 0);
 			enc = &_doorSwitchShapeEncodeDefs[(doorType1 * 3 + i) << 2];
-			_doorSwitches[shapeId1 + i].shp = _screen->encodeShape(enc[0], enc[1], enc[2], enc[3]);
+			_doorSwitches[shapeId1 + i].shp = _screen->encodeShape(enc[0], enc[1], enc[2], enc[3], false, (_flags.gameID == GI_EOB1) ? _cgaMappingLevel[_cgaLevelMappingIndex[_currentLevel - 1]] : 0);
 			_doorSwitches[shapeId1 + i].x = _doorSwitchCoords[doorType1 * 6 + i * 2];
 			_doorSwitches[shapeId1 + i].y = _doorSwitchCoords[doorType1 * 6 + i * 2 + 1];
 		}
 	}
 
-	if (doorType2 != 0xff) {
+	if (doorType2 != 0xFF) {
 		for (int i = 0; i < 3; i++) {
 			const uint8 *enc = &_doorShapeEncodeDefs[(doorType2 * 3 + i) << 2];
-			_doorShapes[shapeId2 + i] = _screen->encodeShape(enc[0], enc[1], enc[2], enc[3]);
+			_doorShapes[shapeId2 + i] = _screen->encodeShape(enc[0], enc[1], enc[2], enc[3], false, (_flags.gameID == GI_EOB1) ? _cgaMappingLevel[_cgaLevelMappingIndex[_currentLevel - 1]] : 0);
 			enc = &_doorSwitchShapeEncodeDefs[(doorType2 * 3 + i) << 2];
-			_doorSwitches[shapeId2 + i].shp = _screen->encodeShape(enc[0], enc[1], enc[2], enc[3]);
+			_doorSwitches[shapeId2 + i].shp = _screen->encodeShape(enc[0], enc[1], enc[2], enc[3], false, (_flags.gameID == GI_EOB1) ? _cgaMappingLevel[_cgaLevelMappingIndex[_currentLevel - 1]] : 0);
 			_doorSwitches[shapeId2 + i].x = _doorSwitchCoords[doorType2 * 6 + i * 2];
 			_doorSwitches[shapeId2 + i].y = _doorSwitchCoords[doorType2 * 6 + i * 2 + 1];
 		}
@@ -381,6 +396,8 @@ void EoBEngine::loadDoorShapes(int doorType1, int shapeId1, int doorType2, int s
 void EoBEngine::drawDoorIntern(int type, int index, int x, int y, int w, int wall, int mDim, int16 y1, int16 y2) {
 	int shapeIndex = type + 2 - mDim;
 	uint8 *shp = _doorShapes[shapeIndex];
+	if (!shp)
+		return;
 
 	int d1 = 0;
 	int d2 = 0;
@@ -415,7 +432,7 @@ void EoBEngine::drawDoorIntern(int type, int index, int x, int y, int w, int wal
 		d1 = x - (_doorShapes[shapeIndex + 3][2] << 2);
 		x -= (shp[2] << 2);
 		drawBlockObject(0, 2, _doorShapes[shapeIndex + 3], d1, y, 5);
-		scaleLevelShapesDim(index, y1, y2, 5);
+		setDoorShapeDim(index, y1, y2, 5);
 		y = _dscDoorY3[mDim] - ((wall < 30) ? (wall - _dscDoorScaleOffs[wall]) * _dscDoorScaleMult1[mDim] : _dscDoorScaleMult2[mDim]);
 		drawBlockObject(0, 2, shp, x, y, 5);
 		if (_wllShapeMap[wall] == -1)
@@ -454,7 +471,7 @@ void EoBEngine::turnUndeadAuto() {
 	int oc = _openBookChar;
 
 	for (int i = 0; i < 6; i++) {
-		if (!testCharacter(i, 0x0d))
+		if (!testCharacter(i, 0x0D))
 			continue;
 
 		EoBCharacter *c = &_characters[i];
@@ -499,7 +516,7 @@ bool EoBEngine::checkPartyStatusExtra() {
 	_txt->printMessage(_menuStringsDefeat[0]);
 	while (!shouldQuit()) {
 		removeInputTop();
-		if (checkInput(0, false, 0) & 0xff)
+		if (checkInput(0, false, 0) & 0xFF)
 			break;
 	}
 	_screen->copyPage(10, 0);
@@ -548,7 +565,7 @@ void EoBEngine::healParty() {
 }
 
 const KyraRpgGUISettings *EoBEngine::guiSettings() {
-	return &_guiSettings;
+	return (_configRenderMode == Common::kRenderCGA || _configRenderMode == Common::kRenderEGA) ? &_guiSettingsEGA : &_guiSettingsVGA;
 }
 
 } // End of namespace Kyra

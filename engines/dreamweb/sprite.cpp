@@ -20,12 +20,13 @@
  *
  */
 
+#include "dreamweb/sound.h"
 #include "dreamweb/dreamweb.h"
 
 namespace DreamWeb {
 
 void DreamWebEngine::printSprites() {
-	for (size_t priority = 0; priority < 7; ++priority) {
+	for (uint priority = 0; priority < 7; ++priority) {
 		Common::List<Sprite>::const_iterator i;
 		for (i = _spriteTable.begin(); i != _spriteTable.end(); ++i) {
 			const Sprite &sprite = *i;
@@ -51,7 +52,7 @@ void DreamWebEngine::printASprite(const Sprite *sprite) {
 	} else {
 		x = sprite->x + _mapAdX;
 	}
-	
+
 	uint8 c;
 	if (sprite->walkFrame != 0)
 		c = 8;
@@ -96,7 +97,7 @@ void DreamWebEngine::spriteUpdate() {
 		else {
 			backObject(&sprite);
 		}
-	
+
 		if (_nowInNewRoom == 1)
 			break;
 	}
@@ -263,8 +264,8 @@ void DreamWebEngine::constant(Sprite *sprite, SetObject *objData) {
 }
 
 void DreamWebEngine::randomSprite(Sprite *sprite, SetObject *objData) {
-	uint8 r = randomNumber();
-	sprite->frameNumber = objData->frames[r&7];
+	uint8 r = _rnd.getRandomNumber(7);
+	sprite->frameNumber = objData->frames[r];
 }
 
 void DreamWebEngine::doorway(Sprite *sprite, SetObject *objData) {
@@ -298,7 +299,7 @@ void DreamWebEngine::doDoor(Sprite *sprite, SetObject *objData, Common::Rect che
 				soundIndex = 13;
 			else
 				soundIndex = 0;
-			playChannel1(soundIndex);
+			_sound->playChannel1(soundIndex);
 		}
 		if (objData->frames[sprite->animFrame] == 255)
 			--sprite->animFrame;
@@ -315,7 +316,7 @@ void DreamWebEngine::doDoor(Sprite *sprite, SetObject *objData, Common::Rect che
 				soundIndex = 13;
 			else
 				soundIndex = 1;
-			playChannel1(soundIndex);
+			_sound->playChannel1(soundIndex);
 		}
 		if (sprite->animFrame != 0)
 			--sprite->animFrame;
@@ -346,7 +347,7 @@ void DreamWebEngine::lockedDoorway(Sprite *sprite, SetObject *objData) {
 	if (openDoor) {
 
 		if (sprite->animFrame == 1) {
-			playChannel1(0);
+			_sound->playChannel1(0);
 		}
 
 		if (sprite->animFrame == 6)
@@ -367,12 +368,12 @@ void DreamWebEngine::lockedDoorway(Sprite *sprite, SetObject *objData) {
 		// shut door
 
 		if (sprite->animFrame == 5) {
-			playChannel1(1);
+			_sound->playChannel1(1);
 		}
 
 		if (sprite->animFrame != 0)
 			--sprite->animFrame;
-	
+
 		_vars._throughDoor = 0;
 		sprite->frameNumber = objData->index = objData->frames[sprite->animFrame];
 
@@ -406,7 +407,7 @@ void DreamWebEngine::liftSprite(Sprite *sprite, SetObject *objData) {
 		}
 		sprite->animFrame = 12;
 		sprite->frameNumber = objData->index = objData->frames[sprite->animFrame];
-	}	
+	}
 	else if (liftFlag == 3) { //openlift
 		if (sprite->animFrame == 12) {
 			_vars._liftFlag = 1;
@@ -471,50 +472,6 @@ const Frame *DreamWebEngine::getReelFrameAX(uint16 frame) {
 	return &base->_frames[frame];
 }
 
-void DreamWebEngine::showRain() {
-	Common::List<Rain>::iterator i;
-
-	// Do nothing if there's no rain at all
-	if (_rainList.empty())
-		return;
-
-	const uint8 *frameData = _mainSprites.getFrameData(58);
-
-	for (i = _rainList.begin(); i != _rainList.end(); ++i) {
-		Rain &rain = *i;
-		uint16 y = rain.y + _mapAdY + _mapYStart;
-		uint16 x = rain.x + _mapAdX + _mapXStart;
-		uint16 size = rain.size;
-		uint16 offset = (rain.w3 - rain.b5) & 511;
-		rain.w3 = offset;
-		const uint8 *src = frameData + offset;
-		uint8 *dst = workspace() + y * 320 + x;
-		for (uint16 j = 0; j < size; ++j) {
-			uint8 v = src[j];
-			if (v != 0)
-				*dst = v;
-			dst += 320-1; // advance diagonally
-		}
-	}
-
-	if (_channel1Playing != 255)
-		return;
-	if (_realLocation == 2 && _vars._beenMugged != 1)
-		return;
-	if (_realLocation == 55)
-		return;
-
-	if (randomNumber() >= 1) // play thunder with 1 in 256 chance
-		return;
-
-	uint8 soundIndex;
-	if (_channel0Playing != 6)
-		soundIndex = 4;
-	else
-		soundIndex = 7;
-	playChannel1(soundIndex);
-}
-
 void DreamWebEngine::moveMap(uint8 param) {
 	switch (param) {
 	case 32:
@@ -545,141 +502,11 @@ void DreamWebEngine::checkOne(uint8 x, uint8 y, uint8 *flag, uint8 *flagEx, uint
 	*type = tileData._type;
 }
 
-uint8 DreamWebEngine::getBlockOfPixel(uint8 x, uint8 y) {
-	uint8 flag, flagEx, type, flagX, flagY;
-	checkOne(x + _mapXStart, y + _mapYStart, &flag, &flagEx, &type, &flagX, &flagY);
-	if (flag & 1)
-		return 0;
-	else
-		return type;
-}
-
-void DreamWebEngine::splitIntoLines(uint8 x, uint8 y) {
-	do {
-		Rain rain;
-
-		// Look for line start
-		while (!getBlockOfPixel(x, y)) {
-			--x;
-			++y;
-			if (x == 0 || y >= _mapYSize)
-				return;
-		}
-
-		rain.x = x;
-		rain.y = y;
-
-		uint8 length = 1;
-
-		// Look for line end
-		while (getBlockOfPixel(x, y)) {
-			--x;
-			++y;
-			if (x == 0 || y >= _mapYSize)
-				break;
-			++length;
-		}
-
-		rain.size = length;
-		rain.w3 = (randomNumber() << 8) | randomNumber();
-		rain.b5 = (randomNumber() & 3) + 4;
-		_rainList.push_back(rain);
-	} while (x > 0 && y < _mapYSize);
-}
-
-struct RainLocation {
-	uint8 location;
-	uint8 x, y;
-	uint8 rainSpacing;
-};
-
-static const RainLocation rainLocationList[] = {
-	{ 1,44,10,16 },
-	{ 4,11,30,14 },
-	{ 4,22,30,14 },
-	{ 3,33,10,14 },
-	{ 10,33,30,14 },
-	{ 10,22,30,24 },
-	{ 9,22,10,14 },
-	{ 2,33,0,14 },
-	{ 2,22,0,14 },
-	{ 6,11,30,14 },
-	{ 7,11,20,18 },
-	{ 7,0,20,18 },
-	{ 7,0,30,18 },
-	{ 55,44,0,14 },
-	{ 5,22,30,14 },
-
-	{ 8,0,10,18 },
-	{ 8,11,10,18 },
-	{ 8,22,10,18 },
-	{ 8,33,10,18 },
-	{ 8,33,20,18 },
-	{ 8,33,30,18 },
-	{ 8,33,40,18 },
-	{ 8,22,40,18 },
-	{ 8,11,40,18 },
-
-	{ 21,44,20,18 },
-	{ 255,0,0,0 }
-};
-
-void DreamWebEngine::initRain() {
-	const RainLocation *r = rainLocationList;
-	_rainList.clear();
-
-	uint8 rainSpacing = 0;
-
-	// look up location in rainLocationList to determine rainSpacing
-	for (r = rainLocationList; r->location != 0xff; ++r) {
-		if (r->location == _realLocation &&
-		        r->x == _mapX && r->y == _mapY) {
-			rainSpacing = r->rainSpacing;
-			break;
-		}
-	}
-
-	if (rainSpacing == 0) {
-		// location not found in rainLocationList: no rain
-		return;
-	}
-
-	// start lines of rain from top of screen
-	uint8 x = 4;
-	do {
-		uint8 delta;
-		do {
-			delta = (randomNumber() & 31) + 3;
-		} while (delta >= rainSpacing);
-
-		x += delta;
-		if (x >= _mapXSize)
-			break;
-
-		splitIntoLines(x, 0);
-	} while (true);
-
-	// start lines of rain from side of screen
-	uint8 y = 0;
-	do {
-		uint8 delta;
-		do {
-			delta = (randomNumber() & 31) + 3;
-		} while (delta >= rainSpacing);
-
-		y += delta;
-		if (y >= _mapYSize)
-			break;
-
-		splitIntoLines(_mapXSize - 1, y);
-	} while (true);
-}
-
 void DreamWebEngine::intro1Text() {
 	if (_introCount != 2 && _introCount != 4 && _introCount != 6)
 		return;
 
-	if (hasSpeech() && _channel1Playing != 255) {
+	if (hasSpeech() && _sound->isChannel1Playing()) {
 		_introCount--;
 	} else {
 		if (_introCount == 2)
@@ -752,7 +579,7 @@ void DreamWebEngine::textForEnd() {
 }
 
 void DreamWebEngine::textForMonkHelper(uint8 textIndex, uint8 voiceIndex, uint8 x, uint8 y, uint16 countToTimed, uint16 timeCount) {
-	if (hasSpeech() && _channel1Playing != 255)
+	if (hasSpeech() && _sound->isChannel1Playing())
 		_introCount--;
 	else
 		setupTimedTemp(textIndex, voiceIndex, x, y, countToTimed, timeCount);
@@ -788,8 +615,7 @@ void DreamWebEngine::textForMonk() {
 	else if (_introCount == 53) {
 		fadeScreenDowns();
 		if (hasSpeech()) {
-			_volumeTo = 7;
-			_volumeDirection = 1;
+			_sound->volumeChange(7, 1);
 		}
 	}
 }
@@ -846,7 +672,7 @@ static const ReelSound g_roomSound6[] = {
 	{ 255,0 }
 };
 static const ReelSound g_roomSound8[] = {
-	
+
 	{ 12, 51 },
 	{ 13, 53 },
 	{ 14, 14 },
@@ -865,7 +691,7 @@ static const ReelSound g_roomSound10[] = {
 	{ 13, 16 },
 	{ 255,0 }
 };
-	
+
 static const ReelSound g_roomSound11[] = {
 	{ 13, 20 },
 	{ 255,0 }
@@ -953,7 +779,7 @@ static const ReelSound g_roomSound26[] = {
 	{ 15, 102 }, // was 90, should be mine cart
 	{ 255,0 }
 };
-	
+
 static const ReelSound g_roomSound27[] = {
 	{ 22, 36 },
 	{ 13, 125 },
@@ -1079,14 +905,14 @@ void DreamWebEngine::soundOnReels(uint16 reelPointer) {
 			continue;
 		_lastSoundReel = r->_reelPointer;
 		if (r->_sample < 64) {
-			playChannel1(r->_sample);
+			_sound->playChannel1(r->_sample);
 			return;
 		}
 		if (r->_sample < 128) {
-			playChannel0(r->_sample & 63, 0);
+			_sound->playChannel0(r->_sample & 63, 0);
 			return;
 		}
-		playChannel0(r->_sample & 63, 255);
+		_sound->playChannel0(r->_sample & 63, 255);
 	}
 
 	if (_lastSoundReel != reelPointer)
@@ -1129,9 +955,9 @@ void DreamWebEngine::getRidOfReels() {
 
 void DreamWebEngine::liftNoise(uint8 index) {
 	if (_realLocation == 5 || _realLocation == 21)
-		playChannel1(13);	// hiss noise
+		_sound->playChannel1(13);	// hiss noise
 	else
-		playChannel1(index);
+		_sound->playChannel1(index);
 }
 
 void DreamWebEngine::checkForExit(Sprite *sprite) {
@@ -1192,3 +1018,4 @@ void DreamWebEngine::checkForExit(Sprite *sprite) {
 }
 
 } // End of namespace DreamWeb
+

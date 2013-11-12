@@ -36,8 +36,8 @@
 
 namespace Sci {
 
-GfxText16::GfxText16(ResourceManager *resMan, GfxCache *cache, GfxPorts *ports, GfxPaint16 *paint16, GfxScreen *screen)
-	: _resMan(resMan), _cache(cache), _ports(ports), _paint16(paint16), _screen(screen) {
+GfxText16::GfxText16(GfxCache *cache, GfxPorts *ports, GfxPaint16 *paint16, GfxScreen *screen)
+	: _cache(cache), _ports(ports), _paint16(paint16), _screen(screen) {
 	init();
 }
 
@@ -100,7 +100,7 @@ int16 GfxText16::CodeProcessing(const char *&text, GuiResourceId orgFontId, int1
 	//  cX -> sets textColor to _textColors[X-1]
 	curCode = textCode[0];
 	curCodeParm = textCode[1];
-	if (isdigit(static_cast<unsigned char>(curCodeParm))) {
+	if (Common::isDigit(curCodeParm)) {
 		curCodeParm -= '0';
 	} else {
 		curCodeParm = -1;

@@ -33,7 +33,7 @@
 #include "common/textconsole.h"
 #include "common/util.h"
 
-#if defined (_WIN32_WCE) || defined (__SYMBIAN32__) || defined(__GP32__) || defined(GP2X) || defined (__MAEMO__) || defined(__DS__) || defined (__MINT__) || defined(__N64__)
+#if defined(_WIN32_WCE) || defined(__SYMBIAN32__) || defined(__GP32__) || defined(GP2X) || defined(__MAEMO__) || defined(__DS__) || defined(__MINT__) || defined(__N64__)
 #include "common/config-manager.h"
 #endif
 
@@ -223,7 +223,7 @@ static int *ENV_CURVE;
 
 
 /* multiple table */
-#define ML(a) (int)(a * 2)
+#define ML(a) (uint)(a * 2)
 static const uint MUL_TABLE[16]= {
 /* 1/2, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15 */
 	ML(0.50), ML(1.00), ML(2.00),  ML(3.00), ML(4.00), ML(5.00), ML(6.00), ML(7.00),
@@ -1226,7 +1226,7 @@ FM_OPL *makeAdLibOPL(int rate) {
 	// We need to emulate one YM3812 chip
 	int env_bits = FMOPL_ENV_BITS_HQ;
 	int eg_ent = FMOPL_EG_ENT_HQ;
-#if defined (_WIN32_WCE) || defined(__SYMBIAN32__) || defined(__GP32__) || defined (GP2X) || defined(__MAEMO__) || defined(__DS__) || defined (__MINT__) || defined(__N64__)
+#if defined(_WIN32_WCE) || defined(__SYMBIAN32__) || defined(__GP32__) || defined(GP2X) || defined(__MAEMO__) || defined(__DS__) || defined(__MINT__) || defined(__N64__)
 	if (ConfMan.hasKey("FM_high_quality") && ConfMan.getBool("FM_high_quality")) {
 		env_bits = FMOPL_ENV_BITS_HQ;
 		eg_ent = FMOPL_EG_ENT_HQ;

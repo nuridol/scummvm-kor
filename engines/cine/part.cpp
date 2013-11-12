@@ -57,7 +57,7 @@ void loadPart(const char *partName) {
 		g_cine->_partFileHandle.readUint32BE(); // unused
 	}
 
-	if (g_cine->getGameType() == Cine::GType_FW && g_cine->getPlatform() == Common::kPlatformPC && strcmp(partName, "BASESON.SND") != 0)
+	if (g_cine->getGameType() == Cine::GType_FW && g_cine->getPlatform() == Common::kPlatformDOS && strcmp(partName, "BASESON.SND") != 0)
 		loadPal(partName);
 }
 
@@ -263,7 +263,7 @@ byte *readBundleSoundFile(const char *entryName, uint32 *size) {
 /** Rotate byte value to the left by n bits */
 byte rolByte(byte value, uint n) {
 	n %= 8;
-	return (byte) ((value << n) | (value >> (8 - n)));
+	return (byte)((value << n) | (value >> (8 - n)));
 }
 
 byte *readFile(const char *filename, bool crypted) {

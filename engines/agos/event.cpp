@@ -365,7 +365,7 @@ void AGOSEngine::drawStuff(const byte *src, uint xoffs) {
 	const uint8 y = (getPlatform() == Common::kPlatformAtariST) ? 132 : 135;
 
 	Graphics::Surface *screen = _system->lockScreen();
-	byte *dst = (byte *)screen->pixels + y * screen->pitch + xoffs;
+	byte *dst = (byte *)screen->getBasePtr(xoffs, y);
 
 	for (uint h = 0; h < 6; h++) {
 		memcpy(dst, src, 4);
@@ -467,11 +467,7 @@ void AGOSEngine::delay(uint amount) {
 					memset(_saveLoadName, 0, sizeof(_saveLoadName));
 					sprintf(_saveLoadName, "Quick %d", _saveLoadSlot);
 					_saveLoadType = (event.kbd.hasFlags(Common::KBD_ALT)) ? 1 : 2;
-
-					// We should only allow a load or save when it was possible in original
-					// This stops load/save during copy protection, conversations and cut scenes
-					if (!_mouseHideCount && !_showPreposition)
-						quickLoadOrSave();
+					quickLoadOrSave();
 				} else if (event.kbd.hasFlags(Common::KBD_CTRL)) {
 					if (event.kbd.keycode == Common::KEYCODE_a) {
 						GUI::Dialog *_aboutDialog;

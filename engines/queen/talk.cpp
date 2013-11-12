@@ -96,7 +96,6 @@ void Talk::talk(const char *filename, int personInRoom, char *cutawayFilename) {
 	}
 
 	int16 oldLevel = 0;
-	bool personWalking = false; // FIXME: unused
 
 	// Lines 828-846 in talk.c
 	for (i = 1; i <= 4; i++) {
@@ -174,8 +173,7 @@ void Talk::talk(const char *filename, int personInRoom, char *cutawayFilename) {
 
 		if (1 == choicesLeft) {
 			// Automatically run the final dialogue option
-			if (speak(_talkString[0], &person, otherVoiceFilePrefix))
-				personWalking = true;
+			speak(_talkString[0], &person, otherVoiceFilePrefix);
 
 			if (_vm->input()->talkQuit())
 				break;
@@ -251,8 +249,7 @@ void Talk::talk(const char *filename, int personInRoom, char *cutawayFilename) {
 			findDialogueString(_person1PtrOff, head, _pMax, _talkString[0]);
 			if (_talkString[0][0] != '\0') {
 				sprintf(otherVoiceFilePrefix, "%2d%4xP", _talkKey, head);
-				if (speak(_talkString[0], &person, otherVoiceFilePrefix))
-					personWalking = true;
+				speak(_talkString[0], &person, otherVoiceFilePrefix);
 			}
 		}
 	}
@@ -657,7 +654,7 @@ void Talk::stringAnimation(const SpeechParameters *parameters, int startFrame, i
 	} else if (parameters->animation[0] == 'E') {
 		// Talking head animation
 		return;
-	} else if (!isdigit(static_cast<unsigned char>(parameters->animation[0]))) {
+	} else if (!Common::isDigit(parameters->animation[0])) {
 		debug(6, "Error in speak string animation: '%s'", parameters->animation);
 		return;
 	} else

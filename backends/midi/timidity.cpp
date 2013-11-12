@@ -148,7 +148,7 @@ MidiDriver_TIMIDITY::MidiDriver_TIMIDITY() {
 
 int MidiDriver_TIMIDITY::open() {
 	char *res;
-	char timidity_host[MAXHOSTNAMELEN];
+	char timidity_host[NI_MAXHOST];
 	int timidity_port, data_port, i;
 
 	/* count ourselves open */
@@ -559,4 +559,4 @@ Common::Error TimidityMusicPlugin::createInstance(MidiDriver **mididriver, MidiD
 	REGISTER_PLUGIN_STATIC(TIMIDITY, PLUGIN_TYPE_MUSIC, TimidityMusicPlugin);
 //#endif
 
-#endif // defined (USE_TIMIDITY)
+#endif // defined(USE_TIMIDITY)

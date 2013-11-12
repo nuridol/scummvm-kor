@@ -61,7 +61,7 @@ static const HugoGameDescription gameDescriptions[] = {
 			"hugo1", 0,
 			AD_ENTRY1s("house.art", "c9403b2fe539185c9fd569b6cc4ff5ca", 14811),
 			Common::EN_ANY,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
 			GUIO0()
 		},
@@ -85,7 +85,7 @@ static const HugoGameDescription gameDescriptions[] = {
 			"hugo2", 0,
 			AD_ENTRY1s("objects.dat", "88a718cc0ff2b3b25d49aaaa69d6d52c", 155240),
 			Common::EN_ANY,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			GF_PACKED,
 			GUIO0()
 		},
@@ -109,7 +109,7 @@ static const HugoGameDescription gameDescriptions[] = {
 			"hugo3", 0,
 			AD_ENTRY1s("objects.dat", "bb1b061538a445f2eb99b682c0f506cc", 136419),
 			Common::EN_ANY,
-			Common::kPlatformPC,
+			Common::kPlatformDOS,
 			GF_PACKED,
 			GUIO0()
 		},
@@ -243,9 +243,6 @@ SaveStateDescriptor HugoMetaEngine::querySaveMetaInfos(const char *target, int s
 
 		Graphics::Surface *const thumbnail = Graphics::loadThumbnail(*file);
 		desc.setThumbnail(thumbnail);
-
-		desc.setDeletableFlag(true);
-		desc.setWriteProtectedFlag(false);
 
 		uint32 saveDate = file->readUint32BE();
 		uint16 saveTime = file->readUint16BE();

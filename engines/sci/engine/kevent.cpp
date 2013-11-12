@@ -87,10 +87,11 @@ reg_t kGetEvent(EngineState *s, int argc, reg_t *argv) {
 		g_sci->getVocabulary()->parser_event = NULL_REG; // Invalidate parser event
 
 	if (s->_cursorWorkaroundActive) {
-		// ffs: GfxCursor::setPosition()
-		// we check, if actual cursor position is inside given rect
-		//  if that's the case, we switch ourself off. Otherwise
-		//  we simulate the original set position to the scripts
+		// We check if the actual cursor position is inside specific rectangles
+		// where the cursor itself should be moved to. If this is the case, we
+		// set the mouse cursor's position to be within the rectangle in
+		// question. Check GfxCursor::setPosition(), for a more detailed
+		// explanation and a list of cursor position workarounds.
 		if (s->_cursorWorkaroundRect.contains(mousePos.x, mousePos.y)) {
 			s->_cursorWorkaroundActive = false;
 		} else {
@@ -157,7 +158,7 @@ reg_t kGetEvent(EngineState *s, int argc, reg_t *argv) {
 		s->r_acc = NULL_REG;
 	}
 
-	if ((s->r_acc.offset) && (g_sci->_debugState.stopOnEvent)) {
+	if ((s->r_acc.getOffset()) && (g_sci->_debugState.stopOnEvent)) {
 		g_sci->_debugState.stopOnEvent = false;
 
 		// A SCI event occurred, and we have been asked to stop, so open the debug console
@@ -248,7 +249,7 @@ reg_t kGlobalToLocal(EngineState *s, int argc, reg_t *argv) {
 	reg_t planeObject = argc > 1 ? argv[1] : NULL_REG; // SCI32
 	SegManager *segMan = s->_segMan;
 
-	if (obj.segment) {
+	if (obj.getSegment()) {
 		int16 x = readSelectorValue(segMan, obj, SELECTOR(x));
 		int16 y = readSelectorValue(segMan, obj, SELECTOR(y));
 
@@ -267,7 +268,7 @@ reg_t kLocalToGlobal(EngineState *s, int argc, reg_t *argv) {
 	reg_t planeObject = argc > 1 ? argv[1] : NULL_REG; // SCI32
 	SegManager *segMan = s->_segMan;
 
-	if (obj.segment) {
+	if (obj.getSegment()) {
 		int16 x = readSelectorValue(segMan, obj, SELECTOR(x));
 		int16 y = readSelectorValue(segMan, obj, SELECTOR(y));
 

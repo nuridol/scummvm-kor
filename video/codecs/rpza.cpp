@@ -28,22 +28,17 @@
 #include "common/system.h"
 #include "common/stream.h"
 #include "common/textconsole.h"
-#include "graphics/colormasks.h"
 
 namespace Video {
 
 RPZADecoder::RPZADecoder(uint16 width, uint16 height) : Codec() {
-	_pixelFormat = g_system->getScreenFormat();
-
 	// We need to increase the surface size to a multiple of 4
 	uint16 wMod = width % 4;
-	if(wMod != 0)
+	if (wMod != 0)
 		width += 4 - wMod;
 
-	debug(2, "RPZA corrected width: %d", width);
-
 	_surface = new Graphics::Surface();
-	_surface->create(width, height, _pixelFormat);
+	_surface->create(width, height, getPixelFormat());
 }
 
 RPZADecoder::~RPZADecoder() {
@@ -59,18 +54,11 @@ RPZADecoder::~RPZADecoder() {
 	} \
 	totalBlocks--; \
 	if (totalBlocks < 0) \
-		error("block counter just went negative (this should not happen)") \
+		error("rpza block counter just went negative (this should not happen)") \
 
-// Convert from RGB555 to the format specified by the screen
 #define PUT_PIXEL(color) \
-	if ((int32)blockPtr < _surface->w * _surface->h) { \
-		byte r = 0, g = 0, b = 0; \
-		Graphics::colorToRGB<Graphics::ColorMasks<555> >(color, r, g, b); \
-		if (_pixelFormat.bytesPerPixel == 2) \
-			*((uint16 *)_surface->pixels + blockPtr) = _pixelFormat.RGBToColor(r, g, b); \
-		else \
-			*((uint32 *)_surface->pixels + blockPtr) = _pixelFormat.RGBToColor(r, g, b); \
-	} \
+	if ((int32)blockPtr < _surface->w * _surface->h) \
+		WRITE_UINT16((uint16 *)_surface->getPixels() + blockPtr, color); \
 	blockPtr++
 
 const Graphics::Surface *RPZADecoder::decodeImage(Common::SeekableReadStream *stream) {
@@ -175,7 +163,7 @@ const Graphics::Surface *RPZADecoder::decodeImage(Common::SeekableReadStream *st
 				blockPtr = rowPtr + pixelPtr;
 				for (byte pixel_y = 0; pixel_y < 4; pixel_y++) {
 					byte index = stream->readByte();
-					for (byte pixel_x = 0; pixel_x < 4; pixel_x++){
+					for (byte pixel_x = 0; pixel_x < 4; pixel_x++) {
 						byte idx = (index >> (2 * (3 - pixel_x))) & 0x03;
 						PUT_PIXEL(color4[idx]);
 					}
@@ -189,7 +177,7 @@ const Graphics::Surface *RPZADecoder::decodeImage(Common::SeekableReadStream *st
 		case 0x00:
 			blockPtr = rowPtr + pixelPtr;
 			for (byte pixel_y = 0; pixel_y < 4; pixel_y++) {
-				for (byte pixel_x = 0; pixel_x < 4; pixel_x++){
+				for (byte pixel_x = 0; pixel_x < 4; pixel_x++) {
 					// We already have color of upper left pixel
 					if (pixel_y != 0 || pixel_x != 0)
 						colorA = stream->readUint16BE();

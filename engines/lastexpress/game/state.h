@@ -502,6 +502,7 @@ public:
 			volume = _defaultVolume;
 
 			//Game data
+			field_0 = 0;
 			time = kTimeCityParis;
 			timeDelta = _defaultTimeDelta;
 			timeTicks = 0;
@@ -620,6 +621,8 @@ public:
 
 	State(LastExpressEngine *engine);
 	~State();
+
+	void reset();
 
 	// Accessors
 	Inventory  *getGameInventory() { return _inventory; }

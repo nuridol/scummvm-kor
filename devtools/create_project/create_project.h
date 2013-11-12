@@ -23,6 +23,10 @@
 #ifndef TOOLS_CREATE_PROJECT_H
 #define TOOLS_CREATE_PROJECT_H
 
+#ifndef __has_feature         // Optional of course.
+  #define __has_feature(x) 0  // Compatibility with non-clang compilers.
+#endif
+
 #include <map>
 #include <list>
 #include <string>
@@ -30,6 +34,30 @@
 #include <cassert>
 
 typedef std::list<std::string> StringList;
+
+typedef StringList TokenList;
+
+/**
+ * Takes a given input line and creates a list of tokens out of it.
+ *
+ * A token in this context is separated by whitespaces. A special case
+ * are quotation marks though. A string inside quotation marks is treated
+ * as single token, even when it contains whitespaces.
+ *
+ * Thus for example the input:
+ * foo bar "1 2 3 4" ScummVM
+ * will create a list with the following entries:
+ * "foo", "bar", "1 2 3 4", "ScummVM"
+ * As you can see the quotation marks will get *removed* too.
+ *
+ * You can also use this with non-whitespace by passing another separator
+ * character (e.g. ',').
+ *
+ * @param input The text to be tokenized.
+ * @param separator The token separator.
+ * @return A list of tokens.
+ */
+TokenList tokenize(const std::string &input, char separator = ' ');
 
 /**
  * Structure to describe a game engine to be built into ScummVM.
@@ -197,13 +225,16 @@ struct BuildSetup {
 
 	StringList defines;   ///< List of all defines for the build.
 	StringList libraries; ///< List of all external libraries required for the build.
+	StringList testDirs;  ///< List of all folders containing tests
 
 	bool devTools;         ///< Generate project files for the tools
+	bool tests;             ///< Generate project files for the tests
 	bool runBuildEvents;   ///< Run build events as part of the build (generate revision number and copy engine/theme data & needed files to the build folder
 	bool createInstaller;  ///< Create NSIS installer after the build
 
 	BuildSetup() {
 		devTools        = false;
+		tests           = false;
 		runBuildEvents  = false;
 		createInstaller = false;
 	}
@@ -276,6 +307,14 @@ void splitFilename(const std::string &fileName, std::string &name, std::string &
 bool producesObjectFile(const std::string &fileName);
 
 /**
+* Convert an integer to string
+*
+* @param num the integer to convert
+* @return string representation of the number
+*/
+std::string toString(int num);
+
+/**
  * Structure representing a file tree. This contains two
  * members: name and children. "name" holds the name of
  * the node. "children" does contain all the node's children.
@@ -315,7 +354,15 @@ public:
 	 *
 	 * @param setup Description of the desired build setup.
 	 */
-	void createProject(const BuildSetup &setup);
+	void createProject(BuildSetup &setup);
+
+	/**
+	 * Returns the last path component.
+	 *
+	 * @param path Path string.
+	 * @return Last path component.
+	 */
+	static std::string getLastPathComponent(const std::string &path);
 
 protected:
 	const int _version;                                      ///< Target project version
@@ -398,10 +445,11 @@ protected:
 	 *
 	 * @param moduleDir Path to the module.
 	 * @param defines List of set defines.
+	 * @param testDirs List of folders containing tests.
 	 * @param includeList Reference to a list, where included files should be added.
 	 * @param excludeList Reference to a list, where excluded files should be added.
 	 */
-	void createModuleList(const std::string &moduleDir, const StringList &defines, StringList &includeList, StringList &excludeList) const;
+	void createModuleList(const std::string &moduleDir, const StringList &defines, StringList &testDirs, StringList &includeList, StringList &excludeList) const;
 
 	/**
 	 * Creates an UUID for every enabled engine of the
@@ -416,7 +464,7 @@ protected:
 	 * Creates an UUID for every enabled tool of the
 	 * passed build description.
 	 *
-	 * @return A map, which includes UUIDs for all enabled engines.
+	 * @return A map, which includes UUIDs for all enabled tools.
 	 */
 	UUIDMap createToolsUUIDMap() const;
 

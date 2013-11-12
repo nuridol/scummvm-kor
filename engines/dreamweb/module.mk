@@ -7,11 +7,13 @@ MODULE_OBJS := \
 	dreamweb.o \
 	keypad.o \
 	monitor.o \
+	mouse.o \
 	newplace.o \
 	object.o \
 	pathfind.o \
 	people.o \
 	print.o \
+	rain.o \
 	saveload.o \
 	sound.o \
 	sprite.o \

@@ -56,10 +56,7 @@ protected:
 	ListWidget		*_list;
 	ButtonWidget	*_addButton;
 	Widget			*_startButton;
-//#ifdef SCUMMVMKOR
-//	Widget			*_resumeButton;
-//#endif
-	Widget			*_loadButton;
+	ButtonWidget	*_loadButton;
 	Widget			*_editButton;
 	Widget			*_removeButton;
 #ifndef DISABLE_FANCY_THEMES
@@ -83,6 +80,7 @@ protected:
 	void updateListing();
 
 	void updateButtons();
+	void switchButtonsText(ButtonWidget *button, const char *normalText, const char *shiftedText);
 
 	void open();
 	void close();
@@ -103,6 +101,16 @@ protected:
 	void editGame(int item);
 
 	/**
+	 * Facade for "Load..."/"Record..." buttons.
+	 */
+	void loadGameButtonPressed(int item);
+
+	/**
+	 * Handle "Record..." button.
+	 */
+	void recordGame(int item);
+
+	/**
 	 * Handle "Load..." button.
 	 */
 	void loadGame(int item);
@@ -114,6 +122,8 @@ protected:
 	 * @target	name of target to select
 	 */
 	void selectTarget(const String &target);
+private:
+	bool checkModifier(int modifier);
 };
 
 } // End of namespace GUI

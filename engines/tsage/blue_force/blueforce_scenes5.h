@@ -225,10 +225,10 @@ public:
 	NamedObject _object6;
 	PicturePart _picture1, _picture2, _picture3, _picture4;
 	Computer _computer;
-	NamedHotspot _chair, _lamp, _item4, _trophy, _watercolours, _fileCabinets;
+	NamedHotspot _chair, _lamp, _item4, _trophy, _waterColors, _fileCabinets;
 	NamedHotspot _certificate, _bookcase, _desk, _carpet, _item12, _office;
 	ASound _sound1;
-	bool _field380; 
+	bool _field380;
 	bool _field11EA;
 	Common::Point _destPosition;
 
@@ -257,7 +257,8 @@ class Scene570: public SceneExt {
 	class Icon: public NamedObject {
 	public:
 		SceneText _sceneText;
-		int _iconId, _folderId, _parentFolderId, _mode;
+		int _iconId, _folderId, _parentFolderId;
+		int _mode; // Useless variable
 		Common::String _text;
 
 		Icon();

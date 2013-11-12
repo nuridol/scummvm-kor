@@ -40,7 +40,8 @@ void KyraRpgEngine::removeInputTop() {
 }
 
 void KyraRpgEngine::gui_drawBox(int x, int y, int w, int h, int frameColor1, int frameColor2, int fillColor) {
-	w--; h--;
+	w--;
+	h--;
 	if (fillColor != -1)
 		screen()->fillRect(x + 1, y + 1, x + w - 1, y + h - 1, fillColor);
 
@@ -72,11 +73,11 @@ void KyraRpgEngine::gui_drawHorizontalBarGraph(int x, int y, int w, int h, int32
 		screen()->fillRect(x, y, x + t - 1, y + h, col1);
 
 	if (t < w && col2)
-		screen()->fillRect(x + t, y, x + w, y + h, col2);
+		screen()->fillRect(x + t, y, x + w - 1, y + h, col2);
 }
 
-void KyraRpgEngine::gui_initButtonsFromList(const int16 *list) {
-	while (*list != -1)
+void KyraRpgEngine::gui_initButtonsFromList(const uint8 *list) {
+	while (*list != 0xFF)
 		gui_initButton(*list++);
 }
 
@@ -106,7 +107,7 @@ bool KyraRpgEngine::clickedShape(int shapeIndex) {
 
 		uint16 s = _levelDecorationProperties[shapeIndex].shapeIndex[1];
 
-		if (s == 0xffff)
+		if (s == 0xFFFF)
 			continue;
 
 		int w = _flags.gameID == GI_LOL ? _levelDecorationShapes[s][3] : (_levelDecorationShapes[s][2] << 3);
@@ -128,6 +129,6 @@ bool KyraRpgEngine::clickedShape(int shapeIndex) {
 	return false;
 }
 
-}	// End of namespace Kyra
+} // End of namespace Kyra
 
 #endif // defined(ENABLE_EOB) || defined(ENABLE_LOL)

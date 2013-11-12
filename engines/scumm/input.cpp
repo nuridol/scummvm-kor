@@ -535,7 +535,7 @@ void ScummEngine::processKeyboard(Common::KeyState lastKeyHit) {
 
 		openMainMenuDialog();		// Display global main menu
 
-		if (VAR_SAVELOAD_SCRIPT != 0xFF && _currentRoom != 0)
+		if (VAR_SAVELOAD_SCRIPT2 != 0xFF && _currentRoom != 0)
 			runScript(VAR(VAR_SAVELOAD_SCRIPT2), 0, 0, 0);
 
 	} else if (restartKeyEnabled && (lastKeyHit.keycode == Common::KEYCODE_F8 && lastKeyHit.hasFlags(0))) {
@@ -583,26 +583,7 @@ void ScummEngine::processKeyboard(Common::KeyState lastKeyHit) {
 
 		ConfMan.setInt("music_volume", vol);
 		syncSoundSettings();
-#ifdef SCUMMVMKOR
-	} else if (pauseKeyEnabled && (lastKeyHit.keycode == Common::KEYCODE_F12 && lastKeyHit.hasFlags(0))) {
-		pauseGame();
-		
-	} else if (lastKeyHit.ascii == '*' || lastKeyHit.ascii == '+') { // Change text speed
-		if (lastKeyHit.ascii == '*' && _defaultTalkDelay > 0)
-			_defaultTalkDelay--;
-		else if (lastKeyHit.ascii == '+' && _defaultTalkDelay < 9)
-			_defaultTalkDelay++;
-		
-		// Display the talk speed
-		ValueDisplayDialog dlg("Subtitle speed: ", 0, 9, _defaultTalkDelay, '+', '*');
-		_defaultTalkDelay = runDialog(dlg);
-		
-		// Save the new talkspeed value to ConfMan
-		setTalkSpeed(_defaultTalkDelay);
-		
-		if (VAR_CHARINC != 0xFF)
-			VAR(VAR_CHARINC) = _defaultTalkDelay;
-#else
+
 	} else if (lastKeyHit.ascii == '-' || lastKeyHit.ascii == '+') { // Change text speed
 		if (lastKeyHit.ascii == '+' && _defaultTalkDelay > 0)
 			_defaultTalkDelay--;
@@ -618,7 +599,7 @@ void ScummEngine::processKeyboard(Common::KeyState lastKeyHit) {
 
 		if (VAR_CHARINC != 0xFF)
 			VAR(VAR_CHARINC) = _defaultTalkDelay;
-#endif
+
 	} else {
 
 		if (lastKeyHit.keycode >= Common::KEYCODE_F1 &&

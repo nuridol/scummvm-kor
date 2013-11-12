@@ -16,6 +16,7 @@ MODULE_OBJS := \
 	gfx/fontresource.o \
 	gfx/graphicengine.o \
 	gfx/graphicengine_script.o \
+	gfx/microtiles.o \
 	gfx/panel.o \
 	gfx/renderobject.o \
 	gfx/renderobjectmanager.o \
@@ -84,11 +85,6 @@ MODULE_OBJS := \
 	util/pluto/pdep.o \
 	util/pluto/pluto.o \
 	util/pluto/plzio.o
-
-ifdef USE_THEORADEC
-MODULE_OBJS += \
-	fmv/theora_decoder.o
-endif
 
 # This module can be built as a plugin
 ifeq ($(ENABLE_SWORD25), DYNAMIC_PLUGIN)

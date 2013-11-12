@@ -48,12 +48,12 @@ InputPersistenceBlock::~InputPersistenceBlock() {
 }
 
 void InputPersistenceBlock::read(int16 &value) {
-	signed int v;
+	int32 v;
 	read(v);
 	value = static_cast<int16>(v);
 }
 
-void InputPersistenceBlock::read(signed int &value) {
+void InputPersistenceBlock::read(int32 &value) {
 	if (checkMarker(SINT_MARKER)) {
 		value = (int32)READ_LE_UINT32(_iter);
 		_iter += 4;
@@ -62,7 +62,7 @@ void InputPersistenceBlock::read(signed int &value) {
 	}
 }
 
-void InputPersistenceBlock::read(uint &value) {
+void InputPersistenceBlock::read(uint32 &value) {
 	if (checkMarker(UINT_MARKER)) {
 		value = READ_LE_UINT32(_iter);
 		_iter += 4;
@@ -86,7 +86,7 @@ void InputPersistenceBlock::read(bool &value) {
 	if (checkMarker(BOOL_MARKER)) {
 		uint uintBool = READ_LE_UINT32(_iter);
 		_iter += 4;
-		value = uintBool == 0 ? false : true;
+		value = uintBool != 0;
 	} else {
 		value = false;
 	}
@@ -96,7 +96,7 @@ void InputPersistenceBlock::readString(Common::String &value) {
 	value = "";
 
 	if (checkMarker(STRING_MARKER)) {
-		uint size;
+		uint32 size;
 		read(size);
 
 		if (checkBlockSize(size)) {
@@ -108,7 +108,7 @@ void InputPersistenceBlock::readString(Common::String &value) {
 
 void InputPersistenceBlock::readByteArray(Common::Array<byte> &value) {
 	if (checkMarker(BLOCK_MARKER)) {
-		uint size;
+		uint32 size;
 		read(size);
 
 		if (checkBlockSize(size)) {

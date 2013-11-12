@@ -75,6 +75,10 @@ AudioVolumeResourceSource::AudioVolumeResourceSource(ResourceManager *resMan, co
 		delete fileStream;
 }
 
+AudioVolumeResourceSource::~AudioVolumeResourceSource() {
+	delete[] _audioCompressionOffsetMapping;
+}
+
 bool Resource::loadFromWaveFile(Common::SeekableReadStream *file) {
 	data = new byte[size];
 
@@ -198,7 +202,7 @@ void ResourceManager::readWaveAudioPatches() {
 	for (Common::ArchiveMemberList::const_iterator x = files.begin(); x != files.end(); ++x) {
 		Common::String name = (*x)->getName();
 
-		if (isdigit(static_cast<unsigned char>(name[0])))
+		if (Common::isDigit(name[0]))
 			processWavePatch(ResourceId(kResourceTypeAudio, atoi(name.c_str())), name);
 	}
 }

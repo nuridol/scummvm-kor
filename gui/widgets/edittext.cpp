@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "common/system.h"
 #include "gui/widgets/edittext.h"
 #include "gui/gui-manager.h"
 
@@ -33,6 +34,7 @@ EditTextWidget::EditTextWidget(GuiObject *boss, int x, int y, int w, int h, cons
 	_finishCmd = finishCmd;
 
 	setEditString(text);
+	setFontStyle(ThemeEngine::kFontStyleNormal);
 }
 
 EditTextWidget::EditTextWidget(GuiObject *boss, const String &name, const String &text, const char *tooltip, uint32 cmd, uint32 finishCmd)
@@ -42,6 +44,7 @@ EditTextWidget::EditTextWidget(GuiObject *boss, const String &name, const String
 	_finishCmd = finishCmd;
 
 	setEditString(text);
+	setFontStyle(ThemeEngine::kFontStyleNormal);
 }
 
 void EditTextWidget::setEditString(const String &str) {
@@ -77,19 +80,28 @@ void EditTextWidget::handleMouseDown(int x, int y, int button, int clickCount) {
 	}
 	if (setCaretPos(i))
 		draw();
-}
 
+#ifdef TIZEN
+	// Display the virtual keypad to allow text entry. Samsung app-store testers expected
+	// the keypad to be displayed when clicking the filter edit control in the laucher gui.
+	g_system->setFeatureState(OSystem::kFeatureVirtualKeyboard, true);
+#endif
+}
 
 void EditTextWidget::drawWidget() {
 	g_gui.theme()->drawWidgetBackground(Common::Rect(_x, _y, _x+_w, _y+_h), 0, ThemeEngine::kWidgetBackgroundEditText);
 
 	// Draw the text
 	adjustOffset();
-	g_gui.theme()->drawText(Common::Rect(_x+2+ _leftPadding,_y+2, _x+_leftPadding+getEditRect().width()+2, _y+_h-2), _editString, _state, Graphics::kTextAlignLeft, ThemeEngine::kTextInversionNone, -_editScrollOffset, false, _font);
+	
+	const Common::Rect &r = Common::Rect(_x + 2 + _leftPadding, _y + 2, _x + _leftPadding + getEditRect().width() + 8, _y + _h);
+	setTextDrawableArea(r);
+
+	g_gui.theme()->drawText(Common::Rect(_x + 2 + _leftPadding, _y + 2, _x + _leftPadding + getEditRect().width() + 2, _y + _h), _editString, _state, Graphics::kTextAlignLeft, ThemeEngine::kTextInversionNone, -_editScrollOffset, false, _font, ThemeEngine::kFontColorNormal, true, _textDrawableArea);
 }
 
 Common::Rect EditTextWidget::getEditRect() const {
-	Common::Rect r(2 + _leftPadding, 2, _w - 2 - _leftPadding - _rightPadding, _h-1);
+	Common::Rect r(2 + _leftPadding, 2, _w - 2 - _leftPadding - _rightPadding, _h - 1);
 
 	return r;
 }

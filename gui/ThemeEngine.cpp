@@ -30,11 +30,11 @@
 
 #include "graphics/cursorman.h"
 #include "graphics/fontman.h"
-#include "graphics/imagedec.h"
 #include "graphics/surface.h"
 #include "graphics/VectorRenderer.h"
 #include "graphics/fonts/bdf.h"
 #include "graphics/fonts/ttf.h"
+#include "graphics/decoders/bmp.h"
 
 #include "gui/widget.h"
 #include "gui/ThemeEngine.h"
@@ -47,6 +47,17 @@ const char * const ThemeEngine::kImageLogo = "logo.bmp";
 const char * const ThemeEngine::kImageLogoSmall = "logo_small.bmp";
 const char * const ThemeEngine::kImageSearch = "search.bmp";
 const char * const ThemeEngine::kImageEraser = "eraser.bmp";
+const char * const ThemeEngine::kImageDelbtn = "delbtn.bmp";
+const char * const ThemeEngine::kImageList = "list.bmp";
+const char * const ThemeEngine::kImageGrid = "grid.bmp";
+const char * const ThemeEngine::kImageStopbtn = "stopbtn.bmp";
+const char * const ThemeEngine::kImageEditbtn = "editbtn.bmp";
+const char * const ThemeEngine::kImageSwitchModebtn = "switchbtn.bmp";
+const char * const ThemeEngine::kImageFastReplaybtn = "fastreplay.bmp";
+const char * const ThemeEngine::kImageStopSmallbtn = "stopbtn_small.bmp";
+const char * const ThemeEngine::kImageEditSmallbtn = "editbtn_small.bmp";
+const char * const ThemeEngine::kImageSwitchModeSmallbtn = "switchbtn_small.bmp";
+const char * const ThemeEngine::kImageFastReplaySmallbtn = "fastreplay_small.bmp";
 
 struct TextDrawData {
 	const Graphics::Font *_fontPtr;
@@ -111,15 +122,16 @@ protected:
 
 class ThemeItemTextData : public ThemeItem {
 public:
-	ThemeItemTextData(ThemeEngine *engine, const TextDrawData *data, const TextColorData *color, const Common::Rect &area, const Common::String &text,
-	                  Graphics::TextAlign alignH, GUI::ThemeEngine::TextAlignVertical alignV,
+	ThemeItemTextData(ThemeEngine *engine, const TextDrawData *data, const TextColorData *color, const Common::Rect &area, const Common::Rect &textDrawableArea,
+	                  const Common::String &text, Graphics::TextAlign alignH, GUI::ThemeEngine::TextAlignVertical alignV,
 	                  bool ellipsis, bool restoreBg, int deltaX) :
 		ThemeItem(engine, area), _data(data), _color(color), _text(text), _alignH(alignH), _alignV(alignV),
-		_ellipsis(ellipsis), _restoreBg(restoreBg), _deltax(deltaX) {}
+		_ellipsis(ellipsis), _restoreBg(restoreBg), _deltax(deltaX), _textDrawableArea(textDrawableArea) {}
 
 	void drawSelf(bool draw, bool restore);
 
 protected:
+	Common::Rect _textDrawableArea;
 	const TextDrawData *_data;
 	const TextColorData *_color;
 	Common::String _text;
@@ -174,6 +186,7 @@ static const DrawDataInfo kDrawDataDefaults[] = {
 	{kDDButtonIdle,                 "button_idle",      true,   kDDWidgetBackgroundSlider},
 	{kDDButtonHover,                "button_hover",     false,  kDDButtonIdle},
 	{kDDButtonDisabled,             "button_disabled",  true,   kDDNone},
+	{kDDButtonPressed,              "button_pressed",   false,  kDDButtonIdle},
 
 	{kDDSliderFull,                 "slider_full",      false,  kDDNone},
 	{kDDSliderHover,                "slider_hover",     false,  kDDNone},
@@ -234,7 +247,7 @@ void ThemeItemTextData::drawSelf(bool draw, bool restore) {
 
 	if (draw) {
 		_engine->renderer()->setFgColor(_color->r, _color->g, _color->b);
-		_engine->renderer()->drawString(_data->_fontPtr, _text, _area, _alignH, _alignV, _deltax, _ellipsis);
+		_engine->renderer()->drawString(_data->_fontPtr, _text, _area, _alignH, _alignV, _deltax, _ellipsis, _textDrawableArea);
 	}
 
 	_engine->addDirtyRect(_area);
@@ -331,9 +344,9 @@ ThemeEngine::~ThemeEngine() {
  *********************************************************/
 const ThemeEngine::Renderer ThemeEngine::_rendererModes[] = {
 	{ _s("Disabled GFX"), _sc("Disabled GFX", "lowres"), "none", kGfxDisabled },
-	{ _s("Standard Renderer (16bpp)"), _s("Standard (16bpp)"), "normal_16bpp", kGfxStandard16bit },
+	{ _s("Standard Renderer"), _s("Standard"), "normal", kGfxStandard },
 #ifndef DISABLE_FANCY_THEMES
-	{ _s("Antialiased Renderer (16bpp)"), _s("Antialiased (16bpp)"), "aa_16bpp", kGfxAntialias16bit }
+	{ _s("Antialiased Renderer"), _s("Antialiased"), "antialias", kGfxAntialias }
 #endif
 };
 
@@ -341,9 +354,9 @@ const uint ThemeEngine::_rendererModesSize = ARRAYSIZE(ThemeEngine::_rendererMod
 
 const ThemeEngine::GraphicsMode ThemeEngine::_defaultRendererMode =
 #ifndef DISABLE_FANCY_THEMES
-	ThemeEngine::kGfxAntialias16bit;
+	ThemeEngine::kGfxAntialias;
 #else
-	ThemeEngine::kGfxStandard16bit;
+	ThemeEngine::kGfxStandard;
 #endif
 
 ThemeEngine::GraphicsMode ThemeEngine::findMode(const Common::String &cfg) {
@@ -377,7 +390,7 @@ bool ThemeEngine::init() {
 	_overlayFormat = _system->getOverlayFormat();
 	setGraphicsMode(_graphicsMode);
 
-	if (_screen.pixels && _backBuffer.pixels) {
+	if (_screen.getPixels() && _backBuffer.getPixels()) {
 		_initOk = true;
 	}
 
@@ -427,7 +440,7 @@ bool ThemeEngine::init() {
 void ThemeEngine::clearAll() {
 	if (_initOk) {
 		_system->clearOverlay();
-		_system->grabOverlay((OverlayColor *)_screen.pixels, _screen.w);
+		_system->grabOverlay(_screen.getPixels(), _screen.pitch);
 	}
 }
 
@@ -452,7 +465,7 @@ void ThemeEngine::refresh() {
 
 		if (_useCursor) {
 			CursorMan.replaceCursorPalette(_cursorPal, 0, _cursorPalSize);
-			CursorMan.replaceCursor(_cursor, _cursorWidth, _cursorHeight, _cursorHotspotX, _cursorHotspotY, 255, _cursorTargetScale);
+			CursorMan.replaceCursor(_cursor, _cursorWidth, _cursorHeight, _cursorHotspotX, _cursorHotspotY, 255, true);
 		}
 	}
 }
@@ -461,11 +474,7 @@ void ThemeEngine::enable() {
 	if (_enabled)
 		return;
 
-	if (_useCursor) {
-		CursorMan.pushCursorPalette(_cursorPal, 0, _cursorPalSize);
-		CursorMan.pushCursor(_cursor, _cursorWidth, _cursorHeight, _cursorHotspotX, _cursorHotspotY, 255, _cursorTargetScale);
-		CursorMan.showMouse(true);
-	}
+	showCursor();
 
 	_system->showOverlay();
 	clearAll();
@@ -478,23 +487,25 @@ void ThemeEngine::disable() {
 
 	_system->hideOverlay();
 
-	if (_useCursor) {
-		CursorMan.popCursorPalette();
-		CursorMan.popCursor();
-	}
+	hideCursor();
+
 
 	_enabled = false;
 }
 
 void ThemeEngine::setGraphicsMode(GraphicsMode mode) {
 	switch (mode) {
-	case kGfxStandard16bit:
+	case kGfxStandard:
 #ifndef DISABLE_FANCY_THEMES
-	case kGfxAntialias16bit:
+	case kGfxAntialias:
 #endif
-		_bytesPerPixel = sizeof(uint16);
-		break;
-
+		if (g_system->getOverlayFormat().bytesPerPixel == 4) {
+			_bytesPerPixel = sizeof(uint32);
+			break;
+		} else if (g_system->getOverlayFormat().bytesPerPixel == 2) {
+			_bytesPerPixel = sizeof(uint16);
+			break;
+		}
 	default:
 		error("Invalid graphics mode");
 	}
@@ -511,6 +522,12 @@ void ThemeEngine::setGraphicsMode(GraphicsMode mode) {
 	delete _vectorRenderer;
 	_vectorRenderer = Graphics::createRenderer(mode);
 	_vectorRenderer->setSurface(&_screen);
+
+	// Since we reinitialized our screen surfaces we know nothing has been
+	// drawn so far. Sometimes we still end up with dirty screen bits in the
+	// list. Clearing it avoids invalid overlay writes when the backend
+	// resizes the overlay.
+	_dirtyScreen.clear();
 }
 
 void WidgetDrawData::calcBackgroundOffset() {
@@ -620,19 +637,24 @@ bool ThemeEngine::addBitmap(const Common::String &filename) {
 	if (surf)
 		return true;
 
-	// If not, try to load the bitmap via the ImageDecoder class.
+	// If not, try to load the bitmap via the BitmapDecoder class.
+	Graphics::BitmapDecoder bitmapDecoder;
+	const Graphics::Surface *srcSurface = 0;
 	Common::ArchiveMemberList members;
 	_themeFiles.listMatchingMembers(members, filename);
 	for (Common::ArchiveMemberList::const_iterator i = members.begin(), end = members.end(); i != end; ++i) {
 		Common::SeekableReadStream *stream = (*i)->createReadStream();
 		if (stream) {
-			surf = Graphics::ImageDecoder::loadFile(*stream, _overlayFormat);
+			bitmapDecoder.loadStream(*stream);
+			srcSurface = bitmapDecoder.getSurface();
 			delete stream;
-
-			if (surf)
+			if (srcSurface)
 				break;
 		}
 	}
+
+	if (srcSurface && srcSurface->format.bytesPerPixel != 1)
+		surf = srcSurface->convertTo(_overlayFormat);
 
 	// Store the surface into our hashmap (attention, may store NULL entries!)
 	_bitmaps[filename] = surf;
@@ -821,7 +843,7 @@ void ThemeEngine::queueDD(DrawData type, const Common::Rect &r, uint32 dynamic, 
 }
 
 void ThemeEngine::queueDDText(TextData type, TextColor color, const Common::Rect &r, const Common::String &text, bool restoreBg,
-                              bool ellipsis, Graphics::TextAlign alignH, TextAlignVertical alignV, int deltax) {
+                              bool ellipsis, Graphics::TextAlign alignH, TextAlignVertical alignV, int deltax, const Common::Rect &drawableTextArea) {
 
 	if (_texts[type] == 0)
 		return;
@@ -829,7 +851,7 @@ void ThemeEngine::queueDDText(TextData type, TextColor color, const Common::Rect
 	Common::Rect area = r;
 	area.clip(_screen.w, _screen.h);
 
-	ThemeItemTextData *q = new ThemeItemTextData(this, _texts[type], _textColors[color], area, text, alignH, alignV, ellipsis, restoreBg, deltax);
+	ThemeItemTextData *q = new ThemeItemTextData(this, _texts[type], _textColors[color], area, drawableTextArea, text, alignH, alignV, ellipsis, restoreBg, deltax);
 
 	if (_buffering) {
 		_screenQueue.push_back(q);
@@ -871,6 +893,8 @@ void ThemeEngine::drawButton(const Common::Rect &r, const Common::String &str, W
 		dd = kDDButtonHover;
 	else if (state == kStateDisabled)
 		dd = kDDButtonDisabled;
+	else if (state == kStatePressed)
+		dd = kDDButtonPressed;
 
 	queueDD(dd, r, 0, hints & WIDGET_CLEARBG);
 	queueDDText(getTextData(dd), getTextColor(dd), r, str, false, true, _widgets[dd]->_textAlignH, _widgets[dd]->_textAlignV);
@@ -1098,7 +1122,7 @@ void ThemeEngine::drawTab(const Common::Rect &r, int tabHeight, int tabWidth, co
 	}
 }
 
-void ThemeEngine::drawText(const Common::Rect &r, const Common::String &str, WidgetStateInfo state, Graphics::TextAlign align, TextInversionState inverted, int deltax, bool useEllipsis, FontStyle font, FontColor color, bool restore) {
+void ThemeEngine::drawText(const Common::Rect &r, const Common::String &str, WidgetStateInfo state, Graphics::TextAlign align, TextInversionState inverted, int deltax, bool useEllipsis, FontStyle font, FontColor color, bool restore, const Common::Rect &drawableTextArea) {
 	if (!ready())
 		return;
 
@@ -1119,6 +1143,7 @@ void ThemeEngine::drawText(const Common::Rect &r, const Common::String &str, Wid
 				break;
 
 			case kStateEnabled:
+			case kStatePressed:
 				colorId = kTextColorNormal;
 				break;
 			}
@@ -1139,6 +1164,7 @@ void ThemeEngine::drawText(const Common::Rect &r, const Common::String &str, Wid
 				break;
 
 			case kStateEnabled:
+			case kStatePressed:
 				colorId = kTextColorAlternative;
 				break;
 			}
@@ -1166,7 +1192,7 @@ void ThemeEngine::drawText(const Common::Rect &r, const Common::String &str, Wid
 		break;
 	}
 
-	queueDDText(textId, colorId, r, str, restore, useEllipsis, align, kTextAlignVCenter, deltax);
+	queueDDText(textId, colorId, r, str, restore, useEllipsis, align, kTextAlignVCenter, deltax, drawableTextArea);
 }
 
 void ThemeEngine::drawChar(const Common::Rect &r, byte ch, const Graphics::Font *font, WidgetStateInfo state, FontColor color) {
@@ -1204,7 +1230,7 @@ void ThemeEngine::updateScreen(bool render) {
 		}
 
 		_vectorRenderer->setSurface(&_screen);
-		memcpy(_screen.getBasePtr(0, 0), _backBuffer.getBasePtr(0, 0), _screen.pitch * _screen.h);
+		memcpy(_screen.getPixels(), _backBuffer.getPixels(), _screen.pitch * _screen.h);
 		_bufferQueue.clear();
 	}
 
@@ -1272,11 +1298,11 @@ void ThemeEngine::openDialog(bool doBuffer, ShadingStyle style) {
 		addDirtyRect(Common::Rect(0, 0, _screen.w, _screen.h));
 	}
 
-	memcpy(_backBuffer.getBasePtr(0, 0), _screen.getBasePtr(0, 0), _screen.pitch * _screen.h);
+	memcpy(_backBuffer.getPixels(), _screen.getPixels(), _screen.pitch * _screen.h);
 	_vectorRenderer->setSurface(&_screen);
 }
 
-bool ThemeEngine::createCursor(const Common::String &filename, int hotspotX, int hotspotY, int scale) {
+bool ThemeEngine::createCursor(const Common::String &filename, int hotspotX, int hotspotY) {
 	if (!_system->hasFeature(OSystem::kFeatureCursorPalette))
 		return true;
 
@@ -1294,7 +1320,6 @@ bool ThemeEngine::createCursor(const Common::String &filename, int hotspotX, int
 	// Set up the cursor parameters
 	_cursorHotspotX = hotspotX;
 	_cursorHotspotY = hotspotY;
-	_cursorTargetScale = scale;
 
 	_cursorWidth = cursor->w;
 	_cursorHeight = cursor->h;
@@ -1306,22 +1331,31 @@ bool ThemeEngine::createCursor(const Common::String &filename, int hotspotX, int
 	memset(_cursor, 0xFF, sizeof(byte) * _cursorWidth * _cursorHeight);
 
 	// the transparent color is 0xFF00FF
-	const int colTransparent = _overlayFormat.RGBToColor(0xFF, 0, 0xFF);
+	const uint32 colTransparent = _overlayFormat.RGBToColor(0xFF, 0, 0xFF);
 
 	// Now, scan the bitmap. We have to convert it from 16 bit color mode
 	// to 8 bit mode, and have to create a suitable palette on the fly.
 	uint colorsFound = 0;
 	Common::HashMap<int, int> colorToIndex;
-	const OverlayColor *src = (const OverlayColor *)cursor->pixels;
+	const byte *src = (const byte *)cursor->getPixels();
 	for (uint y = 0; y < _cursorHeight; ++y) {
 		for (uint x = 0; x < _cursorWidth; ++x) {
+			uint32 color = colTransparent;
 			byte r, g, b;
 
+			if (cursor->format.bytesPerPixel == 2) {
+				color = READ_UINT16(src);
+			} else if (cursor->format.bytesPerPixel == 4) {
+				color = READ_UINT32(src);
+			}
+
+			src += cursor->format.bytesPerPixel;
+
 			// Skip transparency
-			if (src[x] == colTransparent)
+			if (color == colTransparent)
 				continue;
 
-			_overlayFormat.colorToRGB(src[x], r, g, b);
+			cursor->format.colorToRGB(color, r, g, b);
 			const int col = (r << 16) | (g << 8) | b;
 
 			// If there is no entry yet for this color in the palette: Add one
@@ -1343,7 +1377,6 @@ bool ThemeEngine::createCursor(const Common::String &filename, int hotspotX, int
 			const int index = colorToIndex[col];
 			_cursor[y * _cursorWidth + x] = index;
 		}
-		src += _cursorWidth;
 	}
 
 	_useCursor = true;
@@ -1412,7 +1445,7 @@ const Graphics::Font *ThemeEngine::loadScalableFont(const Common::String &filena
 	for (Common::ArchiveMemberList::const_iterator i = members.begin(), end = members.end(); i != end; ++i) {
 		Common::SeekableReadStream *stream = (*i)->createReadStream();
 		if (stream) {
-			font = Graphics::loadTTFFont(*stream, pointsize, false,
+			font = Graphics::loadTTFFont(*stream, pointsize, 0, false,
 #ifdef USE_TRANSLATION
 			                             TransMan.getCharsetMapping()
 #else
@@ -1772,6 +1805,21 @@ Common::String ThemeEngine::getThemeId(const Common::String &filename) {
 		return id;
 	} else {
 		return node.getName();
+	}
+}
+
+void ThemeEngine::showCursor() {
+	if (_useCursor) {
+		CursorMan.pushCursorPalette(_cursorPal, 0, _cursorPalSize);
+		CursorMan.pushCursor(_cursor, _cursorWidth, _cursorHeight, _cursorHotspotX, _cursorHotspotY, 255, true);
+		CursorMan.showMouse(true);
+	}
+}
+
+void ThemeEngine::hideCursor() {
+	if (_useCursor) {
+		CursorMan.popCursorPalette();
+		CursorMan.popCursor();
 	}
 }
 

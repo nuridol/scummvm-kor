@@ -25,12 +25,37 @@
 
 namespace Common {
 
-/**
- * Get a sine table with the specified bit precision
- *
- * @param bits Precision of the table, which must be in range [4, 16]
- */
-const float *getSineTable(int bits);
+class SineTable {
+public:
+	/**
+	 * Construct a sine table with the specified bit precision
+	 *
+	 * @param bitPrecision Precision of the table, which must be in range [4, 16]
+	 */
+	SineTable(int bitPrecision);
+	~SineTable();
+
+	/**
+	 * Get pointer to table
+	 *
+	 * This table contains 2^bitPrecision/2 entries.
+	 * The layout of this table is as follows:
+	 * - Entries 0 up to (excluding) 2^bitPrecision/4:
+	 *           sin(0) till (excluding) sin(1/2*pi)
+	 * - Entries 2^bitPrecision/4 up to (excluding) 2^bitPrecision/2:
+	 *           sin(pi) till (excluding) sin(3/2*pi)
+	 */
+	const float *getTable() { return _table; }
+
+	/**
+	 * Get pointer to table
+	 */
+	int getPrecision() { return _bitPrecision; }
+
+private:
+	float *_table;
+	int _bitPrecision;
+};
 
 } // End of namespace Common
 

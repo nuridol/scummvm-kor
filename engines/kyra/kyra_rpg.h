@@ -70,7 +70,7 @@ struct EoBFlyingObject {
 	int16 attackerId;
 	Item item;
 	uint16 curBlock;
-	uint16 u2;
+	uint16 starting;
 	uint8 u1;
 	uint8 direction;
 	uint8 distance;
@@ -183,7 +183,7 @@ protected:
 
 	virtual const uint8 *getBlockFileData(int levelIndex) = 0;
 	void setLevelShapesDim(int index, int16 &x1, int16 &x2, int dim);
-	void scaleLevelShapesDim(int index, int16 &y1, int16 &y2, int dim);
+	void setDoorShapeDim(int index, int16 &y1, int16 &y2, int dim);
 	void drawLevelModifyScreenDim(int dim, int16 x1, int16 y1, int16 x2, int16 y2);
 	void generateBlockDrawingBuffer();
 	void generateVmpTileData(int16 startBlockX, uint8 startBlockY, uint8 wllVmpIndex, int16 vmpOffset, uint8 numBlocksX, uint8 numBlocksY);
@@ -224,8 +224,9 @@ protected:
 	uint16 *_vmpPtr;
 	uint8 *_vcnBlocks;
 	uint8 *_vcfBlocks;
+	uint8 *_vcnTransitionMask;
 	uint8 *_vcnShift;
-	uint8 *_vcnExpTable;
+	uint8 *_vcnColTable;
 	uint16 *_blockDrawingBuffer;
 	uint8 *_sceneWindowBuffer;
 	uint8 _blockBrightness;
@@ -270,6 +271,10 @@ protected:
 	const uint8 *_dscDoorShpIndex;
 	int _dscDoorShpIndexSize;
 	const uint8 *_dscDoorY2;
+	const uint8 *_dscDoorFrameY1;
+	const uint8 *_dscDoorFrameY2;
+	const uint8 *_dscDoorFrameIndex1;
+	const uint8 *_dscDoorFrameIndex2;
 
 	// Script
 	virtual void runLevelScript(int block, int flags) = 0;
@@ -278,7 +283,7 @@ protected:
 	void removeInputTop();
 	void gui_drawBox(int x, int y, int w, int h, int frameColor1, int frameColor2, int fillColor);
 	virtual void gui_drawHorizontalBarGraph(int x, int y, int w, int h, int32 curVal, int32 maxVal, int col1, int col2);
-	void gui_initButtonsFromList(const int16 *list);
+	void gui_initButtonsFromList(const uint8 *list);
 	virtual void gui_initButton(int index, int x = -1, int y = -1, int val = -1) = 0;
 	void gui_resetButtonList();
 	void gui_notifyButtonListChanged();
@@ -375,7 +380,7 @@ protected:
 	bool lineIsPassable(int, int) { return false; }
 };
 
-}	// End of namespace Kyra
+} // End of namespace Kyra
 
 #endif // ENABLE_EOB || ENABLE_LOL
 

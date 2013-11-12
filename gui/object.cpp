@@ -29,7 +29,7 @@
 namespace GUI {
 
 GuiObject::GuiObject(const Common::String &name)
-	: _x(-1000), _y(-1000), _w(0), _h(0), _name(name), _firstWidget(0) {
+	: _x(-1000), _y(-1000), _w(0), _h(0), _name(name), _firstWidget(0), _textDrawableArea(Common::Rect(0, 0, 0, 0)) {
 	reflowLayout();
 }
 
@@ -56,6 +56,26 @@ void GuiObject::reflowLayout() {
 			error("Widget <%s> has y > %d (%d)", _name.c_str(), g_gui.getHeight(), _y);
 		if (_y + _h > g_gui.getHeight())
 			error("Widget <%s> has y + h > %d (%d)", _name.c_str(), g_gui.getHeight(), _y + _h);
+	}
+}
+
+void GuiObject::removeWidget(Widget *del) {
+	if (del == _firstWidget) {
+		Widget *del_next = del->next();
+		del->setNext(0);
+		_firstWidget = del_next;
+		return;
+	}
+
+	Widget *w = _firstWidget;
+	while (w) {
+		if (w->next() == del) {
+			Widget *del_next = del->next();
+			del->setNext(0);
+			w->setNext(del_next);
+			return;
+		}
+		w = w->next();
 	}
 }
 

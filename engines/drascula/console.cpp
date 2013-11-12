@@ -41,12 +41,11 @@ bool Console::Cmd_Room(int argc, const char **argv) {
 
 	int roomNum = atoi(argv[1]);
 
-	_vm->loadedDifferentChapter = 0;
+	_vm->_loadedDifferentChapter = false;
 	_vm->enterRoom(roomNum);
 	_vm->selectVerb(kVerbNone);
 	_vm->clearRoom();
 	_vm->loadPic(roomNum, _vm->bgSurface, HALF_PAL);
-	_vm->selectionMade = 0;
 
 	return false;
 }

@@ -100,6 +100,9 @@ GfxPalette::GfxPalette(ResourceManager *resMan, GfxScreen *screen)
 	default:
 		error("GfxPalette: Unknown view type");
 	}
+
+	_remapOn = false;
+	resetRemapping();
 }
 
 GfxPalette::~GfxPalette() {
@@ -140,8 +143,9 @@ void GfxPalette::createFromData(byte *data, int bytesLeft, Palette *paletteOut) 
 	memset(paletteOut, 0, sizeof(Palette));
 
 	// Setup 1:1 mapping
-	for (colorNo = 0; colorNo < 256; colorNo++)
+	for (colorNo = 0; colorNo < 256; colorNo++) {
 		paletteOut->mapping[colorNo] = colorNo;
+	}
 
 	if (bytesLeft < 37) {
 		// This happens when loading palette of picture 0 in sq5 - the resource is broken and doesn't contain a full
@@ -329,6 +333,79 @@ void GfxPalette::set(Palette *newPalette, bool force, bool forceRealMerge) {
 	}
 }
 
+byte GfxPalette::remapColor(byte remappedColor, byte screenColor) {
+	assert(_remapOn);
+	if (_remappingType[remappedColor] == kRemappingByRange)
+		return _remappingByRange[screenColor];
+	else if (_remappingType[remappedColor] == kRemappingByPercent)
+		return _remappingByPercent[screenColor];
+	else
+		error("remapColor(): Color %d isn't remapped", remappedColor);
+
+	return 0;	// should never reach here
+}
+
+void GfxPalette::resetRemapping() {
+	_remapOn = false;
+	_remappingPercentToSet = 0;
+
+	for (int i = 0; i < 256; i++) {
+		_remappingType[i] = kRemappingNone;
+		_remappingByPercent[i] = i;
+		_remappingByRange[i] = i;
+	}
+}
+
+void GfxPalette::setRemappingPercent(byte color, byte percent) {
+	_remapOn = true;
+
+	// We need to defer the setup of the remapping table every time the screen
+	// palette is changed, so that kernelFindColor() can find the correct
+	// colors. Set it once here, in case the palette stays the same and update
+	// it on each palette change by copySysPaletteToScreen().
+	_remappingPercentToSet = percent;
+
+	for (int i = 0; i < 256; i++) {
+		byte r = _sysPalette.colors[i].r * _remappingPercentToSet / 100;
+		byte g = _sysPalette.colors[i].g * _remappingPercentToSet / 100;
+		byte b = _sysPalette.colors[i].b * _remappingPercentToSet / 100;
+		_remappingByPercent[i] = kernelFindColor(r, g, b);
+	}
+
+	_remappingType[color] = kRemappingByPercent;
+}
+
+void GfxPalette::setRemappingPercentGray(byte color, byte percent) {
+	_remapOn = true;
+
+	// We need to defer the setup of the remapping table every time the screen
+	// palette is changed, so that kernelFindColor() can find the correct
+	// colors. Set it once here, in case the palette stays the same and update
+	// it on each palette change by copySysPaletteToScreen().
+	_remappingPercentToSet = percent;
+
+	// Note: This is not what the original does, but the results are the same visually
+	for (int i = 0; i < 256; i++) {
+		byte rComponent = (byte)(_sysPalette.colors[i].r * _remappingPercentToSet * 0.30 / 100);
+		byte gComponent = (byte)(_sysPalette.colors[i].g * _remappingPercentToSet * 0.59 / 100);
+		byte bComponent = (byte)(_sysPalette.colors[i].b * _remappingPercentToSet * 0.11 / 100);
+		byte luminosity = rComponent + gComponent + bComponent;
+		_remappingByPercent[i] = kernelFindColor(luminosity, luminosity, luminosity);
+	}
+
+	_remappingType[color] = kRemappingByPercent;
+}
+
+void GfxPalette::setRemappingRange(byte color, byte from, byte to, byte base) {
+	_remapOn = true;
+
+	for (int i = from; i <= to; i++) {
+		_remappingByRange[i] = i + base;
+	}
+
+	_remappingType[color] = kRemappingByRange;
+}
+
 bool GfxPalette::insert(Palette *newPalette, Palette *destPalette) {
 	bool paletteChanged = false;
 
@@ -491,6 +568,16 @@ void GfxPalette::copySysPaletteToScreen() {
 		}
 	}
 
+	// Check if we need to reset remapping by percent with the new colors.
+	if (_remappingPercentToSet) {
+		for (int i = 0; i < 256; i++) {
+			byte r = _sysPalette.colors[i].r * _remappingPercentToSet / 100;
+			byte g = _sysPalette.colors[i].g * _remappingPercentToSet / 100;
+			byte b = _sysPalette.colors[i].b * _remappingPercentToSet / 100;
+			_remappingByPercent[i] = kernelFindColor(r, g, b);
+		}
+	}
+
 	g_system->getPaletteManager()->setPalette(bpal, 0, 256);
 }
 
@@ -635,11 +722,6 @@ void GfxPalette::kernelRestore(reg_t memoryHandle) {
 }
 
 void GfxPalette::kernelAssertPalette(GuiResourceId resourceId) {
-	// Sometimes invalid viewIds are asked for, ignore those (e.g. qfg1vga)
-	//if (!_resMan->testResource(ResourceId(kResourceTypeView, resourceId)))
-	//	return;
-	// maybe we took the wrong parameter before, if this causes invalid view again, enable to commented out code again
-
 	GfxView *view = g_sci->_gfxCache->getView(resourceId);
 	Palette *viewPalette = view->getPalette();
 	if (viewPalette) {
@@ -698,7 +780,7 @@ void GfxPalette::palVaryInit() {
 }
 
 bool GfxPalette::palVaryLoadTargetPalette(GuiResourceId resourceId) {
-	_palVaryResourceId = resourceId;
+	_palVaryResourceId = (resourceId != 65535) ? resourceId : -1;
 	Resource *palResource = _resMan->findResource(ResourceId(kResourceTypePalette, resourceId), false);
 	if (palResource) {
 		// Load and initialize destination palette
@@ -769,7 +851,7 @@ int16 GfxPalette::kernelPalVaryReverse(int16 ticks, uint16 stepStop, int16 direc
 
 	if (!_palVaryTicks) {
 		_palVaryDirection = _palVaryStepStop - _palVaryStep;
-		// ffs. see palVaryInit right above, we fix the code here as well
+		// see palVaryInit above, we fix the code here as well
 		//  just in case
 		palVaryProcess(1, true);
 	} else {
@@ -999,8 +1081,9 @@ bool GfxPalette::loadClut(uint16 clutId) {
 	memset(&pal, 0, sizeof(Palette));
 
 	// Setup 1:1 mapping
-	for (int i = 0; i < 256; i++)
+	for (int i = 0; i < 256; i++) {
 		pal.mapping[i] = i;
+	}
 
 	// Now load in the palette
 	for (int i = 1; i <= 236; i++) {

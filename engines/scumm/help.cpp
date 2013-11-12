@@ -69,27 +69,6 @@ void ScummHelp::updateStrings(byte gameId, byte version, Common::Platform platfo
 	dsc = new String[HELP_NUM_LINES];
 	int i = 0;
 	switch (page) {
-#ifdef SCUMMVMKOR
-        case 1:
-            title = "Common iPhone controls:";
-            ADD_BIND("Left clk", "Single tap");
-            ADD_BIND("Right clk", "Hold finger, single tap another");
-            ADD_BIND("Esc", "Hold finger, double tap another");
-            ADD_BIND("Menu", "Hold finger, swipe down another");
-            ADD_BIND("Dragmode", "Hold finger, swipe up another");
-            ADD_BIND("Touchmode", "Hold finger, swipe right another");
-            ADD_BIND("Quit", "Home button");
-            break;
-        case 2:
-            title = "Special iPhone controls:";
-            ADD_BIND("Keyboard", "Touch three fingers");
-            ADD_BIND("Pause", "Keyboard spacebar");
-            ADD_BIND("F1-F10", "Keyboard directly under 1-0");
-            ADD_BIND("Music vol", "Keyboard [, ]");
-            ADD_BIND("Sub speed", "Keyboard *, +");
-            ADD_BIND("Console", "Keyboard ~, #");
-            break;
-#else
 	case 1:
 		title = _("Common keyboard commands:");
 		ADD_BIND("F5", _("Save / Load dialog"));
@@ -130,8 +109,7 @@ void ScummHelp::updateStrings(byte gameId, byte version, Common::Platform platfo
 		ADD_TEXT(_("  since they may cause crashes"));
 		ADD_TEXT(_("  or incorrect game behavior."));
 		break;
-#endif
-    case 3:
+	case 3:
 		if (gameId == GID_LOOM)
 			title = _("Spinning drafts on the keyboard:");
 		else

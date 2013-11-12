@@ -34,6 +34,9 @@ namespace Ringworld {
  * Scene 4000 - Village
  *
  *--------------------------------------------------------------------------*/
+Scene4000::Hotspot8::Hotspot8() : SceneObject() {
+	_ctr = 0;	
+}
 
 void Scene4000::Action1::signal() {
 	// Quinn has the peg. Everybody enter the screen.
@@ -1893,7 +1896,7 @@ void Scene4045::postInit(SceneObjectList *OwnerList) {
 	_olloFace.setStrip(4);
 	_olloFace.fixPriority(152);
 
-	if(g_globals->_sceneManager._previousScene == 4050) {
+	if (g_globals->_sceneManager._previousScene == 4050) {
 		g_globals->_soundHandler.play(155);
 		g_globals->_player.setPosition(Common::Point(72, 128));
 		g_globals->_player.enableControl();

@@ -31,7 +31,7 @@ namespace Kyra {
 
 class DarkmoonSequenceHelper;
 
-struct EoBSequenceStep {
+struct DarkMoonAnimCommand {
 	uint8 command;
 	uint8 obj;
 	int16 x1;
@@ -72,19 +72,21 @@ private:
 	void seq_playFinale();
 	void seq_playCredits(DarkmoonSequenceHelper *sq, const uint8 *data, int sd, int backupPage, int tempPage, int speed);
 
-	const char * const *_introStrings;
-	const char * const *_cpsFilesIntro;
-	const EoBSequenceStep **_seqIntro;
-	const EoBShapeDef **_shapesIntro;
+	const char *const *_introStrings;
+	const char *const *_cpsFilesIntro;
+	const DarkMoonAnimCommand **_animIntro;
+	const DarkMoonShapeDef **_shapesIntro;
 
-	const char * const *_finaleStrings;
+	const char *const *_finaleStrings;
 	const uint8 *_creditsData;
-	const char * const *_cpsFilesFinale;
-	const EoBSequenceStep **_seqFinale;
-	const EoBShapeDef **_shapesFinale;
+	const char *const *_cpsFilesFinale;
+	const DarkMoonAnimCommand **_animFinale;
+	const DarkMoonShapeDef **_shapesFinale;
 
-	static const char *_palFilesIntro[];
-	static const char *_palFilesFinale[];
+	static const char *const _palFilesIntroVGA[];
+	static const char *const _palFilesIntroEGA[];
+	static const char *const _palFilesFinaleVGA[];
+	static const char *const _palFilesFinaleEGA[];
 
 	// Ingame sequence
 	void seq_nightmare();
@@ -135,9 +137,10 @@ private:
 	const uint8 *_hornSounds;
 
 	static const KyraRpgGUISettings _guiSettings;
+	static const uint8 _egaDefaultPalette[];
 };
 
-}	// End of namespace Kyra
+} // End of namespace Kyra
 
 #endif
 

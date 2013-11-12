@@ -26,6 +26,7 @@
 #include "common/ptr.h"
 #include "common/savefile.h"
 #include "common/system.h"
+#include "common/translation.h"
 #include "graphics/thumbnail.h"
 #include "graphics/surface.h"
 
@@ -102,10 +103,10 @@ static const PlainGameDescriptor s_sciGameTitles[] = {
 	{"pq4",             "Police Quest IV: Open Season"}, // floppy is SCI2, CD SCI2.1
 	{"qfg4",            "Quest for Glory IV: Shadows of Darkness"},	// floppy is SCI2, CD SCI2.1
 	// === SCI2.1 games ========================================================
+	{"chest",           "Inside the Chest"},	// aka Behind the Developer's Shield
 	{"gk2",             "The Beast Within: A Gabriel Knight Mystery"},
-	// TODO: Inside The Chest/Behind the Developer's Shield
 	{"kq7",             "King's Quest VII: The Princeless Bride"},
-	// TODO: King's Questions
+	{"kquestions",      "King's Questions"},
 	{"lsl6hires",       "Leisure Suit Larry 6: Shape Up or Slip Out!"},
 	{"mothergoosehires","Mixed-Up Mother Goose Deluxe"},
 	{"phantasmagoria",  "Phantasmagoria"},
@@ -131,6 +132,7 @@ static const GameIdStrToEnum s_gameIdStrToEnum[] = {
 	{ "astrochicken",    GID_ASTROCHICKEN },
 	{ "camelot",         GID_CAMELOT },
 	{ "castlebrain",     GID_CASTLEBRAIN },
+	{ "chest",           GID_CHEST },
 	{ "christmas1988",   GID_CHRISTMAS1988 },
 	{ "christmas1990",   GID_CHRISTMAS1990 },
 	{ "christmas1992",   GID_CHRISTMAS1992 },
@@ -158,6 +160,7 @@ static const GameIdStrToEnum s_gameIdStrToEnum[] = {
 	{ "kq5",             GID_KQ5 },
 	{ "kq6",             GID_KQ6 },
 	{ "kq7",             GID_KQ7 },
+	{ "kquestions",      GID_KQUESTIONS },
 	{ "laurabow",        GID_LAURABOW },
 	{ "laurabow2",       GID_LAURABOW2 },
 	{ "lighthouse",      GID_LIGHTHOUSE },
@@ -207,6 +210,7 @@ struct OldNewIdTableEntry {
 };
 
 static const OldNewIdTableEntry s_oldNewTable[] = {
+	{ "archive",    "chest",            SCI_VERSION_NONE     },
 	{ "arthur",		"camelot",			SCI_VERSION_NONE     },
 	{ "brain",      "castlebrain",      SCI_VERSION_1_MIDDLE },	// Amiga
 	{ "brain",      "castlebrain",      SCI_VERSION_1_LATE   },
@@ -238,6 +242,7 @@ static const OldNewIdTableEntry s_oldNewTable[] = {
 	// kq5 is the same
 	// kq6 is the same
 	{ "kq7cd",		"kq7",				SCI_VERSION_NONE     },
+	{ "quizgame-demo", "kquestions",    SCI_VERSION_NONE     },
 	{ "mm1",		"laurabow",			SCI_VERSION_NONE     },
 	{ "cb1",		"laurabow",			SCI_VERSION_NONE     },
 	{ "lb2",		"laurabow2",		SCI_VERSION_NONE     },
@@ -362,6 +367,83 @@ Common::String convertSierraGameId(Common::String sierraId, uint32 *gameFlags, R
 
 #include "sci/detection_tables.h"
 
+static const ADExtraGuiOptionsMap optionsList[] = {
+	{
+		GAMEOPTION_EGA_UNDITHER,
+		{
+			_s("EGA undithering"),
+			_s("Enable undithering in EGA games"),
+			"disable_dithering",
+			false
+		}
+	},
+
+	{
+		GAMEOPTION_PREFER_DIGITAL_SFX,
+		{
+			_s("Prefer digital sound effects"),
+			_s("Prefer digital sound effects instead of synthesized ones"),
+			"prefer_digitalsfx",
+			true
+		}
+	},
+
+	{
+		GAMEOPTION_ORIGINAL_SAVELOAD,
+		{
+			_s("Use original save/load screens"),
+			_s("Use the original save/load screens, instead of the ScummVM ones"),
+			"originalsaveload",
+			false
+		}
+	},
+
+	{
+		GAMEOPTION_FB01_MIDI,
+		{
+			_s("Use IMF/Yamaha FB-01 for MIDI output"),
+			_s("Use an IBM Music Feature card or a Yamaha FB-01 FM synth module for MIDI output"),
+			"native_fb01",
+			false
+		}
+	},
+
+	// Jones in the Fast Lane - CD audio tracks or resource.snd
+	{
+		GAMEOPTION_JONES_CDAUDIO,
+		{
+			_s("Use CD audio"),
+			_s("Use CD audio instead of in-game audio, if available"),
+			"use_cdaudio",
+			true
+		}
+	},
+
+	// KQ6 Windows - windows cursors
+	{
+		GAMEOPTION_KQ6_WINDOWS_CURSORS,
+		{
+			_s("Use Windows cursors"),
+			_s("Use the Windows cursors (smaller and monochrome) instead of the DOS ones"),
+			"windows_cursors",
+			false
+		}
+	},
+
+	// SQ4 CD - silver cursors
+	{
+		GAMEOPTION_SQ4_SILVER_CURSORS,
+		{
+			_s("Use silver cursors"),
+			_s("Use the alternate set of silver cursors, instead of the normal golden ones"),
+			"silver_cursors",
+			false
+		}
+	},
+
+	AD_EXTRA_GUI_OPTIONS_TERMINATOR
+};
+
 /**
  * The fallback game descriptor used by the SCI engine's fallbackDetector.
  * Contents of this struct are overwritten by the fallbackDetector.
@@ -371,16 +453,16 @@ static ADGameDescription s_fallbackDesc = {
 	"",
 	AD_ENTRY1(0, 0), // This should always be AD_ENTRY1(0, 0) in the fallback descriptor
 	Common::UNK_LANG,
-	Common::kPlatformPC,
+	Common::kPlatformDOS,
 	ADGF_NO_FLAGS,
-	GUIO0()
+	GUIO3(GAMEOPTION_PREFER_DIGITAL_SFX, GAMEOPTION_ORIGINAL_SAVELOAD, GAMEOPTION_FB01_MIDI)
 };
 
 static char s_fallbackGameIdBuf[256];
 
 class SciMetaEngine : public AdvancedMetaEngine {
 public:
-	SciMetaEngine() : AdvancedMetaEngine(Sci::SciGameDescriptions, sizeof(ADGameDescription), s_sciGameTitles) {
+	SciMetaEngine() : AdvancedMetaEngine(Sci::SciGameDescriptions, sizeof(ADGameDescription), s_sciGameTitles, optionsList) {
 		_singleid = "sci";
 	}
 
@@ -433,9 +515,9 @@ const ADGameDescription *SciMetaEngine::fallbackDetect(const FileMap &allFiles, 
 	s_fallbackDesc.extra = "";
 	s_fallbackDesc.language = Common::EN_ANY;
 	s_fallbackDesc.flags = ADGF_NO_FLAGS;
-	s_fallbackDesc.platform = Common::kPlatformPC;	// default to PC platform
+	s_fallbackDesc.platform = Common::kPlatformDOS;	// default to PC platform
 	s_fallbackDesc.gameid = "sci";
-	s_fallbackDesc.guioptions = GUIO0();
+	s_fallbackDesc.guioptions = GUIO3(GAMEOPTION_PREFER_DIGITAL_SFX, GAMEOPTION_ORIGINAL_SAVELOAD, GAMEOPTION_FB01_MIDI);
 
 	if (allFiles.contains("resource.map") || allFiles.contains("Data1")
 	    || allFiles.contains("resmap.001") || allFiles.contains("resmap.001")) {
@@ -565,7 +647,7 @@ const ADGameDescription *SciMetaEngine::fallbackDetect(const FileMap &allFiles, 
 	const bool isCD = (s_fallbackDesc.flags & ADGF_CD);
 
 	if (!isCD)
-		s_fallbackDesc.guioptions = GUIO1(GUIO_NOSPEECH);
+		s_fallbackDesc.guioptions = GUIO4(GUIO_NOSPEECH, GAMEOPTION_PREFER_DIGITAL_SFX, GAMEOPTION_ORIGINAL_SAVELOAD, GAMEOPTION_FB01_MIDI);
 
 	if (gameId.hasSuffix("sci")) {
 		s_fallbackDesc.extra = "SCI";
@@ -684,9 +766,6 @@ SaveStateDescriptor SciMetaEngine::querySaveMetaInfos(const char *target, int sl
 		Graphics::Surface *const thumbnail = Graphics::loadThumbnail(*in);
 		desc.setThumbnail(thumbnail);
 
-		desc.setDeletableFlag(true);
-		desc.setWriteProtectedFlag(false);
-
 		int day = (meta.saveDate >> 24) & 0xFF;
 		int month = (meta.saveDate >> 16) & 0xFF;
 		int year = meta.saveDate & 0xFFFF;
@@ -759,12 +838,16 @@ Common::Error SciEngine::saveGameState(int slot, const Common::String &desc) {
 	return Common::kNoError;
 }
 
+// Before enabling the load option in the ScummVM menu, the main game loop must
+// have run at least once. When the game loop runs, kGameIsRestarting is invoked,
+// thus the speed throttler is initialized. Hopefully fixes bug #3565505.
+
 bool SciEngine::canLoadGameStateCurrently() {
-	return !_gamestate->executionStackBase;
+	return !_gamestate->executionStackBase && (_gamestate->_throttleLastTime > 0 || _gamestate->_throttleTrigger);
 }
 
 bool SciEngine::canSaveGameStateCurrently() {
-	return !_gamestate->executionStackBase;
+	return !_gamestate->executionStackBase && (_gamestate->_throttleLastTime > 0 || _gamestate->_throttleTrigger);
 }
 
 } // End of namespace Sci

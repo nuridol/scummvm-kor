@@ -51,7 +51,7 @@ namespace Tinsel {
 
 //----------------- LOCAL GLOBAL DATA --------------------
 
-static MOVER Movers[MAX_MOVERS];	// FIXME: Avoid non-const global vars
+static MOVER g_Movers[MAX_MOVERS];	// FIXME: Avoid non-const global vars
 
 //----------------- FUNCTIONS ----------------------------
 
@@ -115,7 +115,7 @@ void MoverBrightness(PMOVER pMover, int brightness) {
  * RebootMovers
  */
 void RebootMovers() {
-	memset(Movers, 0, sizeof(Movers));
+	memset(g_Movers, 0, sizeof(g_Movers));
 }
 
 /**
@@ -127,11 +127,11 @@ PMOVER GetMover(int ano) {
 
 	// Slot 0 is reserved for lead actor
 	if (ano == GetLeadId() || ano == LEAD_ACTOR)
-		return &Movers[0];
+		return &g_Movers[0];
 
 	for (i = 1; i < MAX_MOVERS; i++)
-		if (Movers[i].actorID == ano)
-			return &Movers[i];
+		if (g_Movers[i].actorID == ano)
+			return &g_Movers[i];
 
 	return NULL;
 }
@@ -144,25 +144,25 @@ PMOVER RegisterMover(int ano) {
 
 	// Slot 0 is reserved for lead actor
 	if (ano == GetLeadId() || ano == LEAD_ACTOR) {
-		Movers[0].actorToken = TOKEN_LEAD;
-		Movers[0].actorID = GetLeadId();
-		return &Movers[0];
+		g_Movers[0].actorToken = TOKEN_LEAD;
+		g_Movers[0].actorID = GetLeadId();
+		return &g_Movers[0];
 	}
 
 	// Check it hasn't already been declared
 	for (i = 1; i < MAX_MOVERS; i++) {
-		if (Movers[i].actorID == ano) {
+		if (g_Movers[i].actorID == ano) {
 			// Actor is already a moving actor
-			return &Movers[i];
+			return &g_Movers[i];
 		}
 	}
 
 	// Find an empty slot
 	for (i = 1; i < MAX_MOVERS; i++)
-		if (!Movers[i].actorID) {
-			Movers[i].actorToken = TOKEN_LEAD + i;
-			Movers[i].actorID = ano;
-			return &Movers[i];
+		if (!g_Movers[i].actorID) {
+			g_Movers[i].actorToken = TOKEN_LEAD + i;
+			g_Movers[i].actorID = ano;
+			return &g_Movers[i];
 		}
 
 	error("Too many moving actors");
@@ -176,8 +176,8 @@ PMOVER RegisterMover(int ano) {
 PMOVER GetLiveMover(int index) {
 	assert(index >= 0 && index < MAX_MOVERS); // out of range
 
-	if (Movers[index].bActive)
-		return &Movers[index];
+	if (g_Movers[index].bActive)
+		return &g_Movers[index];
 	else
 		return NULL;
 }
@@ -185,13 +185,13 @@ PMOVER GetLiveMover(int index) {
 bool IsMAinEffectPoly(int index) {
 	assert(index >= 0 && index < MAX_MOVERS); // out of range
 
-	return Movers[index].bInEffect;
+	return g_Movers[index].bInEffect;
 }
 
 void SetMoverInEffect(int index, bool tf) {
 	assert(index >= 0 && index < MAX_MOVERS); // out of range
 
-	Movers[index].bInEffect = tf;
+	g_Movers[index].bInEffect = tf;
 }
 
 /**
@@ -202,8 +202,8 @@ void KillMover(PMOVER pMover) {
 		pMover->bActive = false;
 		MultiDeleteObject(GetPlayfieldList(FIELD_WORLD), pMover->actorObj);
 		pMover->actorObj = NULL;
-		assert(g_scheduler->getCurrentProcess() != pMover->pProc);
-		g_scheduler->killProcess(pMover->pProc);
+		assert(CoroScheduler.getCurrentProcess() != pMover->pProc);
+		CoroScheduler.killProcess(pMover->pProc);
 	}
 }
 
@@ -392,7 +392,7 @@ static void InitMover(PMOVER pMover) {
  */
 void DropMovers() {
 	for (int i = 0; i < MAX_MOVERS; i++)
-		InitMover(&Movers[i]);
+		InitMover(&g_Movers[i]);
 }
 
 
@@ -550,7 +550,7 @@ void AlterMover(PMOVER pMover, SCNHANDLE film, AR_FUNCTION fn) {
 		pfilm = (const FILM *)LockMem(film);
 		assert(pfilm != NULL);
 
-		InitStepAnimScript(&pMover->actorAnim, pMover->actorObj, FROM_LE_32(pfilm->reels[0].script), ONE_SECOND / FROM_LE_32(pfilm->frate));
+		InitStepAnimScript(&pMover->actorAnim, pMover->actorObj, FROM_32(pfilm->reels[0].script), ONE_SECOND / FROM_32(pfilm->frate));
 		if (!TinselV2)
 			pMover->stepCount = 0;
 
@@ -643,7 +643,7 @@ void SetMoverWalkReel(PMOVER pMover, DIRECTION reel, int scale, bool force) {
 		pfilm = (const FILM *)LockMem(whichReel);
 		assert(pfilm != NULL); // no film
 
-		InitStepAnimScript(&pMover->actorAnim, pMover->actorObj, FROM_LE_32(pfilm->reels[0].script), 1);
+		InitStepAnimScript(&pMover->actorAnim, pMover->actorObj, FROM_32(pfilm->reels[0].script), 1);
 
 		// Synchronised walking reels
 		assert(pMover->stepCount >= 0);
@@ -704,14 +704,14 @@ static void MoverProcessHelper(int X, int Y, int id, PMOVER pMover) {
 	InitialPathChecks(pMover, X, Y);
 
 	pfilm = (const FILM *)LockMem(pMover->walkReels[0][FORWARD]);
-	pmi = (const MULTI_INIT *)LockMem(FROM_LE_32(pfilm->reels[0].mobj));
+	pmi = (const MULTI_INIT *)LockMem(FROM_32(pfilm->reels[0].mobj));
 
 //---
-	pFrame = (const FRAME *)LockMem(FROM_LE_32(pmi->hMulFrame));
+	pFrame = (const FRAME *)LockMem(FROM_32(pmi->hMulFrame));
 
 	// get pointer to image
-	pim = (IMAGE *)LockMem(READ_LE_UINT32(pFrame));	// handle to image
-	pim->hImgPal = TO_LE_32(BgPal());
+	pim = (IMAGE *)LockMem(READ_32(pFrame));	// handle to image
+	pim->hImgPal = TO_32(BgPal());
 //---
 	pMover->actorObj = MultiInitObject(pmi);
 
@@ -722,7 +722,7 @@ static void MoverProcessHelper(int X, int Y, int id, PMOVER pMover) {
 	MultiInsertObject(GetPlayfieldList(FIELD_WORLD), pMover->actorObj);
 	storeActorReel(id, NULL, 0, pMover->actorObj, 0, 0, 0);
 
-	InitStepAnimScript(&pMover->actorAnim, pMover->actorObj, FROM_LE_32(pfilm->reels[0].script), ONE_SECOND / FROM_LE_32(pfilm->frate));
+	InitStepAnimScript(&pMover->actorAnim, pMover->actorObj, FROM_32(pfilm->reels[0].script), ONE_SECOND / FROM_32(pfilm->frate));
 	pMover->stepCount = 0;
 
 	MultiSetAniXY(pMover->actorObj, pMover->objX, pMover->objY);
@@ -802,13 +802,14 @@ void T2MoverProcess(CORO_PARAM, const void *param) {
 	InitialPathChecks(pMover, rpos->X, rpos->Y);
 
 	pFilm = (FILM *)LockMem(pMover->walkReels[i][FORWARD]);	// Any old reel
-	pmi = (PMULTI_INIT)LockMem(FROM_LE_32(pFilm->reels[0].mobj));
+	pmi = (PMULTI_INIT)LockMem(FROM_32(pFilm->reels[0].mobj));
 
 	// Poke in the background palette
 	PokeInPalette(pmi);
 
 	pMover->actorObj = MultiInitObject(pmi);
-	pMover->actorID = pMover->actorID;
+	// FIXME: This is what the original did. A bug, perhaps?
+	// pMover->actorID = pMover->actorID;
 	pMover->bActive = true;
 
 	// add it to display list
@@ -856,10 +857,10 @@ void MoverProcessCreate(int X, int Y, int id, PMOVER pMover) {
 		iStruct.Y = Y;
 		iStruct.pMover = pMover;
 
-		g_scheduler->createProcess(PID_MOVER, T2MoverProcess, &iStruct, sizeof(MAINIT));
+		CoroScheduler.createProcess(PID_MOVER, T2MoverProcess, &iStruct, sizeof(MAINIT));
 	} else {
 		MoverProcessHelper(X, Y, id, pMover);
-		pMover->pProc = g_scheduler->createProcess(PID_MOVER, T1MoverProcess, &pMover, sizeof(PMOVER));
+		pMover->pProc = CoroScheduler.createProcess(PID_MOVER, T1MoverProcess, &pMover, sizeof(PMOVER));
 	}
 }
 
@@ -880,30 +881,30 @@ PMOVER InMoverBlock(PMOVER pMover, int x, int y) {
 	caR = GetMoverRight(pMover) + x - caX;
 
 	for (int i = 0; i < MAX_MOVERS; i++) {
-		if (pMover == &Movers[i] ||
-				(TinselV2 && (Movers[i].actorObj == NULL)) ||
-				(!TinselV2 && !Movers[i].bActive))
+		if (pMover == &g_Movers[i] ||
+				(TinselV2 && (g_Movers[i].actorObj == NULL)) ||
+				(!TinselV2 && !g_Movers[i].bActive))
 			continue;
 
 		// At around the same height?
-		GetMoverPosition(&Movers[i], &taX, &taY);
-		if (Movers[i].hFnpath != NOPOLY)
+		GetMoverPosition(&g_Movers[i], &taX, &taY);
+		if (g_Movers[i].hFnpath != NOPOLY)
 			continue;
 
 		if (ABS(y - taY) > 2)	// 2 was 8
 			continue;
 
 		// To the left?
-		taL = GetMoverLeft(&Movers[i]);
+		taL = GetMoverLeft(&g_Movers[i]);
 		if (caR <= taL)
 			continue;
 
 		// To the right?
-		taR = GetMoverRight(&Movers[i]);
+		taR = GetMoverRight(&g_Movers[i]);
 		if (caL >= taR)
 			continue;
 
-		return &Movers[i];
+		return &g_Movers[i];
 	}
 	return NULL;
 }
@@ -913,33 +914,33 @@ PMOVER InMoverBlock(PMOVER pMover, int x, int y) {
  */
 void SaveMovers(SAVED_MOVER *sMoverInfo) {
 	for (int i = 0; i < MAX_MOVERS; i++) {
-		sMoverInfo[i].bActive = !TinselV2 ? Movers[i].bActive : Movers[i].actorObj != NULL;
-		sMoverInfo[i].actorID	= Movers[i].actorID;
-		sMoverInfo[i].objX	= Movers[i].objX;
-		sMoverInfo[i].objY	= Movers[i].objY;
-		sMoverInfo[i].hLastfilm	= Movers[i].hLastFilm;
+		sMoverInfo[i].bActive = !TinselV2 ? g_Movers[i].bActive : g_Movers[i].actorObj != NULL;
+		sMoverInfo[i].actorID	= g_Movers[i].actorID;
+		sMoverInfo[i].objX	= g_Movers[i].objX;
+		sMoverInfo[i].objY	= g_Movers[i].objY;
+		sMoverInfo[i].hLastfilm	= g_Movers[i].hLastFilm;
 
 		if (TinselV2) {
-			sMoverInfo[i].bHidden = Movers[i].bHidden;
-			sMoverInfo[i].brightness = Movers[i].brightness;
-			sMoverInfo[i].startColor = Movers[i].startColor;
-			sMoverInfo[i].paletteLength = Movers[i].paletteLength;
+			sMoverInfo[i].bHidden = g_Movers[i].bHidden;
+			sMoverInfo[i].brightness = g_Movers[i].brightness;
+			sMoverInfo[i].startColor = g_Movers[i].startColor;
+			sMoverInfo[i].paletteLength = g_Movers[i].paletteLength;
 		}
 
-		memcpy(sMoverInfo[i].walkReels, Movers[i].walkReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
-		memcpy(sMoverInfo[i].standReels, Movers[i].standReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
-		memcpy(sMoverInfo[i].talkReels, Movers[i].talkReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
+		memcpy(sMoverInfo[i].walkReels, g_Movers[i].walkReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
+		memcpy(sMoverInfo[i].standReels, g_Movers[i].standReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
+		memcpy(sMoverInfo[i].talkReels, g_Movers[i].talkReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
 	}
 }
 
 void RestoreAuxScales(SAVED_MOVER *sMoverInfo) {
 	for (int i = 0; i < MAX_MOVERS; i++) {
 		if (TinselV2)
-			Movers[i].actorID = sMoverInfo[i].actorID;
+			g_Movers[i].actorID = sMoverInfo[i].actorID;
 
-		memcpy(Movers[i].walkReels, sMoverInfo[i].walkReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
-		memcpy(Movers[i].standReels, sMoverInfo[i].standReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
-		memcpy(Movers[i].talkReels, sMoverInfo[i].talkReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
+		memcpy(g_Movers[i].walkReels, sMoverInfo[i].walkReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
+		memcpy(g_Movers[i].standReels, sMoverInfo[i].standReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
+		memcpy(g_Movers[i].talkReels, sMoverInfo[i].talkReels, TOTAL_SCALES * 4 * sizeof(SCNHANDLE));
 	}
 }
 
@@ -950,10 +951,10 @@ PMOVER NextMover(PMOVER pMover) {
 	if (pMover == NULL)
 		next = 0;
 	else
-		next = pMover - Movers + 1;
+		next = pMover - g_Movers + 1;
 
-	if (Movers[next].actorID)
-		return &Movers[next];
+	if (g_Movers[next].actorID)
+		return &g_Movers[next];
 	else
 		return NULL;
 }

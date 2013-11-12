@@ -118,7 +118,7 @@ void EoBCoreEngine::setItemPosition(Item *itemQueue, int block, Item item, int p
 	EoBItem *itm = &_items[item];
 	itm->pos = pos;
 	itm->block = block;
-	itm->level = block < 0 ? 0xff : _currentLevel;
+	itm->level = block < 0 ? 0xFF : _currentLevel;
 
 	if (!*itemQueue) {
 		*itemQueue = itm->next = itm->prev = item;
@@ -141,7 +141,7 @@ void EoBCoreEngine::createInventoryItem(EoBCharacter *c, Item itemIndex, int16 i
 	if (itemValue != -1)
 		_items[itemIndex].value = itemValue;
 
-	if (itemValue && ((_itemTypes[_items[itemIndex].type].extraProperties & 0x7f) < 4))
+	if (itemValue && ((_itemTypes[_items[itemIndex].type].extraProperties & 0x7F) < 4))
 		_items[itemIndex].flags |= 0x80;
 
 	if (c->inventory[preferedInventorySlot]) {
@@ -208,7 +208,7 @@ int EoBCoreEngine::validateInventorySlotForItem(Item item, int charIndex, int sl
 	}
 
 	int itm = _characters[charIndex].inventory[slot];
-	int ex = _itemTypes[_items[itm].type].extraProperties & 0x7f;
+	int ex = _itemTypes[_items[itm].type].extraProperties & 0x7F;
 
 	if (_items[itm].flags & 0x20 && (_flags.gameID == GI_EOB1 || slot < 2)) {
 		if (_flags.gameID == GI_EOB2 && ex > 0 && ex < 4)
@@ -216,7 +216,7 @@ int EoBCoreEngine::validateInventorySlotForItem(Item item, int charIndex, int sl
 		return 0;
 	}
 
-	uint16 v = item ? _itemTypes[_items[item].type].invFlags : 0xffff;
+	uint16 v = item ? _itemTypes[_items[item].type].invFlags : 0xFFFF;
 	if (v & _slotValidationFlags[slot])
 		return 1;
 
@@ -359,7 +359,7 @@ void EoBCoreEngine::printFullItemName(Item item) {
 	EoBItem *itm = &_items[item];
 	const char *nameUnid = _itemNames[itm->nameUnid];
 	const char *nameId = _itemNames[itm->nameId];
-	uint8 f = _itemTypes[itm->type].extraProperties & 0x7f;
+	uint8 f = _itemTypes[itm->type].extraProperties & 0x7F;
 	int8 v = itm->value;
 
 	const char *tstr2 = 0;
@@ -462,19 +462,18 @@ void EoBCoreEngine::identifyQueuedItems(Item itemQueue) {
 void EoBCoreEngine::drawItemIconShape(int pageNum, Item itemId, int x, int y) {
 	int icn = _items[itemId].icon;
 	bool applyBluePal = ((_partyEffectFlags & 2) && (_items[itemId].flags & 0x80)) ? true : false;
-
-	memcpy(_tempIconShape, _itemIconShapes[icn], _itemIconShapes[icn][1] * _itemIconShapes[icn][2] * 4 + 20);
+	const uint8 *ovl = 0;
 
 	if (applyBluePal) {
 		if (_flags.gameID == GI_EOB1) {
-			_screen->replaceShapePalette(_tempIconShape, &_itemsOverlay[icn << 4]);
+			ovl = (_configRenderMode == Common::kRenderCGA) ? _itemsOverlayCGA : &_itemsOverlay[icn << 4];
 		} else {
 			_screen->setFadeTableIndex(3);
 			_screen->setShapeFadeMode(1, true);
 		}
 	}
 
-	_screen->drawShape(pageNum, _tempIconShape, x, y, 0);
+	_screen->drawShape(pageNum, _itemIconShapes[icn], x, y, 0, ovl ? 2 : 0, ovl);
 
 	if (applyBluePal) {
 		_screen->setFadeTableIndex(4);
@@ -531,7 +530,7 @@ bool EoBCoreEngine::launchObject(int charIndex, Item item, uint16 startBlock, in
 	setItemPosition((Item *)&_levelBlockProperties[startBlock].drawObjects, startBlock, item, startPos | 4);
 
 	t->enable = 1;
-	t->u2 = 1;
+	t->starting = 1;
 	t->flags = 0;
 	t->direction = dir;
 	t->distance = 12;
@@ -559,7 +558,7 @@ void EoBCoreEngine::launchMagicObject(int charIndex, int type, uint16 startBlock
 		return;
 
 	t->enable = 2;
-	t->u2 = 1;
+	t->starting = 1;
 	t->flags = _magicFlightObjectProperties[(type << 2) + 2];
 	t->direction = dir;
 	t->distance = _magicFlightObjectProperties[(type << 2) + 1];
@@ -568,7 +567,6 @@ void EoBCoreEngine::launchMagicObject(int charIndex, int type, uint16 startBlock
 	t->item = type;
 	t->objectType = _magicFlightObjectProperties[(type << 2) + 3];
 	t->attackerId = charIndex;
-	t->u2 = 1;
 	t->callBackIndex = _magicFlightObjectProperties[type << 2];
 	_sceneUpdateRequired = true;
 }
@@ -576,7 +574,7 @@ void EoBCoreEngine::launchMagicObject(int charIndex, int type, uint16 startBlock
 bool EoBCoreEngine::updateObjectFlight(EoBFlyingObject *fo, int block, int pos) {
 	uint8 wallFlags = _wllWallFlags[_levelBlockProperties[block].walls[fo->direction ^ 2]];
 	if (fo->enable == 1) {
-		if ((wallFlags & 1) || (fo->u2) || ((wallFlags & 2) && (_dscItemShapeMap[_items[fo->item].icon] >= 15))) {
+		if ((wallFlags & 1) || (fo->starting) || ((wallFlags & 2) && (_dscItemShapeMap[_items[fo->item].icon] >= 15))) {
 			getQueuedItem((Item *)&_levelBlockProperties[fo->curBlock].drawObjects, 0, fo->item);
 			setItemPosition((Item *)&_levelBlockProperties[block].drawObjects, block, fo->item, pos | 4);
 			fo->curBlock = block;
@@ -602,7 +600,7 @@ bool EoBCoreEngine::updateObjectFlight(EoBFlyingObject *fo, int block, int pos) 
 }
 
 bool EoBCoreEngine::updateFlyingObjectHitTest(EoBFlyingObject *fo, int block, int pos) {
-	if (fo->u2 && (fo->curBlock != _currentBlock || fo->attackerId >= 0) && (!blockHasMonsters(block) || fo->attackerId < 0))
+	if (fo->starting && (fo->curBlock != _currentBlock || fo->attackerId >= 0) && (!blockHasMonsters(fo->curBlock) || fo->attackerId < 0))
 		return false;
 
 	if (fo->enable == 2) {

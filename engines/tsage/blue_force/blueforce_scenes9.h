@@ -41,11 +41,11 @@ using namespace TsAGE;
 
 class Scene900: public PalettedScene {
 	/* Items */
-	class Item1: public NamedHotspot {
+	class Exterior: public NamedHotspot {
 	public:
 		virtual bool startAction(CursorType action, Event &event);
 	};
-	class Item4: public NamedHotspot {
+	class WestExit: public NamedHotspot {
 	public:
 		virtual bool startAction(CursorType action, Event &event);
 	};
@@ -94,7 +94,7 @@ public:
 	SpeakerGameText _gameTextSpeaker;
 	SpeakerJakeJacket _jakeJacketSpeaker;
 	SpeakerLyleHat _lyleHatSpeaker;
-	Item1 _item1;
+	Exterior _exterior;
 	Gate _gate;
 	Door _door;
 	Dog _dog;
@@ -104,7 +104,7 @@ public:
 	NamedObject _object5;
 	Lyle _lyle;
 	Body _body;
-	Item4 _item4;
+	WestExit _westExit;
 	ASoundExt _sound1;
 	Action1 _action1;
 	Action2 _action2;
@@ -188,6 +188,7 @@ class Scene910: public PalettedScene {
 	class Object25: public NamedObject {
 		int _field90, _field92;
 	public:
+		Object25();
 		void setupHiddenSwitch(int x, int y, int arg8, int argA);
 		virtual void synchronize(Serializer &s);
 		virtual bool startAction(CursorType action, Event &event);

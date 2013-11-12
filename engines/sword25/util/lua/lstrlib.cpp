@@ -5,11 +5,7 @@
 */
 
 
-#include <ctype.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#define FORBIDDEN_SYMBOL_EXCEPTION_ctype_h
 
 #define lstrlib_c
 #define LUA_LIB

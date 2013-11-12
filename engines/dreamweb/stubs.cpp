@@ -20,14 +20,11 @@
  *
  */
 
+#include "dreamweb/sound.h"
 #include "dreamweb/dreamweb.h"
 #include "common/config-manager.h"
 
 namespace DreamWeb {
-
-// Keyboard buffer. _bufferIn and _bufferOut are indexes
-// into this, making it a ring buffer
-uint8 g_keyBuffer[16];
 
 const Room g_roomData[] = {
 	// location 0
@@ -510,11 +507,26 @@ void DreamWebEngine::dreamwebFinalize() {
 	_icons1.clear();
 	_icons2.clear();
 	_charset1.clear();
-	_tempGraphics.clear();
-	_tempGraphics2.clear();
-	_tempGraphics3.clear();
-	_tempCharset.clear();
 	_mainSprites.clear();
+
+	// clear local graphics, just in case
+	_keypadGraphics.clear();
+	_menuGraphics.clear();
+	_menuGraphics2.clear();
+	_folderGraphics.clear();
+	_folderGraphics2.clear();
+	_folderGraphics3.clear();
+	_folderCharset.clear();
+	_symbolGraphics.clear();
+	_diaryGraphics.clear();
+	_diaryCharset.clear();
+	_monitorGraphics.clear();
+	_monitorCharset.clear();
+	_newplaceGraphics.clear();
+	_newplaceGraphics2.clear();
+	_newplaceGraphics3.clear();
+	_cityGraphics.clear();
+	_saveGraphics.clear();
 
 	_exFrames.clear();
 	_exText.clear();
@@ -550,7 +562,6 @@ void DreamWebEngine::dreamweb() {
 		break;
 	}
 
-	seeCommandTail();
 	allocateBuffers();
 
 	// setMouse
@@ -564,7 +575,7 @@ void DreamWebEngine::dreamweb() {
 	readSetData();
 	_wonGame = false;
 
-	loadSounds(0, "DREAMWEB.V99"); // basic sample
+	_sound->loadSounds(0, "V99"); // basic sample
 
 	bool firstLoop = true;
 
@@ -640,7 +651,7 @@ void DreamWebEngine::dreamweb() {
 			_vars._location = 255;
 			_vars._roomAfterDream = 1;
 			_newLocation = 35;
-			_volume = 7;
+			_sound->volumeSet(7);
 			loadRoom();
 			clearSprites();
 			initMan();
@@ -650,8 +661,7 @@ void DreamWebEngine::dreamweb() {
 			initialInv();
 			_lastFlag = 32;
 			startup1();
-			_volumeTo = 0;
-			_volumeDirection = -1;
+			_sound->volumeChange(0, -1);
 			_commandType = 255;
 		}
 
@@ -709,12 +719,11 @@ void DreamWebEngine::dreamweb() {
 		showGun();
 		fadeScreenDown();
 		hangOn(100);
-
 	}
 }
 
-void DreamWebEngine::loadTextFile(TextFile &file, const char *fileName)
-{
+void DreamWebEngine::loadTextFile(TextFile &file, const char *suffix) {
+	Common::String fileName = getDatafilePrefix() + suffix;
 	FileHeader header;
 
 	Common::File f;
@@ -740,7 +749,7 @@ void DreamWebEngine::screenUpdate() {
 	showPointer();
 	if ((_vars._watchingTime == 0) && (_newLocation != 0xff))
 		return;
-	vSync();
+	waitForVSync();
 	uint16 mouseState = 0;
 	mouseState |= readMouseState();
 	dumpPointer();
@@ -755,7 +764,7 @@ void DreamWebEngine::screenUpdate() {
 	showPointer();
 	if (_wonGame)
 		return;
-	vSync();
+	waitForVSync();
 	mouseState |= readMouseState();
 	dumpPointer();
 
@@ -767,7 +776,7 @@ void DreamWebEngine::screenUpdate() {
 	afterNewRoom();
 
 	showPointer();
-	vSync();
+	waitForVSync();
 	mouseState |= readMouseState();
 	dumpPointer();
 
@@ -776,7 +785,7 @@ void DreamWebEngine::screenUpdate() {
 	delPointer();
 
 	showPointer();
-	vSync();
+	waitForVSync();
 	_oldButton = _mouseButton;
 	mouseState |= readMouseState();
 	_mouseButton = mouseState;
@@ -819,7 +828,8 @@ void DreamWebEngine::switchRyanOff() {
 	_vars._ryanOn = 1;
 }
 
-void DreamWebEngine::loadGraphicsFile(GraphicsFile &file, const char *fileName) {
+void DreamWebEngine::loadGraphicsFile(GraphicsFile &file, const char *suffix) {
+	Common::String fileName = getDatafilePrefix() + suffix;
 	FileHeader header;
 
 	Common::File f;
@@ -828,17 +838,18 @@ void DreamWebEngine::loadGraphicsFile(GraphicsFile &file, const char *fileName) 
 	uint16 sizeInBytes = header.len(0);
 
 	assert(sizeInBytes >= kFrameBlocksize);
-	delete[] file._data;
+	file.clear();
 	file._data = new uint8[sizeInBytes - kFrameBlocksize];
-
+	file._frames = new Frame[kGraphicsFileFrameSize];
 	f.read((uint8 *)file._frames, kFrameBlocksize);
 	f.read(file._data, sizeInBytes - kFrameBlocksize);
 }
 
 void DreamWebEngine::loadGraphicsSegment(GraphicsFile &file, Common::File &inFile, unsigned int len) {
 	assert(len >= kFrameBlocksize);
-	delete[] file._data;
+	file.clear();
 	file._data = new uint8[len - kFrameBlocksize];
+	file._frames = new Frame[kGraphicsFileFrameSize];
 	inFile.read((uint8 *)file._frames, kFrameBlocksize);
 	inFile.read(file._data, len - kFrameBlocksize);
 }
@@ -852,48 +863,12 @@ void DreamWebEngine::loadTextSegment(TextFile &file, Common::File &inFile, unsig
 	inFile.read((uint8 *)file._text, len - headerSize);
 }
 
-void DreamWebEngine::loadIntoTemp(const char *fileName) {
-	loadGraphicsFile(_tempGraphics, fileName);
-}
-
-void DreamWebEngine::loadIntoTemp2(const char *fileName) {
-	loadGraphicsFile(_tempGraphics2, fileName);
-}
-
-void DreamWebEngine::loadIntoTemp3(const char *fileName) {
-	loadGraphicsFile(_tempGraphics3, fileName);
-}
-
-void DreamWebEngine::loadTempCharset(const char *fileName) {
-	loadGraphicsFile(_tempCharset, fileName);
-}
-
 void DreamWebEngine::hangOnCurs(uint16 frameCount) {
 	for (uint16 i = 0; i < frameCount; ++i) {
 		printCurs();
-		vSync();
+		waitForVSync();
 		delCurs();
 	}
-}
-
-void DreamWebEngine::seeCommandTail() {
-	_brightness = 1;
-}
-
-void DreamWebEngine::readMouse() {
-	_oldButton = _mouseButton;
-	uint16 state = readMouseState();
-	_mouseButton = state;
-}
-
-uint16 DreamWebEngine::readMouseState() {
-	_oldX = _mouseX;
-	_oldY = _mouseY;
-	uint16 x, y, state;
-	mouseCall(&x, &y, &state);
-	_mouseX = x;
-	_mouseY = y;
-	return state;
 }
 
 void DreamWebEngine::dumpTextLine() {
@@ -950,7 +925,7 @@ void DreamWebEngine::processTrigger() {
 void DreamWebEngine::useTimedText() {
 	if (_previousTimedTemp._string) {
 		// TODO: It might be nice to make subtitles wait for the speech
-		// to finish (_channel1Playing) when we're in speech+subtitles mode,
+		// to finish (_sound->isChannel1Playing()) when we're in speech+subtitles mode,
 		// instead of waiting the pre-specified amount of time.
 
 
@@ -985,11 +960,10 @@ void DreamWebEngine::useTimedText() {
 }
 
 void DreamWebEngine::setupTimedTemp(uint8 textIndex, uint8 voiceIndex, uint8 x, uint8 y, uint16 countToTimed, uint16 timeCount) {
-
 	if (hasSpeech() && voiceIndex != 0) {
-		if (loadSpeech('T', voiceIndex, 'T', textIndex)) {
-			playChannel1(50+12);
-		}
+		_speechLoaded = _sound->loadSpeech('T', voiceIndex, 'T', textIndex);
+		if (_speechLoaded)
+			_sound->playChannel1(62);
 
 		if (_speechLoaded && !_subtitles)
 			return;
@@ -1076,7 +1050,7 @@ void DreamWebEngine::lockMon() {
 	// key because calling readkey() drains characters from the input
 	// buffer, we we want the user to be able to type ahead while the text
 	// is being printed.
-	if (_lastHardKey == 57) {
+	if (_lastHardKey == Common::KEYCODE_SPACE) {
 		// Clear the keyboard buffer. Otherwise the space that caused
 		// the pause will be read immediately unpause the game.
 		do {
@@ -1092,7 +1066,7 @@ void DreamWebEngine::lockMon() {
 		}
 		// Forget the last "hard" key, otherwise the space that caused
 		// the unpausing will immediately re-pause the game.
-		_lastHardKey = 0;
+		_lastHardKey = Common::KEYCODE_INVALID;
 		lockLightOff();
 	}
 }
@@ -1168,7 +1142,7 @@ void DreamWebEngine::plotReel(uint16 &reelPointer) {
 		reel += 8;
 	}
 
-	for (size_t i = 0; i < 8; ++i) {
+	for (uint i = 0; i < 8; ++i) {
 		if (reel->frame() != 0xffff)
 			showReelFrame(reel);
 		++reel;
@@ -1267,7 +1241,7 @@ const uint8 *DreamWebEngine::findObName(uint8 type, uint8 index) {
 
 void DreamWebEngine::copyName(uint8 type, uint8 index, uint8 *dst) {
 	const uint8 *src = findObName(type, index);
-	size_t i;
+	uint i;
 	for (i = 0; i < 28; ++i) {
 		char c = src[i];
 		if (c == ':')
@@ -1285,6 +1259,10 @@ void DreamWebEngine::commandWithOb(uint8 command, uint8 type, uint8 index) {
 	uint8 textLen = _textLen;
 
 	const uint8 *string = (const uint8 *)_commandText.getString(command);
+	// Fix spelling in command 3 FR: "Aller ver" => "Aller vers"
+	const char *command3Fr = "Aller vers";
+	if (command == 3 && getLanguage() == Common::FR_FRA)
+		string = (const uint8 *)command3Fr;
 	printDirect(string, _textAddressX, _textAddressY, textLen, (bool)(textLen & 1));
 
 	copyName(type, index, commandLine);
@@ -1397,7 +1375,7 @@ void DreamWebEngine::doChange(uint8 index, uint8 value, uint8 type) {
 }
 
 void DreamWebEngine::deleteTaken() {
-	for (size_t i = 0; i < kNumexobjects; ++i) {
+	for (uint i = 0; i < kNumexobjects; ++i) {
 		uint8 location = _exData[i].initialLocation;
 		if (location == _realLocation) {
 			uint8 index = _exData[i].index;
@@ -1408,7 +1386,7 @@ void DreamWebEngine::deleteTaken() {
 
 uint8 DreamWebEngine::getExPos() {
 	DynObject *objects = _exData;
-	for (size_t i = 0; i < kNumexobjects; ++i) {
+	for (uint i = 0; i < kNumexobjects; ++i) {
 		if (objects[i].mapad[0] == 0xff)
 			return i;
 	}
@@ -1517,16 +1495,6 @@ void DreamWebEngine::obName(uint8 command, uint8 commandType) {
 	}
 }
 
-void DreamWebEngine::delPointer() {
-	if (_oldPointerX == 0xffff)
-		return;
-	_delHereX = _oldPointerX;
-	_delHereY = _oldPointerY;
-	_delXS = _pointerXS;
-	_delYS = _pointerYS;
-	multiPut(_pointerBack, _delHereX, _delHereY, _pointerXS, _pointerYS);
-}
-
 void DreamWebEngine::showBlink() {
 	if (_manIsOffScreen == 1)
 		return;
@@ -1558,111 +1526,6 @@ void DreamWebEngine::dumpBlink() {
 	multiDump(44, 32, 16, 12);
 }
 
-void DreamWebEngine::dumpPointer() {
-	dumpBlink();
-	multiDump(_delHereX, _delHereY, _delXS, _delYS);
-	if ((_oldPointerX != _delHereX) || (_oldPointerY != _delHereY))
-		multiDump(_oldPointerX, _oldPointerY, _pointerXS, _pointerYS);
-}
-
-void DreamWebEngine::showPointer() {
-	showBlink();
-	uint16 x = _mouseX;
-	_oldPointerX = _mouseX;
-	uint16 y = _mouseY;
-	_oldPointerY = _mouseY;
-	if (_pickUp == 1) {
-		const GraphicsFile *frames;
-		if (_objectType != kExObjectType)
-			frames = &_freeFrames;
-		else
-			frames = &_exFrames;
-		const Frame *frame = &frames->_frames[(3 * _itemFrame + 1)];
-
-		uint8 width = frame->width;
-		uint8 height = frame->height;
-		if (width < 12)
-			width = 12;
-		if (height < 12)
-			height = 12;
-		_pointerXS = width;
-		_pointerYS = height;
-		uint16 xMin = (x >= width / 2) ? x - width / 2 : 0;
-		uint16 yMin = (y >= height / 2) ? y - height / 2 : 0;
-		_oldPointerX = xMin;
-		_oldPointerY = yMin;
-		multiGet(_pointerBack, xMin, yMin, width, height);
-		showFrame(*frames, x, y, 3 * _itemFrame + 1, 128);
-		showFrame(_icons1, x, y, 3, 128);
-	} else {
-		const Frame *frame = &_icons1._frames[_pointerFrame + 20];
-		uint8 width = frame->width;
-		uint8 height = frame->height;
-		if (width < 12)
-			width = 12;
-		if (height < 12)
-			height = 12;
-		_pointerXS = width;
-		_pointerYS = height;
-		multiGet(_pointerBack, x, y, width, height);
-		showFrame(_icons1, x, y, _pointerFrame + 20, 0);
-	}
-}
-
-void DreamWebEngine::animPointer() {
-
-	if (_pointerMode == 2) {
-		_pointerFrame = 0;
-		if ((_realLocation == 14) && (_commandType == 211))
-			_pointerFrame = 5;
-		return;
-	} else if (_pointerMode == 3) {
-		if (_pointerSpeed != 0) {
-			--_pointerSpeed;
-		} else {
-			_pointerSpeed = 5;
-			++_pointerCount;
-			if (_pointerCount == 16)
-				_pointerCount = 0;
-		}
-		static const uint8 flashMouseTab[] = { 1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2 };
-		_pointerFrame = flashMouseTab[_pointerCount];
-		return;
-	}
-	if (_vars._watchingTime != 0) {
-		_pointerFrame = 11;
-		return;
-	}
-	_pointerFrame = 0;
-	if (_inMapArea == 0)
-		return;
-	if (_pointerFirstPath == 0)
-		return;
-	uint8 flag, flagEx;
-	getFlagUnderP(&flag, &flagEx);
-	if (flag < 2)
-		return;
-	if (flag >= 128)
-		return;
-	if (flag & 4) {
-		_pointerFrame = 3;
-		return;
-	}
-	if (flag & 16) {
-		_pointerFrame = 4;
-		return;
-	}
-	if (flag & 2) {
-		_pointerFrame = 5;
-		return;
-	}
-	if (flag & 8) {
-		_pointerFrame = 6;
-		return;
-	}
-	_pointerFrame = 8;
-}
-
 void DreamWebEngine::printMessage(uint16 x, uint16 y, uint8 index, uint8 maxWidth, bool centered) {
 	const uint8 *string = (const uint8 *)_commandText.getString(index);
 	printDirect(string, x, y, maxWidth, centered);
@@ -1678,7 +1541,7 @@ void DreamWebEngine::printMessage2(uint16 x, uint16 y, uint8 index, uint8 maxWid
 
 bool DreamWebEngine::objectMatches(void *object, const char *id) {
 	const char *objId = (const char *)object + 12; // whether it is a DynObject or a SetObject
-	for (size_t i = 0; i < 4; ++i) {
+	for (uint i = 0; i < 4; ++i) {
 		if (id[i] != objId[i] + 'A')
 			return false;
 	}
@@ -1769,7 +1632,7 @@ bool DreamWebEngine::checkIfSet(uint8 x, uint8 y) {
 
 void DreamWebEngine::hangOn(uint16 frameCount) {
 	while (frameCount) {
-		vSync();
+		waitForVSync();
 		--frameCount;
 		if (_quitRequested)
 			break;
@@ -1782,7 +1645,7 @@ void DreamWebEngine::hangOnW(uint16 frameCount) {
 		readMouse();
 		animPointer();
 		showPointer();
-		vSync();
+		waitForVSync();
 		dumpPointer();
 		--frameCount;
 		if (_quitRequested)
@@ -1800,7 +1663,7 @@ void DreamWebEngine::hangOnP(uint16 count) {
 	readMouse();
 	animPointer();
 	showPointer();
-	vSync();
+	waitForVSync();
 	dumpPointer();
 
 	count *= 3;
@@ -1809,7 +1672,7 @@ void DreamWebEngine::hangOnP(uint16 count) {
 		readMouse();
 		animPointer();
 		showPointer();
-		vSync();
+		waitForVSync();
 		dumpPointer();
 		if (_quitRequested)
 			break;
@@ -1981,7 +1844,7 @@ void DreamWebEngine::loadRoom() {
 	_vars._location = _newLocation;
 	const Room &room = g_roomData[_newLocation];
 	startLoading(room);
-	loadRoomsSample();
+	_sound->loadRoomsSample(_roomsSample);
 	switchRyanOn();
 	drawFlags();
 
@@ -1991,16 +1854,16 @@ void DreamWebEngine::loadRoom() {
 }
 
 void DreamWebEngine::readSetData() {
-	loadGraphicsFile(_charset1, "DREAMWEB.C00");
-	loadGraphicsFile(_icons1, "DREAMWEB.G00");
-	loadGraphicsFile(_icons2, "DREAMWEB.G01");
-	loadGraphicsFile(_mainSprites, "DREAMWEB.S00");
-	loadTextFile(_puzzleText, "DREAMWEB.T80");
-	loadTextFile(_commandText, "DREAMWEB.T84");
+	loadGraphicsFile(_charset1, "C00");
+	loadGraphicsFile(_icons1, "G00");
+	loadGraphicsFile(_icons2, "G01");
+	loadGraphicsFile(_mainSprites, "S00");
+	loadTextFile(_puzzleText, "T80");
+	loadTextFile(_commandText, "T84");
 	useCharset1();
 
 	// FIXME: Why is this commented out?
-	//openFile("DREAMWEB.VOL");
+	//openFile(getDatafilePrefix() + "VOL");
 	//uint8 *volumeTab = getSegment(data.word(kSoundbuffer)).ptr(16384, 0);
 	//readFromFile(volumeTab, 2048-256);
 	//closeFile();
@@ -2065,28 +1928,12 @@ void DreamWebEngine::useCharset1() {
 	_currentCharset = &_charset1;
 }
 
-void DreamWebEngine::useTempCharset() {
-	_currentCharset = &_tempCharset;
-}
-
-void DreamWebEngine::getRidOfTemp() {
-	_tempGraphics.clear();
+void DreamWebEngine::useTempCharset(GraphicsFile *charset) {
+	_currentCharset = charset;
 }
 
 void DreamWebEngine::getRidOfTempText() {
 	_textFile1.clear();
-}
-
-void DreamWebEngine::getRidOfTemp2() {
-	_tempGraphics2.clear();
-}
-
-void DreamWebEngine::getRidOfTemp3() {
-	_tempGraphics3.clear();
-}
-
-void DreamWebEngine::getRidOfTempCharset() {
-	_tempCharset.clear();
 }
 
 void DreamWebEngine::getRidOfAll() {
@@ -2111,8 +1958,8 @@ void DreamWebEngine::getRidOfAll() {
 void DreamWebEngine::loadRoomData(const Room &room, bool skipDat) {
 	processEvents();
 	Common::File file;
-	if (!file.open(room.name))
-		error("cannot open file %s", room.name);
+	if (!file.open(modifyFileName(room.name)))
+		error("cannot open file %s", modifyFileName(room.name).c_str());
 
 	FileHeader header;
 	file.read((uint8 *)&header, sizeof(FileHeader));
@@ -2197,8 +2044,8 @@ void DreamWebEngine::restoreReels() {
 
 	processEvents();
 	Common::File file;
-	if (!file.open(room.name))
-		error("cannot open file %s", room.name);
+	if (!file.open(modifyFileName(room.name)))
+		error("cannot open file %s", modifyFileName(room.name).c_str());
 
 	FileHeader header;
 	file.read((uint8 *)&header, sizeof(FileHeader));
@@ -2251,11 +2098,11 @@ const uint8 *DreamWebEngine::getTextInFile1(uint16 index) {
 }
 
 void DreamWebEngine::loadTravelText() {
-	loadTextFile(_travelText, "DREAMWEB.T81"); // location descs
+	loadTextFile(_travelText, "T81"); // location descs
 }
 
-void DreamWebEngine::loadTempText(const char *fileName) {
-	loadTextFile(_textFile1, fileName);
+void DreamWebEngine::loadTempText(const char *suffix) {
+	loadTextFile(_textFile1, suffix);
 }
 
 void DreamWebEngine::drawFloor() {
@@ -2274,6 +2121,7 @@ void DreamWebEngine::drawFloor() {
 void DreamWebEngine::allocateBuffers() {
 	_exFrames.clear();
 	_exFrames._data = new uint8[kExframeslen];
+	_exFrames._frames = new Frame[kGraphicsFileFrameSize];
 	_exText.clear();
 	_exText._text = new char[kExtextlen];
 }
@@ -2282,13 +2130,12 @@ void DreamWebEngine::workToScreenM() {
 	animPointer();
 	readMouse();
 	showPointer();
-	vSync();
+	waitForVSync();
 	workToScreen();
 	delPointer();
 }
 
 void DreamWebEngine::atmospheres() {
-
 	const Atmosphere *a = &g_atmosphereList[0];
 
 	for (; a->_location != 255; ++a) {
@@ -2296,12 +2143,12 @@ void DreamWebEngine::atmospheres() {
 			continue;
 		if (a->_mapX != _mapX || a->_mapY != _mapY)
 			continue;
-		if (a->_sound != _channel0Playing) {
+		if (a->_sound != _sound->getChannel0Playing()) {
 
 			if (_vars._location == 45 && _vars._reelToWatch == 45)
 				continue; // "web"
 
-			playChannel0(a->_sound, a->_repeat);
+			_sound->playChannel0(a->_sound, a->_repeat);
 
 			// NB: The asm here reads
 			//	cmp reallocation,2
@@ -2311,21 +2158,21 @@ void DreamWebEngine::atmospheres() {
 			//  I'm interpreting this as if the cmp reallocation is below the jz
 
 			if (_mapY == 0) {
-				_volume = 0; // "fullvol"
+				_sound->volumeSet(0); // "fullvol"
 				return;
 			}
 
 			if (_realLocation == 2 && _mapX == 22 && _mapY == 10)
-				_volume = 5; // "louisvol"
+				_sound->volumeSet(5); // "louisvol"
 
 			if (hasSpeech() && _realLocation == 14) {
 				if (_mapX == 33) {
-					_volume = 0; // "ismad2"
+					_sound->volumeSet(0); // "ismad2"
 					return;
 				}
 
 				if (_mapX == 22) {
-					_volume = 5;
+					_sound->volumeSet(5);
 					return;
 				}
 
@@ -2334,19 +2181,19 @@ void DreamWebEngine::atmospheres() {
 
 		if (_realLocation == 2) {
 			if (_mapX == 22) {
-				_volume = 5; // "louisvol"
+				_sound->volumeSet(5); // "louisvol"
 				return;
 			}
 
 			if (_mapX == 11) {
-				_volume = 0; // "fullvol"
+				_sound->volumeSet(0); // "fullvol"
 				return;
 			}
 		}
 		return;
 	}
 
-	cancelCh0();
+	_sound->cancelCh0();
 }
 
 void DreamWebEngine::readKey() {
@@ -2358,8 +2205,8 @@ void DreamWebEngine::readKey() {
 		return;
 	}
 
-	bufOut = (bufOut + 1) & 15; // The buffer has size 16
-	_currentKey = g_keyBuffer[bufOut];
+	bufOut = (bufOut + 1) % ARRAYSIZE(_keyBuffer);
+	_currentKey = _keyBuffer[bufOut];
 	_bufferOut = bufOut;
 }
 
@@ -2368,36 +2215,6 @@ void DreamWebEngine::newGame() {
 
 	if (_mouseButton == 1)
 		_getBack = 3;
-}
-
-void DreamWebEngine::pickupOb(uint8 command, uint8 pos) {
-	_lastInvPos = pos;
-	_objectType = kFreeObjectType;
-	_itemFrame = command;
-	_command = command;
-	//uint8 dummy;
-	//getAnyAd(&dummy, &dummy);	// was in the original source, seems useless here
-	transferToEx(command);
-}
-
-void DreamWebEngine::initialInv() {
-	if (_realLocation != 24)
-		return;
-
-	pickupOb(11, 5);
-	pickupOb(12, 6);
-	pickupOb(13, 7);
-	pickupOb(14, 8);
-	pickupOb(18, 0);
-	pickupOb(19, 1);
-	pickupOb(20, 9);
-	pickupOb(16, 2);
-	_vars._watchMode = 1;
-	_vars._reelToHold = 0;
-	_vars._endOfHoldReel = 6;
-	_vars._watchSpeed = 1;
-	_vars._speedCount = 1;
-	switchRyanOff();
 }
 
 void DreamWebEngine::walkIntoRoom() {
@@ -2462,13 +2279,6 @@ void DreamWebEngine::makeMainScreen() {
 	workToScreenM();
 	_commandType = 200;
 	_manIsOffScreen = 0;
-}
-
-void DreamWebEngine::openInv() {
-	_invOpen = 1;
-	printMessage(80, 58 - 10, 61, 240, (240 & 1));
-	fillRyan();
-	_commandType = 255;
 }
 
 void DreamWebEngine::obsThatDoThings() {
@@ -2570,10 +2380,6 @@ void DreamWebEngine::errorMessage3() {
 	delPointer();
 }
 
-void DreamWebEngine::reExFromOpen() {
-
-}
-
 void DreamWebEngine::putBackObStuff() {
 	createPanel();
 	showPanel();
@@ -2592,26 +2398,6 @@ void DreamWebEngine::putBackObStuff() {
 
 bool DreamWebEngine::isSetObOnMap(uint8 index) {
 	return (getSetAd(index)->mapad[0] == 0);
-}
-
-void DreamWebEngine::examineInventory() {
-	commandOnlyCond(32, 249);
-
-	if (!(_mouseButton & 1))
-		return;
-
-	createPanel();
-	showPanel();
-	showMan();
-	showExit();
-	examIcon();
-	_pickUp = 0;
-	_invOpen = 2;
-	openInv();
-	workToScreenM();
-}
-
-void DreamWebEngine::middlePanel() {
 }
 
 void DreamWebEngine::underTextLine() {
@@ -2725,7 +2511,6 @@ void DreamWebEngine::madmanRun() {
 		_vars._lastWeapon = 8;
 }
 
-
 void DreamWebEngine::decide() {
 	setMode();
 	loadPalFromIFF();
@@ -2757,7 +2542,7 @@ void DreamWebEngine::decide() {
 
 		readMouse();
 		showPointer();
-		vSync();
+		waitForVSync();
 		dumpPointer();
 		dumpTextLine();
 		delPointer();
@@ -2765,7 +2550,7 @@ void DreamWebEngine::decide() {
 	} while (!_getBack);
 
 	if (_getBack != 4)
-		getRidOfTemp();	// room not loaded
+		_saveGraphics.clear();	// room not loaded
 
 	_textAddressX = 13;
 	_textAddressY = 182;
@@ -2792,46 +2577,21 @@ void DreamWebEngine::showGun() {
 	_numToFade = 128;
 	hangOn(200);
 	_roomsSample = 34;
-	loadRoomsSample();
-	_volume = 0;
-	loadIntoTemp("DREAMWEB.G13");
+	_sound->loadRoomsSample(_roomsSample);
+	_sound->volumeSet(0);
+	GraphicsFile graphics;
+	loadGraphicsFile(graphics, "G13");
 	createPanel2();
-	showFrame(_tempGraphics, 100, 4, 0, 0);
-	showFrame(_tempGraphics, 158, 106, 1, 0);
+	showFrame(graphics, 100, 4, 0, 0);
+	showFrame(graphics, 158, 106, 1, 0);
 	workToScreen();
-	getRidOfTemp();
+	graphics.clear();
 	fadeScreenUp();
 	hangOn(160);
-	playChannel0(12, 0);
-	loadTempText("DREAMWEB.T83");
+	_sound->playChannel0(12, 0);
+	loadTempText("T83");
 	rollEndCreditsGameLost();
 	getRidOfTempText();
-}
-
-void DreamWebEngine::dropError() {
-	_commandType = 255;
-	delPointer();
-	printMessage(76, 21, 56, 240, 240 & 1);
-	workToScreenM();
-	hangOnP(50);
-	showPanel();
-	showMan();
-	examIcon();
-	_commandType = 255;
-	workToScreenM();
-}
-
-void DreamWebEngine::cantDrop() {
-	_commandType = 255;
-	delPointer();
-	printMessage(76, 21, 24, 240, 240 & 1);
-	workToScreenM();
-	hangOnP(50);
-	showPanel();
-	showMan();
-	examIcon();
-	_commandType = 255;
-	workToScreenM();
 }
 
 void DreamWebEngine::getBack1() {
@@ -2839,7 +2599,6 @@ void DreamWebEngine::getBack1() {
 		blank();
 		return;
 	}
-
 
 	commandOnlyCond(26, 202);
 
@@ -3018,7 +2777,7 @@ void DreamWebEngine::lookAtCard() {
 	getRidOfReels();
 	loadKeypad();
 	createPanel2();
-	showFrame(_tempGraphics, 160, 80, 42, 128);
+	showFrame(_keypadGraphics, 160, 80, 42, 128);
 	const uint8 *obText = getObTextStart();
 	findNextColon(&obText);
 	findNextColon(&obText);
@@ -3028,12 +2787,12 @@ void DreamWebEngine::lookAtCard() {
 	workToScreenM();
 	hangOnW(280);
 	createPanel2();
-	showFrame(_tempGraphics, 160, 80, 42, 128);
+	showFrame(_keypadGraphics, 160, 80, 42, 128);
 	printDirect(obText, 36, 130, 241, 241 & 1);
 	workToScreenM();
 	hangOnW(200);
 	_manIsOffScreen = 0;
-	getRidOfTemp();
+	_keypadGraphics.clear();
 	restoreReels();
 	putBackObStuff();
 }
@@ -3069,9 +2828,7 @@ void DreamWebEngine::setupInitialVars() {
 	_vars._progressPoints = 0;
 	_vars._watchOn = 0;
 	_vars._shadesOn = 0;
-	_vars._secondCount = 0;
-	_vars._minuteCount = 30;
-	_vars._hourCount = 19;
+	getTime();
 	_vars._zoomOn = 1;
 	_vars._location = 0;
 	_vars._exPos = 0;
@@ -3152,66 +2909,6 @@ void DreamWebEngine::edensFlatReminders() {
 	}
 
 	_vars._progressPoints++;	// got card
-}
-
-void DreamWebEngine::incRyanPage() {
-	commandOnlyCond(31, 222);
-
-	if (_mouseButton == _oldButton || !(_mouseButton & 1))
-		return;
-
-	_vars._ryanPage = (_mouseX - (kInventx + 167)) / 18;
-
-	delPointer();
-	fillRyan();
-	readMouse();
-	showPointer();
-	workToScreen();
-	delPointer();
-
-}
-
-void DreamWebEngine::emergencyPurge() {
-	while (true) {
-		if (_vars._exFramePos + 4000 < kExframeslen) {
-			// Not near frame end
-			if (_vars._exTextPos + 400 < kExtextlen)
-				return;	// notneartextend
-		}
-
-		purgeAnItem();
-	}
-}
-
-void DreamWebEngine::purgeAnItem() {
-	const DynObject *extraObjects = _exData;
-
-	for (size_t i = 0; i < kNumexobjects; ++i) {
-		if (extraObjects[i].mapad[0] && extraObjects[i].objId[0] == 255 &&
-			extraObjects[i].initialLocation != _realLocation) {
-			deleteExObject(i);
-			return;
-		}
-	}
-
-	for (size_t i = 0; i < kNumexobjects; ++i) {
-		if (extraObjects[i].mapad[0] && extraObjects[i].objId[0] == 255) {
-			deleteExObject(i);
-			return;
-		}
-	}
-}
-
-void DreamWebEngine::checkCoords(const RectWithCallback *rectWithCallbacks) {
-	if (_newLocation != 0xff)
-		return;
-	const RectWithCallback *r;
-	for (r = rectWithCallbacks; r->_xMin != 0xffff; ++r) {
-		if (r->contains(_mouseX, _mouseY)) {
-			(this->*(r->_callback))();
-			return;
-		}
-	}
 }
 
 } // End of namespace DreamWeb

@@ -21,9 +21,9 @@
  */
 
 #include "mohawk/cursors.h"
-#include "mohawk/graphics.h"
 #include "mohawk/riven.h"
 #include "mohawk/riven_external.h"
+#include "mohawk/riven_graphics.h"
 #include "mohawk/sound.h"
 #include "mohawk/video.h"
 
@@ -1467,7 +1467,7 @@ static void catherineViewerIdleTimer(MohawkEngine_Riven *vm) {
 	VideoHandle videoHandle = vm->_video->playMovieRiven(30);
 
 	// Reset the timer
-	vm->installTimer(&catherineViewerIdleTimer, vm->_video->getDuration(videoHandle) + vm->_rnd->getRandomNumber(60) * 1000);
+	vm->installTimer(&catherineViewerIdleTimer, vm->_video->getDuration(videoHandle).msecs() + vm->_rnd->getRandomNumber(60) * 1000);
 }
 
 void RivenExternal::xglview_prisonon(uint16 argc, uint16 *argv) {
@@ -1507,7 +1507,7 @@ void RivenExternal::xglview_prisonon(uint16 argc, uint16 *argv) {
 		_vm->_video->activateMLST(cathMovie, _vm->getCurCard());
 		VideoHandle videoHandle = _vm->_video->playMovieRiven(30);
 
-		timeUntilNextMovie = _vm->_video->getDuration(videoHandle) + _vm->_rnd->getRandomNumber(60) * 1000;
+		timeUntilNextMovie = _vm->_video->getDuration(videoHandle).msecs() + _vm->_rnd->getRandomNumber(60) * 1000;
 	} else {
 		// Otherwise, just redraw the imager
 		timeUntilNextMovie = _vm->_rnd->getRandomNumberRng(10, 20) * 1000;
@@ -2059,7 +2059,7 @@ void RivenExternal::xbookclick(uint16 argc, uint16 *argv) {
 	debug(0, "\tHotspot    = %d -> %d", argv[3], hotspotMap[argv[3] - 1]);
 
 	// Just let the video play while we wait until Gehn opens the trap book for us
-	while (_vm->_video->getElapsedTime(video) < startTime && !_vm->shouldQuit()) {
+	while (_vm->_video->getTime(video) < startTime && !_vm->shouldQuit()) {
 		if (_vm->_video->updateMovies())
 			_vm->_system->updateScreen();
 
@@ -2084,7 +2084,7 @@ void RivenExternal::xbookclick(uint16 argc, uint16 *argv) {
 
 	// OK, Gehn has opened the trap book and has asked us to go in. Let's watch
 	// and see what the player will do...
-	while (_vm->_video->getElapsedTime(video) < endTime && !_vm->shouldQuit()) {
+	while (_vm->_video->getTime(video) < endTime && !_vm->shouldQuit()) {
 		bool updateScreen = _vm->_video->updateMovies();
 
 		Common::Event event;
@@ -2335,7 +2335,7 @@ static void rebelPrisonWindowTimer(MohawkEngine_Riven *vm) {
 	VideoHandle handle = vm->_video->playMovieRiven(movie);
 
 	// Ensure the next video starts after this one ends
-	uint32 timeUntilNextVideo = vm->_video->getDuration(handle) + vm->_rnd->getRandomNumberRng(38, 58) * 1000;
+	uint32 timeUntilNextVideo = vm->_video->getDuration(handle).msecs() + vm->_rnd->getRandomNumberRng(38, 58) * 1000;
 
 	// Save the time in case we leave the card and return
 	vm->_vars["rvillagetime"] = timeUntilNextVideo + vm->getTotalPlayTime();

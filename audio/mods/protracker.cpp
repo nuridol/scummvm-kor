@@ -61,6 +61,7 @@ private:
 
 	struct {
 		byte sample;
+		byte lastSample;
 		uint16 period;
 		Offset offset;
 
@@ -88,6 +89,14 @@ private:
 
 public:
 	ProtrackerStream(Common::SeekableReadStream *stream, int offs, int rate, bool stereo);
+
+	Modules::Module *getModule() {
+		// Ordinarily, the Module is not meant to be seen outside of
+		// this class, but occasionally, it's useful to be able to
+		// manipulate it directly. The Hopkins engine uses this to
+		// repair a broken song.
+		return &_module;
+	}
 
 private:
 	void interrupt();
@@ -184,6 +193,7 @@ void ProtrackerStream::updateRow() {
 				_track[track].vibratoPos = 0;
 			}
 			_track[track].sample = note.sample;
+			_track[track].lastSample = note.sample;
 			_track[track].finetune = _module.sample[note.sample - 1].finetune;
 			_track[track].vol = _module.sample[note.sample - 1].vol;
 		}
@@ -194,7 +204,9 @@ void ProtrackerStream::updateRow() {
 					_track[track].period = _module.noteToPeriod(note.note, _track[track].finetune);
 				else
 					_track[track].period = note.period;
+
 				_track[track].offset = Offset(0);
+				_track[track].sample = _track[track].lastSample;
 			}
 		}
 
@@ -458,8 +470,12 @@ void ProtrackerStream::interrupt() {
 
 namespace Audio {
 
-AudioStream *makeProtrackerStream(Common::SeekableReadStream *stream, int offs, int rate, bool stereo) {
-	return new Modules::ProtrackerStream(stream, offs, rate, stereo);
+AudioStream *makeProtrackerStream(Common::SeekableReadStream *stream, int offs, int rate, bool stereo, Modules::Module **module) {
+	Modules::ProtrackerStream *protrackerStream = new Modules::ProtrackerStream(stream, offs, rate, stereo);
+	if (module) {
+		*module = protrackerStream->getModule();
+	}
+	return (AudioStream *)protrackerStream;
 }
 
 } // End of namespace Audio

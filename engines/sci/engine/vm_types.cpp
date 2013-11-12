@@ -28,12 +28,12 @@
 
 namespace Sci {
 
-reg_t reg_t::lookForWorkaround(const reg_t right) const {
+reg_t reg_t::lookForWorkaround(const reg_t right, const char *operation) const {
 	SciTrackOriginReply originReply;
 	SciWorkaroundSolution solution = trackOriginAndFindWorkaround(0, arithmeticWorkarounds, &originReply);
 	if (solution.type == WORKAROUND_NONE)
-		error("Invalid arithmetic operation (params: %04x:%04x and %04x:%04x) from method %s::%s (room %d, script %d, localCall %x)",
-		PRINT_REG(*this), PRINT_REG(right), originReply.objectName.c_str(),
+		error("Invalid arithmetic operation (%s - params: %04x:%04x and %04x:%04x) from method %s::%s (room %d, script %d, localCall %x)",
+		operation, PRINT_REG(*this), PRINT_REG(right), originReply.objectName.c_str(),
 		originReply.methodName.c_str(), g_sci->getEngineState()->currentRoomNumber(), originReply.scriptNr,
 		originReply.localCallOffset);
 	assert(solution.type == WORKAROUND_FAKE);
@@ -43,19 +43,19 @@ reg_t reg_t::lookForWorkaround(const reg_t right) const {
 reg_t reg_t::operator+(const reg_t right) const {
 	if (isPointer() && right.isNumber()) {
 		// Pointer arithmetics. Only some pointer types make sense here
-		SegmentObj *mobj = g_sci->getEngineState()->_segMan->getSegmentObj(segment);
+		SegmentObj *mobj = g_sci->getEngineState()->_segMan->getSegmentObj(getSegment());
 
 		if (!mobj)
-			error("[VM]: Attempt to add %d to invalid pointer %04x:%04x", right.offset, PRINT_REG(*this));
+			error("[VM]: Attempt to add %d to invalid pointer %04x:%04x", right.getOffset(), PRINT_REG(*this));
 
 		switch (mobj->getType()) {
 		case SEG_TYPE_LOCALS:
 		case SEG_TYPE_SCRIPT:
 		case SEG_TYPE_STACK:
 		case SEG_TYPE_DYNMEM:
-			return make_reg(segment, offset + right.toSint16());
+			return make_reg(getSegment(), getOffset() + right.toSint16());
 		default:
-			return lookForWorkaround(right);
+			return lookForWorkaround(right, "addition");
 		}
 	} else if (isNumber() && right.isPointer()) {
 		// Adding a pointer to a number, flip the order
@@ -64,17 +64,17 @@ reg_t reg_t::operator+(const reg_t right) const {
 		// Normal arithmetics
 		return make_reg(0, toSint16() + right.toSint16());
 	} else {
-		return lookForWorkaround(right);
+		return lookForWorkaround(right, "addition");
 	}
 }
 
 reg_t reg_t::operator-(const reg_t right) const {
-	if (segment == right.segment) {
+	if (getSegment() == right.getSegment()) {
 		// We can subtract numbers, or pointers with the same segment,
 		// an operation which will yield a number like in C
 		return make_reg(0, toSint16() - right.toSint16());
 	} else {
-		return *this + make_reg(right.segment, -right.offset);
+		return *this + make_reg(right.getSegment(), -right.toSint16());
 	}
 }
 
@@ -82,14 +82,14 @@ reg_t reg_t::operator*(const reg_t right) const {
 	if (isNumber() && right.isNumber())
 		return make_reg(0, toSint16() * right.toSint16());
 	else
-		return lookForWorkaround(right);
+		return lookForWorkaround(right, "multiplication");
 }
 
 reg_t reg_t::operator/(const reg_t right) const {
 	if (isNumber() && right.isNumber() && !right.isNull())
 		return make_reg(0, toSint16() / right.toSint16());
 	else
-		return lookForWorkaround(right);
+		return lookForWorkaround(right, "division");
 }
 
 reg_t reg_t::operator%(const reg_t right) const {
@@ -109,21 +109,21 @@ reg_t reg_t::operator%(const reg_t right) const {
 			result += modulo;
 		return make_reg(0, result);
 	} else
-		return lookForWorkaround(right);
+		return lookForWorkaround(right, "modulo");
 }
 
 reg_t reg_t::operator>>(const reg_t right) const {
 	if (isNumber() && right.isNumber())
 		return make_reg(0, toUint16() >> right.toUint16());
 	else
-		return lookForWorkaround(right);
+		return lookForWorkaround(right, "shift right");
 }
 
 reg_t reg_t::operator<<(const reg_t right) const {
 	if (isNumber() && right.isNumber())
 		return make_reg(0, toUint16() << right.toUint16());
 	else
-		return lookForWorkaround(right);
+		return lookForWorkaround(right, "shift left");
 }
 
 reg_t reg_t::operator+(int16 right) const {
@@ -140,7 +140,7 @@ uint16 reg_t::requireUint16() const {
 	else
 		// The right parameter is NULL_REG because
 		// we're not comparing *this with anything here.
-		return lookForWorkaround(NULL_REG).toUint16();
+		return lookForWorkaround(NULL_REG, "require unsigned number").toUint16();
 }
 
 int16 reg_t::requireSint16() const {
@@ -149,32 +149,32 @@ int16 reg_t::requireSint16() const {
 	else
 		// The right parameter is NULL_REG because
 		// we're not comparing *this with anything here.
-		return lookForWorkaround(NULL_REG).toSint16();
+		return lookForWorkaround(NULL_REG, "require signed number").toSint16();
 }
 
 reg_t reg_t::operator&(const reg_t right) const {
 	if (isNumber() && right.isNumber())
 		return make_reg(0, toUint16() & right.toUint16());
 	else
-		return lookForWorkaround(right);
+		return lookForWorkaround(right, "bitwise AND");
 }
 
 reg_t reg_t::operator|(const reg_t right) const {
 	if (isNumber() && right.isNumber())
 		return make_reg(0, toUint16() | right.toUint16());
 	else
-		return lookForWorkaround(right);
+		return lookForWorkaround(right, "bitwise OR");
 }
 
 reg_t reg_t::operator^(const reg_t right) const {
 	if (isNumber() && right.isNumber())
 		return make_reg(0, toUint16() ^ right.toUint16());
 	else
-		return lookForWorkaround(right);
+		return lookForWorkaround(right, "bitwise XOR");
 }
 
 int reg_t::cmp(const reg_t right, bool treatAsUnsigned) const {
-	if (segment == right.segment) { // can compare things in the same segment
+	if (getSegment() == right.getSegment()) { // can compare things in the same segment
 		if (treatAsUnsigned || !isNumber())
 			return toUint16() - right.toUint16();
 		else
@@ -184,7 +184,7 @@ int reg_t::cmp(const reg_t right, bool treatAsUnsigned) const {
 	} else if (right.pointerComparisonWithInteger(*this)) {
 		return -1;
 	} else
-		return lookForWorkaround(right).toSint16();
+		return lookForWorkaround(right, "comparison").toSint16();
 }
 
 bool reg_t::pointerComparisonWithInteger(const reg_t right) const {
@@ -218,7 +218,7 @@ bool reg_t::pointerComparisonWithInteger(const reg_t right) const {
 	// SQ1, room 28, when throwing water at the Orat
 	// SQ1, room 58, when giving the ID card to the robot
 	// SQ4 CD, at the first game screen, when the narrator is about to speak
-	return (isPointer() && right.isNumber() && right.offset <= 2000 && getSciVersion() <= SCI_VERSION_1_1);
+	return (isPointer() && right.isNumber() && right.getOffset() <= 2000 && getSciVersion() <= SCI_VERSION_1_1);
 }
 
 } // End of namespace Sci

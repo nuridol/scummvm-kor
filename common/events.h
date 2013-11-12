@@ -78,7 +78,9 @@ enum EventType {
 	,
 	// IMPORTANT NOTE: This is part of the WIP Keymapper. If you plan to use
 	// this, please talk to tsoliman and/or LordHoto.
-	EVENT_CUSTOM_BACKEND = 18,
+	EVENT_CUSTOM_BACKEND_ACTION = 18,
+	EVENT_CUSTOM_BACKEND_HARDWARE = 21,
+	EVENT_GUI_REMAP_COMPLETE_ACTION = 22,
 	EVENT_KEYMAPPER_REMAP = 19
 #endif
 #ifdef ENABLE_VKEYBD
@@ -118,7 +120,11 @@ struct Event {
 	CustomEventType customType;
 #endif
 
-	Event() : type(EVENT_INVALID), synthetic(false) {}
+	Event() : type(EVENT_INVALID), synthetic(false) {
+#ifdef ENABLE_KEYMAPPER
+		customType = 0;
+#endif
+	}
 };
 
 /**
@@ -226,12 +232,27 @@ public:
 	 * Map an incoming event to one or more action events
 	 */
 	virtual List<Event> mapEvent(const Event &ev, EventSource *source) = 0;
+
+	virtual List<Event> getDelayedEvents() = 0;
 };
 
 class DefaultEventMapper : public EventMapper {
 public:
+	DefaultEventMapper() : _delayedEvents(), _delayedEffectiveTime(0) {}
 	// EventMapper interface
 	virtual List<Event> mapEvent(const Event &ev, EventSource *source);
+	virtual List<Event> getDelayedEvents();
+protected:
+	virtual void addDelayedEvent(uint32 millis, Event ev);
+
+	struct DelayedEventsEntry {
+		const uint32 timerOffset;
+		const Event event;
+		DelayedEventsEntry(const uint32 offset, const Event ev) : timerOffset(offset), event(ev) { }
+	};
+
+	Queue<DelayedEventsEntry> _delayedEvents;
+	uint32 _delayedEffectiveTime;
 };
 
 /**
@@ -267,11 +288,14 @@ public:
 	 * to the EventDispatcher, thus it will be deleted
 	 * with "delete", when EventDispatcher is destroyed.
 	 *
-	 * Note there is only one mapper per EventDispatcher
-	 * possible, thus when this method is called twice,
-	 * the former mapper will be destroied.
+	 * @param autoFree	Destroy previous mapper [default]
+	 *         		Normally we allow only one event mapper to exists,
+	 *			However Event Recorder must intervent into normal
+	 *			event flow without altering its semantics. Thus during
+	 *			Event Recorder playback and recording we allow
+	 *			two mappers.
 	 */
-	void registerMapper(EventMapper *mapper);
+	void registerMapper(EventMapper *mapper, bool autoFree = true);
 
 	/**
 	 * Queries the setup event mapper.
@@ -305,6 +329,7 @@ public:
 	 */
 	void unregisterObserver(EventObserver *obs);
 private:
+	bool _autoFreeMapper;
 	EventMapper *_mapper;
 
 	struct Entry {

@@ -289,10 +289,6 @@ public:
 		return _oldTimer2;
 	}
 
-	OSystem *getSystem() {
-		return _system;
-	}
-
 	AudioManager *getAudioManager() {
 		return _audioManager;
 	}
@@ -320,12 +316,11 @@ public:
 	}
 
 	Common::Error saveGameState(int slot, const Common::String &desc) {
-
-		return (saveGame(slot, desc) ? Common::kWritingFailed : Common::kNoError);
+		return (saveGame(slot, desc) ? Common::kNoError : Common::kWritingFailed);
 	}
 
 	Common::Error loadGameState(int slot) {
-		return (loadGame(slot) ? Common::kReadingFailed : Common::kNoError);
+		return (loadGame(slot) ? Common::kNoError : Common::kReadingFailed);
 	}
 
 	bool hasFeature(EngineFeature f) const {
@@ -340,7 +335,6 @@ public:
 	void clearDirtyRects();
 
 protected:
-	OSystem *_system;
 	int32 _tickLength;
 	Resources *_resources;
 	TextResource *_genericTexts;

@@ -31,9 +31,6 @@ public:
 	OSystem_SDL_WebOS();
 
 	virtual void initBackend();
-#ifdef ENABLE_KEYMAPPER
-	virtual Common::HardwareKeySet *getHardwareKeySet();
-#endif
 };
 
 #endif

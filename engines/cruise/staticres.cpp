@@ -177,9 +177,9 @@ const int16 spanish_fontCharacterTable[256] = {
 	72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85,
 	86, 87, 88, 89, 90, 91, 92,
 	-1, -1, -1,
-	0x72, 0x80
+	0x72, 0x80,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	0x7f, 0x79, 0x7b, 0x81, 0x82, 0x83,
 	-1, -1,
 	0x7d,
@@ -319,6 +319,10 @@ const char *frenchLanguageStrings[13] = {
 const char *germanLanguageStrings[13] = {
 	" ", NULL, NULL, NULL, NULL, "Inventar", "Sprechen ""\xFC""ber", "Speilermen\xFC", "Speicherlaufwerk",
 	"Speichern", "Laden", "Neu beginnen", "Ende"
+};
+const char *italianLanguageStrings[13] = {
+	"Pausa", NULL, NULL, NULL, NULL, "Inventario", "Parla di...", "Menu giocatore", NULL,
+	"Salva", "Carica", "Ricomincia", "Esci"
 };
 
 } // End of namespace Cruise

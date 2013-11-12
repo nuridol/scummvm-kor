@@ -179,7 +179,12 @@ void initCommonGFX(bool defaultTo1XScaler) {
 	} else {
 		// Override global scaler with any game-specific define
 		if (ConfMan.hasKey("gfx_mode")) {
-			g_system->setGraphicsMode(ConfMan.get("gfx_mode").c_str());
+			Common::String gfxMode = ConfMan.get("gfx_mode");
+			g_system->setGraphicsMode(gfxMode.c_str());
+
+			// HACK: For OpenGL modes, we will still honor the graphics scale override
+			if (defaultTo1XScaler && (gfxMode.equalsIgnoreCase("opengl_linear") || gfxMode.equalsIgnoreCase("opengl_nearest")))
+				g_system->resetGraphicsScale();
 		}
 	}
 
@@ -420,12 +425,16 @@ void Engine::openMainMenuDialog() {
 	// (not from inside the menu loop to avoid
 	// mouse cursor glitches and simliar bugs,
 	// e.g. #2822778).
-	// FIXME: For now we just ignore the return
-	// value, which is quite bad since it could
-	// be a fatal loading error, which renders
-	// the engine unusable.
-	if (_saveSlotToLoad >= 0)
-		loadGameState(_saveSlotToLoad);
+	if (_saveSlotToLoad >= 0) {
+		Common::Error status = loadGameState(_saveSlotToLoad);
+		if (status.getCode() != Common::kNoError) {
+			Common::String failMessage = Common::String::format(_("Gamestate load failed (%s)! "
+				  "Please consult the README for basic information, and for "
+				  "instructions on how to obtain further assistance."), status.getDesc().c_str());
+			GUI::MessageDialog dialog(failMessage);
+			dialog.runModal();
+		}
+	}
 
 	syncSoundSettings();
 }

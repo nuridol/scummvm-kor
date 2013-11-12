@@ -123,15 +123,15 @@ void Overlay::setSize(uint32 width, uint32 height) {
 	_renderer.setDrawWholeBuffer();	// We need to let the renderer know how much to draw
 }
 
-void Overlay::copyToArray(OverlayColor *buf, int pitch) {
+void Overlay::copyToArray(void *buf, int pitch) {
 	DEBUG_ENTER_FUNC();
-	_buffer.copyToArray((byte *)buf, pitch * sizeof(OverlayColor));	// Change to bytes
+	_buffer.copyToArray((byte *)buf, pitch);	// Change to bytes
 }
 
-void Overlay::copyFromRect(const OverlayColor *buf, int pitch, int x, int y, int w, int h) {
+void Overlay::copyFromRect(const void *buf, int pitch, int x, int y, int w, int h) {
 	DEBUG_ENTER_FUNC();
 
-	_buffer.copyFromRect((byte *)buf, pitch * sizeof(OverlayColor), x, y, w, h);	// Change to bytes
+	_buffer.copyFromRect((byte *)buf, pitch, x, y, w, h);	// Change to bytes
 	// debug
 	//_buffer.print(0xFF);
 	setDirty();
@@ -192,11 +192,8 @@ void Screen::setScummvmPixelFormat(const Graphics::PixelFormat *format) {
 Graphics::Surface *Screen::lockAndGetForEditing() {
 	DEBUG_ENTER_FUNC();
 
-	_frameBuffer.pixels = _buffer.getPixels();
-	_frameBuffer.w = _buffer.getSourceWidth();
-	_frameBuffer.h = _buffer.getSourceHeight();
-	_frameBuffer.pitch = _buffer.getBytesPerPixel() * _buffer.getWidth();
-	_frameBuffer.format = _pixelFormat;
+	_frameBuffer.init(_buffer.getSourceWidth(), _buffer.getSourceHeight(), _buffer.getBytesPerPixel() * _buffer.getWidth(),
+	                  _buffer.getPixels(), _pixelFormat);
 	// We'll set to dirty once we unlock the screen
 
 	return &_frameBuffer;

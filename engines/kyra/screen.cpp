@@ -27,6 +27,7 @@
 #include "common/endian.h"
 #include "common/memstream.h"
 #include "common/system.h"
+#include "common/config-manager.h"
 
 #include "engines/util.h"
 
@@ -38,7 +39,7 @@ namespace Kyra {
 
 Screen::Screen(KyraEngine_v1 *vm, OSystem *system, const ScreenDim *dimTable, const int dimTableSize)
 	: _system(system), _vm(vm), _sjisInvisibleColor(0), _dimTable(dimTable), _dimTableCount(dimTableSize),
-	_cursorColorKey((vm->game() == GI_KYRA1) ? 0xFF : 0x00) {
+	_cursorColorKey((vm->game() == GI_KYRA1 || vm->game() == GI_EOB1 || vm->game() == GI_EOB2) ? 0xFF : 0) {
 	_debugEnabled = false;
 	_maskMinY = _maskMaxY = -1;
 
@@ -48,6 +49,14 @@ Screen::Screen(KyraEngine_v1 *vm, OSystem *system, const ScreenDim *dimTable, co
 	_drawShapeVar5 = 0;
 
 	memset(_fonts, 0, sizeof(_fonts));
+
+	memset(_pagePtrs, 0, sizeof(_pagePtrs));
+	// In VGA mode the odd and even page pointers point to the same buffers.
+	for (int i = 0; i < SCREEN_PAGE_NUM; i++)
+		_pageMapping[i] = i & ~1;
+
+	_renderMode = Common::kRenderDefault;
+	_sjisMixedFontMode = false;
 
 	_currentFont = FID_8_FNT;
 	_paletteChanged = true;
@@ -84,12 +93,39 @@ bool Screen::init() {
 	_useSJIS = false;
 	_use16ColorMode = _vm->gameFlags().use16ColorMode;
 	_isAmiga = (_vm->gameFlags().platform == Common::kPlatformAmiga);
+
+	// We only check the "render_mode" setting for both Eye of the Beholder
+	// games here, since all the other games do not support the render_mode
+	// setting or handle it differently, like Kyra 1 PC-98. This avoids
+	// graphics glitches and crashes in other games, when the user sets his
+	// global render_mode setting to EGA for example.
+	// TODO/FIXME: It would be nice not to hardcode this. But there is no
+	// trivial/non annoying way to do mode checks in an easy fashion right
+	// now.
+	// In a more general sense, we might want to think about a way to only
+	// pass valid config values, as in values which the engine can work with,
+	// to the engines. We already limit the selection via our GUIO flags in
+	// the game specific settings, but this is not enough due to global
+	// settings allowing everything.
+	if (_vm->game() == GI_EOB1 || _vm->game() == GI_EOB2) {
+		if (ConfMan.hasKey("render_mode"))
+			_renderMode = Common::parseRenderMode(ConfMan.get("render_mode"));
+	}
+
+	// CGA and EGA modes use additional pages to do the CGA/EGA specific graphics conversions.
+	if (_vm->game() == GI_EOB1 && (_renderMode == Common::kRenderCGA || _renderMode == Common::kRenderEGA)) {
+		for (int i = 0; i < 8; i++)
+			_pageMapping[i] = i;
+	}
+
 	memset(_fonts, 0, sizeof(_fonts));
 
-	if (_vm->gameFlags().useHiResOverlay) {
-		_useOverlays = true;
+	_useOverlays = (_vm->gameFlags().useHiRes && _renderMode != Common::kRenderEGA);
+
+	if (_useOverlays) {
 		_useSJIS = (_vm->gameFlags().lang == Common::JA_JPN);
 		_sjisInvisibleColor = (_vm->game() == GI_KYRA1) ? 0x80 : 0xF6;
+		_sjisMixedFontMode = !_use16ColorMode;
 
 		for (int i = 0; i < SCREEN_OVLS_NUM; ++i) {
 			if (!_sjisOverlayPtrs[i]) {
@@ -105,20 +141,39 @@ bool Screen::init() {
 			if (!font)
 				error("Could not load any SJIS font, neither the original nor ScummVM's 'SJIS.FNT'");
 
-			_fonts[FID_SJIS_FNT] = new SJISFont(this, font, _sjisInvisibleColor, _use16ColorMode, !_use16ColorMode);
+			_fonts[FID_SJIS_FNT] = new SJISFont(font, _sjisInvisibleColor, _use16ColorMode, !_use16ColorMode && _vm->game() != GI_LOL, _vm->game() == GI_LOL ? 1 : 0);
 		}
 	}
 
 	_curPage = 0;
-	uint8 *pagePtr = new uint8[SCREEN_PAGE_SIZE * 8];
-	for (int pageNum = 0; pageNum < SCREEN_PAGE_NUM; pageNum += 2)
-		_pagePtrs[pageNum] = _pagePtrs[pageNum + 1] = pagePtr + (pageNum >> 1) * SCREEN_PAGE_SIZE;
-	memset(pagePtr, 0, SCREEN_PAGE_SIZE * 8);
+
+	Common::Array<uint8> realPages;
+	for (int i = 0; i < SCREEN_PAGE_NUM; i++) {
+		if (Common::find(realPages.begin(), realPages.end(), _pageMapping[i]) == realPages.end())
+			realPages.push_back(_pageMapping[i]);
+	}
+
+	int numPages = realPages.size();
+	uint32 bufferSize = numPages * SCREEN_PAGE_SIZE;
+
+	uint8 *pagePtr = new uint8[bufferSize];
+	memset(pagePtr, 0, bufferSize);
+
+	memset(_pagePtrs, 0, sizeof(_pagePtrs));
+	for (int i = 0; i < SCREEN_PAGE_NUM; i++) {
+		if (_pagePtrs[_pageMapping[i]]) {
+			_pagePtrs[i] = _pagePtrs[_pageMapping[i]];
+		} else {
+			_pagePtrs[i] = pagePtr;
+			pagePtr += SCREEN_PAGE_SIZE;
+		}
+	}
 
 	memset(_shapePages, 0, sizeof(_shapePages));
 
 	const int paletteCount = _isAmiga ? 13 : 4;
-	const int numColors = _use16ColorMode ? 16 : (_isAmiga ? 32 : 256);
+	// We allow 256 color palettes in EGA mode, since original EOB II code does the same and requires it
+	const int numColors = _use16ColorMode ? 16 : (_isAmiga ? 32 : (_renderMode == Common::kRenderCGA ? 4 : 256));
 
 	_interfacePaletteEnabled = false;
 
@@ -129,6 +184,15 @@ bool Screen::init() {
 	for (int i = 0; i < paletteCount; ++i) {
 		_palettes[i] = new Palette(numColors);
 		assert(_palettes[i]);
+	}
+
+	// Setup CGA colors (if CGA mode is selected)
+	if (_renderMode == Common::kRenderCGA) {
+		Palette pal(5);
+		pal.setCGAPalette(1, Palette::kIntensityHigh);
+		// create additional black color 4 for use with the mouse cursor manager
+		pal.fill(4, 1, 0);
+		Screen::setScreenPalette(pal);
 	}
 
 	_internFadePalette = new Palette(numColors);
@@ -191,7 +255,7 @@ void Screen::setResolution() {
 	int width = 320, height = 200;
 	bool defaultTo1xScaler = false;
 
-	if (_vm->gameFlags().useHiResOverlay) {
+	if (_vm->gameFlags().useHiRes) {
 		defaultTo1xScaler = true;
 		height = 400;
 
@@ -597,12 +661,17 @@ uint8 Screen::getPagePixel(int pageNum, int x, int y) {
 void Screen::setPagePixel(int pageNum, int x, int y, uint8 color) {
 	assert(pageNum < SCREEN_PAGE_NUM);
 	assert(x >= 0 && x < SCREEN_W && y >= 0 && y < SCREEN_H);
+
 	if (pageNum == 0 || pageNum == 1)
 		addDirtyRect(x, y, 1, 1);
 
 	if (_use16ColorMode) {
 		color &= 0x0F;
 		color |= (color << 4);
+	} else if (_renderMode == Common::kRenderCGA) {
+		color &= 0x03;
+	} else if (_renderMode == Common::kRenderEGA && !_useHiResEGADithering) {
+		color &= 0x0F;
 	}
 
 	_pagePtrs[pageNum][y * SCREEN_W + x] = color;
@@ -613,12 +682,21 @@ void Screen::fadeFromBlack(int delay, const UpdateFunctor *upFunc) {
 }
 
 void Screen::fadeToBlack(int delay, const UpdateFunctor *upFunc) {
+	if (_renderMode == Common::kRenderEGA)
+		return;
+
 	Palette pal(getPalette(0).getNumColors());
 	fadePalette(pal, delay, upFunc);
 }
 
 void Screen::fadePalette(const Palette &pal, int delay, const UpdateFunctor *upFunc) {
+	if (_renderMode == Common::kRenderEGA)
+		setScreenPalette(pal);
+
 	updateScreen();
+
+	if (_renderMode == Common::kRenderCGA || _renderMode == Common::kRenderEGA)
+		return;
 
 	int diff = 0, delayInc = 0;
 	getFadeParams(pal, delay, delayInc, diff);
@@ -639,6 +717,13 @@ void Screen::fadePalette(const Palette &pal, int delay, const UpdateFunctor *upF
 
 		_vm->delay((delayAcc >> 8) * 1000 / 60);
 		delayAcc &= 0xFF;
+	}
+
+	// In case we should quit we setup the final palette here. This avoids
+	// ugly palette glitches when quitting while fading. This can for example
+	// be noticed when quitting while viewing the family album in Kyra3.
+	if (_vm->shouldQuit()) {
+		setScreenPalette(pal);
 	}
 }
 
@@ -996,6 +1081,10 @@ void Screen::fillRect(int x1, int y1, int x2, int y2, uint8 color, int pageNum, 
 	if (_use16ColorMode) {
 		color &= 0x0F;
 		color |= (color << 4);
+	} else if (_renderMode == Common::kRenderCGA) {
+		color &= 0x03;
+	} else if (_renderMode == Common::kRenderEGA && !_useHiResEGADithering) {
+		color &= 0x0F;
 	}
 
 	if (xored) {
@@ -1021,8 +1110,6 @@ void Screen::drawBox(int x1, int y1, int x2, int y2, int color) {
 
 void Screen::drawShadedBox(int x1, int y1, int x2, int y2, int color1, int color2) {
 	assert(x1 >= 0 && y1 >= 0);
-	hideMouse();
-
 	fillRect(x1, y1, x2, y1 + 1, color1);
 	fillRect(x2 - 1, y1, x2, y2, color1);
 
@@ -1030,8 +1117,6 @@ void Screen::drawShadedBox(int x1, int y1, int x2, int y2, int color1, int color
 	drawClippedLine(x1 + 1, y1 + 1, x1 + 1, y2 - 1, color2);
 	drawClippedLine(x1, y2 - 1, x2 - 1, y2 - 1, color2);
 	drawClippedLine(x1, y2, x2, y2, color2);
-
-	showMouse();
 }
 
 void Screen::drawClippedLine(int x1, int y1, int x2, int y2, int color) {
@@ -1073,6 +1158,10 @@ void Screen::drawLine(bool vertical, int x, int y, int length, int color) {
 	if (_use16ColorMode) {
 		color &= 0x0F;
 		color |= (color << 4);
+	} else if (_renderMode == Common::kRenderCGA) {
+		color &= 0x03;
+	} else if (_renderMode == Common::kRenderEGA && !_useHiResEGADithering) {
+		color &= 0x0F;
 	}
 
 	if (vertical) {
@@ -1126,7 +1215,8 @@ bool Screen::loadFont(FontId fontId, const char *filename) {
 			fnt = new AMIGAFont();
 #ifdef ENABLE_EOB
 		else if (_vm->game() == GI_EOB1 || _vm->game() == GI_EOB2)
-			fnt = new OldDOSFont();
+			// We use normal VGA rendering in EOB II, since we do the complete EGA dithering in updateScreen().
+			fnt = new OldDOSFont(_useHiResEGADithering ? Common::kRenderVGA : _renderMode);
 #endif // ENABLE_EOB
 		else
 			fnt = new DOSFont();
@@ -1165,11 +1255,16 @@ int Screen::getCharWidth(uint16 c) const {
 	return width + ((_currentFont != FID_SJIS_FNT) ? _charWidth : 0);
 }
 
-int Screen::getTextWidth(const char *str) const {
+int Screen::getTextWidth(const char *str) {
 	int curLineLen = 0;
 	int maxLineLen = 0;
 
+	FontId curFont = _currentFont;
+
 	while (1) {
+		if (_sjisMixedFontMode)
+			setFont((*str & 0x80) ? FID_SJIS_FNT : curFont);
+
 		uint c = fetchChar(str);
 
 		if (c == 0) {
@@ -1193,7 +1288,7 @@ void Screen::printText(const char *str, int x, int y, uint8 color1, uint8 color2
 	cmap[1] = color1;
 	setTextColor(cmap, 0, 1);
 
-	const uint8 charHeightFnt = getFontHeight();
+	FontId curFont = _currentFont;
 
 	if (x < 0)
 		x = 0;
@@ -1207,18 +1302,23 @@ void Screen::printText(const char *str, int x, int y, uint8 color1, uint8 color2
 		return;
 
 	while (1) {
+		if (_sjisMixedFontMode)
+			setFont((*str & 0x80) ? FID_SJIS_FNT : curFont);
+
+		uint8 charHeightFnt = getFontHeight();
+
 		uint c = fetchChar(str);
 
 		if (c == 0) {
 			break;
 		} else if (c == '\r') {
 			x = x_start;
-			y += charHeightFnt + _charOffset;
+			y += (charHeightFnt + _charOffset);
 		} else {
 			int charWidth = getCharWidth(c);
 			if (x + charWidth > SCREEN_W) {
 				x = x_start;
-				y += charHeightFnt + _charOffset;
+				y += (charHeightFnt + _charOffset);
 				if (y >= SCREEN_H)
 					break;
 			}
@@ -1409,7 +1509,7 @@ void Screen::drawShape(uint8 pageNum, const uint8 *shapeData, int x, int y, int 
 
 	int scaleCounterV = 0;
 
-	const int drawFunc = flags & 0x0f;
+	const int drawFunc = flags & 0x0F;
 	_dsProcessMargin = dsMarginFunc[drawFunc];
 	_dsScaleSkip = dsSkipFunc[drawFunc];
 	_dsProcessLine = dsLineFunc[drawFunc];
@@ -1666,7 +1766,7 @@ int Screen::drawShapeMarginScaleUpwind(uint8 *&dst, const uint8 *&src, int &cnt)
 	_dsTmpWidth += cnt;
 
 	int i = (_dsOffscreenLeft - cnt) * _dsScaleW;
-	int res = i & 0xff;
+	int res = i & 0xFF;
 	i >>= 8;
 	i -= _dsOffscreenScaleVal2;
 	dst += i;
@@ -1692,7 +1792,7 @@ int Screen::drawShapeMarginScaleDownwind(uint8 *&dst, const uint8 *&src, int &cn
 	_dsTmpWidth += cnt;
 
 	int i = (_dsOffscreenLeft - cnt) * _dsScaleW;
-	int res = i & 0xff;
+	int res = i & 0xFF;
 	i >>= 8;
 	i -= _dsOffscreenScaleVal2;
 	dst -= i;
@@ -1781,7 +1881,7 @@ void Screen::drawShapeProcessLineScaleUpwind(uint8 *&dst, const uint8 *&src, int
 				int r = c * _dsScaleW + scaleState;
 				dst += (r >> 8);
 				cnt -= (r >> 8);
-				scaleState = r & 0xff;
+				scaleState = r & 0xFF;
 			}
 		} else if (scaleState) {
 			(this->*_dsPlot)(dst++, c);
@@ -1809,7 +1909,7 @@ void Screen::drawShapeProcessLineScaleDownwind(uint8 *&dst, const uint8 *&src, i
 				int r = c * _dsScaleW + scaleState;
 				dst -= (r >> 8);
 				cnt -= (r >> 8);
-				scaleState = r & 0xff;
+				scaleState = r & 0xFF;
 			}
 		} else {
 			(this->*_dsPlot)(dst--, c);
@@ -1857,9 +1957,9 @@ void Screen::drawShapePlotType5(uint8 *dst, uint8 cmd) {
 
 void Screen::drawShapePlotType6(uint8 *dst, uint8 cmd) {
 	int t = _drawShapeVar4 + _drawShapeVar5;
-	if (t & 0xff00) {
+	if (t & 0xFF00) {
 		cmd = dst[_drawShapeVar3];
-		t &= 0xff;
+		t &= 0xFF;
 	} else {
 		cmd = _dsTable2[cmd];
 	}
@@ -1870,7 +1970,7 @@ void Screen::drawShapePlotType6(uint8 *dst, uint8 cmd) {
 
 void Screen::drawShapePlotType8(uint8 *dst, uint8 cmd) {
 	uint32 relOffs = dst - _dsDstPage;
-	int t = (_shapePages[0][relOffs] & 0x7f) & 0x87;
+	int t = (_shapePages[0][relOffs] & 0x7F) & 0x87;
 	if (_dsDrawLayer < t)
 		cmd = _shapePages[1][relOffs];
 
@@ -1879,7 +1979,7 @@ void Screen::drawShapePlotType8(uint8 *dst, uint8 cmd) {
 
 void Screen::drawShapePlotType9(uint8 *dst, uint8 cmd) {
 	uint32 relOffs = dst - _dsDstPage;
-	int t = (_shapePages[0][relOffs] & 0x7f) & 0x87;
+	int t = (_shapePages[0][relOffs] & 0x7F) & 0x87;
 	if (_dsDrawLayer < t) {
 		cmd = _shapePages[1][relOffs];
 	} else {
@@ -1893,7 +1993,7 @@ void Screen::drawShapePlotType9(uint8 *dst, uint8 cmd) {
 
 void Screen::drawShapePlotType11_15(uint8 *dst, uint8 cmd) {
 	uint32 relOffs = dst - _dsDstPage;
-	int t = (_shapePages[0][relOffs] & 0x7f) & 0x87;
+	int t = (_shapePages[0][relOffs] & 0x7F) & 0x87;
 
 	if (_dsDrawLayer < t) {
 		cmd = _shapePages[1][relOffs];
@@ -1909,7 +2009,7 @@ void Screen::drawShapePlotType11_15(uint8 *dst, uint8 cmd) {
 
 void Screen::drawShapePlotType12(uint8 *dst, uint8 cmd) {
 	uint32 relOffs = dst - _dsDstPage;
-	int t = (_shapePages[0][relOffs] & 0x7f) & 0x87;
+	int t = (_shapePages[0][relOffs] & 0x7F) & 0x87;
 	if (_dsDrawLayer < t) {
 		cmd = _shapePages[1][relOffs];
 	} else {
@@ -1921,7 +2021,7 @@ void Screen::drawShapePlotType12(uint8 *dst, uint8 cmd) {
 
 void Screen::drawShapePlotType13(uint8 *dst, uint8 cmd) {
 	uint32 relOffs = dst - _dsDstPage;
-	int t = (_shapePages[0][relOffs] & 0x7f) & 0x87;
+	int t = (_shapePages[0][relOffs] & 0x7F) & 0x87;
 	if (_dsDrawLayer < t) {
 		cmd = _shapePages[1][relOffs];
 	} else {
@@ -1936,14 +2036,14 @@ void Screen::drawShapePlotType13(uint8 *dst, uint8 cmd) {
 
 void Screen::drawShapePlotType14(uint8 *dst, uint8 cmd) {
 	uint32 relOffs = dst - _dsDstPage;
-	int t = (_shapePages[0][relOffs] & 0x7f) & 0x87;
+	int t = (_shapePages[0][relOffs] & 0x7F) & 0x87;
 	if (_dsDrawLayer < t) {
 		cmd = _shapePages[1][relOffs];
 	} else {
 		t = _drawShapeVar4 + _drawShapeVar5;
-		if (t & 0xff00) {
+		if (t & 0xFF00) {
 			cmd = dst[_drawShapeVar3];
-			t &= 0xff;
+			t &= 0xFF;
 		} else {
 			cmd = _dsTable2[cmd];
 		}
@@ -2037,7 +2137,7 @@ void Screen::decodeFrame1(const uint8 *src, uint8 *dst, uint32 size) {
 	uint8 nib = 0;
 
 	uint16 code = decodeEGAGetCode(src, nib);
-	uint8 last = code & 0xff;
+	uint8 last = code & 0xFF;
 
 	uint8 *dstPrev = dst;
 	uint16 count = 1;
@@ -2047,17 +2147,16 @@ void Screen::decodeFrame1(const uint8 *src, uint8 *dst, uint32 size) {
 
 	while (dst < dstEnd) {
 		code = decodeEGAGetCode(src, nib);
-		last = code & 0xff;
 		uint8 cmd = code >> 8;
 
 		if (cmd--) {
-			code = (cmd << 8) | last;
+			code = (cmd << 8) | (code & 0xFF);
 			uint8 *tmpDst = dst;
-			last = *dst;
 
 			if (code < numPatterns) {
 				const uint8 *tmpSrc = patterns[code].pos;
 				countPrev = patterns[code].len;
+				last = *tmpSrc;
 				for (int i = 0; i < countPrev; i++)
 					*dst++ = *tmpSrc++;
 
@@ -2079,7 +2178,7 @@ void Screen::decodeFrame1(const uint8 *src, uint8 *dst, uint32 size) {
 			count = countPrev;
 
 		} else {
-			*dst++ = last;
+			*dst++ = last = (code & 0xFF);
 
 			if (numPatterns < 3840) {
 				patterns[numPatterns].pos = dstPrev;
@@ -2100,7 +2199,7 @@ uint16 Screen::decodeEGAGetCode(const uint8 *&pos, uint8 &nib) {
 		res >>= 4;
 	} else {
 		pos++;
-		res &= 0xfff;
+		res &= 0xFFF;
 	}
 	return res;
 }
@@ -2782,8 +2881,6 @@ void Screen::setShapePages(int page1, int page2, int minY, int maxY) {
 void Screen::setMouseCursor(int x, int y, const byte *shape) {
 	if (!shape)
 		return;
-	// if mouseDisabled
-	//	return _mouseShape
 
 	if (_vm->gameFlags().useAltShapeHeader)
 		shape += 2;
@@ -2794,13 +2891,12 @@ void Screen::setMouseCursor(int x, int y, const byte *shape) {
 	if (_vm->gameFlags().useAltShapeHeader)
 		shape -= 2;
 
-	if (_vm->gameFlags().useHiResOverlay) {
+	if (_vm->gameFlags().useHiRes) {
 		x <<= 1;
 		y <<= 1;
 		mouseWidth <<= 1;
 		mouseHeight <<= 1;
 	}
-
 
 	uint8 *cursor = new uint8[mouseHeight * mouseWidth];
 	fillRect(0, 0, mouseWidth, mouseHeight, _cursorColorKey, 8);
@@ -2808,7 +2904,7 @@ void Screen::setMouseCursor(int x, int y, const byte *shape) {
 
 	int xOffset = 0;
 
-	if (_vm->gameFlags().useHiResOverlay) {
+	if (_vm->gameFlags().useHiRes) {
 		xOffset = mouseWidth;
 		scale2x(getPagePtr(8) + mouseWidth, SCREEN_W, getPagePtr(8), SCREEN_W, mouseWidth, mouseHeight);
 		postProcessCursor(getPagePtr(8) + mouseWidth, mouseWidth, mouseHeight, SCREEN_W);
@@ -3013,6 +3109,9 @@ void Screen::loadBitmap(const char *filename, int tempPage, int dstPage, Palette
 }
 
 bool Screen::loadPalette(const char *filename, Palette &pal) {
+	if (_renderMode == Common::kRenderCGA)
+		return true;
+
 	Common::SeekableReadStream *stream = _vm->resource()->createReadStream(filename);
 
 	if (!stream)
@@ -3029,6 +3128,12 @@ bool Screen::loadPalette(const char *filename, Palette &pal) {
 	} else if (_vm->gameFlags().platform == Common::kPlatformPC98 && _use16ColorMode) {
 		numCols = stream->size() / Palette::kPC98BytesPerColor;
 		pal.loadPC98Palette(*stream, 0, MIN(maxCols, numCols));
+	} else if (_renderMode == Common::kRenderEGA) {
+		numCols = stream->size();
+		// There aren't any 16 color EGA palette files. So this shouldn't ever get triggered.
+		assert (numCols != 16);
+		numCols /= Palette::kVGABytesPerColor;
+		pal.loadVGAPalette(*stream, 0, numCols);
 	} else {
 		numCols = stream->size() / Palette::kVGABytesPerColor;
 		pal.loadVGAPalette(*stream, 0, MIN(maxCols, numCols));
@@ -3076,7 +3181,14 @@ void Screen::loadPalette(const byte *data, Palette &pal, int bytes) {
 		pal.loadAmigaPalette(stream, 0, stream.size() / Palette::kAmigaBytesPerColor);
 	else if (_vm->gameFlags().platform == Common::kPlatformPC98 && _use16ColorMode)
 		pal.loadPC98Palette(stream, 0, stream.size() / Palette::kPC98BytesPerColor);
-	else
+	else if (_renderMode == Common::kRenderEGA) {
+		// EOB II checks the number of palette bytes to distinguish between real EGA palettes
+		// and normal palettes (which are used to generate a color map).
+		if (stream.size() == 16)
+			pal.loadEGAPalette(stream, 0, stream.size());
+		else
+			pal.loadVGAPalette(stream, 0, stream.size() / Palette::kVGABytesPerColor);
+	} else
 		pal.loadVGAPalette(stream, 0, stream.size() / Palette::kVGABytesPerColor);
 }
 
@@ -3222,10 +3334,10 @@ void Screen::crossFadeRegion(int x1, int y1, int x2, int y2, int w, int h, int s
 		int iH = i;
 		uint32 end = _system->getMillis() + 3;
 		for (int ii = 0; ii < w; ii++) {
-			int sX = x1 + wB[ii];
-			int sY = y1 + hB[iH];
-			int dX = x2 + wB[ii];
-			int dY = y2 + hB[iH];
+			int sX = (x1 + wB[ii]);
+			int sY = (y1 + hB[iH]);
+			int dX = (x2 + wB[ii]);
+			int dY = (y2 + hB[iH]);
 
 			if (++iH >= h)
 				iH = 0;
@@ -3473,11 +3585,11 @@ void AMIGAFont::unload() {
 	memset(_chars, 0, sizeof(_chars));
 }
 
-SJISFont::SJISFont(Screen *s, Graphics::FontSJIS *font, const uint8 invisColor, bool is16Color, bool outlineSize)
-    : _colorMap(0), _font(font), _invisColor(invisColor), _is16Color(is16Color), _screen(s) {
+SJISFont::SJISFont(Graphics::FontSJIS *font, const uint8 invisColor, bool is16Color, bool drawOutline, int extraSpacing)
+    : _colorMap(0), _font(font), _invisColor(invisColor), _is16Color(is16Color), _drawOutline(drawOutline), _sjisWidthOffset(extraSpacing) {
 	assert(_font);
 
-	_font->setDrawingMode(outlineSize ? Graphics::FontSJIS::kOutlineMode : Graphics::FontSJIS::kDefaultMode);
+	_font->setDrawingMode(_drawOutline ? Graphics::FontSJIS::kOutlineMode : Graphics::FontSJIS::kDefaultMode);
 
 	_sjisWidth = _font->getMaxFontWidth() >> 1;
 	_fontHeight = _font->getFontHeight() >> 1;
@@ -3494,14 +3606,14 @@ int SJISFont::getHeight() const {
 }
 
 int SJISFont::getWidth() const {
-	return _sjisWidth;
+	return _sjisWidth + _sjisWidthOffset;
 }
 
 int SJISFont::getCharWidth(uint16 c) const {
 	if (c <= 0x7F || (c >= 0xA1 && c <= 0xDF))
 		return _asciiWidth;
 	else
-		return _sjisWidth;
+		return _sjisWidth + _sjisWidthOffset;
 }
 
 void SJISFont::setColorMap(const uint8 *src) {
@@ -3511,7 +3623,7 @@ void SJISFont::setColorMap(const uint8 *src) {
 		if (_colorMap[0] == _invisColor)
 			_font->setDrawingMode(Graphics::FontSJIS::kDefaultMode);
 		else
-			_font->setDrawingMode(Graphics::FontSJIS::kOutlineMode);
+			_font->setDrawingMode(_drawOutline ? Graphics::FontSJIS::kOutlineMode : Graphics::FontSJIS::kDefaultMode);
 	}
 }
 
@@ -3550,7 +3662,25 @@ void Palette::loadVGAPalette(Common::ReadStream &stream, int startIndex, int col
 
 	uint8 *pos = _palData + startIndex * 3;
 	for (int i = 0 ; i < colors * 3; i++)
-		*pos++ = stream.readByte() & 0x3f;
+		*pos++ = stream.readByte() & 0x3F;
+}
+
+void Palette::loadEGAPalette(Common::ReadStream &stream, int startIndex, int colors) {
+	assert(startIndex + colors <= 16);
+
+	uint8 *dst = _palData + startIndex * 3;
+	for (int i = 0; i < colors; i++) {
+		uint8 index = stream.readByte();
+		assert(index < _egaNumColors);
+		memcpy(dst, &_egaColors[index * 3], 3);
+		dst += 3;
+	}
+}
+
+void Palette::setCGAPalette(int palIndex, CGAIntensity intensity) {
+	assert(_numColors >= _cgaNumColors);
+	assert(!(palIndex & ~1));
+	memcpy(_palData, _cgaColors[palIndex * 2 + intensity], _numColors * 3);
 }
 
 void Palette::loadAmigaPalette(Common::ReadStream &stream, int startIndex, int colors) {
@@ -3628,5 +3758,23 @@ uint8 *Palette::fetchRealPalette() const {
 
 	return buffer;
 }
+
+const uint8 Palette::_egaColors[] = {
+	0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0x00, 0xAA, 0x00, 0x00, 0xAA, 0xAA,
+	0xAA, 0x00, 0x00, 0xAA,	0x00, 0xAA, 0xAA, 0x55, 0x00, 0xAA, 0xAA, 0xAA,
+	0x55, 0x55, 0x55, 0x55, 0x55, 0xFF, 0x55, 0xFF,	0x55, 0x55, 0xFF, 0xFF,
+	0xFF, 0x55, 0x55, 0xFF, 0x55, 0xFF, 0xFF, 0xFF, 0x55, 0xFF, 0xFF, 0xFF
+};
+
+const int Palette::_egaNumColors = ARRAYSIZE(_egaColors) / 3;
+
+const uint8 Palette::_cgaColors[4][12] = {
+	{ 0x00, 0x00, 0x00, 0x00, 0x2A, 0x00, 0x2A, 0x00, 0x00, 0x2A, 0x15, 0x00 },
+	{ 0x00, 0x00, 0x00, 0x15, 0x3F, 0x15, 0x3F, 0x15, 0x15, 0x3F, 0x3F, 0x15 },
+	{ 0x00, 0x00, 0x00, 0x00, 0x2A, 0x2A, 0x2A, 0x00, 0x2A, 0x2A, 0x2A, 0x2A },
+	{ 0x00, 0x00, 0x00, 0x15, 0x3F, 0x3F, 0x3F, 0x15, 0x3F, 0x3F, 0x3F, 0x3F }
+};
+
+const int Palette::_cgaNumColors = ARRAYSIZE(_cgaColors[0]) / 3;
 
 } // End of namespace Kyra

@@ -27,9 +27,9 @@
 #include "common/textconsole.h"
 
 #include "mohawk/cursors.h"
-#include "mohawk/graphics.h"
 #include "mohawk/myst.h"
 #include "mohawk/myst_areas.h"
+#include "mohawk/myst_graphics.h"
 #include "mohawk/myst_scripts.h"
 #include "mohawk/myst_state.h"
 #include "mohawk/dialogs.h"
@@ -98,11 +98,6 @@ MohawkEngine_Myst::MohawkEngine_Myst(OSystem *syst, const MohawkGameDescription 
 	_view.soundListVolume = NULL;
 	_view.scriptResCount = 0;
 	_view.scriptResources = NULL;
-
-	if ((getFeatures() & GF_ME) && getPlatform() == Common::kPlatformMacintosh) {
-		const Common::FSNode gameDataDir(ConfMan.get("path"));
-		SearchMan.addSubDirectoryMatching(gameDataDir, "CD Data");
-	}
 }
 
 MohawkEngine_Myst::~MohawkEngine_Myst() {
@@ -205,11 +200,6 @@ static const char *mystFiles[] = {
 // qtw/myst/libelev.mov:	libup.mov is basically the same with sound
 
 Common::String MohawkEngine_Myst::wrapMovieFilename(const Common::String &movieName, uint16 stack) {
-	// The Macintosh release of Myst ME stores its videos in a different folder
-	// WORKAROUND: The gear rotation videos are not in the CD Data folder. See above comments.
-	if ((getFeatures() & GF_ME) && getPlatform() == Common::kPlatformMacintosh && !movieName.matchString("cl1wg?"))
-		return Common::String("CD Data/m/") + movieName + ".mov";
-
 	Common::String prefix;
 
 	switch (stack) {
@@ -252,8 +242,7 @@ Common::Error MohawkEngine_Myst::run() {
 	_gfx = new MystGraphics(this);
 	_console = new MystConsole(this);
 	_gameState = new MystGameState(this, _saveFileMan);
-	_loadDialog = new GUI::SaveLoadChooser(_("Load game:"), _("Load"));
-	_loadDialog->setSaveMode(false);
+	_loadDialog = new GUI::SaveLoadChooser(_("Load game:"), _("Load"), false);
 	_optionsDialog = new MystOptionsDialog(this);
 	_cursor = new MystCursorManager(this);
 	_rnd = new Common::RandomSource("myst");
@@ -429,6 +418,7 @@ void MohawkEngine_Myst::changeToStack(uint16 stack, uint16 card, uint16 linkSrcS
 
 	_sound->stopSound();
 	_sound->stopBackgroundMyst();
+	_video->stopVideos();
 	if (linkSrcSound)
 		_sound->playSoundBlocking(linkSrcSound);
 
@@ -499,52 +489,32 @@ void MohawkEngine_Myst::changeToStack(uint16 stack, uint16 card, uint16 linkSrcS
 	if (!_mhk[0]->openFile(mystFiles[_curStack]))
 		error("Could not open %s", mystFiles[_curStack]);
 
-	if (getPlatform() == Common::kPlatformMacintosh)
-		_gfx->loadExternalPictureFile(_curStack);
-
 	_runExitScript = false;
 
 	// Clear the resource cache and the image cache
 	_cache.clear();
 	_gfx->clearCache();
 
-	// Play Flyby Entry Movie on Masterpiece Edition. The Macintosh version is currently hooked
-	// up to the Cinepak versions of the video (the 'c' suffix) until the SVQ1 decoder is completed.
+	// Play Flyby Entry Movie on Masterpiece Edition.
 	const char *flyby = 0;
 	if (getFeatures() & GF_ME) {
 		switch (_curStack) {
 		case kSeleniticStack:
-			if (getPlatform() == Common::kPlatformMacintosh)
-				flyby = "FLY_SEc";
-			else
-				flyby = "selenitic flyby";
+			flyby = "selenitic flyby";
 			break;
 		case kStoneshipStack:
-			if (getPlatform() == Common::kPlatformMacintosh)
-				flyby = "FLY_STc";
-			else
-				flyby = "stoneship flyby";
+			flyby = "stoneship flyby";
 			break;
 		// Myst Flyby Movie not used in Original Masterpiece Edition Engine
 		case kMystStack:
-			if (_tweaksEnabled) {
-				if (getPlatform() == Common::kPlatformMacintosh)
-					flyby = "FLY_MYc";
-				else
-					flyby = "myst flyby";
-			}
+			if (_tweaksEnabled)
+				flyby = "myst flyby";
 			break;
 		case kMechanicalStack:
-			if (getPlatform() == Common::kPlatformMacintosh)
-				flyby = "FLY_MEc";
-			else
-				flyby = "mech age flyby";
+			flyby = "mech age flyby";
 			break;
 		case kChannelwoodStack:
-			if (getPlatform() == Common::kPlatformMacintosh)
-				flyby = "FLY_CHc";
-			else
-				flyby = "channelwood flyby";
+			flyby = "channelwood flyby";
 			break;
 		default:
 			break;
@@ -554,7 +524,7 @@ void MohawkEngine_Myst::changeToStack(uint16 stack, uint16 card, uint16 linkSrcS
 			_video->playMovieBlockingCentered(wrapMovieFilename(flyby, kMasterpieceOnly));
 	}
 
-	changeToCard(card, true);
+	changeToCard(card, kTransitionCopy);
 
 	if (linkDstSound)
 		_sound->playSoundBlocking(linkDstSound);
@@ -580,7 +550,7 @@ void MohawkEngine_Myst::drawCardBackground() {
 	_gfx->copyImageToBackBuffer(getCardBackgroundId(), Common::Rect(0, 0, 544, 332));
 }
 
-void MohawkEngine_Myst::changeToCard(uint16 card, bool updateScreen) {
+void MohawkEngine_Myst::changeToCard(uint16 card, TransitionType transition) {
 	debug(2, "changeToCard(%d)", card);
 
 	_scriptParser->disablePersistentScripts();
@@ -660,9 +630,11 @@ void MohawkEngine_Myst::changeToCard(uint16 card, bool updateScreen) {
 	}
 
 	// Make sure the screen is updated
-	if (updateScreen) {
-		_gfx->copyBackBufferToScreen(Common::Rect(544, 333));
-		_system->updateScreen();
+	if (transition != kNoTransition) {
+		if (!_gameState->_globals.transitions)
+			transition = kTransitionCopy;
+
+		_gfx->runTransition(transition, Common::Rect(544, 333), 10, 0);
 	}
 
 	// Make sure we have the right cursor showing
@@ -1210,41 +1182,41 @@ bool MohawkEngine_Myst::canSaveGameStateCurrently() {
 }
 
 void MohawkEngine_Myst::dropPage() {
-    uint16 page = _gameState->_globals.heldPage;
+	uint16 page = _gameState->_globals.heldPage;
 	bool whitePage = page == 13;
 	bool bluePage = page - 1 < 6;
-    bool redPage = page - 7 < 6;
+	bool redPage = page - 7 < 6;
 
-    // Play drop page sound
-    _sound->replaceSoundMyst(800);
+	// Play drop page sound
+	_sound->replaceSoundMyst(800);
 
-    // Drop page
-    _gameState->_globals.heldPage = 0;
+	// Drop page
+	_gameState->_globals.heldPage = 0;
 
-    // Redraw page area
-    if (whitePage && _gameState->_globals.currentAge == 2) {
-    	redrawArea(41);
-    } else if (bluePage) {
-    	if (page == 6) {
-    		if (_gameState->_globals.currentAge == 2)
-    			redrawArea(24);
-    	} else {
-    		redrawArea(103);
-    	}
-    } else if (redPage) {
-    	if (page == 12) {
-    		if (_gameState->_globals.currentAge == 2)
-    			redrawArea(25);
-    	} else if (page == 10) {
-    		if (_gameState->_globals.currentAge == 1)
-    			redrawArea(35);
-    	} else {
-    		redrawArea(102);
-    	}
-    }
+	// Redraw page area
+	if (whitePage && _gameState->_globals.currentAge == 2) {
+		redrawArea(41);
+	} else if (bluePage) {
+		if (page == 6) {
+			if (_gameState->_globals.currentAge == 2)
+				redrawArea(24);
+		} else {
+			redrawArea(103);
+		}
+	} else if (redPage) {
+		if (page == 12) {
+			if (_gameState->_globals.currentAge == 2)
+				redrawArea(25);
+		} else if (page == 10) {
+			if (_gameState->_globals.currentAge == 1)
+				redrawArea(35);
+		} else {
+			redrawArea(102);
+		}
+	}
 
-    setMainCursor(kDefaultMystCursor);
-    checkCursorHints();
+	setMainCursor(kDefaultMystCursor);
+	checkCursorHints();
 }
 
 } // End of namespace Mohawk

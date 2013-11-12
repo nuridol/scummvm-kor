@@ -2,7 +2,6 @@ package org.scummvm.scummvm;
 
 import android.os.Handler;
 import android.os.Message;
-import android.util.Log;
 import android.content.Context;
 import android.view.KeyEvent;
 import android.view.KeyCharacterMap;
@@ -10,6 +9,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.GestureDetector;
+import android.view.InputDevice;
 import android.view.inputmethod.InputMethodManager;
 
 public class ScummVMEvents implements
@@ -27,16 +27,27 @@ public class ScummVMEvents implements
 	public static final int JE_DOUBLE_TAP = 6;
 	public static final int JE_MULTI = 7;
 	public static final int JE_BALL = 8;
+	public static final int JE_LMB_DOWN = 9;
+	public static final int JE_LMB_UP = 10;
+	public static final int JE_RMB_DOWN = 11;
+	public static final int JE_RMB_UP = 12;
+	public static final int JE_MOUSE_MOVE = 13;
+	public static final int JE_GAMEPAD = 14;
+	public static final int JE_JOYSTICK = 15;
+	public static final int JE_MMB_DOWN = 16;
+	public static final int JE_MMB_UP = 17;
 	public static final int JE_QUIT = 0x1000;
 
 	final protected Context _context;
 	final protected ScummVM _scummvm;
 	final protected GestureDetector _gd;
 	final protected int _longPress;
+	final protected MouseHelper _mouseHelper;
 
-	public ScummVMEvents(Context context, ScummVM scummvm) {
+	public ScummVMEvents(Context context, ScummVM scummvm, MouseHelper mouseHelper) {
 		_context = context;
 		_scummvm = scummvm;
+		_mouseHelper = mouseHelper;
 
 		_gd = new GestureDetector(context, this);
 		_gd.setOnDoubleTapListener(this);
@@ -57,6 +68,18 @@ public class ScummVMEvents implements
 		return true;
 	}
 
+	public boolean onGenericMotionEvent(final MotionEvent e) {
+		if((e.getSource() & InputDevice.SOURCE_CLASS_JOYSTICK) != 0) {
+			_scummvm.pushEvent(JE_JOYSTICK, e.getAction(),
+					   (int)(e.getAxisValue(MotionEvent.AXIS_X)*100),
+					   (int)(e.getAxisValue(MotionEvent.AXIS_Y)*100),
+					   0, 0);
+			return true;
+		}
+
+		return false;
+	}
+
 	final static int MSG_MENU_LONG_PRESS = 1;
 
 	final private Handler keyHandler = new Handler() {
@@ -64,7 +87,7 @@ public class ScummVMEvents implements
 		public void handleMessage(Message msg) {
 			if (msg.what == MSG_MENU_LONG_PRESS) {
 				InputMethodManager imm = (InputMethodManager)
-					_context.getSystemService(_context.INPUT_METHOD_SERVICE);
+					_context.getSystemService(Context.INPUT_METHOD_SERVICE);
 
 				if (imm != null)
 					imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
@@ -73,8 +96,29 @@ public class ScummVMEvents implements
 	};
 
 	// OnKeyListener
+	@Override
 	final public boolean onKey(View v, int keyCode, KeyEvent e) {
 		final int action = e.getAction();
+
+		if (keyCode == 238) {
+			// this (undocumented) event is sent when ACTION_HOVER_ENTER or ACTION_HOVER_EXIT occurs
+			return false;
+		}
+
+		if (keyCode == KeyEvent.KEYCODE_BACK) {
+			if (action != KeyEvent.ACTION_UP) {
+				// only send event from back button on up event, since down event is sent on right mouse click and
+				// cannot be caught (thus rmb click would send escape key first)
+				return true;
+			}
+
+			if (_mouseHelper != null) {
+				if (_mouseHelper.getRmbGuard()) {
+					// right mouse button was just clicked which sends an extra back button press
+					return true;
+				}
+			}
+		}
 
 		if (e.isSystem()) {
 			// filter what we handle
@@ -150,6 +194,25 @@ public class ScummVMEvents implements
 								(int)(e.getEventTime() - e.getDownTime()),
 								e.getRepeatCount(), 0);
 			return true;
+		case KeyEvent.KEYCODE_BUTTON_A:
+		case KeyEvent.KEYCODE_BUTTON_B:
+		case KeyEvent.KEYCODE_BUTTON_C:
+		case KeyEvent.KEYCODE_BUTTON_X:
+		case KeyEvent.KEYCODE_BUTTON_Y:
+		case KeyEvent.KEYCODE_BUTTON_Z:
+		case KeyEvent.KEYCODE_BUTTON_L1:
+		case KeyEvent.KEYCODE_BUTTON_R1:
+		case KeyEvent.KEYCODE_BUTTON_L2:
+		case KeyEvent.KEYCODE_BUTTON_R2:
+		case KeyEvent.KEYCODE_BUTTON_THUMBL:
+		case KeyEvent.KEYCODE_BUTTON_THUMBR:
+		case KeyEvent.KEYCODE_BUTTON_START:
+		case KeyEvent.KEYCODE_BUTTON_SELECT:
+		case KeyEvent.KEYCODE_BUTTON_MODE:
+			_scummvm.pushEvent(JE_GAMEPAD, action, keyCode,
+								(int)(e.getEventTime() - e.getDownTime()),
+								e.getRepeatCount(), 0);
+			return true;
 		}
 
 		_scummvm.pushEvent(JE_KEY, action, keyCode,
@@ -160,7 +223,16 @@ public class ScummVMEvents implements
 	}
 
 	// OnTouchListener
+	@Override
 	final public boolean onTouch(View v, MotionEvent e) {
+		if (_mouseHelper != null) {
+			boolean isMouse = MouseHelper.isMouse(e);
+			if (isMouse) {
+				// mouse button is pressed
+				return _mouseHelper.onMouseEvent(e, false);
+			}
+		}
+
 		final int action = e.getAction();
 
 		// constants from APIv5:
@@ -177,11 +249,13 @@ public class ScummVMEvents implements
 	}
 
 	// OnGestureListener
+	@Override
 	final public boolean onDown(MotionEvent e) {
 		_scummvm.pushEvent(JE_DOWN, (int)e.getX(), (int)e.getY(), 0, 0, 0);
 		return true;
 	}
 
+	@Override
 	final public boolean onFling(MotionEvent e1, MotionEvent e2,
 									float velocityX, float velocityY) {
 		//Log.d(ScummVM.LOG_TAG, String.format("onFling: %s -> %s (%.3f %.3f)",
@@ -191,10 +265,12 @@ public class ScummVMEvents implements
 		return true;
 	}
 
+	@Override
 	final public void onLongPress(MotionEvent e) {
 		// disabled, interferes with drag&drop
 	}
 
+	@Override
 	final public boolean onScroll(MotionEvent e1, MotionEvent e2,
 									float distanceX, float distanceY) {
 		_scummvm.pushEvent(JE_SCROLL, (int)e1.getX(), (int)e1.getY(),
@@ -203,9 +279,11 @@ public class ScummVMEvents implements
 		return true;
 	}
 
+	@Override
 	final public void onShowPress(MotionEvent e) {
 	}
 
+	@Override
 	final public boolean onSingleTapUp(MotionEvent e) {
 		_scummvm.pushEvent(JE_TAP, (int)e.getX(), (int)e.getY(),
 							(int)(e.getEventTime() - e.getDownTime()), 0, 0);
@@ -214,10 +292,12 @@ public class ScummVMEvents implements
 	}
 
 	// OnDoubleTapListener
+	@Override
 	final public boolean onDoubleTap(MotionEvent e) {
 		return true;
 	}
 
+	@Override
 	final public boolean onDoubleTapEvent(MotionEvent e) {
 		_scummvm.pushEvent(JE_DOUBLE_TAP, (int)e.getX(), (int)e.getY(),
 							e.getAction(), 0, 0);
@@ -225,6 +305,7 @@ public class ScummVMEvents implements
 		return true;
 	}
 
+	@Override
 	final public boolean onSingleTapConfirmed(MotionEvent e) {
 		return true;
 	}

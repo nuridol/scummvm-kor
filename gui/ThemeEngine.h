@@ -29,19 +29,16 @@
 #include "common/hashmap.h"
 #include "common/list.h"
 #include "common/str.h"
+#include "common/rect.h"
 
 #include "graphics/surface.h"
 #include "graphics/font.h"
 #include "graphics/pixelformat.h"
 
 
-#define SCUMMVM_THEME_VERSION_STR "SCUMMVM_STX0.8.8"
+#define SCUMMVM_THEME_VERSION_STR "SCUMMVM_STX0.8.20"
 
 class OSystem;
-
-namespace Common {
-struct Rect;
-}
 
 namespace Graphics {
 struct DrawStep;
@@ -81,6 +78,7 @@ enum DrawData {
 	kDDButtonIdle,
 	kDDButtonHover,
 	kDDButtonDisabled,
+	kDDButtonPressed,
 
 	kDDSliderFull,
 	kDDSliderHover,
@@ -178,7 +176,8 @@ public:
 	enum State {
 		kStateDisabled,     ///< Indicates that the widget is disabled, that does NOT include that it is invisible
 		kStateEnabled,      ///< Indicates that the widget is enabled
-		kStateHighlight     ///< Indicates that the widget is highlighted by the user
+		kStateHighlight,    ///< Indicates that the widget is highlighted by the user
+		kStatePressed       ///< Indicates that the widget is pressed, currently works for buttons
 	};
 
 	typedef State WidgetStateInfo;
@@ -229,6 +228,17 @@ public:
 	static const char *const kImageLogoSmall; ///< ScummVM logo used in the GMM
 	static const char *const kImageSearch;    ///< Search tool image used in the launcher
 	static const char *const kImageEraser;     ///< Clear input image used in the launcher
+	static const char *const kImageDelbtn; ///< Delete characters in the predictive dialog
+	static const char *const kImageList;      ///< List image used in save/load chooser selection
+	static const char *const kImageGrid;      ///< Grid image used in save/load chooser selection
+	static const char *const kImageStopbtn; ///< Stop recording button in recorder onscreen dialog
+	static const char *const kImageEditbtn; ///< Edit recording metadata in recorder onscreen dialog
+	static const char *const kImageSwitchModebtn; ///< Switch mode button in recorder onscreen dialog
+	static const char *const kImageFastReplaybtn; ///< Fast playback mode button in recorder onscreen dialog
+	static const char *const kImageStopSmallbtn; ///< Stop recording button in recorder onscreen dialog (for 320xY)
+	static const char *const kImageEditSmallbtn; ///< Edit recording metadata in recorder onscreen dialog (for 320xY)
+	static const char *const kImageSwitchModeSmallbtn; ///< Switch mode button in recorder onscreen dialog (for 320xY)
+	static const char *const kImageFastReplaySmallbtn; ///< Fast playback mode button in recorder onscreen dialog (for 320xY)
 
 	/**
 	 * Graphics mode enumeration.
@@ -237,8 +247,8 @@ public:
 	 */
 	enum GraphicsMode {
 		kGfxDisabled = 0,   ///< No GFX
-		kGfxStandard16bit,  ///< 2BPP with the standard (aliased) renderer.
-		kGfxAntialias16bit  ///< 2BPP with the optimized AA renderer.
+		kGfxStandard,  ///< Standard (aliased) renderer.
+		kGfxAntialias  ///< Optimized AA renderer.
 	};
 
 	/** Constant value to expand dirty rectangles, to make sure they are fully copied */
@@ -270,7 +280,17 @@ public:
 
 	void refresh();
 	void enable();
+
+	void showCursor();
+	void hideCursor();
+
 	void disable();
+
+
+	/**
+	 * Query the set up pixel format.
+	 */
+	const Graphics::PixelFormat getPixelFormat() const { return _overlayFormat; }
 
 	/**
 	 * Implementation of the GUI::Theme API. Called when a
@@ -353,7 +373,7 @@ public:
 
 	void drawDialogBackground(const Common::Rect &r, DialogBackground type, WidgetStateInfo state = kStateEnabled);
 
-	void drawText(const Common::Rect &r, const Common::String &str, WidgetStateInfo state = kStateEnabled, Graphics::TextAlign align = Graphics::kTextAlignCenter, TextInversionState inverted = kTextInversionNone, int deltax = 0, bool useEllipsis = true, FontStyle font = kFontStyleBold, FontColor color = kFontColorNormal, bool restore = true);
+	void drawText(const Common::Rect &r, const Common::String &str, WidgetStateInfo state = kStateEnabled, Graphics::TextAlign align = Graphics::kTextAlignCenter, TextInversionState inverted = kTextInversionNone, int deltax = 0, bool useEllipsis = true, FontStyle font = kFontStyleBold, FontColor color = kFontColorNormal, bool restore = true, const Common::Rect &drawableTextArea = Common::Rect(0, 0, 0, 0));
 
 	void drawChar(const Common::Rect &r, byte ch, const Graphics::Font *font, WidgetStateInfo state = kStateEnabled, FontColor color = kFontColorNormal);
 
@@ -492,9 +512,8 @@ public:
 	 * @param filename File name of the bitmap to load.
 	 * @param hotspotX X Coordinate of the bitmap which does the cursor click.
 	 * @param hotspotY Y Coordinate of the bitmap which does the cursor click.
-	 * @param scale    Scale at which the bitmap is supposed to be used.
 	 */
-	bool createCursor(const Common::String &filename, int hotspotX, int hotspotY, int scale);
+	bool createCursor(const Common::String &filename, int hotspotX, int hotspotY);
 
 	/**
 	 * Wrapper for restoring data from the Back Buffer to the screen.
@@ -566,7 +585,7 @@ protected:
 	 */
 	void queueDD(DrawData type,  const Common::Rect &r, uint32 dynamic = 0, bool restore = false);
 	void queueDDText(TextData type, TextColor color, const Common::Rect &r, const Common::String &text, bool restoreBg,
-	                 bool elipsis, Graphics::TextAlign alignH = Graphics::kTextAlignLeft, TextAlignVertical alignV = kTextAlignVTop, int deltax = 0);
+	                 bool elipsis, Graphics::TextAlign alignH = Graphics::kTextAlignLeft, TextAlignVertical alignV = kTextAlignVTop, int deltax = 0, const Common::Rect &drawableTextArea = Common::Rect(0, 0, 0, 0));
 	void queueBitmap(const Graphics::Surface *bitmap, const Common::Rect &r, bool alpha);
 
 	/**
@@ -666,7 +685,6 @@ protected:
 
 	bool _useCursor;
 	int _cursorHotspotX, _cursorHotspotY;
-	int _cursorTargetScale;
 	enum {
 		MAX_CURS_COLORS = 255
 	};

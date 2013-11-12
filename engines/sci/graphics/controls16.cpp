@@ -42,14 +42,11 @@ namespace Sci {
 
 GfxControls16::GfxControls16(SegManager *segMan, GfxPorts *ports, GfxPaint16 *paint16, GfxText16 *text16, GfxScreen *screen)
 	: _segMan(segMan), _ports(ports), _paint16(paint16), _text16(text16), _screen(screen) {
-	init();
+	_texteditBlinkTime = 0;
+	_texteditCursorVisible = false;
 }
 
 GfxControls16::~GfxControls16() {
-}
-
-void GfxControls16::init() {
-	_texteditCursorVisible = false;
 }
 
 const char controlListUpArrow[2]	= { 0x18, 0 };
@@ -297,7 +294,7 @@ void GfxControls16::kernelDrawButton(Common::Rect rect, reg_t obj, const char *t
 		_paint16->eraseRect(rect);
 		_paint16->frameRect(rect);
 		rect.grow(-2);
-		_ports->textGreyedOutput(style & 1 ? false : true);
+		_ports->textGreyedOutput(!(style & SCI_CONTROLS_STYLE_ENABLED));
 		_text16->Box(text, false, rect, SCI_TEXT16_ALIGNMENT_CENTER, fontId);
 		_ports->textGreyedOutput(false);
 		rect.grow(1);

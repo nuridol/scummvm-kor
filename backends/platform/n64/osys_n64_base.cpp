@@ -95,20 +95,20 @@ OSystem_N64::OSystem_N64() {
 	// Allocate memory for offscreen buffers
 	_offscreen_hic = (uint16 *)memalign(8, _screenWidth * _screenHeight * 2);
 	_offscreen_pal = (uint8 *)memalign(8, _screenWidth * _screenHeight);
-	_overlayBuffer = (uint16 *)memalign(8, _overlayWidth * _overlayHeight * sizeof(OverlayColor));
+	_overlayBuffer = (uint16 *)memalign(8, _overlayWidth * _overlayHeight * sizeof(uint16));
 
 	_cursor_pal = NULL;
 	_cursor_hic = NULL;
 
-	_cursorWidth = -1;
-	_cursorHeight = -1;
+	_cursorWidth = 0;
+	_cursorHeight = 0;
 	_cursorKeycolor = -1;
 	_mouseHotspotX = _mouseHotspotY = -1;
 
 	// Clean offscreen buffers
 	memset(_offscreen_hic, 0, _screenWidth * _screenHeight * 2);
 	memset(_offscreen_pal, 0, _screenWidth * _screenHeight);
-	memset(_overlayBuffer, 0, _overlayWidth * _overlayHeight * sizeof(OverlayColor));
+	memset(_overlayBuffer, 0, _overlayWidth * _overlayHeight * sizeof(uint16));
 
 	// Default graphic mode
 	_graphicMode = OVERS_NTSC_340X240;
@@ -442,17 +442,18 @@ void OSystem_N64::setCursorPalette(const byte *colors, uint start, uint num) {
 	_dirtyOffscreen = true;
 }
 
-void OSystem_N64::copyRectToScreen(const byte *buf, int pitch, int x, int y, int w, int h) {
+void OSystem_N64::copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {
 	//Clip the coordinates
+	const byte *src = (const byte *)buf;
 	if (x < 0) {
 		w += x;
-		buf -= x;
+		src -= x;
 		x = 0;
 	}
 
 	if (y < 0) {
 		h += y;
-		buf -= y * pitch;
+		src -= y * pitch;
 		y = 0;
 	}
 
@@ -472,14 +473,14 @@ void OSystem_N64::copyRectToScreen(const byte *buf, int pitch, int x, int y, int
 
 	do {
 		for (int hor = 0; hor < w; hor++) {
-			if (dst_pal[hor] != buf[hor]) {
-				uint16 color = _screenPalette[buf[hor]];
+			if (dst_pal[hor] != src[hor]) {
+				uint16 color = _screenPalette[src[hor]];
 				dst_hicol[hor] = color;  // Save image converted to 16-bit
-				dst_pal[hor] = buf[hor]; // Save palettized display
+				dst_pal[hor] = src[hor]; // Save palettized display
 			}
 		}
 
-		buf += pitch;
+		src += pitch;
 		dst_pal += _screenWidth;
 		dst_hicol += _screenWidth;
 	} while (--h);
@@ -574,19 +575,20 @@ void OSystem_N64::updateScreen() {
 			horiz_pix_skip = skip_pixels;
 		}
 
-		int mX = _mouseX - _mouseHotspotX;
-		int mY = _mouseY - _mouseHotspotY;
+		for (uint h = 0; h < _cursorHeight; h++) {
+			for (uint w = 0; w < _cursorWidth; w++) {
+				int posX = (_mouseX - _mouseHotspotX) + w;
+				int posY = (_mouseY - _mouseHotspotY) + h;
 
-		for (int h = 0; h < _cursorHeight; h++)
-			for (int w = 0; w < _cursorWidth; w++) {
 				// Draw pixel
-				if (((mY + h) >= 0) && ((mY + h) < _mouseMaxY) && ((mX + w) >= 0) && ((mX + w) < _mouseMaxX)) {
+				if ((posY >= 0) && (posY < _mouseMaxY) && (posX >= 0) && (posX < _mouseMaxX)) {
 					uint16 cursor_pixel_hic = _cursor_hic[(h * _cursorWidth) + w];
 
 					if (!(cursor_pixel_hic & 0x00001))
-						mouse_framebuffer[((mY + h) * _frameBufferWidth) + ((mX + w) + _offscrPixels + horiz_pix_skip)] = cursor_pixel_hic;
+						mouse_framebuffer[(posY * _frameBufferWidth) + (posX + _offscrPixels + horiz_pix_skip)] = cursor_pixel_hic;
 				}
 			}
+		}
 	}
 
 #ifndef _ENABLE_DEBUG_
@@ -603,11 +605,7 @@ void OSystem_N64::updateScreen() {
 }
 
 Graphics::Surface *OSystem_N64::lockScreen() {
-	_framebuffer.pixels = _offscreen_pal;
-	_framebuffer.w = _gameWidth;
-	_framebuffer.h = _gameHeight;
-	_framebuffer.pitch = _screenWidth;
-	_framebuffer.format = Graphics::PixelFormat::createFormatCLUT8();
+	_framebuffer.init(_gameWidth, _gameHeight, _screenWidth, _offscreen_pal, Graphics::PixelFormat::createFormatCLUT8());
 
 	return &_framebuffer;
 }
@@ -666,7 +664,7 @@ void OSystem_N64::hideOverlay() {
 }
 
 void OSystem_N64::clearOverlay() {
-	memset(_overlayBuffer, 0, _overlayWidth * _overlayHeight * sizeof(OverlayColor));
+	memset(_overlayBuffer, 0, _overlayWidth * _overlayHeight * sizeof(uint16));
 
 	uint8 skip_lines = (_screenHeight - _gameHeight) / 4;
 	uint8 skip_pixels = (_screenWidth - _gameWidth) / 2; // Center horizontally the image
@@ -682,28 +680,30 @@ void OSystem_N64::clearOverlay() {
 	_dirtyOffscreen = true;
 }
 
-void OSystem_N64::grabOverlay(OverlayColor *buf, int pitch) {
+void OSystem_N64::grabOverlay(void *buf, int pitch) {
 	int h = _overlayHeight;
-	OverlayColor *src = _overlayBuffer;
+	uint16 *src = _overlayBuffer;
+	byte *dst = (byte *)buf;
 
 	do {
-		memcpy(buf, src, _overlayWidth * sizeof(OverlayColor));
+		memcpy(dst, src, _overlayWidth * sizeof(uint16));
 		src += _overlayWidth;
-		buf += pitch;
+		dst += pitch;
 	} while (--h);
 }
 
-void OSystem_N64::copyRectToOverlay(const OverlayColor *buf, int pitch, int x, int y, int w, int h) {
+void OSystem_N64::copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) {
+	const byte *src = (const byte *)buf;
 	//Clip the coordinates
 	if (x < 0) {
 		w += x;
-		buf -= x;
+		src -= x * sizeof(uint16);
 		x = 0;
 	}
 
 	if (y < 0) {
 		h += y;
-		buf -= y * pitch;
+		src -= y * pitch;
 		y = 0;
 	}
 
@@ -719,14 +719,14 @@ void OSystem_N64::copyRectToOverlay(const OverlayColor *buf, int pitch, int x, i
 		return;
 
 
-	OverlayColor *dst = _overlayBuffer + (y * _overlayWidth + x);
+	uint16 *dst = _overlayBuffer + (y * _overlayWidth + x);
 
-	if (_overlayWidth == pitch && pitch == w) {
-		memcpy(dst, buf, h * w * sizeof(OverlayColor));
+	if (_overlayWidth == (uint16)w && (uint16)pitch == _overlayWidth * sizeof(uint16)) {
+		memcpy(dst, src, h * pitch);
 	} else {
 		do {
-			memcpy(dst, buf, w * sizeof(OverlayColor));
-			buf += pitch;
+			memcpy(dst, src, w * sizeof(uint16));
+			src += pitch;
 			dst += _overlayWidth;
 		} while (--h);
 	}
@@ -773,7 +773,7 @@ void OSystem_N64::warpMouse(int x, int y) {
 	_dirtyOffscreen = true;
 }
 
-void OSystem_N64::setMouseCursor(const byte *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, int cursorTargetScale, const Graphics::PixelFormat *format) {
+void OSystem_N64::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
 	if (!w || !h) return;
 
 	_mouseHotspotX = hotspotX;
@@ -806,7 +806,7 @@ void OSystem_N64::setMouseCursor(const byte *buf, uint w, uint h, int hotspotX, 
 	return;
 }
 
-uint32 OSystem_N64::getMillis() {
+uint32 OSystem_N64::getMillis(bool skipRecord) {
 	return getMilliTick();
 }
 
@@ -866,6 +866,7 @@ void OSystem_N64::getTimeAndDate(TimeDate &t) const {
 	t.tm_mday = 1;
 	t.tm_mon  = 0;
 	t.tm_year = 110;
+	t.tm_wday = 0;
 
 	return;
 }

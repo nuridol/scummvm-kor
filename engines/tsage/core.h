@@ -189,7 +189,7 @@ public:
 	Action *_action;
 	SceneObject *_sceneObject;
 public:
-	ObjectMover() { _action = NULL; _sceneObject = NULL; }
+	ObjectMover() { _action = NULL; _sceneObject = NULL; _minorDiff = 0; _majorDiff = 0; _changeCtr = 0;}
 	virtual ~ObjectMover();
 
 	virtual void synchronize(Serializer &s);
@@ -272,7 +272,7 @@ public:
 	SceneObject *_destObject;
 	int _maxArea;
 	int _minArea;
-	PlayerMover2() : PlayerMover() { _destObject = NULL; }
+	PlayerMover2() : PlayerMover() { _destObject = NULL; _minArea = _maxArea = 0;}
 
 	virtual void synchronize(Serializer &s);
 	virtual Common::String getClassName() { return "PlayerMover2"; }
@@ -378,7 +378,7 @@ public:
 	void setPalette(int index, int count);
 	void getEntry(int index, uint *r, uint *g, uint *b);
 	void setEntry(int index, uint r, uint g, uint b);
-	uint8 indexOf(uint r, uint g, uint b, int threshold = 0xffff);
+	uint8 indexOf(uint r, uint g, uint b, int threshold = 0xffff, int start = 0, int count = 256);
 	void getPalette(int start = 0, int count = 256);
 	void signalListeners();
 	void clearListeners();
@@ -415,7 +415,7 @@ public:
 	int _yDiff;
 	int _sceneRegionId;
 public:
-	SceneItem() : EventHandler() { _msg = "Feature"; _action = NULL; _sceneRegionId = 0; }
+	SceneItem() : EventHandler() { _msg = "Feature"; _action = NULL; _sceneRegionId = 0; _yDiff = 0; _fieldE = _field10 = 0;}
 
 	virtual void synchronize(Serializer &s);
 	virtual Common::String getClassName() { return "SceneItem"; }
@@ -466,17 +466,22 @@ enum AnimateMode {ANIM_MODE_NONE = 0, ANIM_MODE_1 = 1, ANIM_MODE_2 = 2, ANIM_MOD
 		ANIM_MODE_9 = 9
 };
 
+enum Effect { EFFECT_NONE = 0, EFFECT_SHADED = 1, EFFECT_2 = 2, EFFECT_3 = 3,
+	EFFECT_4 = 4, EFFECT_5 = 5 };
+
 class SceneObject;
 
 class Visage {
 private:
 	byte *_data;
 
-	void flip(GfxSurface &s);
+	void flipHorizontal(GfxSurface &s);
+	void flipVertical(GfxSurface &s);
 public:
 	int _resNum;
 	int _rlbNum;
 	bool _flipHoriz;
+	bool _flipVert;
 public:
 	Visage();
 	Visage(const Visage &v);
@@ -548,7 +553,7 @@ public:
 
 	// Ringworld 2 specific fields
 	byte *_field9C;
-	int _shade, _shade2;
+	int _shade, _oldShade;
 	int _effect;
 	SceneObject *_linkedActor;
 public:
@@ -573,7 +578,6 @@ public:
 	int getRegionIndex();
 	int checkRegion(const Common::Point &pt);
 	void animate(AnimateMode animMode, ...);
-	SceneObject *clone() const;
 	void checkAngle(const SceneObject *obj);
 	void checkAngle(const Common::Point &pt);
 	void hide();
@@ -600,6 +604,7 @@ public:
 	virtual void changeAngle(int angle);
 	// New methods introduced by Ringworld 2
 	virtual void copy(SceneObject *src);
+	virtual SceneObject *clone() const;
 
 	void setup(int visage, int stripFrameNum, int frameNum, int posX, int posY, int priority);
 	void setup(int visage, int stripFrameNum, int frameNum);
@@ -610,8 +615,10 @@ public:
 	virtual Common::String getClassName() { return "BackgroundSceneObject"; }
 	virtual void postInit(SceneObjectList *OwnerList = NULL);
 	virtual void draw();
-	void setup2(int visage, int stripFrameNum, int frameNum, int posX, int posY, int priority, int32 arg10);
-	void proc27();
+	virtual SceneObject *clone() const;
+
+	void setup2(int visage, int stripFrameNum, int frameNum, int posX, int posY, int priority, int effect);
+	static void copySceneToBackground();
 };
 
 class SceneText : public SceneObject {
@@ -685,6 +692,7 @@ public:
 			int xe = va_arg(va, int);
 			items.push_back(LineSlice(xs, xe));
 		}
+		va_end(va);
 	}
 
 	void add(LineSlice &slice) { items.push_back(slice); }
@@ -897,6 +905,7 @@ public:
 protected:
 	virtual void playerAction(Event &event) {}
 	virtual void processEnd(Event &event) {}
+	virtual void postLoad(int priorSceneBeforeLoad, int currentSceneBeforeLoad) {}
 public:
 	SceneHandler();
 	void registerHandler();

@@ -93,7 +93,7 @@ const char *getSciVersionDesc(SciVersion version) {
 
 //#define SCI_VERBOSE_RESMAN 1
 
-static const char *const sci_error_types[] = {
+static const char *const s_errorDescriptions[] = {
 	"No error",
 	"I/O error",
 	"Resource is empty (size 0)",
@@ -101,10 +101,8 @@ static const char *const sci_error_types[] = {
 	"resource.map file not found",
 	"No resource files found",
 	"Unknown compression method",
-	"Decompression failed: Decompression buffer overflow",
 	"Decompression failed: Sanity check failed",
-	"Decompression failed: Resource too big",
-	"SCI version is unsupported"
+	"Decompression failed: Resource too big"
 };
 
 static const char *const s_resourceTypeNames[] = {
@@ -160,24 +158,24 @@ static const ResourceType s_resTypeMapSci21[] = {
 ResourceType ResourceManager::convertResType(byte type) {
 	type &= 0x7f;
 
-	if (_mapVersion < kResVersionSci2) {
+	bool forceSci0 = false;
+
+	// LSL6 hires doesn't have the chunk resource type, to match
+	// the resource types of the lowres version, thus we use the
+	// older resource types here.
+	// PQ4 CD and QFG4 CD are SCI2.1, but use the resource types of the
+	// corresponding SCI2 floppy disk versions.
+	if (g_sci && (g_sci->getGameId() == GID_LSL6HIRES ||
+	        g_sci->getGameId() == GID_QFG4 || g_sci->getGameId() == GID_PQ4))
+		forceSci0 = true;
+
+	if (_mapVersion < kResVersionSci2 || forceSci0) {
 		// SCI0 - SCI2
 		if (type < ARRAYSIZE(s_resTypeMapSci0))
 			return s_resTypeMapSci0[type];
 	} else {
-		// SCI2.1+
-		if (type < ARRAYSIZE(s_resTypeMapSci21)) {
-			// LSL6 hires doesn't have the chunk resource type, to match
-			// the resource types of the lowres version, thus we use the
-			// older resource types here.
-			// PQ4 CD and QFG4 CD are SCI2.1, but use the resource types of the
-			// corresponding SCI2 floppy disk versions.
-			if (g_sci && (g_sci->getGameId() == GID_LSL6HIRES ||
-				g_sci->getGameId() == GID_QFG4 || g_sci->getGameId() == GID_PQ4))
-				return s_resTypeMapSci0[type];
-			else
-				return s_resTypeMapSci21[type];
-		}
+		if (type < ARRAYSIZE(s_resTypeMapSci21))
+			return s_resTypeMapSci21[type];
 	}
 
 	return kResourceTypeInvalid;
@@ -576,7 +574,7 @@ void ResourceSource::loadResource(ResourceManager *resMan, Resource *res) {
 	if (error) {
 		warning("Error %d occurred while reading %s from resource file %s: %s",
 				error, res->_id.toString().c_str(), res->getResourceLocation().c_str(),
-				sci_error_types[error]);
+				s_errorDescriptions[error]);
 		res->unalloc();
 	}
 
@@ -609,7 +607,7 @@ int ResourceManager::addAppropriateSources() {
 		if (Common::File::exists("alt.map") && Common::File::exists("resource.alt"))
 			addSource(new VolumeResourceSource("resource.alt", addExternalMap("alt.map", 10), 10));
 #endif
-	} else if (Common::File::exists("Data1")) {
+	} else if (Common::MacResManager::exists("Data1")) {
 		// Mac SCI1.1+ file naming scheme
 		SearchMan.listMatchingMembers(files, "Data?*");
 
@@ -1154,7 +1152,6 @@ ResVersion ResourceManager::detectMapVersion() {
 			}
 			break;
 		} else if (rsrc->getSourceType() == kSourceMacResourceFork) {
-			delete fileStream;
 			return kResVersionSci11Mac;
 		}
 	}
@@ -1558,7 +1555,7 @@ void ResourceManager::readResourcePatches() {
 			name = (*x)->getName();
 
 			// SCI1 scheme
-			if (isdigit(static_cast<unsigned char>(name[0]))) {
+			if (Common::isDigit(name[0])) {
 				char *end = 0;
 				resourceNr = strtol(name.c_str(), &end, 10);
 				bAdd = (*end == '.'); // Ensure the next character is the period
@@ -1566,7 +1563,7 @@ void ResourceManager::readResourcePatches() {
 				// SCI0 scheme
 				int resname_len = strlen(szResType);
 				if (scumm_strnicmp(name.c_str(), szResType, resname_len) == 0
-					&& !isalpha(static_cast<unsigned char>(name[resname_len + 1]))) {
+					&& !Common::isAlpha(name[resname_len + 1])) {
 					resourceNr = atoi(name.c_str() + resname_len + 1);
 					bAdd = true;
 				}
@@ -1876,6 +1873,9 @@ int Resource::readResourceInfo(ResVersion volVersion, Common::SeekableReadStream
 	uint32 wCompression, szUnpacked;
 	ResourceType type;
 
+	if (file->size() == 0)
+		return SCI_ERROR_EMPTY_RESOURCE;
+
 	switch (volVersion) {
 	case kResVersionSci0Sci1Early:
 	case kResVersionSci1Middle:
@@ -1920,7 +1920,7 @@ int Resource::readResourceInfo(ResVersion volVersion, Common::SeekableReadStream
 		break;
 #endif
 	default:
-		return SCI_ERROR_INVALID_RESMAP_ENTRY;
+		return SCI_ERROR_RESMAP_INVALID_ENTRY;
 	}
 
 	// check if there were errors while reading
@@ -1961,7 +1961,7 @@ int Resource::readResourceInfo(ResVersion volVersion, Common::SeekableReadStream
 		compression = kCompUnknown;
 	}
 
-	return compression == kCompUnknown ? SCI_ERROR_UNKNOWN_COMPRESSION : 0;
+	return (compression == kCompUnknown) ? SCI_ERROR_UNKNOWN_COMPRESSION : SCI_ERROR_NONE;
 }
 
 int Resource::decompress(ResVersion volVersion, Common::SeekableReadStream *file) {
@@ -2589,7 +2589,7 @@ Common::String ResourceManager::findSierraGameId() {
 	if (!heap)
 		return "";
 
-	int16 gameObjectOffset = findGameObject(false).offset;
+	int16 gameObjectOffset = findGameObject(false).getOffset();
 
 	if (!gameObjectOffset)
 		return "";

@@ -7,13 +7,16 @@ MODULE_OBJS := \
 	debugger.o \
 	dialog.o \
 	error.o \
+	EventRecorder.o \
 	gui-manager.o \
 	launcher.o \
 	massadd.o \
 	message.o \
 	object.o \
 	options.o \
+	predictivedialog.o \
 	saveload.o \
+	saveload-dialog.o \
 	themebrowser.o \
 	ThemeEngine.o \
 	ThemeEval.o \
@@ -34,6 +37,18 @@ MODULE_OBJS += \
 else
 MODULE_OBJS += \
 	browser.o
+endif
+
+ifdef ENABLE_EVENTRECORDER
+MODULE_OBJS += \
+	editrecorddialog.o \
+	onscreendialog.o \
+	recorderdialog.o
+endif
+
+ifdef USE_FLUIDSYNTH
+MODULE_OBJS += \
+	fluidsynth-dialog.o
 endif
 
 # Include common rules

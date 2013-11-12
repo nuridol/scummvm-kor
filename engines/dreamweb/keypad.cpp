@@ -20,6 +20,7 @@
  *
  */
 
+#include "dreamweb/sound.h"
 #include "dreamweb/dreamweb.h"
 
 namespace DreamWeb {
@@ -62,11 +63,11 @@ void DreamWebEngine::enterCode(uint8 digit0, uint8 digit1, uint8 digit2, uint8 d
 		readMouse();
 		showKeypad();
 		showPointer();
-		vSync();
+		waitForVSync();
 		if (_pressCount == 0) {
 			_pressed = 255;
 			_graphicPress = 255;
-			vSync();
+			waitForVSync();
 		} else
 			--_pressCount;
 
@@ -85,7 +86,7 @@ void DreamWebEngine::enterCode(uint8 digit0, uint8 digit1, uint8 digit2, uint8 d
 				if (_pressed == 11) {
 					if (isItRight(digit0, digit1, digit2, digit3))
 						_vars._lockStatus = 0;
-					playChannel1(11);
+					_sound->playChannel1(11);
 					_lightCount = 120;
 					_pressPointer = 0;
 				}
@@ -93,7 +94,7 @@ void DreamWebEngine::enterCode(uint8 digit0, uint8 digit1, uint8 digit2, uint8 d
 		}
 	}
 	_manIsOffScreen = 0;
-	getRidOfTemp();
+	_keypadGraphics.clear();
 	restoreReels();
 	redrawMainScrn();
 	workToScreenM();
@@ -102,13 +103,12 @@ void DreamWebEngine::enterCode(uint8 digit0, uint8 digit1, uint8 digit2, uint8 d
 // Note: isItRight comes from use.asm, but is only used by enterCode(),
 // so we place it here.
 bool DreamWebEngine::isItRight(uint8 digit0, uint8 digit1, uint8 digit2, uint8 digit3) {
-
 	return digit0 == _pressList[0] && digit1 == _pressList[1]
 		&& digit2 == _pressList[2] && digit3 == _pressList[3];
 }
 
 void DreamWebEngine::loadKeypad() {
-	loadIntoTemp("DREAMWEB.G02");
+	loadGraphicsFile(_keypadGraphics, "G02");
 }
 
 void DreamWebEngine::quitKey() {
@@ -180,13 +180,13 @@ void DreamWebEngine::buttonPress(uint8 buttonId) {
 		_graphicPress = buttonId + 21;
 		_pressCount = 40;
 		if (buttonId != 11)
-			playChannel1(10);
+			_sound->playChannel1(10);
 	}
 }
 
 void DreamWebEngine::showOuterPad() {
-	showFrame(_tempGraphics, kKeypadx-3, kKeypady-4, 1, 0);
-	showFrame(_tempGraphics, kKeypadx+74, kKeypady+76, 37, 0);
+	showFrame(_keypadGraphics, kKeypadx-3, kKeypady-4, 1, 0);
+	showFrame(_keypadGraphics, kKeypadx+74, kKeypady+76, 37, 0);
 }
 
 void DreamWebEngine::showKeypad() {
@@ -214,7 +214,7 @@ void DreamWebEngine::showKeypad() {
 		}
 		if ((_lightCount >= 60) && (_lightCount < 100))
 			--frameIndex;
-		showFrame(_tempGraphics, kKeypadx+60, y, frameIndex, 0);
+		showFrame(_keypadGraphics, kKeypadx+60, y, frameIndex, 0);
 	}
 }
 
@@ -225,7 +225,7 @@ void DreamWebEngine::singleKey(uint8 key, uint16 x, uint16 y) {
 			key -= 11;
 	}
 	key -= 20;
-	showFrame(_tempGraphics, x, y, key, 0);
+	showFrame(_keypadGraphics, x, y, key, 0);
 }
 
 void DreamWebEngine::dumpKeypad() {
@@ -241,9 +241,9 @@ void DreamWebEngine::useMenu() {
 	_vars._newObs = 0;
 	drawFloor();
 	printSprites();
-	showFrame(_tempGraphics2, kMenux-48, kMenuy-4, 4, 0);
+	showFrame(_menuGraphics2, kMenux-48, kMenuy-4, 4, 0);
 	getUnderMenu();
-	showFrame(_tempGraphics2, kMenux+54, kMenuy+72, 5, 0);
+	showFrame(_menuGraphics2, kMenux+54, kMenuy+72, 5, 0);
 	workToScreenM();
 	_getBack = 0;
 	do {
@@ -252,7 +252,7 @@ void DreamWebEngine::useMenu() {
 		showMenu();
 		readMouse();
 		showPointer();
-		vSync();
+		waitForVSync();
 		dumpPointer();
 		dumpMenu();
 		dumpTextLine();
@@ -265,8 +265,8 @@ void DreamWebEngine::useMenu() {
 	} while ((_getBack != 1) && !_quitRequested);
 	_manIsOffScreen = 0;
 	redrawMainScrn();
-	getRidOfTemp();
-	getRidOfTemp2();
+	_menuGraphics.clear();
+	_menuGraphics2.clear();
 	restoreReels();
 	workToScreenM();
 }
@@ -289,12 +289,12 @@ void DreamWebEngine::showMenu() {
 	++_menuCount;
 	if (_menuCount == 37*2)
 		_menuCount = 0;
-	showFrame(_tempGraphics, kMenux, kMenuy, _menuCount / 2, 0);
+	showFrame(_menuGraphics, kMenux, kMenuy, _menuCount / 2, 0);
 }
 
 void DreamWebEngine::loadMenu() {
-	loadIntoTemp("DREAMWEB.S02"); // sprite name 3
-	loadIntoTemp2("DREAMWEB.G07"); // mon. graphics 2
+	loadGraphicsFile(_menuGraphics, "S02"); // sprite name 3
+	loadGraphicsFile(_menuGraphics2, "G07"); // mon. graphics 2
 }
 
 void DreamWebEngine::viewFolder() {
@@ -311,16 +311,16 @@ void DreamWebEngine::viewFolder() {
 		delPointer();
 		readMouse();
 		showPointer();
-		vSync();
+		waitForVSync();
 		dumpPointer();
 		dumpTextLine();
 		checkFolderCoords();
 	} while (_getBack == 0);
 	_manIsOffScreen = 0;
-	getRidOfTemp();
-	getRidOfTemp2();
-	getRidOfTemp3();
-	getRidOfTempCharset();
+	_folderGraphics.clear();
+	_folderGraphics2.clear();
+	_folderGraphics3.clear();
+	_folderCharset.clear();
 	restoreAll();
 	redrawMainScrn();
 	workToScreenM();
@@ -394,22 +394,22 @@ void DreamWebEngine::checkFolderCoords() {
 }
 
 void DreamWebEngine::loadFolder() {
-	loadIntoTemp("DREAMWEB.G09"); // folder graphics 1
-	loadIntoTemp2("DREAMWEB.G10"); // folder graphics 2
-	loadIntoTemp3("DREAMWEB.G11"); // folder graphics 3
-	loadTempCharset("DREAMWEB.C02"); // character set 3
-	loadTempText("DREAMWEB.T50"); // folder text
+	loadGraphicsFile(_folderGraphics, "G09"); // folder graphics 1
+	loadGraphicsFile(_folderGraphics2, "G10"); // folder graphics 2
+	loadGraphicsFile(_folderGraphics3, "G11"); // folder graphics 3
+	loadGraphicsFile(_folderCharset, "C02"); // character set 3
+	loadTempText("T50"); // folder text
 }
 
 void DreamWebEngine::showFolder() {
 	_commandType = 255;
 	if (_folderPage) {
-		useTempCharset();
+		useTempCharset(&_folderCharset);
 		createPanel2();
-		showFrame(_tempGraphics, 0, 0, 0, 0);
-		showFrame(_tempGraphics, 143, 0, 1, 0);
-		showFrame(_tempGraphics, 0, 92, 2, 0);
-		showFrame(_tempGraphics, 143, 92, 3, 0);
+		showFrame(_folderGraphics, 0, 0, 0, 0);
+		showFrame(_folderGraphics, 143, 0, 1, 0);
+		showFrame(_folderGraphics, 0, 92, 2, 0);
+		showFrame(_folderGraphics, 143, 92, 3, 0);
 		folderExit();
 		if (_folderPage != 1)
 			showLeftPage();
@@ -419,32 +419,32 @@ void DreamWebEngine::showFolder() {
 		underTextLine();
 	} else {
 		createPanel2();
-		showFrame(_tempGraphics3, 143-28, 0, 0, 0);
-		showFrame(_tempGraphics3, 143-28, 92, 1, 0);
+		showFrame(_folderGraphics3, 143-28, 0, 0, 0);
+		showFrame(_folderGraphics3, 143-28, 92, 1, 0);
 		folderExit();
 		underTextLine();
 	}
 }
 
 void DreamWebEngine::folderExit() {
-	showFrame(_tempGraphics2, 296, 178, 6, 0);
+	showFrame(_folderGraphics2, 296, 178, 6, 0);
 }
 
 void DreamWebEngine::showLeftPage() {
-	showFrame(_tempGraphics2, 0, 12, 3, 0);
+	showFrame(_folderGraphics2, 0, 12, 3, 0);
 	uint16 y = 12+5;
-	for (size_t i = 0; i < 9; ++i) {
-		showFrame(_tempGraphics2, 0, y, 4, 0);
+	for (uint i = 0; i < 9; ++i) {
+		showFrame(_folderGraphics2, 0, y, 4, 0);
 		y += 16;
 	}
-	showFrame(_tempGraphics2, 0, y, 5, 0);
+	showFrame(_folderGraphics2, 0, y, 5, 0);
 	_lineSpacing = 8;
 	_charShift = 91;
 	_kerning = 1;
 	uint8 pageIndex = _folderPage - 2;
 	const uint8 *string = getTextInFile1(pageIndex * 2);
 	y = 48;
-	for (size_t i = 0; i < 2; ++i) {
+	for (uint i = 0; i < 2; ++i) {
 		uint8 lastChar;
 		do {
 			lastChar = printDirect(&string, 2, &y, 140, false);
@@ -454,30 +454,30 @@ void DreamWebEngine::showLeftPage() {
 	_kerning = 0;
 	_charShift = 0;
 	_lineSpacing = 10;
-	uint8 *bufferToSwap = workspace() + (48*320)+2;
-	for (size_t i = 0; i < 120; ++i) {
-		for (size_t j = 0; j < 65; ++j) {
+	uint8 *bufferToSwap = workspace() + (48*kScreenwidth)+2;
+	for (uint i = 0; i < 120; ++i) {
+		for (uint j = 0; j < 65; ++j) {
 			SWAP(bufferToSwap[j], bufferToSwap[130 - j]);
 		}
-		bufferToSwap += 320;
+		bufferToSwap += kScreenwidth;
 	}
 }
 
 void DreamWebEngine::showRightPage() {
-	showFrame(_tempGraphics2, 143, 12, 0, 0);
+	showFrame(_folderGraphics2, 143, 12, 0, 0);
 	uint16 y = 12+37;
-	for (size_t i = 0; i < 7; ++i) {
-		showFrame(_tempGraphics2, 143, y, 1, 0);
+	for (uint i = 0; i < 7; ++i) {
+		showFrame(_folderGraphics2, 143, y, 1, 0);
 		y += 16;
 	}
 
-	showFrame(_tempGraphics2, 143, y, 2, 0);
+	showFrame(_folderGraphics2, 143, y, 2, 0);
 	_lineSpacing = 8;
 	_kerning = 1;
 	uint8 pageIndex = _folderPage - 1;
 	const uint8 *string = getTextInFile1(pageIndex * 2);
 	y = 48;
-	for (size_t i = 0; i < 2; ++i) {
+	for (uint i = 0; i < 2; ++i) {
 		uint8 lastChar;
 		do {
 			lastChar = printDirect(&string, 152, &y, 140, false);
@@ -491,7 +491,7 @@ void DreamWebEngine::showRightPage() {
 void DreamWebEngine::enterSymbol() {
 	_manIsOffScreen = 1;
 	getRidOfReels();
-	loadIntoTemp("DREAMWEB.G12"); // symbol graphics
+	loadGraphicsFile(_symbolGraphics, "G12"); // symbol graphics
 	_symbolTopX = 24;
 	_symbolTopDir = 0;
 	_symbolBotX = 24;
@@ -508,7 +508,7 @@ void DreamWebEngine::enterSymbol() {
 		showSymbol();
 		readMouse();
 		showPointer();
-		vSync();
+		waitForVSync();
 		dumpPointer();
 		dumpTextLine();
 		dumpSymbol();
@@ -529,17 +529,17 @@ void DreamWebEngine::enterSymbol() {
 		turnAnyPathOn(0, _roomNum + 12);
 		_manIsOffScreen = 0;
 		redrawMainScrn();
-		getRidOfTemp();
+		_symbolGraphics.clear();
 		restoreReels();
 		workToScreenM();
-		playChannel1(13);
+		_sound->playChannel1(13);
 	} else {
 		removeSetObject(46);
 		placeSetObject(43);
 		turnAnyPathOff(0, _roomNum + 12);
 		_manIsOffScreen = 0;
 		redrawMainScrn();
-		getRidOfTemp();
+		_symbolGraphics.clear();
 		restoreReels();
 		workToScreenM();
 	}
@@ -616,19 +616,19 @@ void DreamWebEngine::dumpSymbol() {
 }
 
 void DreamWebEngine::showSymbol() {
-	showFrame(_tempGraphics, kSymbolx, kSymboly, 12, 0);
+	showFrame(_symbolGraphics, kSymbolx, kSymboly, 12, 0);
 
-	showFrame(_tempGraphics, _symbolTopX + kSymbolx-44, kSymboly+20, _symbolTopNum, 32);
+	showFrame(_symbolGraphics, _symbolTopX + kSymbolx-44, kSymboly+20, _symbolTopNum, 32);
 	uint8 nextTopSymbol = nextSymbol(_symbolTopNum);
-	showFrame(_tempGraphics, _symbolTopX + kSymbolx+5, kSymboly+20, nextTopSymbol, 32);
+	showFrame(_symbolGraphics, _symbolTopX + kSymbolx+5, kSymboly+20, nextTopSymbol, 32);
 	uint8 nextNextTopSymbol = nextSymbol(nextTopSymbol);
-	showFrame(_tempGraphics, _symbolTopX + kSymbolx+54, kSymboly+20, nextNextTopSymbol, 32);
+	showFrame(_symbolGraphics, _symbolTopX + kSymbolx+54, kSymboly+20, nextNextTopSymbol, 32);
 
-	showFrame(_tempGraphics, _symbolBotX + kSymbolx-44, kSymboly+49, 6 + _symbolBotNum, 32);
+	showFrame(_symbolGraphics, _symbolBotX + kSymbolx-44, kSymboly+49, 6 + _symbolBotNum, 32);
 	uint8 nextBotSymbol = nextSymbol(_symbolBotNum);
-	showFrame(_tempGraphics, _symbolBotX + kSymbolx+5, kSymboly+49, 6 + nextBotSymbol, 32);
+	showFrame(_symbolGraphics, _symbolBotX + kSymbolx+5, kSymboly+49, 6 + nextBotSymbol, 32);
 	uint8 nextNextBotSymbol = nextSymbol(nextBotSymbol);
-	showFrame(_tempGraphics, _symbolBotX + kSymbolx+54, kSymboly+49, 6 + nextNextBotSymbol, 32);
+	showFrame(_symbolGraphics, _symbolBotX + kSymbolx+54, kSymboly+49, 6 + nextNextBotSymbol, 32);
 }
 
 uint8 DreamWebEngine::nextSymbol(uint8 symbol) {
@@ -716,9 +716,9 @@ void DreamWebEngine::updateSymbolBot() {
 
 void DreamWebEngine::useDiary() {
 	getRidOfReels();
-	loadIntoTemp("DREAMWEB.G14");
-	loadTempText("DREAMWEB.T51");
-	loadTempCharset("DREAMWEB.C02");
+	loadGraphicsFile(_diaryGraphics, "G14");
+	loadTempText("T51");
+	loadGraphicsFile(_diaryCharset, "C02");
 	createPanel();
 	showIcon();
 	showDiary();
@@ -743,7 +743,7 @@ void DreamWebEngine::useDiary() {
 		readMouse();
 		showDiaryKeys();
 		showPointer();
-		vSync();
+		waitForVSync();
 		dumpPointer();
 		dumpDiaryKeys();
 		dumpTextLine();
@@ -751,9 +751,9 @@ void DreamWebEngine::useDiary() {
 	} while (!_getBack && !_quitRequested);
 
 
-	getRidOfTemp();
+	_diaryGraphics.clear();
 	getRidOfTempText();
-	getRidOfTempCharset();
+	_diaryCharset.clear();
 	restoreReels();
 	_manIsOffScreen = 0;
 	redrawMainScrn();
@@ -761,8 +761,8 @@ void DreamWebEngine::useDiary() {
 }
 
 void DreamWebEngine::showDiary() {
-	showFrame(_tempGraphics, kDiaryx, kDiaryy + 37, 1, 0);
-	showFrame(_tempGraphics, kDiaryx + 176, kDiaryy + 108, 2, 0);
+	showFrame(_diaryGraphics, kDiaryx, kDiaryy + 37, 1, 0);
+	showFrame(_diaryGraphics, kDiaryx + 176, kDiaryy + 108, 2, 0);
 }
 
 void DreamWebEngine::showDiaryKeys() {
@@ -776,10 +776,10 @@ void DreamWebEngine::showDiaryKeys() {
 
 	if (_pressed == 'N') {
 		byte frame = (_pressCount == 1) ? 3 : 4;
-		showFrame(_tempGraphics, kDiaryx + 94, kDiaryy + 97, frame, 0);
+		showFrame(_diaryGraphics, kDiaryx + 94, kDiaryy + 97, frame, 0);
 	} else {
 		byte frame = (_pressCount == 1) ? 5 : 6;
-		showFrame(_tempGraphics, kDiaryx + 151, kDiaryy + 71, frame, 0);
+		showFrame(_diaryGraphics, kDiaryx + 151, kDiaryy + 71, frame, 0);
 	}
 
 	if (_pressCount == 1)
@@ -820,7 +820,7 @@ void DreamWebEngine::diaryKeyP() {
 		_pressCount)
 		return; // notkeyp
 
-	playChannel1(16);
+	_sound->playChannel1(16);
 	_pressCount = 12;
 	_pressed = 'P';
 	_diaryPage--;
@@ -837,7 +837,7 @@ void DreamWebEngine::diaryKeyN() {
 		_pressCount)
 		return; // notkeyn
 
-	playChannel1(16);
+	_sound->playChannel1(16);
 	_pressCount = 12;
 	_pressed = 'N';
 	_diaryPage++;
@@ -847,9 +847,9 @@ void DreamWebEngine::diaryKeyN() {
 }
 
 void DreamWebEngine::showDiaryPage() {
-	showFrame(_tempGraphics, kDiaryx, kDiaryy, 0, 0);
+	showFrame(_diaryGraphics, kDiaryx, kDiaryy, 0, 0);
 	_kerning = 1;
-	useTempCharset();
+	useTempCharset(&_diaryCharset);
 	_charShift = 91+91;
 	const uint8 *string = getTextInFile1(_diaryPage);
 	uint16 y = kDiaryy + 16;

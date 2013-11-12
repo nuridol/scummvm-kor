@@ -22,10 +22,10 @@
  * Also provides a couple of utility functions.
  */
 
+#include "common/coroutines.h"
 #include "tinsel/actors.h"
 #include "tinsel/background.h"
 #include "tinsel/config.h"
-#include "tinsel/coroutine.h"
 #include "tinsel/cursor.h"
 #include "tinsel/dw.h"
 #include "tinsel/events.h"
@@ -54,37 +54,37 @@ extern HPOLYGON GetTaggedPoly();
 
 //----------------- EXTERNAL GLOBAL DATA ---------------------
 
-extern bool bEnableMenu;
+extern bool g_bEnableMenu;
 
 //----------------- LOCAL GLOBAL DATA --------------------
 
 // FIXME: Avoid non-const global vars
 
-static uint32 lastUserEvent = 0;	// Time it hapenned
-static int leftEvents = 0;		// Single or double, left or right. Or escape key.
-static int escEvents = 1;		// Escape key
-static int userEvents = 0;		// Whenever a button or a key comes in
+static uint32 g_lastUserEvent = 0;	// Time it hapenned
+static int g_leftEvents = 0;		// Single or double, left or right. Or escape key.
+static int g_escEvents = 1;		// Escape key
+static int g_userEvents = 0;		// Whenever a button or a key comes in
 
-static int eCount = 0;
+static int g_eCount = 0;
 
-static int controlState;
-static bool bStartOff;
+static int g_controlState;
+static bool g_bStartOff;
 
-static int controlX, controlY;
-static bool bProvNotProcessed = false;
+static int g_controlX, g_controlY;
+static bool g_bProvNotProcessed = false;
 
 /**
  * Gets called before each schedule, only 1 user action per schedule
  * is allowed.
  */
 void ResetEcount() {
-	eCount = 0;
+	g_eCount = 0;
 }
 
 
 void IncUserEvents() {
-	userEvents++;
-	lastUserEvent = DwGetCurrentTime();
+	g_userEvents++;
+	g_lastUserEvent = DwGetCurrentTime();
 }
 
 /**
@@ -104,7 +104,7 @@ void AllowDclick(CORO_PARAM, PLR_EVENT be) {
 		FreeToken(TOKEN_LEFT_BUT);
 
 		// Prevent activation of 2 events on the same tick
-		if (++eCount != 1)
+		if (++g_eCount != 1)
 			CORO_KILL_SELF();
 
 		break;
@@ -125,17 +125,17 @@ void ControlOn() {
 		return;
 	}
 
-	bEnableMenu = false;
+	g_bEnableMenu = false;
 
-	if (controlState == CONTROL_OFF) {
+	if (g_controlState == CONTROL_OFF) {
 		// Control is on
-		controlState = CONTROL_ON;
+		g_controlState = CONTROL_ON;
 
 		// Restore cursor to where it was
-		if (bStartOff == true)
-			bStartOff = false;
+		if (g_bStartOff == true)
+			g_bStartOff = false;
 		else
-			SetCursorXY(controlX, controlY);
+			SetCursorXY(g_controlX, g_controlY);
 
 		// Re-instate cursor
 		UnHideCursor();
@@ -155,14 +155,14 @@ void ControlOff() {
 		return;
 	}
 
-	bEnableMenu = false;
+	g_bEnableMenu = false;
 
-	if (controlState == CONTROL_ON) {
+	if (g_controlState == CONTROL_ON) {
 		// Control is off
-		controlState = CONTROL_OFF;
+		g_controlState = CONTROL_OFF;
 
 		// Store cursor position
-		GetCursorXY(&controlX, &controlY, true);
+		GetCursorXY(&g_controlX, &g_controlY, true);
 
 		// Blank out cursor
 		DwHideCursor();
@@ -181,10 +181,10 @@ void ControlStartOff() {
 		return;
 	}
 
-	bEnableMenu = false;
+	g_bEnableMenu = false;
 
 	// Control is off
-	controlState = CONTROL_OFF;
+	g_controlState = CONTROL_OFF;
 
 	// Blank out cursor
 	DwHideCursor();
@@ -192,7 +192,7 @@ void ControlStartOff() {
 	// Switch off tags
 	DisableTags();
 
-	bStartOff = true;
+	g_bStartOff = true;
 }
 
 /**
@@ -211,7 +211,7 @@ bool GetControl(int param) {
 }
 
 bool GetControl() {
-	if (controlState == CONTROL_ON) {
+	if (g_controlState == CONTROL_ON) {
 		ControlOff();
 		return true;
 	} else
@@ -220,7 +220,7 @@ bool GetControl() {
 
 bool ControlIsOn() {
 	if (TinselV2)
-		return (controlState == CONTROL_ON);
+		return (g_controlState == CONTROL_ON);
 
 	return TestToken(TOKEN_CONTROL);
 }
@@ -276,7 +276,7 @@ static void WalkProcess(CORO_PARAM, const void *param) {
 void WalkTo(int x, int y) {
 	WP_INIT to = { x, y };
 
-	g_scheduler->createProcess(PID_TCODE, WalkProcess, &to, sizeof(to));
+	CoroScheduler.createProcess(PID_TCODE, WalkProcess, &to, sizeof(to));
 }
 
 /**
@@ -289,13 +289,13 @@ static void ProcessUserEvent(TINSEL_EVENT uEvent, const Common::Point &coOrds, P
 	HPOLYGON hPoly;
 
 	// Prevent activation of 2 events on the same tick
-	if (++eCount != 1)
+	if (++g_eCount != 1)
 		return;
 
 	if ((actor = GetTaggedActor()) != 0) {
 		// Event for a tagged actor
 		if (TinselV2)
-			ActorEvent(nullContext, actor, uEvent, false, 0);
+			ActorEvent(Common::nullContext, actor, uEvent, false, 0);
 		else
 			ActorEvent(actor, uEvent, be);
 	} else if ((hPoly = GetTaggedPoly()) != NOPOLY) {
@@ -303,7 +303,7 @@ static void ProcessUserEvent(TINSEL_EVENT uEvent, const Common::Point &coOrds, P
 		if (!TinselV2)
 			RunPolyTinselCode(hPoly, uEvent, be, false);
 		else if (uEvent != PROV_WALKTO)
-			PolygonEvent(nullContext, hPoly, uEvent, 0, false, 0);
+			PolygonEvent(Common::nullContext, hPoly, uEvent, 0, false, 0);
 
 	} else {
 		GetCursorXY(&aniX, &aniY, true);
@@ -312,7 +312,7 @@ static void ProcessUserEvent(TINSEL_EVENT uEvent, const Common::Point &coOrds, P
 		if ((hPoly = InPolygon(aniX, aniY, TAG)) != NOPOLY ||
 			(!TinselV2 && ((hPoly = InPolygon(aniX, aniY, EXIT)) != NOPOLY))) {
 			if (TinselV2 && (uEvent != PROV_WALKTO))
-				PolygonEvent(nullContext, hPoly, uEvent, 0, false, 0);
+				PolygonEvent(Common::nullContext, hPoly, uEvent, 0, false, 0);
 			else if (!TinselV2)
 				RunPolyTinselCode(hPoly, uEvent, be, false);
 		} else if ((uEvent == PROV_WALKTO) || (uEvent == WALKTO)) {
@@ -389,25 +389,26 @@ void PlayerEvent(PLR_EVENT pEvent, const Common::Point &coOrds) {
 		"PLR_PROV_WALKTO", "PLR_WALKTO", "PLR_LOOK", "PLR_ACTION", "PLR_ESCAPE",
 		"PLR_MENU", "PLR_QUIT", "PLR_PGUP", "PLR_PGDN", "PLR_HOME", "PLR_END",
 		"PLR_DRAG1_START", "PLR_DRAG1_END", "PLR_DRAG2_START", "PLR_DRAG2_END",
-		"PLR_JUMP", "PLR_NOEVENT"};
+		"PLR_JUMP", "PLR_NOEVENT", "PLR_SAVE", "PLR_LOAD", "PLR_WHEEL_UP",
+		"PLR_WHEEL_DOWN"};
 	debugC(DEBUG_BASIC, kTinselDebugActions, "%s - (%d,%d)",
 		actionList[pEvent], coOrds.x, coOrds.y);
 	static uint32 lastRealAction = 0;	// FIXME: Avoid non-const global vars
 
 	// This stuff to allow F1 key during startup.
-	if (bEnableMenu && pEvent == PLR_MENU)
+	if (g_bEnableMenu && pEvent == PLR_MENU)
 		Control(CONTROL_ON);
 	else
 		IncUserEvents();
 
 	if (pEvent == PLR_ESCAPE) {
-		++escEvents;
-		++leftEvents;		// Yes, I do mean this
+		++g_escEvents;
+		++g_leftEvents;		// Yes, I do mean this
 	} else if ((pEvent == PLR_PROV_WALKTO)
 			|| (pEvent == PLR_WALKTO)
 			|| (pEvent == PLR_LOOK)
 			|| (pEvent == PLR_ACTION)) {
-		++leftEvents;
+		++g_leftEvents;
 	}
 
 	// Only allow events if player control is on
@@ -484,18 +485,18 @@ void PlayerEvent(PLR_EVENT pEvent, const Common::Point &coOrds) {
  * For ESCapable Glitter sequences
  */
 int GetEscEvents() {
-	return escEvents;
+	return g_escEvents;
 }
 
 /**
  * For cutting short talk()s etc.
  */
 int GetLeftEvents() {
-	return leftEvents;
+	return g_leftEvents;
 }
 
 bool LeftEventChange(int myleftEvent) {
-	if (leftEvents != myleftEvent) {
+	if (g_leftEvents != myleftEvent) {
 		ProcessedProvisional();
 		return true;
 	} else
@@ -506,15 +507,15 @@ bool LeftEventChange(int myleftEvent) {
  * For waitkey() Glitter function
  */
 int getUserEvents() {
-	return userEvents;
+	return g_userEvents;
 }
 
 uint32 getUserEventTime() {
-	return DwGetCurrentTime() - lastUserEvent;
+	return DwGetCurrentTime() - g_lastUserEvent;
 }
 
 void resetUserEventTime() {
-	lastUserEvent = DwGetCurrentTime();
+	g_lastUserEvent = DwGetCurrentTime();
 }
 
 struct PTP_INIT {
@@ -604,7 +605,7 @@ void PolyTinselProcess(CORO_PARAM, const void *param) {
 void PolygonEvent(CORO_PARAM, HPOLYGON hPoly, TINSEL_EVENT tEvent, int actor, bool bWait,
 				  int myEscape, bool *result) {
 	CORO_BEGIN_CONTEXT;
-		PPROCESS pProc;
+		Common::PPROCESS pProc;
 	CORO_END_CONTEXT(_ctx);
 
 	CORO_BEGIN_CODE(_ctx);
@@ -623,7 +624,7 @@ void PolygonEvent(CORO_PARAM, HPOLYGON hPoly, TINSEL_EVENT tEvent, int actor, bo
 			NULL,			// No Object
 			myEscape);
 	if (to.pic != NULL) {
-		_ctx->pProc = g_scheduler->createProcess(PID_TCODE, PolyTinselProcess, &to, sizeof(to));
+		_ctx->pProc = CoroScheduler.createProcess(PID_TCODE, PolyTinselProcess, &to, sizeof(to));
 		AttachInterpret(to.pic, _ctx->pProc);
 
 		if (bWait)
@@ -640,14 +641,14 @@ void RunPolyTinselCode(HPOLYGON hPoly, TINSEL_EVENT event, PLR_EVENT be, bool tc
 	PTP_INIT to = { hPoly, event, be, tc, 0, NULL };
 
 	assert(!TinselV2);
-	g_scheduler->createProcess(PID_TCODE, PolyTinselProcess, &to, sizeof(to));
+	CoroScheduler.createProcess(PID_TCODE, PolyTinselProcess, &to, sizeof(to));
 }
 
 void effRunPolyTinselCode(HPOLYGON hPoly, TINSEL_EVENT event, int actor) {
 	PTP_INIT to = { hPoly, event, PLR_NOEVENT, false, actor, NULL };
 
 	assert(!TinselV2);
-	g_scheduler->createProcess(PID_TCODE, PolyTinselProcess, &to, sizeof(to));
+	CoroScheduler.createProcess(PID_TCODE, PolyTinselProcess, &to, sizeof(to));
 }
 
 /**
@@ -655,18 +656,18 @@ void effRunPolyTinselCode(HPOLYGON hPoly, TINSEL_EVENT event, int actor) {
  * subsequent 'real' event.
  */
 void ProcessedProvisional() {
-	bProvNotProcessed = false;
+	g_bProvNotProcessed = false;
 }
 
 /**
  * Resets the bProvNotProcessed flag
  */
 void ProvNotProcessed() {
-	bProvNotProcessed = true;
+	g_bProvNotProcessed = true;
 }
 
 bool GetProvNotProcessed() {
-	return bProvNotProcessed;
+	return g_bProvNotProcessed;
 }
 
 } // End of namespace Tinsel

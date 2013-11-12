@@ -1,8 +1,6 @@
 MODULE := backends/platform/sdl
 
 MODULE_OBJS := \
-	hardwarekeys.o \
-	main.o \
 	sdl.o
 
 ifdef POSIX

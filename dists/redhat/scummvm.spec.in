@@ -27,6 +27,7 @@ BuildRequires: flac-devel
 BuildRequires: zlib-devel
 BuildRequires: nasm
 BuildRequires: SDL-devel >= 1.2.2
+BuildRequires: freetype-devel
 
 #------------------------------------------------------------------------------
 #   Description
@@ -71,6 +72,7 @@ install -m644 -D dists/engine-data/sky.cpt %{buildroot}%{_datadir}/scummvm/sky.c
 install -m644 -D dists/engine-data/drascula.dat %{buildroot}%{_datadir}/scummvm/drascula.dat
 install -m644 -D dists/engine-data/teenagent.dat %{buildroot}%{_datadir}/scummvm/teenagent.dat
 install -m644 -D dists/engine-data/hugo.dat %{buildroot}%{_datadir}/scummvm/hugo.dat
+install -m644 -D dists/engine-data/tony.dat %{buildroot}%{_datadir}/scummvm/tony.dat
 install -m644 -D dists/engine-data/toon.dat %{buildroot}%{_datadir}/scummvm/toon.dat
 desktop-file-install --vendor scummvm --dir=%{buildroot}/%{_datadir}/applications dists/scummvm.desktop
 
@@ -94,7 +96,7 @@ fi
 #------------------------------------------------------------------------------
 %files
 %defattr(0644,root,root,0755)
-%doc AUTHORS README NEWS COPYING COPYING.LGPL COPYING.BSD COPYRIGHT
+%doc AUTHORS README NEWS COPYING COPYING.LGPL COPYING.FREEFONT COPYING.BSD COPYRIGHT
 %attr(0755,root,root)%{_bindir}/scummvm
 %{_datadir}/applications/*
 %{_datadir}/pixmaps/scummvm.xpm
@@ -110,6 +112,7 @@ fi
 %{_datadir}/scummvm/drascula.dat
 %{_datadir}/scummvm/teenagent.dat
 %{_datadir}/scummvm/hugo.dat
+%{_datadir}/scummvm/tony.dat
 %{_datadir}/scummvm/toon.dat
 %{_mandir}/man6/scummvm.6*
 

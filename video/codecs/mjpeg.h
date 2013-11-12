@@ -31,15 +31,17 @@ class SeekableReadStream;
 }
 
 namespace Graphics {
-class JPEG;
+struct Surface;
 }
 
 namespace Video {
 
-// Motion JPEG Decoder
-// Basically a wrapper around JPEG which converts to RGB and also functions
-// as a Codec.
-
+/**
+ * Motion JPEG decoder.
+ *
+ * Used in video:
+ *  - QuickTimeDecoder
+ */
 class JPEGDecoder : public Codec {
 public:
 	JPEGDecoder();
@@ -50,7 +52,6 @@ public:
 
 private:
 	Graphics::PixelFormat _pixelFormat;
-	Graphics::JPEG *_jpeg;
 	Graphics::Surface *_surface;
 };
 

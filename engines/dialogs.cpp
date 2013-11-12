@@ -111,10 +111,8 @@ MainMenuDialog::MainMenuDialog(Engine *engine)
 
 	_aboutDialog = new GUI::AboutDialog();
 	_optionsDialog = new ConfigDialog(_engine->hasFeature(Engine::kSupportsSubtitleOptions));
-	_loadDialog = new GUI::SaveLoadChooser(_("Load game:"), _("Load"));
-	_loadDialog->setSaveMode(false);
-	_saveDialog = new GUI::SaveLoadChooser(_("Save game:"), _("Save"));
-	_saveDialog->setSaveMode(true);
+	_loadDialog = new GUI::SaveLoadChooser(_("Load game:"), _("Load"), false);
+	_saveDialog = new GUI::SaveLoadChooser(_("Save game:"), _("Save"), true);
 }
 
 MainMenuDialog::~MainMenuDialog() {
@@ -216,30 +214,22 @@ void MainMenuDialog::reflowLayout() {
 }
 
 void MainMenuDialog::save() {
-	const Common::String gameId = ConfMan.get("gameid");
-
-	const EnginePlugin *plugin = 0;
-	EngineMan.findGame(gameId, &plugin);
-
-	int slot = _saveDialog->runModalWithPluginAndTarget(plugin, ConfMan.getActiveDomainName());
+	int slot = _saveDialog->runModalWithCurrentTarget();
 
 	if (slot >= 0) {
 		Common::String result(_saveDialog->getResultString());
 		if (result.empty()) {
 			// If the user was lazy and entered no save name, come up with a default name.
-			Common::String buf;
-			#if defined(USE_SAVEGAME_TIMESTAMP)
-			TimeDate curTime;
-			g_system->getTimeAndDate(curTime);
-			curTime.tm_year += 1900; // fixup year
-			curTime.tm_mon++; // fixup month
-			buf = Common::String::format("%04d.%02d.%02d / %02d:%02d:%02d", curTime.tm_year, curTime.tm_mon, curTime.tm_mday, curTime.tm_hour, curTime.tm_min, curTime.tm_sec);
-			#else
-			buf = Common::String::format("Save %d", slot + 1);
-			#endif
-			_engine->saveGameState(slot, buf);
-		} else {
-			_engine->saveGameState(slot, result);
+			result = _saveDialog->createDefaultSaveDescription(slot);
+		}
+
+		Common::Error status = _engine->saveGameState(slot, result);
+		if (status.getCode() != Common::kNoError) {
+			Common::String failMessage = Common::String::format(_("Gamestate save failed (%s)! "
+				  "Please consult the README for basic information, and for "
+				  "instructions on how to obtain further assistance."), status.getDesc().c_str());
+			GUI::MessageDialog dialog(failMessage);
+			dialog.runModal();
 		}
 
 		close();
@@ -247,16 +237,11 @@ void MainMenuDialog::save() {
 }
 
 void MainMenuDialog::load() {
-	const Common::String gameId = ConfMan.get("gameid");
-
-	const EnginePlugin *plugin = 0;
-	EngineMan.findGame(gameId, &plugin);
-
-	int slot = _loadDialog->runModalWithPluginAndTarget(plugin, ConfMan.getActiveDomainName());
+	int slot = _loadDialog->runModalWithCurrentTarget();
 
 	_engine->setGameToLoadSlot(slot);
 
-	if (slot >= 0)		
+	if (slot >= 0)
 		close();
 }
 

@@ -370,7 +370,7 @@ void AGOSEngine_PN::opn_opcode30() {
 
 void AGOSEngine_PN::opn_opcode31() {
 	int a, slot = 0;
-	char bf[60];
+	Common::String bf;
 
 	if ((a = varval()) > 2) {
 		setScriptReturn(false);
@@ -381,10 +381,10 @@ void AGOSEngine_PN::opn_opcode31() {
 		case 0:
 			getFilename();
 			slot = matchSaveGame(_saveFile, countSaveGames());
-			strcpy(bf, genSaveName(slot));
+			bf = genSaveName(slot);
 			break;
 		case 1:
-			strcpy(bf, "pn.sav");
+			bf = "pn.sav";
 			break;
 		case 2:
 			// NOTE: Is this case ever used?
@@ -404,7 +404,7 @@ void AGOSEngine_PN::opn_opcode31() {
 }
 
 void AGOSEngine_PN::opn_opcode32() {
-	char bf[60];
+	Common::String bf;
 	int a, slot;
 
 	a = varval();
@@ -419,12 +419,12 @@ void AGOSEngine_PN::opn_opcode32() {
 			getFilename();
 			slot = matchSaveGame(_saveFile, curSlot);
 			if (slot != -1)
-				strcpy(bf, genSaveName(slot));
+				bf = genSaveName(slot);
 			else
-				strcpy(bf, genSaveName(curSlot));
+				bf = genSaveName(curSlot);
 			break;
 		case 1:
-			strcpy(bf, "pn.sav");
+			bf = "pn.sav";
 			break;
 		case 2:
 			// NOTE: Is this case ever used?
@@ -466,8 +466,8 @@ void AGOSEngine_PN::opn_opcode35() {
 void AGOSEngine_PN::opn_opcode36() {
 	for (int i = 0; i < _dataBase[57] + 1; ++i)
 		_wordcp[i] = 0;
-	if (isspace(static_cast<unsigned char>(*_inpp)))
-		while ((*_inpp) && (isspace(static_cast<unsigned char>(*_inpp))))
+	if (Common::isSpace(*_inpp))
+		while ((*_inpp) && (Common::isSpace(*_inpp)))
 			_inpp++;
 	if (*_inpp == 0) {
 		setScriptReturn(false);
@@ -481,7 +481,7 @@ void AGOSEngine_PN::opn_opcode36() {
 	}
 
 	int ct = 1;
-	while ((*_inpp != '.') && (*_inpp != ',') && (!isspace(static_cast<unsigned char>(*_inpp))) && (*_inpp != '\0') &&
+	while ((*_inpp != '.') && (*_inpp != ',') && (!Common::isSpace(*_inpp)) && (*_inpp != '\0') &&
 		(*_inpp!='"')) {
 		if (ct < _dataBase[57])
 			_wordcp[ct++] = *_inpp;
@@ -581,7 +581,7 @@ void AGOSEngine_PN::opn_opcode46() {
 		return;
 	}
 	x++;
-	while ((*x != '.') && (*x != ',') && (*x != '"') && (!isspace(static_cast<unsigned char>(*x))) && (*x != '\0'))
+	while ((*x != '.') && (*x != ',') && (*x != '"') && (!Common::isSpace(*x)) && (*x != '\0'))
 		pcf(*x++);
 	setScriptReturn(true);
 }

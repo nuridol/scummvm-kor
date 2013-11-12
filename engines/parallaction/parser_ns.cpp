@@ -246,7 +246,7 @@ DECLARE_ANIM_PARSER(file)  {
 
 	char vC8[200];
 	strcpy(vC8, _tokens[1]);
-	if (_engineFlags & kEngineTransformedDonna) {
+	if (g_engineFlags & kEngineTransformedDonna) {
 		if (!scumm_stricmp(_tokens[1], "donnap") || !scumm_stricmp(_tokens[1], "donnapa")) {
 			strcat(vC8, "tras");
 		}
@@ -292,7 +292,7 @@ void LocationParser_ns::parseAnimation(AnimationList &list, char *name) {
 	AnimationPtr a(new Animation);
 	_zoneProg++;
 
-	strncpy(a->_name, name, ZONENAME_LENGTH);
+	Common::strlcpy(a->_name, name, ZONENAME_LENGTH);
 	a->_flags |= kFlagsIsAnimation;
 
 	list.push_front(AnimationPtr(a));
@@ -534,7 +534,7 @@ DECLARE_INSTRUCTION_PARSER(endscript)  {
 
 void ProgramParser_ns::parseRValue(ScriptVar &v, const char *str) {
 
-	if (isdigit(static_cast<unsigned char>(str[0])) || str[0] == '-') {
+	if (Common::isDigit(str[0]) || str[0] == '-') {
 		v.setImmediate(atoi(str));
 		return;
 	}
@@ -1312,7 +1312,7 @@ void LocationParser_ns::parseZone(ZoneList &list, char *name) {
 	ZonePtr z(new Zone);
 	_zoneProg++;
 
-	strncpy(z->_name, name, ZONENAME_LENGTH);
+	Common::strlcpy(z->_name, name, ZONENAME_LENGTH);
 
 	ctxt.z = z;
 

@@ -27,6 +27,7 @@
 #include "common/rect.h"
 #include "common/textconsole.h"
 #include "common/translation.h"
+#include "gui/EventRecorder.h"
 
 #include "backends/keymapper/keymapper.h"
 
@@ -112,18 +113,18 @@ void GuiManager::initKeymap() {
 	Action *act;
 	Keymap *guiMap = new Keymap(kGuiKeymapName);
 
-	act = new Action(guiMap, "CLOS", _("Close"), kQuitActionType);
+	act = new Action(guiMap, "CLOS", _("Close"));
 	act->addKeyEvent(KeyState(KEYCODE_ESCAPE, ASCII_ESCAPE, 0));
 
-	act = new Action(guiMap, "CLIK", _("Mouse click"), kLeftClickActionType);
+	act = new Action(guiMap, "CLIK", _("Mouse click"));
 	act->addLeftClickEvent();
 
 #ifdef ENABLE_VKEYBD
-	act = new Action(guiMap, "VIRT", _("Display keyboard"), kVirtualKeyboardActionType);
+	act = new Action(guiMap, "VIRT", _("Display keyboard"));
 	act->addEvent(EVENT_VIRTUAL_KEYBOARD);
 #endif
 
-	act = new Action(guiMap, "REMP", _("Remap keys"), kKeyRemapActionType);
+	act = new Action(guiMap, "REMP", _("Remap keys"));
 	act->addEvent(EVENT_KEYMAPPER_REMAP);
 
 	act = new Action(guiMap, "FULS", _("Toggle FullScreen"));
@@ -188,7 +189,7 @@ bool GuiManager::loadNewTheme(Common::String id, ThemeEngine::GraphicsMode gfx, 
 	}
 
 	// refresh all dialogs
-	for (int i = 0; i < _dialogStack.size(); ++i)
+	for (DialogStack::size_type i = 0; i < _dialogStack.size(); ++i)
 		_dialogStack[i]->reflowLayout();
 
 	// We need to redraw immediately. Otherwise
@@ -202,7 +203,6 @@ bool GuiManager::loadNewTheme(Common::String id, ThemeEngine::GraphicsMode gfx, 
 }
 
 void GuiManager::redraw() {
-	int i;
 	ThemeEngine::ShadingStyle shading;
 
 	if (_redrawStatus == kRedrawDisabled || _dialogStack.empty())
@@ -223,7 +223,7 @@ void GuiManager::redraw() {
 			_theme->clearAll();
 			_theme->openDialog(true, ThemeEngine::kShadingNone);
 
-			for (i = 0; i < _dialogStack.size() - 1; i++)
+			for (DialogStack::size_type i = 0; i < _dialogStack.size() - 1; i++)
 				_dialogStack[i]->drawDialog();
 
 			_theme->finishBuffering();
@@ -254,11 +254,14 @@ Dialog *GuiManager::getTopDialog() const {
 void GuiManager::runLoop() {
 	Dialog * const activeDialog = getTopDialog();
 	bool didSaveState = false;
-	int button;
-	uint32 time;
 
 	if (activeDialog == 0)
 		return;
+
+#ifdef ENABLE_EVENTRECORDER
+	// Suspend recording while GUI is shown
+	g_eventRec.suspendRecording();
+#endif
 
 	if (!_stateIsSaved) {
 		saveState();
@@ -297,15 +300,28 @@ void GuiManager::runLoop() {
 //		_theme->updateScreen();
 //		_system->updateScreen();
 
-		if (lastRedraw + waitTime < _system->getMillis()) {
+		if (lastRedraw + waitTime < _system->getMillis(true)) {
 			_theme->updateScreen();
 			_system->updateScreen();
-			lastRedraw = _system->getMillis();
+			lastRedraw = _system->getMillis(true);
 		}
 
 		Common::Event event;
 
 		while (eventMan->pollEvent(event)) {
+			// We will need to check whether the screen changed while polling
+			// for an event here. While we do send EVENT_SCREEN_CHANGED
+			// whenever this happens we still cannot be sure that we get such
+			// an event immediately. For example, we might have an mouse move
+			// event queued before an screen changed event. In some rare cases
+			// this would make the GUI redraw (with the code a few lines
+			// below) when it is not yet updated for new overlay dimensions.
+			// As a result ScummVM would crash because it tries to copy data
+			// outside the actual overlay screen.
+			if (event.type != Common::EVENT_SCREEN_CHANGED) {
+				checkScreenChange();
+			}
+
 			// The top dialog can change during the event loop. In that case, flush all the
 			// dialog-related events since they were probably generated while the old dialog
 			// was still visible, and therefore not intended for the new one.
@@ -315,71 +331,23 @@ void GuiManager::runLoop() {
 			if (activeDialog != getTopDialog() && event.type != Common::EVENT_SCREEN_CHANGED)
 				continue;
 
-			Common::Point mouse(event.mouse.x - activeDialog->_x, event.mouse.y - activeDialog->_y);
+			processEvent(event, activeDialog);
 
-			switch (event.type) {
-			case Common::EVENT_KEYDOWN:
-				activeDialog->handleKeyDown(event.kbd);
-				break;
-			case Common::EVENT_KEYUP:
-				activeDialog->handleKeyUp(event.kbd);
-				break;
-			case Common::EVENT_MOUSEMOVE:
-				activeDialog->handleMouseMoved(mouse.x, mouse.y, 0);
-
-				if (mouse.x != _lastMousePosition.x || mouse.y != _lastMousePosition.y) {
-					_lastMousePosition.x = mouse.x;
-					_lastMousePosition.y = mouse.y;
-					_lastMousePosition.time = _system->getMillis();
-				}
-
+			if (event.type == Common::EVENT_MOUSEMOVE) {
 				tooltipCheck = true;
-				break;
-			// We don't distinguish between mousebuttons (for now at least)
-			case Common::EVENT_LBUTTONDOWN:
-			case Common::EVENT_RBUTTONDOWN:
-				button = (event.type == Common::EVENT_LBUTTONDOWN ? 1 : 2);
-				time = _system->getMillis();
-				if (_lastClick.count && (time < _lastClick.time + kDoubleClickDelay)
-							&& ABS(_lastClick.x - event.mouse.x) < 3
-							&& ABS(_lastClick.y - event.mouse.y) < 3) {
-					_lastClick.count++;
-				} else {
-					_lastClick.x = event.mouse.x;
-					_lastClick.y = event.mouse.y;
-					_lastClick.count = 1;
-				}
-				_lastClick.time = time;
-				activeDialog->handleMouseDown(mouse.x, mouse.y, button, _lastClick.count);
-				break;
-			case Common::EVENT_LBUTTONUP:
-			case Common::EVENT_RBUTTONUP:
-				button = (event.type == Common::EVENT_LBUTTONUP ? 1 : 2);
-				activeDialog->handleMouseUp(mouse.x, mouse.y, button, _lastClick.count);
-				break;
-			case Common::EVENT_WHEELUP:
-				activeDialog->handleMouseWheel(mouse.x, mouse.y, -1);
-				break;
-			case Common::EVENT_WHEELDOWN:
-				activeDialog->handleMouseWheel(mouse.x, mouse.y, 1);
-				break;
-			case Common::EVENT_SCREEN_CHANGED:
-				screenChange();
-				break;
-			default:
-				break;
 			}
 
-			if (lastRedraw + waitTime < _system->getMillis()) {
+
+			if (lastRedraw + waitTime < _system->getMillis(true)) {
 				_theme->updateScreen();
 				_system->updateScreen();
-				lastRedraw = _system->getMillis();
+				lastRedraw = _system->getMillis(true);
 			}
 		}
 
-		if (tooltipCheck && _lastMousePosition.time + kTooltipDelay < _system->getMillis()) {
+		if (tooltipCheck && _lastMousePosition.time + kTooltipDelay < _system->getMillis(true)) {
 			Widget *wdg = activeDialog->findWidget(_lastMousePosition.x, _lastMousePosition.y);
-			if (wdg && wdg->getTooltip()) {
+			if (wdg && wdg->hasTooltip() && !(wdg->getFlags() & WIDGET_PRESSED)) {
 				Tooltip *tooltip = new Tooltip();
 				tooltip->setup(activeDialog, wdg, _lastMousePosition.x, _lastMousePosition.y);
 				tooltip->runModal();
@@ -407,6 +375,11 @@ void GuiManager::runLoop() {
 		restoreState();
 		_useStdCursor = false;
 	}
+
+#ifdef ENABLE_EVENTRECORDER
+	// Resume recording once GUI is shown
+	g_eventRec.resumeRecording();
+#endif
 }
 
 #pragma mark -
@@ -439,6 +412,11 @@ void GuiManager::restoreState() {
 }
 
 void GuiManager::openDialog(Dialog *dialog) {
+	dialog->receivedFocus();
+
+	if (!_dialogStack.empty())
+		getTopDialog()->lostFocus();
+
 	_dialogStack.push(dialog);
 	if (_redrawStatus != kRedrawFull)
 		_redrawStatus = kRedrawOpenDialog;
@@ -456,7 +434,11 @@ void GuiManager::closeTopDialog() {
 		return;
 
 	// Remove the dialog from the stack
-	_dialogStack.pop();
+	_dialogStack.pop()->lostFocus();
+
+	if (!_dialogStack.empty())
+		getTopDialog()->receivedFocus();
+
 	if (_redrawStatus != kRedrawFull)
 		_redrawStatus = kRedrawCloseDialog;
 
@@ -481,7 +463,7 @@ void GuiManager::setupCursor() {
 // very much. We could plug in a different cursor here if we like to.
 
 void GuiManager::animateCursor() {
-	int time = _system->getMillis();
+	int time = _system->getMillis(true);
 	if (time > _cursorAnimateTimer + kCursorAnimateDelay) {
 		for (int i = 0; i < 15; i++) {
 			if ((i < 6) || (i > 8)) {
@@ -515,7 +497,7 @@ void GuiManager::screenChange() {
 	_theme->refresh();
 
 	// refresh all dialogs
-	for (int i = 0; i < _dialogStack.size(); ++i) {
+	for (DialogStack::size_type i = 0; i < _dialogStack.size(); ++i) {
 		_dialogStack[i]->reflowLayout();
 	}
 	// We need to redraw immediately. Otherwise
@@ -524,6 +506,66 @@ void GuiManager::screenChange() {
 	_redrawStatus = kRedrawFull;
 	redraw();
 	_system->updateScreen();
+}
+
+void GuiManager::processEvent(const Common::Event &event, Dialog *const activeDialog) {
+	int button;
+	uint32 time;
+	Common::Point mouse(event.mouse.x - activeDialog->_x, event.mouse.y - activeDialog->_y);
+	switch (event.type) {
+	case Common::EVENT_KEYDOWN:
+		activeDialog->handleKeyDown(event.kbd);
+		break;
+	case Common::EVENT_KEYUP:
+		activeDialog->handleKeyUp(event.kbd);
+		break;
+	case Common::EVENT_MOUSEMOVE:
+		activeDialog->handleMouseMoved(mouse.x, mouse.y, 0);
+
+		if (mouse.x != _lastMousePosition.x || mouse.y != _lastMousePosition.y) {
+			_lastMousePosition.x = mouse.x;
+			_lastMousePosition.y = mouse.y;
+			_lastMousePosition.time = _system->getMillis(true);
+		}
+
+		break;
+		// We don't distinguish between mousebuttons (for now at least)
+	case Common::EVENT_LBUTTONDOWN:
+	case Common::EVENT_RBUTTONDOWN:
+		button = (event.type == Common::EVENT_LBUTTONDOWN ? 1 : 2);
+		time = _system->getMillis(true);
+		if (_lastClick.count && (time < _lastClick.time + kDoubleClickDelay)
+			&& ABS(_lastClick.x - event.mouse.x) < 3
+			&& ABS(_lastClick.y - event.mouse.y) < 3) {
+				_lastClick.count++;
+		} else {
+			_lastClick.x = event.mouse.x;
+			_lastClick.y = event.mouse.y;
+			_lastClick.count = 1;
+		}
+		_lastClick.time = time;
+		activeDialog->handleMouseDown(mouse.x, mouse.y, button, _lastClick.count);
+		break;
+	case Common::EVENT_LBUTTONUP:
+	case Common::EVENT_RBUTTONUP:
+		button = (event.type == Common::EVENT_LBUTTONUP ? 1 : 2);
+		activeDialog->handleMouseUp(mouse.x, mouse.y, button, _lastClick.count);
+		break;
+	case Common::EVENT_WHEELUP:
+		activeDialog->handleMouseWheel(mouse.x, mouse.y, -1);
+		break;
+	case Common::EVENT_WHEELDOWN:
+		activeDialog->handleMouseWheel(mouse.x, mouse.y, 1);
+		break;
+	case Common::EVENT_SCREEN_CHANGED:
+		screenChange();
+		break;
+	default:
+	#ifdef ENABLE_KEYMAPPER
+		activeDialog->handleOtherEvent(event);
+	#endif
+		break;
+	}
 }
 
 } // End of namespace GUI

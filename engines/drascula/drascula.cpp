@@ -87,13 +87,93 @@ DrasculaEngine::DrasculaEngine(OSystem *syst, const DrasculaGameDescription *gam
 	_textmisc = 0;
 	_textd1 = 0;
 	_talkSequences = 0;
+	_currentSaveSlot = 0;
+
+	bjX = 0;
+	bjY = 0;
+	trackBJ = 0;
+    framesWithoutAction = 0;
+	term_int = 0;
+	currentChapter = 0;
+	_loadedDifferentChapter = 0;
+	musicStopped = 0;
+	FrameSSN = 0;
+	globalSpeed = 0;
+	LastFrame = 0;
+	flag_tv = 0;
+	_charMapSize = 0;
+	_itemLocationsSize = 0;
+	_polXSize = 0;
+	_verbBarXSize = 0;
+	_x1dMenuSize = 0;
+	_frameXSize = 0;
+	_candleXSize = 0;
+	_pianistXSize = 0;
+	_drunkXSize = 0;
+	_roomPreUpdatesSize = 0;
+	_roomUpdatesSize = 0;
+	_roomActionsSize = 0;
+	_talkSequencesSize = 0;
+	_numLangs = 0;
+	feetHeight = 0;
+	floorX1 = 0;
+	floorY1 = 0;
+	floorX2 = 0;
+	floorY2 = 0;
+	lowerLimit = 0;
+	upperLimit = 0;
+	trackFinal = 0;
+	walkToObject = 0;
+	objExit = 0;
+	_startTime = 0;
+	hasAnswer = 0;
+	savedTime = 0;
+	breakOut = 0;
+	vonBraunX = 0;
+	trackVonBraun = 0;
+	vonBraunHasMoved = 0;
+	newHeight = 0;
+	newWidth = 0;
+	color_solo = 0;
+	igorX = 0;
+	igorY = 0;
+	trackIgor = 0;
+	drasculaX = 0;
+	drasculaY = 0;
+	trackDrascula = 0;
+	_roomNumber = 0;
+	numRoomObjs = 0;
+	takeObject = 0;
+	pickedObject = 0;
+	_subtitlesDisabled = 0;
+	_menuBar = 0;
+	_menuScreen = 0;
+	_hasName = 0;
+	curExcuseLook = 0;
+	curExcuseAction = 0;
+	frame_y = 0;
+	curX = 0;
+	curY = 0;
+	characterMoved = 0;
+	curDirection = 0;
+	trackProtagonist = 0;
+	_characterFrame = 0;
+	hare_se_ve = 0;
+	roomX = 0;
+	roomY = 0;
+	checkFlags = 0;
+	doBreak = 0;
+	stepX = 0;
+	stepY = 0;
+	curHeight = 0;
+	curWidth = 0;
 
 	_color = 0;
 	blinking = 0;
-	mouseX = 0;
-	mouseY = 0;
-	leftMouseButton = 0;
-	rightMouseButton = 0;
+	_mouseX = 0;
+	_mouseY = 0;
+	_leftMouseButton = 0;
+	_rightMouseButton = 0;
 	*textName = 0;
 
 	_rnd = new Common::RandomSource("drascula");
@@ -187,6 +267,8 @@ Common::Error DrasculaEngine::run() {
 	if (!loadDrasculaDat())
 		return Common::kUnknownError;
 
+	checkForOldSaveGames();
+
 	setupRoomsTable();
 	loadArchives();
 
@@ -194,7 +276,14 @@ Common::Error DrasculaEngine::run() {
 	syncSoundSettings();
 
 	currentChapter = 1; // values from 1 to 6 will start each part of game
-	loadedDifferentChapter = 0;
+	_loadedDifferentChapter = false;
+	setTotalPlayTime(0);
+
+	// Check if a save is loaded from the launcher
+	int directSaveSlotLoading = ConfMan.getInt("save_slot");
+	if (directSaveSlotLoading >= 0) {
+		loadGame(directSaveSlotLoading);
+	}
 
 	checkCD();
 
@@ -208,7 +297,7 @@ Common::Error DrasculaEngine::run() {
 		curX = -1;
 		characterMoved = 0;
 		trackProtagonist = 3;
-		num_frame = 0;
+		_characterFrame = 0;
 		hare_se_ve = 1;
 		checkFlags = 1;
 		doBreak = 0;
@@ -221,9 +310,6 @@ Common::Error DrasculaEngine::run() {
 		curWidth = CHARACTER_WIDTH;
 		feetHeight = FEET_HEIGHT;
 
-		talkHeight = TALK_HEIGHT;
-		talkWidth = TALK_WIDTH;
-
 		hasAnswer = 0;
 		savedTime = 0;
 		breakOut = 0;
@@ -233,11 +319,10 @@ Common::Error DrasculaEngine::run() {
 		framesWithoutAction = 0;
 		term_int = 0;
 		musicStopped = 0;
-		selectionMade = 0;
 		globalSpeed = 0;
 		curExcuseLook = 0;
 		curExcuseAction = 0;
-		roomNumber = 0;
+		_roomNumber = 0;
 
 		for (i = 0; i < 8; i++)
 			actorFrames[i] = 0;
@@ -246,7 +331,6 @@ Common::Error DrasculaEngine::run() {
 		allocMemory();
 
 		_subtitlesDisabled = !ConfMan.getBool("subtitles");
-		selectionMade = 0;
 
 		if (currentChapter != 3)
 			loadPic(96, frontSurface, COMPLETE_PAL);
@@ -260,8 +344,8 @@ Common::Error DrasculaEngine::run() {
 			loadPic("aux13.alg", bgSurface, COMPLETE_PAL);
 			loadPic(96, frontSurface);
 		} else if (currentChapter == 4) {
-			if (loadedDifferentChapter == 0)
-				animation_ray();
+			if (!_loadedDifferentChapter)
+				animation_castle();
 			loadPic(96, frontSurface);
 			clearRoom();
 		} else if (currentChapter == 5) {
@@ -292,9 +376,10 @@ Common::Error DrasculaEngine::run() {
 		memset(iconName, 0, sizeof(iconName));
 
 		for (i = 0; i < 6; i++)
-			strcpy(iconName[i + 1], _textverbs[i]);
+			Common::strlcpy(iconName[i + 1], _textverbs[i], 13);
 
 		assignPalette(defaultPalette);
+
 		if (!runCurrentChapter()) {
 			endChapter();
 			break;
@@ -321,7 +406,7 @@ void DrasculaEngine::endChapter() {
 bool DrasculaEngine::runCurrentChapter() {
 	int n;
 
-	rightMouseButton = 0;
+	_rightMouseButton = 0;
 
 	previousMusic = -1;
 
@@ -351,15 +436,15 @@ bool DrasculaEngine::runCurrentChapter() {
 	if (currentChapter == 1) {
 		pickObject(28);
 
-		if (loadedDifferentChapter == 0)
+		if (!_loadedDifferentChapter)
 			animation_1_1();
 
 		selectVerb(kVerbNone);
 		loadPic("2aux62.alg", drawSurface2);
 		trackProtagonist = 1;
 		objExit = 104;
-		if (loadedDifferentChapter != 0) {
-			if (!loadGame(saveName)) {
+		if (_loadedDifferentChapter) {
+			if (!loadGame(_currentSaveSlot)) {
 				return true;
 			}
 		} else {
@@ -368,14 +453,16 @@ bool DrasculaEngine::runCurrentChapter() {
 			curY = 56;
 			gotoObject(65, 145);
 		}
+
+		// REMINDER: This is a good place to debug animations
 	} else if (currentChapter == 2) {
 		addObject(kItemPhone);
 		trackProtagonist = 3;
 		objExit = 162;
-		if (loadedDifferentChapter == 0)
+		if (!_loadedDifferentChapter)
 			enterRoom(14);
 		else {
-			if (!loadGame(saveName)) {
+			if (!loadGame(_currentSaveSlot)) {
 				return true;
 			}
 		}
@@ -390,10 +477,10 @@ bool DrasculaEngine::runCurrentChapter() {
 		flags[1] = 1;
 		trackProtagonist = 1;
 		objExit = 99;
-		if (loadedDifferentChapter == 0)
+		if (!_loadedDifferentChapter)
 			enterRoom(20);
 		else {
-			if (!loadGame(saveName)) {
+			if (!loadGame(_currentSaveSlot)) {
 				return true;
 			}
 		}
@@ -404,13 +491,13 @@ bool DrasculaEngine::runCurrentChapter() {
 		addObject(kItemReefer2);
 		addObject(kItemOneCoin2);
 		objExit = 100;
-		if (loadedDifferentChapter == 0) {
+		if (!_loadedDifferentChapter) {
 			enterRoom(21);
 			trackProtagonist = 0;
 			curX = 235;
 			curY = 164;
 		} else {
-			if (!loadGame(saveName)) {
+			if (!loadGame(_currentSaveSlot)) {
 				return true;
 			}
 		}
@@ -426,10 +513,10 @@ bool DrasculaEngine::runCurrentChapter() {
 		addObject(20);
 		trackProtagonist = 1;
 		objExit = 100;
-		if (loadedDifferentChapter == 0) {
+		if (!_loadedDifferentChapter) {
 			enterRoom(45);
 		} else {
-			if (!loadGame(saveName)) {
+			if (!loadGame(_currentSaveSlot)) {
 				return true;
 			}
 		}
@@ -439,11 +526,11 @@ bool DrasculaEngine::runCurrentChapter() {
 
 		trackProtagonist = 1;
 		objExit = 104;
-		if (loadedDifferentChapter == 0) {
+		if (!_loadedDifferentChapter) {
 			enterRoom(58);
 			animation_1_6();
 		} else {
-			if (!loadGame(saveName)) {
+			if (!loadGame(_currentSaveSlot)) {
 				return true;
 			}
 			loadPic("auxdr.alg", drawSurface2);
@@ -469,13 +556,13 @@ bool DrasculaEngine::runCurrentChapter() {
 			// lead to an incorrect setting of the protagonist's tracking flag (above). This
 			// made the character start walking off screen, as his actual position was
 			// different than the displayed one
-			if (roomNumber == 3 && (curX == 279) && (curY + curHeight == 101)) {
+			if (_roomNumber == 3 && (curX == 279) && (curY + curHeight == 101)) {
 				gotoObject(178, 121);
 				gotoObject(169, 135);
-			} else if (roomNumber == 14 && (curX == 214) && (curY + curHeight == 121)) {
+			} else if (_roomNumber == 14 && (curX == 214) && (curY + curHeight == 121)) {
 				walkToObject = 1;
 				gotoObject(190, 130);
-			} else if (roomNumber == 14 && (curX == 246) && (curY + curHeight == 112)) {
+			} else if (_roomNumber == 14 && (curX == 246) && (curY + curHeight == 112)) {
 				walkToObject = 1;
 				gotoObject(190, 130);
 			}
@@ -507,12 +594,12 @@ bool DrasculaEngine::runCurrentChapter() {
 			checkObjects();
 
 #ifdef _WIN32_WCE
-		if (rightMouseButton) {
+		if (_rightMouseButton) {
 			if (_menuScreen) {
 #else
-		if (rightMouseButton == 1 && _menuScreen) {
+		if (_rightMouseButton == 1 && _menuScreen) {
 #endif
-			rightMouseButton = 0;
+			_rightMouseButton = 0;
 			delay(100);
 			if (currentChapter == 2) {
 				loadPic(menuBackground, cursorSurface);
@@ -538,10 +625,10 @@ bool DrasculaEngine::runCurrentChapter() {
 		// Do not show the inventory screen in chapter 5, if the right mouse button is clicked
 		// while the plug (object 16) is held
 		// Fixes bug #2059621 - "DRASCULA: Plug bug"
-		if (rightMouseButton == 1 && !_menuScreen &&
+		if (_rightMouseButton == 1 && !_menuScreen &&
 			!(currentChapter == 5 && pickedObject == 16)) {
 #endif
-			rightMouseButton = 0;
+			_rightMouseButton = 0;
 			delay(100);
 			characterMoved = 0;
 			if (trackProtagonist == 2)
@@ -569,19 +656,19 @@ bool DrasculaEngine::runCurrentChapter() {
 		}
 #endif
 
-		if (leftMouseButton == 1 && _menuBar) {
+		if (_leftMouseButton == 1 && _menuBar) {
 			delay(100);
 			selectVerbFromBar();
-		} else if (leftMouseButton == 1 && takeObject == 0) {
+		} else if (_leftMouseButton == 1 && takeObject == 0) {
 			delay(100);
 			if (verify1())
 				return true;
-		} else if (leftMouseButton == 1 && takeObject == 1) {
+		} else if (_leftMouseButton == 1 && takeObject == 1) {
 			if (verify2())
 				return true;
 		}
 
-		_menuBar = (mouseY < 24 && !_menuScreen) ? true : false;
+		_menuBar = (_mouseY < 24 && !_menuScreen) ? true : false;
 
 		Common::KeyCode key = getScan();
 		if (key == Common::KEYCODE_F1 && !_menuScreen) {
@@ -596,13 +683,23 @@ bool DrasculaEngine::runCurrentChapter() {
 			selectVerb(kVerbTalk);
 		} else if (key == Common::KEYCODE_F6 && !_menuScreen) {
 			selectVerb(kVerbMove);
-		} else if (key == Common::KEYCODE_F9) {
-			volumeControls();
-		} else if (key == Common::KEYCODE_F10) {
-			if (!saveLoadScreen())
+		} else if (key == Common::KEYCODE_F7) {
+			// ScummVM load screen
+			if (!scummVMSaveLoadDialog(false))
 				return true;
 		} else if (key == Common::KEYCODE_F8) {
 			selectVerb(kVerbNone);
+		} else if (key == Common::KEYCODE_F9) {
+			volumeControls();
+		} else if (key == Common::KEYCODE_F10) {
+			if (!ConfMan.getBool("originalsaveload")) {
+				// ScummVM save screen
+				scummVMSaveLoadDialog(true);
+			} else {
+				// Original save/load screen
+				if (!saveLoadScreen())
+					return true;
+			}
 		} else if (key == Common::KEYCODE_v) {
 			_subtitlesDisabled = true;
 			ConfMan.setBool("subtitles", !_subtitlesDisabled);
@@ -623,22 +720,19 @@ bool DrasculaEngine::runCurrentChapter() {
 		} else if (key == Common::KEYCODE_TILDE || key == Common::KEYCODE_BACKQUOTE) {
 			_console->attach();
 			_console->onFrame();
-		} else if (currentChapter == 6 && key == Common::KEYCODE_0 && roomNumber == 61) {
+		} else if (currentChapter == 6 && key == Common::KEYCODE_0 && _roomNumber == 61) {
 			loadPic("alcbar.alg", bgSurface, 255);
 		}
 
-		if (leftMouseButton != 0 || rightMouseButton != 0 || key != 0)
-			if (currentChapter != 3)
-				framesWithoutAction = 0;
+		if (_leftMouseButton != 0 || _rightMouseButton != 0 || key != 0)
+			framesWithoutAction = 0;
 
 		if (framesWithoutAction == 15000) {
 			screenSaver();
-			if (currentChapter != 3)
-				framesWithoutAction = 0;
+			framesWithoutAction = 0;
 		}
 
-		if (currentChapter != 3)
-			framesWithoutAction++;
+		framesWithoutAction++;
 	}
 
 	return false;
@@ -652,8 +746,8 @@ bool DrasculaEngine::verify1() {
 		removeObject();
 	else {
 		for (l = 0; l < numRoomObjs; l++) {
-			if (mouseX >= x1[l] && mouseY >= y1[l]
-					&& mouseX <= x2[l] && mouseY <= y2[l] && doBreak == 0) {
+			if (_mouseX >= _objectX1[l] && _mouseY >= _objectY1[l]
+					&& _mouseX <= _objectX2[l] && _mouseY <= _objectY2[l] && doBreak == 0) {
 				if (exitRoom(l))
 					return true;
 				if (doBreak == 1)
@@ -661,13 +755,13 @@ bool DrasculaEngine::verify1() {
 			}
 		}
 
-		if (mouseX > curX && mouseY > curY
-				&& mouseX < curX + curWidth && mouseY < curY + curHeight)
+		if (_mouseX > curX && _mouseY > curY
+				&& _mouseX < curX + curWidth && _mouseY < curY + curHeight)
 			doBreak = 1;
 
 		for (l = 0; l < numRoomObjs; l++) {
-			if (mouseX > x1[l] && mouseY > y1[l]
-					&& mouseX < x2[l] && mouseY < y2[l] && doBreak == 0) {
+			if (_mouseX > _objectX1[l] && _mouseY > _objectY1[l]
+					&& _mouseX < _objectX2[l] && _mouseY < _objectY2[l] && doBreak == 0) {
 				roomX = roomObjX[l];
 				roomY = roomObjY[l];
 				trackFinal = trackObj[l];
@@ -678,8 +772,8 @@ bool DrasculaEngine::verify1() {
 		}
 
 		if (doBreak == 0) {
-			roomX = CLIP(mouseX, floorX1, floorX2);
-			roomY = CLIP(mouseY, floorY1 + feetHeight, floorY2);
+			roomX = CLIP(_mouseX, floorX1, floorX2);
+			roomY = CLIP(_mouseY, floorY1 + feetHeight, floorY2);
 			startWalking();
 		}
 		doBreak = 0;
@@ -700,8 +794,8 @@ bool DrasculaEngine::verify2() {
 				return true;
 		} else {
 			for (l = 0; l < numRoomObjs; l++) {
-				if (mouseX > x1[l] && mouseY > y1[l]
-						&& mouseX < x2[l] && mouseY < y2[l] && visible[l] == 1) {
+				if (_mouseX > _objectX1[l] && _mouseY > _objectY1[l]
+						&& _mouseX < _objectX2[l] && _mouseY < _objectY2[l] && visible[l] == 1) {
 					trackFinal = trackObj[l];
 					walkToObject = 1;
 					gotoObject(roomObjX[l], roomObjY[l]);
@@ -761,20 +855,20 @@ void DrasculaEngine::updateEvents() {
 		case Common::EVENT_KEYUP:
 			break;
 		case Common::EVENT_MOUSEMOVE:
-			mouseX = event.mouse.x;
-			mouseY = event.mouse.y;
+			_mouseX = event.mouse.x;
+			_mouseY = event.mouse.y;
 			break;
 		case Common::EVENT_LBUTTONDOWN:
-			leftMouseButton = 1;
+			_leftMouseButton = 1;
 			break;
 		case Common::EVENT_LBUTTONUP:
-			leftMouseButton = 0;
+			_leftMouseButton = 0;
 			break;
 		case Common::EVENT_RBUTTONDOWN:
 			// We changed semantic and react only on button up event
 			break;
 		case Common::EVENT_RBUTTONUP:
-			rightMouseButton = 1;
+			_rightMouseButton = 1;
 			break;
 		default:
 			break;

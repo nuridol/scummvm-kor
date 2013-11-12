@@ -31,8 +31,6 @@
 
 #include "common/file.h"
 
-
-
 //using namespace Scumm;
 
 int strncasecmp2(const char *s1, const char *s2, int n)
@@ -342,7 +340,7 @@ namespace Scumm {
             if (i > 0)
                 _KBuffer[i] = _KBuffer[i-1] + strlen(_KBuffer[i-1])+1;
             if (len > 1000)
-                warning("_KBuffer[%d]:%x, len=%d\n", i, (int)_KBuffer[i], len);
+                warning("_KBuffer[%d]:%x, len=%d\n", i, (long)_KBuffer[i], len);
             if(strlen(buf)) {
                 strcpy(_KBuffer[i], buf);
                 char *b = _KBuffer[i];

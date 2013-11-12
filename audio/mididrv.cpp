@@ -22,6 +22,7 @@
 
 #include "common/config-manager.h"
 #include "common/error.h"
+#include "common/gui_options.h"
 #include "common/str.h"
 #include "common/system.h"
 #include "common/textconsole.h"
@@ -59,17 +60,17 @@ static const struct {
 	uint32      type;
 	const char *guio;
 } GUIOMapping[] = {
-	{ MT_PCSPK,		GUIO_MIDIPCSPK, },
-	{ MT_CMS,		GUIO_MIDICMS, },
-	{ MT_PCJR,		GUIO_MIDIPCJR, },
-	{ MT_ADLIB,		GUIO_MIDIADLIB, },
-	{ MT_C64,		GUIO_MIDIC64, },
-	{ MT_AMIGA,	    GUIO_MIDIAMIGA, },
-	{ MT_APPLEIIGS,	GUIO_MIDIAPPLEIIGS, },
-	{ MT_TOWNS,		GUIO_MIDITOWNS, },
-	{ MT_PC98,		GUIO_MIDIPC98, },
-	{ MT_GM,		GUIO_MIDIGM, },
-	{ MT_MT32,		GUIO_MIDIMT32, },
+	{ MT_PCSPK,		GUIO_MIDIPCSPK },
+	{ MT_CMS,		GUIO_MIDICMS },
+	{ MT_PCJR,		GUIO_MIDIPCJR },
+	{ MT_ADLIB,		GUIO_MIDIADLIB },
+	{ MT_C64,		GUIO_MIDIC64 },
+	{ MT_AMIGA,	    GUIO_MIDIAMIGA },
+	{ MT_APPLEIIGS,	GUIO_MIDIAPPLEIIGS },
+	{ MT_TOWNS,		GUIO_MIDITOWNS },
+	{ MT_PC98,		GUIO_MIDIPC98 },
+	{ MT_GM,		GUIO_MIDIGM },
+	{ MT_MT32,		GUIO_MIDIMT32 },
 	{ 0,			0 },
 };
 
@@ -239,7 +240,7 @@ MidiDriver::DeviceHandle MidiDriver::detectDevice(int flags) {
 				devStr = ConfMan.hasKey("gm_device") ? ConfMan.get("gm_device") : Common::String("null");
 			else
 				devStr = "auto";
-			
+
 			// Default to Null device here, since we also register a default null setting for
 			// the MT32 or GM device in the config manager.
 			hdl = getDeviceHandle(devStr.empty() ? Common::String("null") : devStr);

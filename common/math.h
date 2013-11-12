@@ -52,14 +52,6 @@
 #endif
 #endif
 
-#ifndef M_SQRT1_2
-	#define M_SQRT1_2 0.70710678118654752440 /* 1/sqrt(2) */
-#endif
-
-#ifndef M_PI
-	#define M_PI 3.14159265358979323846
-#endif
-
 #ifndef FLT_MIN
 	#define FLT_MIN 1E-37
 #endif
@@ -75,7 +67,7 @@ struct Complex {
 	float re, im;
 };
 
-#if defined(__GNUC__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4))
+#if GCC_ATLEAST(3, 4)
 inline int intLog2(uint32 v) {
 	// This is a slightly optimized implementation of log2 for natural numbers
 	// targeting gcc. It also saves some binary size over our fallback

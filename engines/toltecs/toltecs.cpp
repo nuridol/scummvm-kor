@@ -39,6 +39,7 @@
 
 #include "toltecs/toltecs.h"
 #include "toltecs/animation.h"
+#include "toltecs/console.h"
 #include "toltecs/menu.h"
 #include "toltecs/movie.h"
 #include "toltecs/music.h"
@@ -62,10 +63,8 @@ struct GameSettings {
 };
 
 ToltecsEngine::ToltecsEngine(OSystem *syst, const ToltecsGameDescription *gameDesc) : Engine(syst), _gameDescription(gameDesc) {
-
-	// Setup mixer
-	_mixer->setVolumeForSoundType(Audio::Mixer::kSFXSoundType, ConfMan.getInt("sfx_volume"));
-	_mixer->setVolumeForSoundType(Audio::Mixer::kMusicSoundType, ConfMan.getInt("music_volume"));
+	// Assign default values to the config manager, in case settings are missing
+	ConfMan.registerDefault("originalsaveload", "false");
 
 	_rnd = new Common::RandomSource("toltecs");
 }
@@ -85,7 +84,7 @@ Common::Error ToltecsEngine::run() {
 	_flag01 = 0;
 
 	_saveLoadRequested = 0;
-		
+
 	_cameraX = 0;
 	_cameraY = 0;
 	_newCameraX = 0;
@@ -96,7 +95,7 @@ Common::Error ToltecsEngine::run() {
 
 	_sceneWidth = 0;
 	_sceneHeight = 0;
-	
+
 	_doSpeech = true;
 	_doText = true;
 
@@ -126,24 +125,34 @@ Common::Error ToltecsEngine::run() {
 	_moviePlayer = new MoviePlayer(this);
 	_music = new Music(_arc);
 	_menuSystem = new MenuSystem(this);
-	
-	_sound = new Sound(this);
 
+	_sound = new Sound(this);
+	_console = new Console(this);
+
+	_cfgText = ConfMan.getBool("subtitles");
+	_cfgVoices = !ConfMan.getBool("speech_mute");
+
+	bool mute = false;
+	if (ConfMan.hasKey("mute"))
+		mute = ConfMan.getBool("mute");
+
+	_mixer->setVolumeForSoundType(Audio::Mixer::kSpeechSoundType, mute ? 0 : ConfMan.getInt("speech_volume"));
+	_mixer->setVolumeForSoundType(Audio::Mixer::kMusicSoundType,  mute ? 0 : ConfMan.getInt("music_volume"));
+	_mixer->setVolumeForSoundType(Audio::Mixer::kSFXSoundType,    mute ? 0 : ConfMan.getInt("sfx_volume"));
 	syncSoundSettings();
 
 	CursorMan.showMouse(true);
 
 	setupSysStrings();
 
-//#define TEST_MENU
-#ifdef TEST_MENU
+#if 0
+	// Menu test
 	_screen->registerFont(0, 0x0D);
 	_screen->registerFont(1, 0x0E);
 	_screen->loadMouseCursor(12);
 	_palette->loadAddPalette(9, 224);
 	_palette->setDeltaPalette(_palette->getMainPalette(), 7, 0, 31, 224);
 	_screen->finishTalkTextItems();
-	_screen->clearSprites();
 	_menuSystem->run();
 	/*
 	while (1) {
@@ -171,6 +180,7 @@ Common::Error ToltecsEngine::run() {
 	_music->stopSequence();
 	_sound->stopAll();
 
+	delete _console;
 	delete _arc;
 	delete _res;
 	delete _screen;
@@ -181,7 +191,7 @@ Common::Error ToltecsEngine::run() {
 	delete _music;
 	delete _moviePlayer;
 	delete _menuSystem;
-	
+
 	delete _sound;
 
 	return Common::kNoError;
@@ -210,7 +220,6 @@ void ToltecsEngine::requestLoadgame(int slotNum) {
 }
 
 void ToltecsEngine::loadScene(uint resIndex) {
-
 	Resource *sceneResource = _res->load(resIndex);
 	byte *scene = sceneResource->data;
 
@@ -245,13 +254,10 @@ void ToltecsEngine::loadScene(uint resIndex) {
 
 	_screen->_fullRefresh = true;
 	_screen->_renderQueue->clear();
-	
 }
 
 void ToltecsEngine::updateScreen() {
-
 	_sound->updateSpeech();
-
 	_screen->updateShakeScreen();
 
 	// TODO: Set quit flag
@@ -273,7 +279,6 @@ void ToltecsEngine::updateScreen() {
 		_flag01 = 1;
 		_counter02 = 1;
 	} else {
-		_screen->clearSprites();
 		_flag01 = 0;
 	}
 
@@ -284,7 +289,6 @@ void ToltecsEngine::updateScreen() {
 		_counter02 = (currUpdateTime - prevUpdateTime) / 13;
 	} while (_counter02 == 0);
 	prevUpdateTime = currUpdateTime;
-
 }
 
 void ToltecsEngine::drawScreen() {
@@ -300,18 +304,19 @@ void ToltecsEngine::drawScreen() {
 
 	if (_screen->_guiRefresh && _guiHeight > 0 && _cameraHeight > 0) {
 		// Update the GUI when needed and it's visible
-		_system->copyRectToScreen((const byte *)_screen->_frontScreen + _cameraHeight * 640,
+		_system->copyRectToScreen(_screen->_frontScreen + _cameraHeight * 640,
 			640, 0, _cameraHeight, 640, _guiHeight);
 		_screen->_guiRefresh = false;
 	}
 
+	_console->onFrame();
 	_system->updateScreen();
+	_system->delayMillis(10);
 
 	updateCamera();
 }
 
 void ToltecsEngine::updateInput() {
-
 	Common::Event event;
 	Common::EventManager *eventMan = _system->getEventManager();
 	while (eventMan->pollEvent(event)) {
@@ -321,15 +326,17 @@ void ToltecsEngine::updateInput() {
 
 			//debug("key: flags = %02X; keycode = %d", _keyState.flags, _keyState.keycode);
 
-			// FIXME: This is just for debugging
+			if (event.kbd.hasFlags(Common::KBD_CTRL) && event.kbd.keycode == Common::KEYCODE_d)
+				_console->attach();
+
 			switch (event.kbd.keycode) {
+			case Common::KEYCODE_F5:
+				showMenu(kMenuIdSave);
+				break;
 			case Common::KEYCODE_F7:
-				savegame("toltecs.001", "Quicksave");
+				showMenu(kMenuIdLoad);
 				break;
-			case Common::KEYCODE_F9:
-				loadgame("toltecs.001");
-				break;
-			case Common::KEYCODE_ESCAPE:
+			case Common::KEYCODE_SPACE:
 				// Skip current dialog line, if a dialog is active
 				if (_screen->getTalkTextDuration() > 0) {
 					_sound->stopSpeech();
@@ -344,9 +351,6 @@ void ToltecsEngine::updateInput() {
 			break;
 		case Common::EVENT_KEYUP:
 			_keyState.reset();
-			break;
-		case Common::EVENT_QUIT:
-			quitGame();
 			break;
 		case Common::EVENT_MOUSEMOVE:
 			_mouseX = event.mouse.x;
@@ -403,9 +407,7 @@ void ToltecsEngine::updateInput() {
 			_mouseWaitForRelease = false;
 			_mouseButton = 0;
 		}
-
 	}
-
 }
 
 void ToltecsEngine::setGuiHeight(int16 guiHeight) {
@@ -421,8 +423,6 @@ void ToltecsEngine::setGuiHeight(int16 guiHeight) {
 void ToltecsEngine::setCamera(int16 x, int16 y) {
 	_screen->finishTalkTextItems();
 
-	_screen->clearSprites();
-	
 	_cameraX = x;
 	_newCameraX = x;
 
@@ -473,7 +473,6 @@ void ToltecsEngine::scrollCameraRight(int16 delta) {
 }
 
 void ToltecsEngine::updateCamera() {
-
 	if (_cameraX != _newCameraX) {
 		_cameraX = _newCameraX;
 		_screen->_fullRefresh = true;
@@ -487,13 +486,16 @@ void ToltecsEngine::updateCamera() {
 	}
 
 	//debug(0, "ToltecsEngine::updateCamera() _cameraX = %d; _cameraY = %d", _cameraX, _cameraY);
-
 }
 
 void ToltecsEngine::talk(int16 slotIndex, int16 slotOffset) {
-	
 	byte *scanData = _script->getSlotData(slotIndex) + slotOffset;
-	
+
+	// If there's another talk text at the requested slot and it's still
+	// active, don't overwrite it. Fixes bug #3600166.
+	if (_screen->isTalkTextActive(slotIndex))
+		return;
+
 	while (*scanData < 0xF0) {
 		if (*scanData == 0x19) {
 			scanData++;
@@ -506,26 +508,25 @@ void ToltecsEngine::talk(int16 slotIndex, int16 slotOffset) {
 		}
 		scanData++;
 	}
-	
+
 	if (*scanData == 0xFE) {
 		if (_doSpeech) {
 			int16 resIndex = READ_LE_UINT16(scanData + 1);
 			debug(0, "ToltecsEngine::talk() playSound(resIndex: %d)", resIndex);
 			_sound->playSpeech(resIndex);
 		}
+
 		if (_doText) {
-			_screen->updateTalkText(slotIndex, slotOffset);
+			_screen->updateTalkText(slotIndex, slotOffset, false);
 		} else {
 			_screen->keepTalkTextItemsAlive();
 		}
 	} else {
-		_screen->updateTalkText(slotIndex, slotOffset);
+		_screen->updateTalkText(slotIndex, slotOffset, true);
 	}
-
 }
 
 void ToltecsEngine::walk(byte *walkData) {
-
 	int16 xdelta, ydelta, v8, v10, v11;
 	int16 xstep, ystep;
 	ScriptWalk walkInfo;
@@ -540,7 +541,7 @@ void ToltecsEngine::walk(byte *walkData) {
 	walkInfo.xerror = READ_LE_UINT16(walkData + 14);
 	walkInfo.mulValue = READ_LE_UINT16(walkData + 16);
 	walkInfo.scaling = READ_LE_UINT16(walkData + 18);
-	
+
 	walkInfo.scaling = -_segmap->getScalingAtPoint(walkInfo.x, walkInfo.y);
 
 	if (walkInfo.y1 < walkInfo.y2)
@@ -548,7 +549,7 @@ void ToltecsEngine::walk(byte *walkData) {
 	else
 		ystep = 1;
 	ydelta = ABS(walkInfo.y1 - walkInfo.y2) * _walkSpeedY;
-	
+
 	if (walkInfo.x1 < walkInfo.x2)
 		xstep = -1;
 	else
@@ -608,14 +609,13 @@ void ToltecsEngine::walk(byte *walkData) {
 	WRITE_LE_UINT16(walkData + 14, walkInfo.xerror);
 	WRITE_LE_UINT16(walkData + 16, walkInfo.mulValue);
 	WRITE_LE_UINT16(walkData + 18, walkInfo.scaling);
-
 }
 
-int16 ToltecsEngine::findRectAtPoint(byte *rectData, int16 x, int16 y, int16 index, int16 itemSize, 
+int16 ToltecsEngine::findRectAtPoint(byte *rectData, int16 x, int16 y, int16 index, int16 itemSize,
 	byte *rectDataEnd) {
 
 	rectData += index * itemSize;
-	
+
 	while (rectData < rectDataEnd) {
 		int16 rectY = READ_LE_UINT16(rectData);
 		if (rectY == -10)
@@ -633,9 +633,31 @@ int16 ToltecsEngine::findRectAtPoint(byte *rectData, int16 x, int16 y, int16 ind
 		index++;
 		rectData += itemSize;
 	}
-	
-	return -1;
 
+	return -1;
+}
+
+void ToltecsEngine::showMenu(MenuID menuId) {
+	_screen->loadMouseCursor(12);
+	_palette->loadAddPalette(9, 224);
+	_palette->setDeltaPalette(_palette->getMainPalette(), 7, 0, 31, 224);
+	_screen->finishTalkTextItems();
+	CursorMan.showMouse(true);
+	_menuSystem->run(menuId);
+	_keyState.reset();
+	_script->setSwitchLocalDataNear(true);
+}
+
+void ToltecsEngine::syncSoundSettings() {
+	Engine::syncSoundSettings();
+
+	bool mute = false;
+	if (ConfMan.hasKey("mute"))
+		mute = ConfMan.getBool("mute");
+
+	_cfgVoicesVolume  = (mute ? 0 : ConfMan.getInt("speech_volume")) * 20 / Audio::Mixer::kMaxChannelVolume;
+	_cfgMusicVolume   = (mute ? 0 : ConfMan.getInt("music_volume"))  * 20 / Audio::Mixer::kMaxChannelVolume;
+	_cfgSoundFXVolume = (mute ? 0 : ConfMan.getInt("sfx_volume"))    * 20 / Audio::Mixer::kMaxChannelVolume;
 }
 
 } // End of namespace Toltecs

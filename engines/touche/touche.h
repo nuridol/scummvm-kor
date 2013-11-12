@@ -31,6 +31,7 @@
 #include "common/util.h"
 
 #include "audio/mixer.h"
+#include "audio/audiostream.h"
 
 #include "engines/engine.h"
 
@@ -101,7 +102,7 @@ struct KeyChar {
 	int16 zPosPrev;
 	int16 prevWalkDataNum;
 	uint16 textColor;
-	int16 inventoryItems[4];
+	int16 inventoryItems[5];
 	int16 money;
 	int16 pointsDataNum;
 	int16 currentWalkBox;
@@ -645,6 +646,18 @@ protected:
 	Common::Point getMousePos() const;
 
 	MidiPlayer *_midiPlayer;
+
+	int _musicVolume;
+	Audio::SoundHandle _musicHandle;
+
+	void initMusic();
+public: // To allow access from console
+	void startMusic(int num);
+	void stopMusic();
+protected:
+	int getMusicVolume();
+	void setMusicVolume(int volume);
+	void adjustMusicVolume(int diff);
 
 	Common::Language _language;
 	Common::RandomSource _rnd;

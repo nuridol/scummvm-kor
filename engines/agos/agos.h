@@ -1265,14 +1265,14 @@ protected:
 	virtual void doOutput(const byte *src, uint len);
 	void clsCheck(WindowBlock *window);
 
-	void quickLoadOrSave();
+	virtual void quickLoadOrSave();
 
 	byte *vc10_uncompressFlip(const byte *src, uint16 w, uint16 h);
 	byte *vc10_flip(const byte *src, uint16 w, uint16 h);
 
 	Item *getNextItemPtrStrange();
 
-	virtual bool loadGame(const char *filename, bool restartMode = false);
+	virtual bool loadGame(const Common::String &filename, bool restartMode = false);
 	virtual bool saveGame(uint slot, const char *caption);
 
 	void openTextWindow();
@@ -1311,7 +1311,7 @@ protected:
 
 	int countSaveGames();
 
-	virtual char *genSaveName(int slot);
+	virtual Common::String genSaveName(int slot) const;
 };
 
 class AGOSEngine_PN : public AGOSEngine {
@@ -1517,8 +1517,8 @@ protected:
 	virtual void windowPutChar(WindowBlock *window, byte c, byte b = 0);
 
 	bool badload(int8 errorNum);
-	int loadFile(char *name);
-	int saveFile(char *name);
+	int loadFile(const Common::String &name);
+	int saveFile(const Common::String &name);
 	void getFilename();
 	void sysftodb();
 	void dbtosysf();
@@ -1640,7 +1640,7 @@ protected:
 
 	virtual void drawIcon(WindowBlock *window, uint icon, uint x, uint y);
 
-	virtual char *genSaveName(int slot);
+	virtual Common::String genSaveName(int slot) const;
 };
 
 class AGOSEngine_Elvira2 : public AGOSEngine_Elvira1 {
@@ -1709,7 +1709,7 @@ protected:
 
 	virtual void readItemChildren(Common::SeekableReadStream *in, Item *item, uint tmp);
 
-	virtual bool loadGame(const char *filename, bool restartMode = false);
+	virtual bool loadGame(const Common::String &filename, bool restartMode = false);
 	virtual bool saveGame(uint slot, const char *caption);
 
 	virtual void addArrows(WindowBlock *window, uint8 num);
@@ -1735,7 +1735,7 @@ protected:
 	virtual void userGame(bool load);
 	virtual int userGameGetKey(bool *b, char *buf, uint maxChar);
 
-	virtual char *genSaveName(int slot);
+	virtual Common::String genSaveName(int slot) const;
 };
 
 class AGOSEngine_Waxworks : public AGOSEngine_Elvira2 {
@@ -1802,7 +1802,7 @@ protected:
 
 	virtual bool confirmOverWrite(WindowBlock *window);
 
-	virtual char *genSaveName(int slot);
+	virtual Common::String genSaveName(int slot) const;
 };
 
 class AGOSEngine_Simon1 : public AGOSEngine_Waxworks {
@@ -1873,7 +1873,7 @@ protected:
 
 	virtual void vcStopAnimation(uint16 zone, uint16 sprite);
 
-	virtual char *genSaveName(int slot);
+	virtual Common::String genSaveName(int slot) const;
 };
 
 class AGOSEngine_Simon2 : public AGOSEngine_Simon1 {
@@ -1919,7 +1919,7 @@ protected:
 
 	virtual void playSpeech(uint16 speechId, uint16 vgaSpriteId);
 
-	virtual char *genSaveName(int slot);
+	virtual Common::String genSaveName(int slot) const;
 };
 
 #ifdef ENABLE_AGOS2
@@ -2059,7 +2059,8 @@ protected:
 	void saveUserGame(int slot);
 	void windowBackSpace(WindowBlock *window);
 
-	virtual char *genSaveName(int slot);
+	virtual Common::String genSaveName(int slot) const;
+	virtual void quickLoadOrSave();
 };
 
 class AGOSEngine_FeebleDemo : public AGOSEngine_Feeble {
@@ -2138,7 +2139,7 @@ protected:
 
 	void printInfoText(const char *itemText);
 
-	virtual char *genSaveName(int slot);
+	virtual Common::String genSaveName(int slot) const;
 };
 
 

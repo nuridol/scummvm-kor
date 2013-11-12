@@ -52,13 +52,6 @@ KyraEngine_HoF::KyraEngine_HoF(OSystem *system, const GameFlags &flags) : KyraEn
 	_screen = 0;
 	_text = 0;
 
-	_seqProcessedString = 0;
-	_activeWSA = 0;
-	_activeText = 0;
-	_seqWsa = 0;
-	_sequences = 0;
-	_sequenceSoundList = 0;
-
 	_gamePlayBuffer = 0;
 	_cCodeBuffer = _optionsBuffer = _chapterBuffer = 0;
 
@@ -89,7 +82,6 @@ KyraEngine_HoF::KyraEngine_HoF(OSystem *system, const GameFlags &flags) : KyraEn
 
 	memset(&_invWsa, 0, sizeof(_invWsa));
 	_itemAnimDefinition = 0;
-	_demoAnimData = 0;
 	_nextAnimItem = 0;
 
 	for (int i = 0; i < 15; i++)
@@ -136,7 +128,6 @@ KyraEngine_HoF::KyraEngine_HoF(OSystem *system, const GameFlags &flags) : KyraEn
 	memset(_cauldronStateTables, 0, sizeof(_cauldronStateTables));
 
 	_menuDirectlyToLoad = false;
-	_menu = 0;
 	_chatIsNote = false;
 	memset(&_npcScriptData, 0, sizeof(_npcScriptData));
 
@@ -148,7 +139,6 @@ KyraEngine_HoF::KyraEngine_HoF(OSystem *system, const GameFlags &flags) : KyraEn
 
 KyraEngine_HoF::~KyraEngine_HoF() {
 	cleanup();
-	seq_uninit();
 
 	delete _screen;
 	delete _text;
@@ -156,15 +146,6 @@ KyraEngine_HoF::~KyraEngine_HoF() {
 	delete _tim;
 	_text = 0;
 	delete _invWsa.wsa;
-
-	if (_sequenceSoundList) {
-		for (int i = 0; i < _sequenceSoundListSize; i++) {
-			if (_sequenceSoundList[i])
-				delete[] _sequenceSoundList[i];
-		}
-		delete[] _sequenceSoundList;
-		_sequenceSoundList = NULL;
-	}
 
 	delete[] _dlgBuffer;
 	for (int i = 0; i < 19; i++)
@@ -179,41 +160,13 @@ KyraEngine_HoF::~KyraEngine_HoF() {
 void KyraEngine_HoF::pauseEngineIntern(bool pause) {
 	KyraEngine_v2::pauseEngineIntern(pause);
 
+	seq_pausePlayer(pause);
+
 	if (!pause) {
 		uint32 pausedTime = _system->getMillis() - _pauseStart;
 		_pauseStart = 0;
 
-		// sequence player
-		//
-		// Timers in KyraEngine_HoF::seq_cmpFadeFrame() and KyraEngine_HoF::seq_animatedSubFrame()
-		// have been left out for now. I think we don't need them here.
-
-		_seqStartTime += pausedTime;
-		_seqSubFrameStartTime += pausedTime;
-		_seqEndTime += pausedTime;
-		_seqSubFrameEndTimeInternal += pausedTime;
-		_seqWsaChatTimeout += pausedTime;
-		_seqWsaChatFrameTimeout += pausedTime;
-
-		if (_activeText) {
-			for (int x = 0; x < 10; x++) {
-				if (_activeText[x].duration != -1)
-					_activeText[x].startTime += pausedTime;
-			}
-		}
-
-		if (_activeWSA) {
-			for (int x = 0; x < 8; x++) {
-				if (_activeWSA[x].flags != -1)
-					_activeWSA[x].nextFrame += pausedTime;
-			}
-		}
-
 		_nextIdleAnim += pausedTime;
-
-		for (int x = 0; x < _itemAnimDefinitionSize; x++)
-			_activeItemAnim[x].nextFrameTime += pausedTime;
-
 		_tim->refreshTimersAfterPause(pausedTime);
 	}
 }
@@ -244,8 +197,6 @@ Common::Error KyraEngine_HoF::init() {
 		_screen->loadFont(_screen->FID_8_FNT, "8FAT.FNT");
 		_screen->loadFont(_screen->FID_BOOKFONT_FNT, "BOOKFONT.FNT");
 	}
-	_screen->loadFont(_screen->FID_GOLDFONT_FNT, "GOLDFONT.FNT");
-
 	_screen->setFont(_flags.lang == Common::JA_JPN ? Screen::FID_SJIS_FNT : _screen->FID_8_FNT);
 
 	_screen->setAnimBlockPtr(3504);
@@ -253,13 +204,6 @@ Common::Error KyraEngine_HoF::init() {
 
 	if (!_sound->init())
 		error("Couldn't init sound");
-
-	_abortIntroFlag = false;
-
-	if (_sequenceStrings) {
-		for (int i = 0; i < MIN(33, _sequenceStringsSize); i++)
-			_sequenceStringsDuration[i] = (int) strlen(_sequenceStrings[i]) * 8;
-	}
 
 	// No mouse display in demo
 	if (_flags.isDemo && !_flags.isTalkie)
@@ -279,32 +223,28 @@ Common::Error KyraEngine_HoF::init() {
 }
 
 Common::Error KyraEngine_HoF::go() {
+	int menuChoice = 0;
+
 	if (_gameToLoad == -1) {
 		if (_flags.platform == Common::kPlatformFMTowns || _flags.platform == Common::kPlatformPC98)
 			seq_showStarcraftLogo();
 
 		if (_flags.isDemo && !_flags.isTalkie) {
-#ifdef ENABLE_LOL
-			if (_flags.gameID == GI_LOL)
-				seq_playSequences(kSequenceLoLDemoScene1, kSequenceLoLDemoScene6);
-			else
-#endif // ENABLE_LOL
-				seq_playSequences(kSequenceDemoVirgin, kSequenceDemoFisher);
-			_menuChoice = 4;
+			menuChoice = seq_playDemo();
 		} else {
-			seq_playSequences(kSequenceVirgin, kSequenceZanfaun);
+			menuChoice = seq_playIntro();
 		}
 	} else {
-		_menuChoice = 1;
+		menuChoice = 1;
 	}
 
 	_res->unloadAllPakFiles();
 
-	if (_menuChoice != 4) {
+	if (menuChoice != 4) {
 		// load just the pak files needed for ingame
 		_staticres->loadStaticResourceFile();
 
-		if (_flags.platform == Common::kPlatformPC && _flags.isTalkie) {
+		if (_flags.platform == Common::kPlatformDOS && _flags.isTalkie) {
 			if (!_res->loadFileList("FILEDATA.FDT"))
 				error("couldn't load 'FILEDATA.FDT'");
 		} else {
@@ -317,24 +257,24 @@ Common::Error KyraEngine_HoF::go() {
 		}
 	}
 
-	_menuDirectlyToLoad = (_menuChoice == 3) ? true : false;
+	_menuDirectlyToLoad = (menuChoice == 3) ? true : false;
 	_menuDirectlyToLoad &= saveFileLoadable(0);
 
-	if (_menuChoice & 1) {
+	if (menuChoice & 1) {
 		startup();
 		if (!shouldQuit())
 			runLoop();
 		cleanup();
 
 		if (_showOutro)
-			seq_playSequences(kSequenceFunters, kSequenceFrash);
+			seq_playOutro();
 	}
 
 	return Common::kNoError;
 }
 
 void KyraEngine_HoF::startup() {
-	_sound->setSoundList(&_soundData[kMusicIngame]);
+	_sound->selectAudioResourceSet(kMusicIngame);
 	// The track map is exactly the same
 	// for FM-TOWNS and DOS
 	_trackMap = _dosTrackMap;
@@ -419,8 +359,6 @@ void KyraEngine_HoF::startup() {
 	_screen->loadPalette("PALETTE.COL", _screen->getPalette(0));
 	_screen->loadBitmap("_PLAYFLD.CPS", 3, 3, 0);
 	_screen->copyPage(3, 0);
-	_screen->showMouse();
-	_screen->hideMouse();
 
 	clearAnimObjects();
 
@@ -784,20 +722,16 @@ void KyraEngine_HoF::updateMouse() {
 
 	if (type != 0 && _mouseState != type && _screen->isMouseVisible()) {
 		_mouseState = type;
-		_screen->hideMouse();
 		_screen->setMouseCursor(xOffset, yOffset, getShapePtr(shapeIndex));
-		_screen->showMouse();
 	}
 
 	if (type == 0 && _mouseState != _itemInHand && _screen->isMouseVisible()) {
 		if ((mouse.y > 145) || (mouse.x > 6 && mouse.x < 312 && mouse.y > 6 && mouse.y < 135)) {
 			_mouseState = _itemInHand;
-			_screen->hideMouse();
 			if (_itemInHand == kItemNone)
 				_screen->setMouseCursor(0, 0, getShapePtr(0));
 			else
 				_screen->setMouseCursor(8, 15, getShapePtr(_itemInHand+64));
-			_screen->showMouse();
 		}
 	}
 }
@@ -914,7 +848,6 @@ void KyraEngine_HoF::showMessageFromCCode(int id, int16 palIndex, int) {
 
 void KyraEngine_HoF::showMessage(const char *string, int16 palIndex) {
 	_shownMessage = string;
-	_screen->hideMouse();
 	_screen->fillRect(0, 190, 319, 199, 0xCF);
 
 	if (string) {
@@ -932,7 +865,6 @@ void KyraEngine_HoF::showMessage(const char *string, int16 palIndex) {
 	}
 
 	_fadeMessagePalette = false;
-	_screen->showMouse();
 }
 
 void KyraEngine_HoF::showChapterMessage(int id, int16 palIndex) {
@@ -1058,7 +990,7 @@ void KyraEngine_HoF::loadNPCScript() {
 
 	char filename[] = "_NPC.EMC";
 
-	if (_flags.platform != Common::kPlatformPC || _flags.isTalkie) {
+	if (_flags.platform != Common::kPlatformDOS || _flags.isTalkie) {
 		switch (_lang) {
 		case 0:
 			filename[5] = 'E';
@@ -1116,9 +1048,7 @@ int KyraEngine_HoF::getDrawLayer(int x, int y) {
 
 void KyraEngine_HoF::backUpPage0() {
 	if (_screenBuffer) {
-		_screen->hideMouse();
 		memcpy(_screenBuffer, _screen->getCPagePtr(0), 64000);
-		_screen->showMouse();
 	}
 }
 
@@ -1518,8 +1448,8 @@ void KyraEngine_HoF::snd_playSoundEffect(int track, int volume) {
 
 	int16 vocIndex = (int16)READ_LE_UINT16(&_ingameSoundIndex[track * 2]);
 	if (vocIndex != -1) {
-		_sound->voicePlay(_ingameSoundList[vocIndex], 0, 255, true);
-	} else if (_flags.platform == Common::kPlatformPC) {
+		_sound->voicePlay(_ingameSoundList[vocIndex], 0, 255, 255, true);
+	} else if (_flags.platform == Common::kPlatformDOS) {
 		if (_sound->getSfxType() == Sound::kMidiMT32)
 			track = track < _mt32SfxMapSize ? _mt32SfxMap[track] - 1 : -1;
 		else if (_sound->getSfxType() == Sound::kMidiGM)

@@ -250,7 +250,7 @@ bool KyraEngine_LoK::seq_introStory() {
 	if (!textEnabled() && speechEnabled() && _flags.lang != Common::IT_ITA)
 		return false;
 
-	if (((_flags.lang == Common::EN_ANY || _flags.lang == Common::RU_RUS) && !_flags.isTalkie && _flags.platform == Common::kPlatformPC) || _flags.platform == Common::kPlatformAmiga)
+	if (((_flags.lang == Common::EN_ANY || _flags.lang == Common::RU_RUS) && !_flags.isTalkie && _flags.platform == Common::kPlatformDOS) || _flags.platform == Common::kPlatformAmiga)
 		_screen->loadBitmap("TEXT.CPS", 3, 3, &_screen->getPalette(0));
 	else if (_flags.lang == Common::EN_ANY || _flags.lang == Common::JA_JPN)
 		_screen->loadBitmap("TEXT_ENG.CPS", 3, 3, &_screen->getPalette(0));
@@ -838,9 +838,7 @@ void KyraEngine_LoK::seq_fillFlaskWithWater(int item, int type) {
 	if (newItem == -1)
 		return;
 
-	_screen->hideMouse();
 	setMouseItem(newItem);
-	_screen->showMouse();
 	_itemInHand = newItem;
 
 	assert(_fullFlask);
@@ -1209,7 +1207,7 @@ struct CreditsLine {
 
 void KyraEngine_LoK::seq_playCredits() {
 	static const uint8 colorMap[] = { 0, 0, 0xC, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-	static const char stringTerms[] = { 0x5, 0xd, 0x0};
+	static const char stringTerms[] = { 0x5, 0xD, 0x0};
 
 	typedef Common::List<CreditsLine> CreditsLineList;
 	CreditsLineList lines;
@@ -1258,9 +1256,9 @@ void KyraEngine_LoK::seq_playCredits() {
 
 	do {
 		currentString = nextString;
-		nextString = (uint8 *)strpbrk((const char *)currentString, stringTerms);
+		nextString = (uint8 *)strpbrk((char *)currentString, stringTerms);
 		if (!nextString)
-			nextString = (uint8 *)strchr((const char *)currentString, 0);
+			nextString = (uint8 *)strchr((char *)currentString, 0);
 
 		CreditsLine line;
 
@@ -1724,9 +1722,10 @@ int KyraEngine_LoK::handleBeadState() {
 			_screen->addBitBlitRect(_beadState1.x, _beadState1.y, _beadState1.width2, _beadState1.height);
 
 			++_beadState1.tableIndex;
-			if (_beadState1.tableIndex > 24)
+			if (_beadState1.tableIndex > 24) {
 				_beadState1.tableIndex = 0;
 				_unkEndSeqVar4 = 1;
+			}
 			if (_system->getMillis() > _beadStateTimer2 && _malcolmFlag == 7 && !_unkAmuletVar && !_text->printed()) {
 				snd_playSoundEffect(0x0B);
 				if (_currentCharacter->x1 > 233 && _currentCharacter->x1 < 305 && _currentCharacter->y1 > 85 && _currentCharacter->y1 < 105 &&

@@ -180,7 +180,7 @@ static const ResString string_map_table_v345[] = {
 	// "Moechten Sie wirklich neu starten?  (J/N)J"
 	// Will react to J as 'Yes'
 	{5, _s("Are you sure you want to restart?  (Y/N)")},
-	// I18N: you may specify 'Yes' symbol at the end of the line. See previous comment 
+	// I18N: you may specify 'Yes' symbol at the end of the line. See previous comment
 	{6, _s("Are you sure you want to quit?  (Y/N)")},
 
 	// Added in SCUMM4
@@ -415,11 +415,11 @@ void InfoDialog::reflowLayout() {
 	_w = width;
 	_h = height;
 	_x = (screenW - width) / 2;
-#ifdef SCUMMVMKOR
-	_y = (screenH - height) / 4;
-#else
+// #ifdef SCUMMVMKOR
+// 	_y = (screenH - height) / 4;
+// #else
 	_y = (screenH - height) / 2;
-#endif
+// #endif
 	_text->setSize(_w, _h);
 }
 
@@ -472,10 +472,6 @@ PauseDialog::PauseDialog(ScummEngine *scumm, int res)
 void PauseDialog::handleKeyDown(Common::KeyState state) {
 	if (state.ascii == ' ')  // Close pause dialog if space key is pressed
 		close();
-#ifdef SCUMMVMKOR
-	else if (state.keycode == Common::KEYCODE_F12)
-		close();
-#endif
 	else
 		ScummDialog::handleKeyDown(state);
 }
@@ -545,11 +541,11 @@ void ValueDisplayDialog::reflowLayout() {
 	int height = g_gui.getFontHeight() + 4 * 2;
 
 	_x = (screenW - width) / 2;
-#ifdef SCUMMVMKOR
-	_y = (screenH - height) / 4;
-#else
+// #ifdef SCUMMVMKOR
+// 	_y = (screenH - height) / 4;
+// #else
 	_y = (screenH - height) / 2;
-#endif
+// #endif
 	_w = width;
 	_h = height;
 }

@@ -28,6 +28,7 @@
 #include "common/list.h"
 #include "common/array.h"
 #include "common/rect.h"
+#include "common/rendermode.h"
 #include "common/stream.h"
 
 class OSystem;
@@ -145,8 +146,8 @@ private:
  */
 class OldDOSFont : public Font {
 public:
-	OldDOSFont();
-	~OldDOSFont() { unload(); }
+	OldDOSFont(Common::RenderMode mode);
+	~OldDOSFont();
 
 	bool load(Common::SeekableReadStream &file);
 	int getHeight() const { return _height; }
@@ -165,6 +166,11 @@ private:
 	const uint8 *_colorMap;
 
 	int _numGlyphs;
+
+	Common::RenderMode _renderMode;
+
+	static uint16 *_cgaDitheringTable;
+	static int _numRef;
 };
 #endif // ENABLE_EOB
 
@@ -205,7 +211,7 @@ private:
  */
 class SJISFont : public Font {
 public:
-	SJISFont(Screen *s, Graphics::FontSJIS *font, const uint8 invisColor, bool is16Color, bool outlineSize);
+	SJISFont(Graphics::FontSJIS *font, const uint8 invisColor, bool is16Color, bool drawOutline, int extraSpacing);
 	~SJISFont() { unload(); }
 
 	bool usesOverlay() const { return true; }
@@ -224,8 +230,13 @@ private:
 	Graphics::FontSJIS *_font;
 	const uint8 _invisColor;
 	const bool _is16Color;
+	const bool _drawOutline;
+	// We use this for cases where the font width returned by getWidth() or getCharWidth() does not match the original.
+	// The original Japanese game versions use hard coded sjis font widths of 8 or 9. However, this does not necessarily
+	// depend on whether an outline is used or not (neither LOL/PC-9801 nor LOL/FM-TOWNS use an outline, but the first
+	// version uses a font width of 8 where the latter uses a font width of 9).
+	const int _sjisWidthOffset;
 
-	const Screen *_screen;
 	int _sjisWidth, _asciiWidth;
 	int _fontHeight;
 };
@@ -250,6 +261,21 @@ public:
 	 * Load a VGA palette from the given stream.
 	 */
 	void loadVGAPalette(Common::ReadStream &stream, int startIndex, int colors);
+
+	/**
+	 * Load a EGA palette from the given stream.
+	 */
+	void loadEGAPalette(Common::ReadStream &stream, int startIndex, int colors);
+
+	/**
+	 * Set default CGA palette. We only need the cyan/magenta/grey mode.
+	 */
+	enum CGAIntensity {
+		kIntensityLow = 0,
+		kIntensityHigh = 1
+	};
+
+	void setCGAPalette(int palIndex, CGAIntensity intensity);
 
 	/**
 	 * Load a AMIGA palette from the given stream.
@@ -325,9 +351,15 @@ public:
 	 */
 	uint8 *getData() { return _palData; }
 	const uint8 *getData() const { return _palData; }
+
 private:
 	uint8 *_palData;
 	const int _numColors;
+
+	static const uint8 _egaColors[];
+	static const int _egaNumColors;
+	static const uint8 _cgaColors[4][12];
+	static const int _cgaNumColors;
 };
 
 class Screen {
@@ -424,7 +456,7 @@ public:
 	void enableInterfacePalette(bool e);
 	void setInterfacePalette(const Palette &pal, uint8 r, uint8 g, uint8 b);
 
-	void getRealPalette(int num, uint8 *dst);
+	virtual void getRealPalette(int num, uint8 *dst);
 	Palette &getPalette(int num);
 	void copyPalette(const int dst, const int src);
 
@@ -442,7 +474,7 @@ public:
 	int getFontWidth() const;
 
 	int getCharWidth(uint16 c) const;
-	int getTextWidth(const char *str) const;
+	int getTextWidth(const char *str);
 
 	void printText(const char *str, int x, int y, uint8 color1, uint8 color2);
 
@@ -480,9 +512,9 @@ public:
 	// misc
 	void loadBitmap(const char *filename, int tempPage, int dstPage, Palette *pal, bool skip=false);
 
-	bool loadPalette(const char *filename, Palette &pal);
+	virtual bool loadPalette(const char *filename, Palette &pal);
 	bool loadPaletteTable(const char *filename, int firstPalette);
-	void loadPalette(const byte *data, Palette &pal, int bytes);
+	virtual void loadPalette(const byte *data, Palette &pal, int bytes);
 
 	void setAnimBlockPtr(int size);
 
@@ -521,7 +553,7 @@ public:
 
 protected:
 	uint8 *getPagePtr(int pageNum);
-	void updateDirtyRects();
+	virtual void updateDirtyRects();
 	void updateDirtyRectsAmiga();
 	void updateDirtyRectsOvl();
 
@@ -545,13 +577,17 @@ protected:
 
 	uint8 *_pagePtrs[16];
 	uint8 *_sjisOverlayPtrs[SCREEN_OVLS_NUM];
+	uint8 _pageMapping[SCREEN_PAGE_NUM];
 
 	bool _useOverlays;
 	bool _useSJIS;
 	bool _use16ColorMode;
+	bool _useHiResEGADithering;
 	bool _isAmiga;
+	Common::RenderMode _renderMode;
 
 	uint8 _sjisInvisibleColor;
+	bool _sjisMixedFontMode;
 
 	Palette *_screenPalette;
 	Common::Array<Palette *> _palettes;
@@ -567,7 +603,7 @@ protected:
 	int _animBlockSize;
 
 	// dimension handling
-	const ScreenDim * const _dimTable;
+	const ScreenDim *const _dimTable;
 	ScreenDim **_customDimTable;
 	const int _dimTableCount;
 	int _curDimIndex;

@@ -140,8 +140,14 @@ reg_t kDoAudio(EngineState *s, int argc, reg_t *argv) {
 			         ((argv[3].toUint16() & 0xff) << 16) |
 			         ((argv[4].toUint16() & 0xff) <<  8) |
 			          (argv[5].toUint16() & 0xff);
-			if (argc == 8)
-				warning("kDoAudio: Play called with SQ6 extra parameters");
+			// Removed warning because of the high amount of console spam
+			/*if (argc == 8) {
+				// TODO: Handle the extra 2 SCI21 params
+				// argv[6] is always 1
+				// argv[7] is the contents of global 229 (0xE5)
+				warning("kDoAudio: Play called with SCI2.1 extra parameters: %04x:%04x and %04x:%04x",
+						PRINT_REG(argv[6]), PRINT_REG(argv[7]));
+			}*/
 		} else {
 			warning("kDoAudio: Play called with an unknown number of parameters (%d)", argc);
 			return NULL_REG;
@@ -187,6 +193,7 @@ reg_t kDoAudio(EngineState *s, int argc, reg_t *argv) {
 		} else
 #endif
 		mixer->setVolumeForSoundType(Audio::Mixer::kSpeechSoundType, volume * 2);
+		break;
 	}
 	case kSciAudioLanguage:
 		// In SCI1.1: tests for digital audio support
@@ -239,6 +246,11 @@ reg_t kDoAudio(EngineState *s, int argc, reg_t *argv) {
 	case 13:
 		// Used in Pharkas whenever a speech sample starts (takes no params)
 		//warning("kDoAudio: Unhandled case 13, %d extra arguments passed", argc - 1);
+		break;
+	case 17:
+		// Seems to be some sort of audio sync, used in SQ6. Silenced the
+		// warning due to the high level of spam it produces. (takes no params)
+		//warning("kDoAudio: Unhandled case 17, %d extra arguments passed", argc - 1);
 		break;
 	default:
 		warning("kDoAudio: Unhandled case %d, %d extra arguments passed", argv[0].toUint16(), argc - 1);
@@ -294,6 +306,33 @@ reg_t kSetLanguage(EngineState *s, int argc, reg_t *argv) {
 	//warning("SetLanguage: set audio resource directory to '%s'", audioDirectory.c_str());
 	g_sci->getResMan()->changeAudioDirectory(audioDirectory);
 
+	return s->r_acc;
+}
+
+reg_t kDoSoundPhantasmagoriaMac(EngineState *s, int argc, reg_t *argv) {
+	// Phantasmagoria Mac (and seemingly no other game (!)) uses this
+	// cutdown version of kDoSound.
+
+	switch (argv[0].toUint16()) {
+	case 0:
+		return g_sci->_soundCmd->kDoSoundMasterVolume(argc - 1, argv + 1, s->r_acc);
+	case 2:
+		return g_sci->_soundCmd->kDoSoundInit(argc - 1, argv + 1, s->r_acc);
+	case 3:
+		return g_sci->_soundCmd->kDoSoundDispose(argc - 1, argv + 1, s->r_acc);
+	case 4:
+		return g_sci->_soundCmd->kDoSoundPlay(argc - 1, argv + 1, s->r_acc);
+	case 5:
+		return g_sci->_soundCmd->kDoSoundStop(argc - 1, argv + 1, s->r_acc);
+	case 8:
+		return g_sci->_soundCmd->kDoSoundSetVolume(argc - 1, argv + 1, s->r_acc);
+	case 9:
+		return g_sci->_soundCmd->kDoSoundSetLoop(argc - 1, argv + 1, s->r_acc);
+	case 10:
+		return g_sci->_soundCmd->kDoSoundUpdateCues(argc - 1, argv + 1, s->r_acc);
+	}
+
+	error("Unknown kDoSound Phantasmagoria Mac subop %d", argv[0].toUint16());
 	return s->r_acc;
 }
 

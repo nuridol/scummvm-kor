@@ -141,7 +141,7 @@ SaveStateList CineMetaEngine::listSaves(const char *target) const {
 
 		for (file = filenames.begin(); file != filenames.end(); ++file) {
 			// Jump over savegame files that don't end with a digit (e.g. "fw.3" is ok, "fw.a" is not).
-			if (!isdigit(static_cast<unsigned char>(file->lastChar())))
+			if (!Common::isDigit(file->lastChar()))
 				continue;
 
 			// Obtain the last digit of the filename, since they correspond to the save slot
@@ -184,7 +184,7 @@ void CineMetaEngine::removeSaveState(const char *target, int slot) const {
 	// Set description for selected slot
 	char slotName[20];
 	slotName[0] = 0;
-	strncpy(saveNames[slot], slotName, 20);
+	Common::strlcpy(saveNames[slot], slotName, 20);
 
 	// Update savegame descriptions
 	Common::String indexFile = Common::String::format("%s.dir", target);

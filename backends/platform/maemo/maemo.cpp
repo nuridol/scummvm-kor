@@ -28,7 +28,6 @@
 #include "common/config-manager.h"
 
 #include "backends/platform/maemo/maemo.h"
-#include "backends/platform/maemo/maemo-keys.h"
 #include "backends/events/maemosdl/maemosdl-events.h"
 #include "backends/graphics/maemosdl/maemosdl-graphics.h"
 #include "backends/keymapper/keymapper.h"
@@ -44,6 +43,7 @@ namespace Maemo {
 
 OSystem_SDL_Maemo::OSystem_SDL_Maemo()
 	:
+	_eventObserver(0),
 	OSystem_POSIX() {
 }
 
@@ -85,6 +85,9 @@ static void registerDefaultKeyBindings(Common::KeymapperDefaultBindings *_keymap
 #endif
 
 void OSystem_SDL_Maemo::initBackend() {
+	ConfMan.registerDefault("fullscreen", true);
+	ConfMan.registerDefault("aspect_ratio", true);
+
 	// Create the events manager
 	if (_eventSource == 0)
 		_eventSource = new MaemoSdlEventSource();
@@ -156,10 +159,19 @@ void OSystem_SDL_Maemo::setWindowCaption(const char *caption) {
 	setXWindowName(cap.c_str());
 }
 
+static const Model models[] = {
+	{"SU-18", kModelType770, "770", false, true},
+	{"RX-34", kModelTypeN800, "N800", false, true},
+	{"RX-44", kModelTypeN810, "N810", true, true},
+	{"RX-48", kModelTypeN810, "N810W", true, true},
+	{"RX-51", kModelTypeN900, "N900", true, false},
+	{0, kModelTypeInvalid, 0, true, true}
+};
+
 const Maemo::Model OSystem_SDL_Maemo::detectModel() {
 	Common::String deviceHwId = Common::String(getenv("SCUMMVM_MAEMO_DEVICE"));
 	const Model *model;
-	for (model = models; model->hwId; model++) {
+	for (model = models; model->hwId; ++model) {
 		if (deviceHwId.equals(model->hwId))
 			return *model;
 	}
@@ -173,8 +185,19 @@ void OSystem_SDL_Maemo::setupIcon() {
 }
 
 #ifdef ENABLE_KEYMAPPER
-Common::HardwareKeySet *OSystem_SDL_Maemo::getHardwareKeySet() {
-	return new Common::HardwareKeySet(Common::maemoKeys, Common::maemoModifiers);
+static const Common::KeyTableEntry maemoKeys[] = {
+	// Function keys
+	{"MENU", Common::KEYCODE_F11, 0, "Menu", false},
+	{"HOME", Common::KEYCODE_F12, 0, "Home", false},
+	{"FULLSCREEN", Common::KEYCODE_F13, 0, "FullScreen", false},
+	{"ZOOMPLUS", Common::KEYCODE_F14, 0, "Zoom+", false},
+	{"ZOOMMINUS", Common::KEYCODE_F15, 0, "Zoom-", false},
+
+	{0, Common::KEYCODE_INVALID, 0, 0, false}
+};
+
+Common::HardwareInputSet *OSystem_SDL_Maemo::getHardwareInputSet() {
+	return new Common::HardwareInputSet(true, maemoKeys);
 }
 
 Common::Keymap *OSystem_SDL_Maemo::getGlobalKeymap() {
@@ -185,17 +208,17 @@ Common::Keymap *OSystem_SDL_Maemo::getGlobalKeymap() {
 
 	act = new Action(globalMap, "CLKM", _("Click Mode"));
 	Event evt = Event();
-	evt.type = EVENT_CUSTOM_BACKEND;
+	evt.type = EVENT_CUSTOM_BACKEND_ACTION;
 	evt.customType = Maemo::kEventClickMode;
 	act->addEvent(evt);
 
-	act = new Action(globalMap, "LCLK", _("Left Click"), kLeftClickActionType);
+	act = new Action(globalMap, "LCLK", _("Left Click"));
 	act->addLeftClickEvent();
 
 	act = new Action(globalMap, "MCLK", _("Middle Click"));
 	act->addMiddleClickEvent();
 
-	act = new Action(globalMap, "RCLK", _("Right Click"), kRightClickActionType);
+	act = new Action(globalMap, "RCLK", _("Right Click"));
 	act->addRightClickEvent();
 
 	return globalMap;

@@ -111,6 +111,7 @@ bool T7GFont::load(Common::SeekableReadStream &stream) {
 	delete[] glyphOffsets;
 	return true;
 }
+
 #ifdef SCUMMVMKOR
 void T7GFont::drawChar(Graphics::Surface *dst, uint16 chr, int x, int y, uint32 color) const {
 #else

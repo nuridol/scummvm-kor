@@ -26,6 +26,10 @@
 #include "engines/metaengine.h"
 #include "engines/engine.h"
 
+#include "common/hash-str.h"
+
+#include "common/gui_options.h" // FIXME: Temporary hack?
+
 namespace Common {
 class Error;
 class FSList;
@@ -42,6 +46,20 @@ struct ADGameFileDescription {
 	const char *md5; ///< MD5 of (the beginning of) the described file. Optional. Set to NULL to ignore.
 	int32 fileSize;  ///< Size of the described file. Set to -1 to ignore.
 };
+
+/**
+ * A record describing the properties of a file. Used on the existing
+ * files while detecting a game.
+ */
+struct ADFileProperties {
+	int32 size;
+	Common::String md5;
+};
+
+/**
+ * A map of all relevant existing files in a game directory while detecting.
+ */
+typedef Common::HashMap<Common::String, ADFileProperties, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> ADFilePropertiesMap;
 
 /**
  * A shortcut to produce an empty ADGameFileDescription record. Used to mark
@@ -69,7 +87,8 @@ enum ADGameFlags {
 	ADGF_ADDENGLISH = (1 << 24), ///< always add English as language option
 	ADGF_MACRESFORK = (1 << 25), ///< the md5 for this entry will be calculated from the resource fork
 	ADGF_USEEXTRAASTITLE = (1 << 26), ///< Extra field value will be used as main game title, not gameid
-	ADGF_DROPLANGUAGE = (1 << 28), ///< don't add language to gameid
+	ADGF_DROPLANGUAGE = (1 << 27), ///< don't add language to gameid
+	ADGF_DROPPLATFORM = (1 << 28), ///< don't add platform to gameid
 	ADGF_CD = (1 << 29),    	///< add "-cd" to gameid
 	ADGF_DEMO = (1 << 30)   	///< add "-demo" to gameid
 };
@@ -132,6 +151,24 @@ enum ADFlags {
 
 
 /**
+ * Map entry for mapping GUIO_GAMEOPTIONS* to their ExtraGuiOption
+ * description.
+ */
+struct ADExtraGuiOptionsMap {
+	/**
+	 * GUIO_GAMEOPTION* string.
+	 */
+	const char *guioFlag;
+
+	/**
+	 * The associated option.
+	 */
+	ExtraGuiOption option;
+};
+
+#define AD_EXTRA_GUI_OPTIONS_TERMINATOR { 0, { 0, 0, 0, 0 } }
+
+/**
  * A MetaEngine implementation based around the advanced detector code.
  */
 class AdvancedMetaEngine : public MetaEngine {
@@ -157,6 +194,11 @@ protected:
 	const PlainGameDescriptor *_gameids;
 
 	/**
+	 * A map containing all the extra game GUI options the engine supports.
+	 */
+	const ADExtraGuiOptionsMap * const _extraGuiOptions;
+
+	/**
 	 * The number of bytes to compute MD5 sum for. The AdvancedDetector
 	 * is primarily based on computing and matching MD5 checksums of files.
 	 * Since doing that for large files can be slow, it can be restricted
@@ -169,7 +211,13 @@ protected:
 	/**
 	 * Name of single gameid (optional).
 	 *
-	 * @todo Properly explain this -- what does it do?
+	 * Used to override gameid.
+	 * This is a recommended setting to prevent global gameid pollution.
+	 * With this option set, the gameid effectively turns into engineid.
+	 *
+	 * FIXME: This field actually removes a feature (gameid) in order to
+	 * address a more generic problem. We should find a better way to
+	 * disambiguate gameids.
 	 */
 	const char *_singleid;
 
@@ -203,7 +251,7 @@ protected:
 	const char * const *_directoryGlobs;
 
 public:
-	AdvancedMetaEngine(const void *descs, uint descItemSize, const PlainGameDescriptor *gameids);
+	AdvancedMetaEngine(const void *descs, uint descItemSize, const PlainGameDescriptor *gameids, const ADExtraGuiOptionsMap *extraGuiOptions = 0);
 
 	/**
 	 * Returns list of targets supported by the engine.
@@ -216,6 +264,8 @@ public:
 	virtual GameList detectGames(const Common::FSList &fslist) const;
 
 	virtual Common::Error createInstance(OSystem *syst, Engine **engine) const;
+
+	virtual const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const;
 
 protected:
 	// To be implemented by subclasses
@@ -230,6 +280,9 @@ protected:
 	virtual const ADGameDescription *fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const {
 		return 0;
 	}
+
+private:
+	void initSubSystems(const ADGameDescription *gameDesc) const;
 
 protected:
 	/**
@@ -253,9 +306,17 @@ protected:
 	 * In case of a tie, the entry coming first in the list is chosen.
 	 *
 	 * @param allFiles	a map describing all present files
+	 * @param fslist	a list of nodes for all present files
 	 * @param fileBasedFallback	a list of ADFileBasedFallback records, zero-terminated
+	 * @param filesProps	if not 0, return a map of properties for all detected files here
 	 */
-	const ADGameDescription *detectGameFilebased(const FileMap &allFiles, const ADFileBasedFallback *fileBasedFallback) const;
+	const ADGameDescription *detectGameFilebased(const FileMap &allFiles, const Common::FSList &fslist, const ADFileBasedFallback *fileBasedFallback, ADFilePropertiesMap *filesProps = 0) const;
+
+	/**
+	 * Log and print a report that we found an unknown game variant, together with the file
+	 * names, sizes and MD5 sums.
+	 */
+	void reportUnknown(const Common::FSNode &path, const ADFilePropertiesMap &filesProps) const;
 
 	// TODO
 	void updateGameDescriptor(GameDescriptor &desc, const ADGameDescription *realDesc) const;
@@ -265,6 +326,9 @@ protected:
 	 * Includes nifty stuff like removing trailing dots and ignoring case.
 	 */
 	void composeFileHashMap(FileMap &allFiles, const Common::FSList &fslist, int depth) const;
+
+	/** Get the properties (size and MD5) of this file. */
+	bool getFileProperties(const Common::FSNode &parent, const FileMap &allFiles, const ADGameDescription &game, const Common::String fname, ADFileProperties &fileProps) const;
 };
 
 #endif

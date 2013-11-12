@@ -63,9 +63,16 @@ create_lure (dreammaster)
     the lure.dat file.
 
 
+create_mort (Strangerke)
+-----------
+    Gathers several information found in the original DOS executable:
+    - Font data
+    - French, German and fan-made English translation
+
+
 create_project (LordHoto, Littleboy)
 --------------
-    Creates project files for Visual Studio 2005, 2008, 2010, Xcode and
+    Creates project files for Visual Studio 2005, 2008, 2010, 2012, Xcode and
     Code::Blocks out of the configure / Makefile based build system.
     It also offers a way to enable or disable certain engines and the use
     of external libraries similar to configure. Run the tool without
