@@ -11,7 +11,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -338,7 +338,14 @@ void TizenAppForm::showKeypad() {
 	// display the soft keyboard
 	if (_state == kActiveState) {
 		_buttonState = kLeftButton;
-		pushKey(Common::KEYCODE_F7);
+		
+		Common::Event e;
+		e.type = Common::EVENT_VIRTUAL_KEYBOARD;
+		if (_eventQueueLock) {
+			_eventQueueLock->Acquire();
+			_eventQueue.push(e);
+			_eventQueueLock->Release();
+		}
 	}
 }
 

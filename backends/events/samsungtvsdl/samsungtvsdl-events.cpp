@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -38,10 +38,10 @@ bool SamsungTVSdlEventSource::remapKey(SDL_Event &ev, Common::Event &event) {
 				event.kbd.ascii = Common::ASCII_F5;
 				return true;
 			} else if (ev.key.keysym.sym == SDLK_F2 && ev.key.keysym.scancode == 21) {
-				event.type = Common::EVENT_KEYDOWN;
-				event.kbd.keycode = Common::KEYCODE_F7;
-				event.kbd.ascii = Common::ASCII_F7;
+#ifdef ENABLE_VKEYBD
+				event.type = Common::EVENT_VIRTUAL_KEYBOARD;
 				return true;
+#endif
 			}
 			break;
 		}
@@ -53,11 +53,6 @@ bool SamsungTVSdlEventSource::remapKey(SDL_Event &ev, Common::Event &event) {
 				event.type = Common::EVENT_KEYUP;
 				event.kbd.keycode = Common::KEYCODE_F5;
 				event.kbd.ascii = Common::ASCII_F5;
-				return true;
-			} else if (ev.key.keysym.sym == SDLK_F2 && ev.key.keysym.scancode == 21) {
-				event.type = Common::EVENT_KEYUP;
-				event.kbd.keycode = Common::KEYCODE_F7;
-				event.kbd.ascii = Common::ASCII_F7;
 				return true;
 			}
 			break;

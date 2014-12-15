@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -348,8 +348,7 @@ bool GPHEventSource::handleJoyButtonDown(SDL_Event &ev, Common::Event &event) {
 		event.type = Common::EVENT_KEYDOWN;
 		if (BUTTON_STATE_L == true) {
 #ifdef ENABLE_VKEYBD
-			event.kbd.keycode = Common::KEYCODE_F7;
-			event.kbd.ascii = mapKey(SDLK_F7, ev.key.keysym.mod, 0);
+			event.type = Common::EVENT_VIRTUAL_KEYBOARD;
 #else
 			event.kbd.keycode = Common::KEYCODE_0;
 			event.kbd.ascii = mapKey(SDLK_0, ev.key.keysym.mod, 0);

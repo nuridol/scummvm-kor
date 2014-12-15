@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -68,11 +68,16 @@ GfxSurface surfaceFromRes(const byte *imgData) {
 	Rect r(0, 0, READ_LE_UINT16(imgData), READ_LE_UINT16(imgData + 2));
 	GfxSurface s;
 	s.create(r.width(), r.height());
-	s._centroid.x = READ_LE_UINT16(imgData + 4);
-	s._centroid.y = READ_LE_UINT16(imgData + 6);
 	s._transColor = *(imgData + 8);
 
-	bool rleEncoded = (imgData[9] & 2) != 0;
+	byte flags = imgData[9];
+	s._flags = (g_vm->getGameID() != GType_Ringworld) ? flags : 0;
+
+	bool rleEncoded = (flags & 2) != 0;
+
+	// Figure out the centroid
+	s._centroid.x = READ_LE_UINT16(imgData + 4);
+	s._centroid.y = READ_LE_UINT16(imgData + 6);
 
 	const byte *srcP = imgData + 10;
 	Graphics::Surface destSurface = s.lockSurface();
@@ -184,8 +189,9 @@ void Rect::contain(const Rect &r) {
  * @percent Scaling percentage
  */
 void Rect::resize(const GfxSurface &surface, int xp, int yp, int percent) {
-	int xe = surface.getBounds().width() * percent / 100;
-	int ye = surface.getBounds().height() * percent / 100;
+	const Rect &bounds = surface.getBounds();
+	int xe = bounds.width() * percent / 100;
+	int ye = bounds.height() * percent / 100;
 	this->set(0, 0, xe, ye);
 
 	if (!right) ++right;
@@ -193,8 +199,13 @@ void Rect::resize(const GfxSurface &surface, int xp, int yp, int percent) {
 
 	this->moveTo(xp, yp);
 
-	int xd = surface._centroid.x * percent / 100;
-	int yd = surface._centroid.y * percent / 100;
+	int xa = (surface._flags & FRAME_FLIP_CENTROID_X) == 0 ? surface._centroid.x :
+		bounds.width() - (surface._centroid.x + 1);
+	int ya = (surface._flags & FRAME_FLIP_CENTROID_Y) == 0 ? surface._centroid.y :
+		bounds.height() - (surface._centroid.y + 1);
+
+	int xd = xa * percent / 100;
+	int yd = ya * percent / 100;
 	this->translate(-xd, -yd);
 }
 
@@ -224,6 +235,7 @@ GfxSurface::GfxSurface() : _bounds(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT) {
 	_customSurface = NULL;
 	_transColor = -1;
 	_trackDirtyRects = false;
+	_flags = 0;
 }
 
 GfxSurface::GfxSurface(const GfxSurface &s) {
@@ -407,6 +419,7 @@ GfxSurface &GfxSurface::operator=(const GfxSurface &s) {
 	_bounds = s._bounds;
 	_centroid = s._centroid;
 	_transColor = s._transColor;
+	_flags = s._flags;
 
 	if (_customSurface) {
 		// Surface owns the internal data, so replicate it so new surface owns it's own
@@ -559,9 +572,11 @@ static GfxSurface ResizeSurface(GfxSurface &src, int xSize, int ySize, int trans
 }
 
 /**
- * Copys an area from one GfxSurface to another
+ * Copys an area from one GfxSurface to another.
+ *
  */
-void GfxSurface::copyFrom(GfxSurface &src, Rect srcBounds, Rect destBounds, Region *priorityRegion) {
+void GfxSurface::copyFrom(GfxSurface &src, Rect srcBounds, Rect destBounds,
+		Region *priorityRegion, const byte *shadowMap) {
 	GfxSurface srcImage;
 	if (srcBounds.isEmpty())
 		return;
@@ -631,8 +646,15 @@ void GfxSurface::copyFrom(GfxSurface &src, Rect srcBounds, Rect destBounds, Regi
 					if (!priorityRegion || !priorityRegion->contains(Common::Point(
 							xp + g_globals->_sceneManager._scene->_sceneBounds.left,
 							destBounds.top + y + g_globals->_sceneManager._scene->_sceneBounds.top))) {
-						if (*tempSrc != src._transColor)
-							*tempDest = *tempSrc;
+						if (*tempSrc != src._transColor) {
+							if (shadowMap) {
+								// Using a shadow map, so translate the dest pixel using the mapping array
+								*tempDest = shadowMap[*tempDest];
+							} else {
+								// Otherwise, it's a standard pixel copy
+								*tempDest = *tempSrc;
+							}
+						}
 					}
 					++tempSrc;
 					++tempDest;
@@ -805,8 +827,8 @@ void GfxElement::drawFrame() {
 
 		// Draw the edge frame
 		// Outer frame border
-		surface.hLine(tempRect.left + 2, tempRect.top, tempRect.right - 2, 0); 
-		surface.hLine(tempRect.left + 2, tempRect.bottom, tempRect.right - 2, 0); 
+		surface.hLine(tempRect.left + 2, tempRect.top, tempRect.right - 2, 0);
+		surface.hLine(tempRect.left + 2, tempRect.bottom, tempRect.right - 2, 0);
 		surface.vLine(tempRect.left, tempRect.top + 2, tempRect.bottom - 2, 0);
 		surface.vLine(tempRect.right, tempRect.top + 2, tempRect.bottom - 2, 0);
 		*((byte *)surface.getBasePtr(tempRect.left + 1, tempRect.top + 1)) = 0;
@@ -815,8 +837,8 @@ void GfxElement::drawFrame() {
 		*((byte *)surface.getBasePtr(tempRect.right - 1, tempRect.bottom - 1)) = 0;
 
 		// Inner frame border
-		surface.hLine(tempRect.left + 2, tempRect.top + 1, tempRect.right - 2, R2_GLOBALS._frameEdgeColor); 
-		surface.hLine(tempRect.left + 2, tempRect.bottom - 1, tempRect.right - 2, R2_GLOBALS._frameEdgeColor); 
+		surface.hLine(tempRect.left + 2, tempRect.top + 1, tempRect.right - 2, R2_GLOBALS._frameEdgeColor);
+		surface.hLine(tempRect.left + 2, tempRect.bottom - 1, tempRect.right - 2, R2_GLOBALS._frameEdgeColor);
 		surface.vLine(tempRect.left + 1, tempRect.top + 2, tempRect.bottom - 2, R2_GLOBALS._frameEdgeColor);
 		surface.vLine(tempRect.right - 1, tempRect.top + 2, tempRect.bottom - 2, R2_GLOBALS._frameEdgeColor);
 		*((byte *)surface.getBasePtr(tempRect.left + 2, tempRect.top + 2)) = R2_GLOBALS._frameEdgeColor;
@@ -1207,6 +1229,8 @@ GfxButton *GfxDialog::execute(GfxButton *defaultButton) {
 					selectedButton = defaultButton;
 					breakFlag = true;
 					break;
+				} else if (event.eventType == EVENT_KEYPRESS && handleKeypress(event, selectedButton)) {
+					breakFlag = true;
 				}
 			}
 		}
@@ -1223,8 +1247,9 @@ GfxButton *GfxDialog::execute(GfxButton *defaultButton) {
 }
 
 void GfxDialog::setPalette() {
-	if (g_vm->getGameID() == GType_BlueForce) {
-		g_globals->_scenePalette.loadPalette(2);
+	if (g_vm->getGameID() != GType_Ringworld) {
+		if (g_vm->getGameID() == GType_BlueForce)
+			g_globals->_scenePalette.loadPalette(2);
 		g_globals->_scenePalette.setPalette(0, 1);
 		g_globals->_scenePalette.setPalette(g_globals->_gfxColors.background, 1);
 		g_globals->_scenePalette.setPalette(g_globals->_gfxColors.foreground, 1);
@@ -1367,7 +1392,10 @@ void GfxManager::copyFrom(GfxSurface &src, const Rect &srcBounds, const Rect &de
 
 
 GfxFont::GfxFont() {
-	_fontNumber = (g_vm->getFeatures() & GF_DEMO) ? 0 : 50;
+	if ((g_vm->getGameID() == GType_Ringworld) && (g_vm->getFeatures() & GF_DEMO))
+		_fontNumber = 0;
+	else
+		_fontNumber = 50;
 	_numChars = 0;
 	_bpp = 0;
 	_fontData = NULL;
@@ -1457,7 +1485,6 @@ int GfxFont::getStringFit(const char *&s, int maxWidth) {
 	const char *nextWord = NULL;
 	const char *sStart = s;
 	int numChars = 1;
-	int strWidth = 1;
 	char nextChar;
 
 	for (;;) {
@@ -1471,7 +1498,7 @@ int GfxFont::getStringFit(const char *&s, int maxWidth) {
 			nextWord = s;
 		}
 
-		strWidth = getStringWidth(sStart, numChars);
+		int strWidth = getStringWidth(sStart, numChars);
 		if (strWidth > maxWidth) {
 			if (nextWord) {
 				s = nextWord;

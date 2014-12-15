@@ -8,24 +8,24 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
  *
  */
 
 #ifndef ZVISION_ZVISION_H
 #define ZVISION_ZVISION_H
 
+#include "zvision/core/console.h"
 #include "zvision/detection.h"
-#include "zvision/clock.h"
+#include "zvision/utility/clock.h"
 
 #include "common/random.h"
 #include "common/events.h"
@@ -44,14 +44,13 @@ class VideoDecoder;
 namespace ZVision {
 
 struct ZVisionGameDescription;
-class Console;
 class ScriptManager;
 class RenderManager;
 class CursorManager;
 class StringManager;
 class SaveManager;
 class RlfAnimation;
- 
+
 class ZVision : public Engine {
 public:
 	ZVision(OSystem *syst, const ZVisionGameDescription *gameDesc);
@@ -70,11 +69,11 @@ private:
 	enum {
 		WINDOW_WIDTH = 640,
 		WINDOW_HEIGHT = 480,
-		
+
 		//Zork nemesis working window sizes
 		ZNEM_WORKING_WINDOW_WIDTH = 512,
 		ZNEM_WORKING_WINDOW_HEIGHT = 320,
-		
+
 		//ZGI(and default) working window sizes
 		ZGI_WORKING_WINDOW_WIDTH = 640,
 		ZGI_WORKING_WINDOW_HEIGHT = 344,
@@ -117,6 +116,7 @@ public:
 	StringManager *getStringManager() const { return _stringManager; }
 	Common::RandomSource *getRandomSource() const { return _rnd; }
 	ZVisionGameId getGameId() const { return _gameDescription->gameId; }
+	GUI::Debugger *getDebugger() { return _console; }
 
 	/**
 	 * Play a video until it is finished. This is a blocking call. It will call
@@ -147,5 +147,5 @@ private:
 };
 
 } // End of namespace ZVision
- 
+
 #endif

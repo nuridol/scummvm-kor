@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -310,7 +310,7 @@ IMPLEMENT_FUNCTION_I(14, Boutarel, function14, bool)
 			break;
 
 		case 2:
-			getSavePoints()->push(kEntityBoutarel, kEntityServers1, kAction326144276);
+			getSavePoints()->push(kEntityBoutarel, kEntityWaiter2, kAction326144276);
 			getEntities()->drawSequenceRight(kEntityBoutarel, "812DS");
 			if (getEntities()->isInRestaurant(kEntityPlayer))
 				getEntities()->updateFrame(kEntityBoutarel);
@@ -674,7 +674,7 @@ IMPLEMENT_FUNCTION(20, Boutarel, function20)
 			break;
 
 		case 2:
-			getSavePoints()->push(kEntityBoutarel, kEntityServers1, kAction256200848);
+			getSavePoints()->push(kEntityBoutarel, kEntityWaiter2, kAction256200848);
 			break;
 
 		case 3:
@@ -937,7 +937,7 @@ IMPLEMENT_FUNCTION(29, Boutarel, function29)
 
 	case kActionNone:
 		if (Entity::updateParameter(params->param2, getState()->time, 450)) {
-			getSavePoints()->push(kEntityBoutarel, kEntityServers1, kAction256200848);
+			getSavePoints()->push(kEntityBoutarel, kEntityWaiter2, kAction256200848);
 		}
 
 		if (!params->param1)
@@ -1086,7 +1086,7 @@ IMPLEMENT_FUNCTION(33, Boutarel, function33)
 			break;
 
 		case 2:
-			getSavePoints()->push(kEntityBoutarel, kEntityServers1, kAction256200848);
+			getSavePoints()->push(kEntityBoutarel, kEntityWaiter2, kAction256200848);
 			break;
 
 		case 3:

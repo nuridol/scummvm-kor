@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -48,9 +48,9 @@ public:
 	 */
 	DECLARE_FUNCTION_1(playSound, const char *filename)
 
-	DECLARE_FUNCTION(function3)
+	DECLARE_FUNCTION(uptrainVersion)
 
-	DECLARE_FUNCTION(function4)
+	DECLARE_FUNCTION(downtrainVersion)
 
 	/**
 	 * Setup Chapter 1
@@ -58,21 +58,21 @@ public:
 	DECLARE_FUNCTION(chapter1)
 
 	/**
-	 * Handle Chapter 1 events
+	 * Chapter 1: Prepare dinner in kitchen
 	 */
-	DECLARE_FUNCTION(chapter1Handler)
+	DECLARE_FUNCTION(inKitchenDinner)
 
-	DECLARE_FUNCTION(function7)
+	DECLARE_FUNCTION(lockUp)
 
 	/**
 	 * Setup Chapter 2
 	 */
 	DECLARE_FUNCTION(chapter2)
 
-	/**
-	 * Handle Chapter 2 events
+	/*
+	 * Chapter 2: Prepare breakfast in kitchen
 	 */
-	DECLARE_FUNCTION(chapter2Handler)
+	DECLARE_FUNCTION(inKitchenBreakfast)
 
 	/**
 	 * Setup Chapter 3
@@ -80,9 +80,9 @@ public:
 	DECLARE_FUNCTION(chapter3)
 
 	/**
-	 * Handle Chapter 3 events
+	 * Chapter 3: Prepare lunch in kitchen
 	 */
-	DECLARE_FUNCTION(chapter3Handler)
+	DECLARE_FUNCTION(inKitchenLunch)
 
 	/**
 	 * Setup Chapter 4
@@ -90,9 +90,9 @@ public:
 	DECLARE_FUNCTION(chapter4)
 
 	/**
-	 * Handle Chapter 4 events
+	 * Chapter 4: Prepare second dinner in kitchen
 	 */
-	DECLARE_FUNCTION(chapter4Handler)
+	DECLARE_FUNCTION(inKitchenDinner2)
 
 	/**
 	 * Setup Chapter 5

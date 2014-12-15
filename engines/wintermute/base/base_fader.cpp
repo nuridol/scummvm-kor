@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -178,11 +178,11 @@ bool BaseFader::persist(BasePersistenceManager *persistMgr) {
 	persistMgr->transferBool(TMEMBER(_active));
 	persistMgr->transferByte(TMEMBER(_blue));
 	persistMgr->transferByte(TMEMBER(_currentAlpha));
-	persistMgr->transfer(TMEMBER(_duration));
+	persistMgr->transferUint32(TMEMBER(_duration));
 	persistMgr->transferByte(TMEMBER(_green));
 	persistMgr->transferByte(TMEMBER(_red));
 	persistMgr->transferByte(TMEMBER(_sourceAlpha));
-	persistMgr->transfer(TMEMBER(_startTime));
+	persistMgr->transferUint32(TMEMBER(_startTime));
 	persistMgr->transferByte(TMEMBER(_targetAlpha));
 	persistMgr->transferBool(TMEMBER(_system));
 

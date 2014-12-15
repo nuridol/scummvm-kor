@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -76,11 +76,6 @@ namespace Avalanche {
 
 const char AvalancheEngine::kSpludwicksOrder[3] = {kObjectOnion, kObjectInk, kObjectMushroom};
 const uint16 AvalancheEngine::kNotes[12] = {196, 220, 247, 262, 294, 330, 350, 392, 440, 494, 523, 587};
-const TuneType AvalancheEngine::kTune = {
-	kPitchHigher, kPitchHigher, kPitchLower, kPitchSame, kPitchHigher, kPitchHigher, kPitchLower, kPitchHigher, kPitchHigher, kPitchHigher,
-	kPitchLower, kPitchHigher, kPitchHigher, kPitchSame, kPitchHigher, kPitchLower, kPitchLower, kPitchLower, kPitchLower, kPitchHigher,
-	kPitchHigher, kPitchLower, kPitchLower, kPitchLower, kPitchLower, kPitchSame, kPitchLower, kPitchHigher, kPitchSame, kPitchLower, kPitchHigher
-};
 
 Room AvalancheEngine::_whereIs[29] = {
 	// The Lads
@@ -116,88 +111,6 @@ Room AvalancheEngine::_whereIs[29] = {
 	kRoomWiseWomans  // The Wise Woman.
 };
 
-Clock::Clock(AvalancheEngine *vm) {
-	_vm = vm;
-	// Magic value to determine if we just created the instance
-	_oldHour = _oldHourAngle = _oldMinute = 17717;
-	_hour = _minute = _second = 0;
-	_hourAngle = 0;
-}
-
-void Clock::update() {
-	TimeDate t;
-	_vm->_system->getTimeAndDate(t);
-	_hour = t.tm_hour;
-	_minute = t.tm_min;
-	_second = t.tm_sec;
-
-	_hourAngle = (_hour % 12) * 30 + _minute / 2;
-
-	if (_oldHour != _hour)  {
-		plotHands();
-		chime();
-	}
-
-	if (_oldMinute != _minute)
-		plotHands();
-
-	if ((_hour == 0) && (_oldHour != 0) && (_oldHour != 17717)) {
-		Common::String tmpStr = Common::String::format("Good morning!%c%cYes, it's just past " \
-			"midnight. Are you having an all-night Avvy session? Glad you like the game that much!", 
-			kControlNewLine, kControlNewLine);
-		_vm->_dialogs->displayText(tmpStr);
-	}
-	_oldHour = _hour;
-	_oldHourAngle = _hourAngle;
-	_oldMinute = _minute;
-}
-
-Common::Point Clock::calcHand(uint16 angle, uint16 length, Color color) {
-	if (angle > 900) {
-		return(Common::Point(177, 177));
-	}
-
-	return(_vm->_graphics->drawScreenArc(kCenterX, kCenterY, 449 - angle, 450 - angle, length, color));
-}
-
-void Clock::drawHand(const Common::Point &endPoint, Color color) {
-	if (endPoint.x == 177)
-		return;
-
-	_vm->_graphics->drawScreenLine(kCenterX, kCenterY, endPoint.x, endPoint.y, color);
-}
-
-void Clock::plotHands() {
-	_clockHandHour = calcHand(_oldHourAngle, 14, kColorYellow);
-	_clockHandMinute = calcHand(_oldMinute * 6, 17, kColorYellow);
-	drawHand(_clockHandHour, kColorBrown);
-	drawHand(_clockHandMinute, kColorBrown);
-
-	_clockHandHour = calcHand(_hourAngle, 14, kColorBrown);
-	_clockHandMinute = calcHand(_minute * 6, 17, kColorBrown);
-	drawHand(_clockHandHour, kColorYellow);
-	drawHand(_clockHandMinute, kColorYellow);
-}
-
-void Clock::chime() {
-	// Too high - must be first time around
-	// Mute - skip the sound generation
-	if ((_oldHour == 17717) || (!_vm->_soundFx))
-		return;
-	
-	byte hour = _hour % 12;
-	if (hour == 0)
-		hour = 12;
-
-	_vm->_graphics->loadMouse(kCurWait);
-
-	for (int i = 1; i <= hour; i++) {
-		for (int j = 1; j <= 3; j++)
-			_vm->_sound->playNote((i % 3) * 64 + 140 - j * 30, 50 - j * 12);
-		if (i != hour) 
-			_vm->_system->delayMillis(100);
-	}
-}
 
 
 void AvalancheEngine::handleKeyDown(Common::Event &event) {
@@ -277,7 +190,6 @@ void AvalancheEngine::setup() {
 
 	_animation->resetAnims();
 
-	drawToolbar();
 	_dialogs->setReadyLight(2);
 
 	fadeIn();
@@ -286,7 +198,11 @@ void AvalancheEngine::setup() {
 	_animation->_sprites[0]->_speedX = kWalk;
 	_animation->updateSpeed();
 
-	_menu->init();
+	_dropdown->init();
+
+	_graphics->drawSoundLight(_sound->_soundFl);
+
+	drawToolbar();
 
 	int16 loadSlot = ConfMan.instance().getInt("save_slot");
 	if (loadSlot >= 0) {
@@ -295,27 +211,31 @@ void AvalancheEngine::setup() {
 
 		loadGame(loadSlot);
 	} else {
-		_isLoaded = false; // Set to true in _vm->loadGame().
+		// We don't need the MainMenu during the whole game, only at the beginning of it.
+		MainMenu *mainmenu = new MainMenu(this);
+		mainmenu->run();
+		delete mainmenu;
+		if (_letMeOut)
+			return;
+
 		newGame();
 
-		_soundFx = !_soundFx;
-		fxToggle();
 		thinkAbout(kObjectMoney, kThing);
 
-		_dialogs->displayScrollChain('q', 83); // Info on the game, etc.
+		_dialogs->displayScrollChain('Q', 83); // Info on the game, etc.
 	}
 }
 
 void AvalancheEngine::runAvalot() {
 	setup();
 
-	do {
+	while (!_letMeOut && !shouldQuit()) {
 		uint32 beginLoop = _system->getMillis();
 
 		updateEvents(); // The event handler.
 
 		_clock->update();
-		_menu->update();
+		_dropdown->update();
 		_background->update();
 		_animation->animLink();
 		checkClick();
@@ -327,9 +247,7 @@ void AvalancheEngine::runAvalot() {
 		uint32 delay = _system->getMillis() - beginLoop;
 		if (delay <= 55)
 			_system->delayMillis(55 - delay); // Replaces slowdown(); 55 comes from 18.2 Hz (B Flight).
-	} while (!_letMeOut && !shouldQuit());
-
-	warning("STUB: run()");
+	};
 
 	_closing->exitGame();
 }
@@ -339,13 +257,6 @@ void AvalancheEngine::init() {
 		for (int j = 0; j < 2; j++)
 			_also[i][j] = nullptr;
 	}
-
-#if 0
-	if (_vm->_enhanced->atbios)
-		atkey = "f1";
-	else
-		atkey = "alt-";
-#endif
 
 	_letMeOut = false;
 	_currentMouse = 177;
@@ -503,9 +414,7 @@ void AvalancheEngine::loadAlso(byte num) {
 	}
 }
 
-void AvalancheEngine::loadRoom(byte num) {
-	CursorMan.showMouse(false);
-
+void AvalancheEngine::loadBackground(byte num) {
 	Common::String filename = Common::String::format("place%d.avd", num);
 	Common::File file;
 	if (!file.open(filename))
@@ -527,9 +436,15 @@ void AvalancheEngine::loadRoom(byte num) {
 	_graphics->refreshBackground();
 
 	file.close();
+}
 
+void AvalancheEngine::loadRoom(byte num) {
+	CursorMan.showMouse(false);
+
+	loadBackground(num);
 	loadAlso(num);
-	_background->load(num);
+	_background->loadSprites(num);
+
 	CursorMan.showMouse(true);
 }
 
@@ -547,7 +462,7 @@ void AvalancheEngine::findPeople(byte room) {
 void AvalancheEngine::exitRoom(byte x) {
 	_sound->stopSound();
 	_background->release();
-	_seeScroll = true;  // This stops the trippancy system working over the length of this procedure.
+	_animationsEnabled = false;
 
 	switch (x) {
 	case kRoomSpludwicks:
@@ -570,13 +485,12 @@ void AvalancheEngine::exitRoom(byte x) {
 	}
 
 	_interrogation = 0; // Leaving the room cancels all the questions automatically.
-	_seeScroll = false; // Now it can work again!
+	_animationsEnabled = true;
 
 	_lastRoom = _room;
 	if (_room != kRoomMap)
 		_lastRoomNotMap = _room;
 }
-
 
 /**
  * Only when entering a NEW town! Not returning to the last one,
@@ -584,7 +498,7 @@ void AvalancheEngine::exitRoom(byte x) {
  * @remarks	Originally called 'new_town'
  */
 void AvalancheEngine::enterNewTown() {
-	_menu->setup();
+	_dropdown->setup();
 
 	switch (_room) {
 	case kRoomOutsideNottsPub: // Entry into Nottingham.
@@ -618,11 +532,11 @@ void AvalancheEngine::putGeidaAt(byte whichPed, byte ped) {
 	spr1->init(5, false); // load Geida
 	_animation->appearPed(1, whichPed);
 	spr1->_callEachStepFl = true;
-	spr1->_eachStepProc = Animation::kProcGeida;
+	spr1->_eachStepProc = Animation::kProcFollowAvvy;
 }
 
 void AvalancheEngine::enterRoom(Room roomId, byte ped) {
-	_seeScroll = true;  // This stops the trippancy system working over the length of this procedure.
+	_animationsEnabled = false;
 
 	findPeople(roomId);
 	_room = roomId;
@@ -639,11 +553,12 @@ void AvalancheEngine::enterRoom(Room roomId, byte ped) {
 	if (_geidaFollows)
 		_whereIs[kPeopleGeida - 150] = roomId;
 
-	_roomTime = 0;
-
+	_roomCycles = 0;
 
 	if ((_lastRoom == kRoomMap) && (_lastRoomNotMap != _room))
 		enterNewTown();
+
+	_animation->updateSpeed();
 
 	switch (roomId) {
 	case kRoomYours:
@@ -702,7 +617,7 @@ void AvalancheEngine::enterRoom(Room roomId, byte ped) {
 			}
 
 			spr1->_callEachStepFl = true;
-			spr1->_eachStepProc = Animation::kProcGeida;
+			spr1->_eachStepProc = Animation::kProcFollowAvvy;
 		} else
 			_whereIs[kPeopleSpludwick - 150] = kRoomNowhere;
 		break;
@@ -811,12 +726,12 @@ void AvalancheEngine::enterRoom(Room roomId, byte ped) {
 			_graphics->zoomOut(_peds[ped - 1]._x, _peds[ped - 1]._y);
 
 		if ((_objects[kObjectWine - 1]) && (_wineState != 3)) {
-			_dialogs->displayScrollChain('q', 9); // Don't want to waste the wine!
+			_dialogs->displayScrollChain('Q', 9); // Don't want to waste the wine!
 			_objects[kObjectWine - 1] = false;
 			refreshObjectList();
 		}
 
-		_dialogs->displayScrollChain('q', 69);
+		_dialogs->displayScrollChain('Q', 69);
 		break;
 
 	case kRoomCatacombs:
@@ -999,14 +914,13 @@ void AvalancheEngine::enterRoom(Room roomId, byte ped) {
 
 	case kRoomDucks:
 		_npcFacing = 1; // Duck.
-		break; 
+		break;
 
 	default:
 		break;
 	}
 
-	_seeScroll = false; // Now it can work again!
-	_isLoaded = false;
+	_animationsEnabled = true;
 }
 
 void AvalancheEngine::thinkAbout(byte object, bool type) {
@@ -1041,7 +955,7 @@ void AvalancheEngine::drawToolbar() {
 }
 
 void AvalancheEngine::drawScore() {
-	uint16 score = _dnascore;
+	uint16 score = _score;
 	int8 numbers[3] = {0, 0, 0};
 	for (int i = 0; i < 2; i++) {
 		byte divisor = 1;
@@ -1065,17 +979,16 @@ void AvalancheEngine::drawScore() {
 		_scoreToDisplay[i] = numbers[i];
 }
 
-void AvalancheEngine::incScore(byte num) {    
+void AvalancheEngine::incScore(byte num) {
 	for (int i = 1; i <= num; i++) {
-		_dnascore++;
+		_score++;
 
 		if (_soundFx) {
 			for (int j = 1; j <= 97; j++)
-				// Length os 2 is a guess, the original doesn't have a delay specified
-				_sound->playNote(177 + _dnascore * 3, 2);
+				// Length of 2 is a guess, the original doesn't have a delay specified
+				_sound->playNote(177 + _score * 3, 2);
 		}
 	}
-	warning("STUB: points()");
 
 	drawScore();
 }
@@ -1200,7 +1113,7 @@ void AvalancheEngine::checkClick() {
 		_graphics->loadMouse(kCurIBeam); //I-beam
 	else if ((340 <= cursorPos.y) && (cursorPos.y <= 399))
 		_graphics->loadMouse(kCurScrewDriver); // screwdriver
-	else if (!_menu->isActive()) { // Dropdown can handle its own pointers.
+	else if (!_dropdown->isActive()) { // Dropdown can handle its own pointers.
 		if (_holdLeftMouse) {
 			_graphics->loadMouse(kCurCrosshair); // Mark's crosshairs
 			guideAvvy(cursorPos); // Normally, if you click on the picture, you're guiding Avvy around.
@@ -1211,7 +1124,7 @@ void AvalancheEngine::checkClick() {
 	if (_holdLeftMouse) {
 		if ((0 <= cursorPos.y) && (cursorPos.y <= 21)) { // Click on the dropdown menu.
 			if (_dropsOk)
-				_menu->update();
+				_dropdown->update();
 		} else if ((317 <= cursorPos.y) && (cursorPos.y <= 339)) { // Click on the command line.
 			_parser->_inputTextPos = (cursorPos.x - 23) / 8;
 			if (_parser->_inputTextPos > _parser->_inputText.size() + 1)
@@ -1251,7 +1164,7 @@ void AvalancheEngine::checkClick() {
 				_animation->_sprites[0]->_speedX = kRun;
 				_animation->updateSpeed();
 			} else if ((396 <= cursorPos.x) && (cursorPos.x <= 483))
-				fxToggle();
+				_sound->toggleSound();
 			else if ((535 <= cursorPos.x) && (cursorPos.x <= 640))
 				_mouseText.insertChar(kControlNewLine, 0);
 		} else if (!_dropsOk)
@@ -1260,7 +1173,14 @@ void AvalancheEngine::checkClick() {
 }
 
 void AvalancheEngine::errorLed() {
-	warning("STUB: errorled()");
+	_dialogs->setReadyLight(0);
+	_graphics->drawErrorLight(true);
+	for (int i = 177; i >= 1; i--) {
+		_sound->playNote(177 + (i * 177177) / 999, 1);
+		_system->delayMillis(1);
+	}
+	_graphics->drawErrorLight(false);
+	_dialogs->setReadyLight(2);
 }
 
 /**
@@ -1312,9 +1232,9 @@ void AvalancheEngine::fadeOut() {
 void AvalancheEngine::fadeIn() {
 	if (_holdTheDawn || !_fxHidden)
 		return;
-	
+
 	_fxHidden = false;
-	
+
 	byte pal[3];
 	for (int i = 15; i >= 0; i--) {
 		for (int j = 0; j < 16; j++) {
@@ -1341,7 +1261,6 @@ void AvalancheEngine::drawDirection() { // It's data is loaded in load_digits().
 	_graphics->drawDirection(_animation->getDirection(), 0, 161);
 	CursorMan.showMouse(true);
 }
-
 
 void AvalancheEngine::gameOver() {
 	_userMovesAvvy = false;
@@ -1371,17 +1290,13 @@ void AvalancheEngine::minorRedraw() {
 	fadeIn();
 }
 
-void AvalancheEngine::majorRedraw() {
-	warning("STUB: major_redraw()");
-}
-
 uint16 AvalancheEngine::bearing(byte whichPed) {
 	AnimationType *avvy = _animation->_sprites[0];
 	PedType *curPed = &_peds[whichPed];
 
 	if (avvy->_x == curPed->_x)
 		return 0;
-	
+
 	int16 deltaX = avvy->_x - curPed->_x;
 	int16 deltaY = avvy->_y - curPed->_y;
 	uint16 result = (uint16)(atan((float)(deltaY / deltaX)) * 180 / M_PI);
@@ -1392,7 +1307,7 @@ uint16 AvalancheEngine::bearing(byte whichPed) {
 	}
 }
 
-/** 
+/**
  * @remarks	Originally called 'sprite_run'
  */
 void AvalancheEngine::spriteRun() {
@@ -1414,12 +1329,11 @@ Common::String AvalancheEngine::intToStr(int32 num) {
 }
 
 void AvalancheEngine::resetVariables() {
-	_animation->setDirection(kDirUp);
 	_carryNum = 0;
 	for (int i = 0; i < kObjectNum; i++)
 		_objects[i] = false;
 
-	_dnascore = 0;
+	_score = 0;
 	_money = 0;
 	_room = kRoomNowhere;
 	_saveNum = 0;
@@ -1461,8 +1375,8 @@ void AvalancheEngine::resetVariables() {
 	_jumpStatus = 0;
 	_mushroomGrowing = false;
 	_spludwickAtHome = false;
-	_lastRoom = 0;
-	_lastRoomNotMap = 0;
+	_lastRoom = kRoomDummy;
+	_lastRoomNotMap = kRoomDummy;
 	_crapulusWillTell = false;
 	_enterCatacombsFromLustiesRoom = false;
 	_teetotal = false;
@@ -1482,12 +1396,18 @@ void AvalancheEngine::resetVariables() {
 	_takenMushroom = false;
 	_givenPenToAyles = false;
 	_askedDogfoodAboutNim = false;
+	_startTime = getTimeInSeconds();
+}
 
+void AvalancheEngine::resetAllVariables() {
+	resetVariables();
 	_parser->resetVariables();
+	_nim->resetVariables();
 	_animation->resetVariables();
 	_sequence->resetVariables();
 	_background->resetVariables();
-	_menu->resetVariables();
+	_dropdown->resetVariables();
+	_timer->resetVariables();
 }
 
 void AvalancheEngine::newGame() {
@@ -1502,7 +1422,7 @@ void AvalancheEngine::newGame() {
 	avvy->init(0, true);
 
 	_alive = true;
-	resetVariables();
+	resetAllVariables();
 
 	_dialogs->setBubbleStateNatural();
 
@@ -1519,7 +1439,7 @@ void AvalancheEngine::newGame() {
 	_thinkThing = true;
 	_thinks = 2;
 	refreshObjectList();
-	_seeScroll = false;
+	_animationsEnabled = true;
 
 	avvy->appear(300, 117, kDirRight); // Needed to initialize Avalot.
 	//for (gd = 0; gd <= 30; gd++) for (gm = 0; gm <= 1; gm++) also[gd][gm] = nil;
@@ -1532,10 +1452,12 @@ void AvalancheEngine::newGame() {
 	_doingSpriteRun = false;
 	_avvyInBed = true;
 
+	_isLoaded = false;
+
 	enterRoom(kRoomYours, 1);
 	avvy->_visible = false;
 	drawScore();
-	_menu->setup();
+	_dropdown->setup();
 	_clock->update();
 	spriteRun();
 }
@@ -1563,7 +1485,7 @@ Common::String AvalancheEngine::getName(People whose) {
 	static const char lads[17][20] = {
 		"Avalot",     "Spludwick",  "Crapulus",  "Dr. Duck",  "Malagauche",
 		"Friar Tuck", "Robin Hood", "Cwytalot",  "du Lustie", "the Duke of Cardiff",
-		"Dogfood",    "A trader",   "Ibythneth", "Ayles",     "Port", 
+		"Dogfood",    "A trader",   "Ibythneth", "Ayles",     "Port",
 		"Spurge",     "Jacques"
 	};
 
@@ -1745,10 +1667,10 @@ void AvalancheEngine::openDoor(Room whither, byte ped, byte magicnum) {
 }
 
 void AvalancheEngine::setRoom(People persId, Room roomId) {
-	_whereIs[persId - kPeopleAvalot] = roomId;	
+	_whereIs[persId - kPeopleAvalot] = roomId;
 }
 
 Room AvalancheEngine::getRoom(People persId) {
-	return _whereIs[persId - kPeopleAvalot];	
+	return _whereIs[persId - kPeopleAvalot];
 }
 } // End of namespace Avalanche

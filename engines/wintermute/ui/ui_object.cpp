@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -626,19 +626,19 @@ bool UIObject::persist(BasePersistenceManager *persistMgr) {
 	persistMgr->transferBool(TMEMBER(_disable));
 	persistMgr->transferPtr(TMEMBER_PTR(_focusedWidget));
 	persistMgr->transferPtr(TMEMBER_PTR(_font));
-	persistMgr->transfer(TMEMBER(_height));
+	persistMgr->transferSint32(TMEMBER(_height));
 	persistMgr->transferPtr(TMEMBER_PTR(_image));
 	persistMgr->transferPtr(TMEMBER_PTR(_listenerObject));
 	persistMgr->transferPtr(TMEMBER_PTR(_listenerParamObject));
-	persistMgr->transfer(TMEMBER(_listenerParamDWORD));
+	persistMgr->transferUint32(TMEMBER(_listenerParamDWORD));
 	persistMgr->transferPtr(TMEMBER_PTR(_parent));
 	persistMgr->transferBool(TMEMBER(_parentNotify));
 	persistMgr->transferBool(TMEMBER(_sharedFonts));
 	persistMgr->transferBool(TMEMBER(_sharedImages));
-	persistMgr->transfer(TMEMBER(_text));
-	persistMgr->transfer(TMEMBER_INT(_type));
+	persistMgr->transferCharPtr(TMEMBER(_text));
+	persistMgr->transferSint32(TMEMBER_INT(_type));
 	persistMgr->transferBool(TMEMBER(_visible));
-	persistMgr->transfer(TMEMBER(_width));
+	persistMgr->transferSint32(TMEMBER(_width));
 
 	return STATUS_OK;
 }

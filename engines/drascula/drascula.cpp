@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -176,9 +176,26 @@ DrasculaEngine::DrasculaEngine(OSystem *syst, const DrasculaGameDescription *gam
 	_rightMouseButton = 0;
 	*textName = 0;
 
+	crosshairCursor = 0;
+	mouseCursor = 0;
+	bgSurface = 0;
+	backSurface = 0;
+	cursorSurface = 0;
+	drawSurface3 = 0;
+	drawSurface2 = 0;
+	tableSurface = 0;
+	extraSurface = 0;
+	screenSurface = 0;
+	frontSurface = 0;
+	previousMusic = 0;
+	roomMusic = 0;
+
 	_rnd = new Common::RandomSource("drascula");
 
 	_console = 0;
+
+	const Common::FSNode gameDataDir(ConfMan.get("path"));
+	SearchMan.addSubDirectoryMatching(gameDataDir, "audio");
 
 	int cd_num = ConfMan.getInt("cdrom");
 	if (cd_num >= 0)
@@ -850,6 +867,11 @@ void DrasculaEngine::updateEvents() {
 #endif
 		switch (event.type) {
 		case Common::EVENT_KEYDOWN:
+			if (event.kbd.keycode == Common::KEYCODE_d && event.kbd.hasFlags(Common::KBD_CTRL)) {
+				// Start the debugger
+				getDebugger()->attach();
+				getDebugger()->onFrame();
+			}
 			addKeyToBuffer(event.kbd);
 			break;
 		case Common::EVENT_KEYUP:

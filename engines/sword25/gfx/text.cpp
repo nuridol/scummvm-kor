@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -99,7 +99,7 @@ void Text::setText(const Common::String &text) {
 }
 
 void Text::setColor(uint32 modulationColor) {
-	uint32 newModulationColor = (modulationColor & 0x00ffffff) | (_modulationColor & 0xff000000);
+	uint32 newModulationColor = (modulationColor & 0xffffff00) | (_modulationColor & 0x000000ff);
 	if (newModulationColor != _modulationColor) {
 		_modulationColor = newModulationColor;
 		forceRefresh();
@@ -108,7 +108,7 @@ void Text::setColor(uint32 modulationColor) {
 
 void Text::setAlpha(int alpha) {
 	assert(alpha >= 0 && alpha < 256);
-	uint32 newModulationColor = (_modulationColor & 0x00ffffff) | alpha << 24;
+	uint32 newModulationColor = (_modulationColor & 0xffffff00) | alpha;
 	if (newModulationColor != _modulationColor) {
 		_modulationColor = newModulationColor;
 		forceRefresh();
@@ -173,7 +173,7 @@ bool Text::doRender(RectangleList *updateRects) {
 
 			Common::Rect renderRect(curX, curY, curX + curRect.width(), curY + curRect.height());
 			renderRect.translate(curRect.left - curX, curRect.top - curY);
-			result = charMapPtr->blit(curX, curY, Image::FLIP_NONE, &renderRect, _modulationColor, -1, -1, updateRects);
+			result = charMapPtr->blit(curX, curY, Graphics::FLIP_NONE, &renderRect, _modulationColor, -1, -1, updateRects);
 			if (!result)
 				break;
 

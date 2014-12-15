@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -198,8 +198,7 @@ SurfaceSdlGraphicsManager::~SurfaceSdlGraphicsManager() {
 }
 
 void SurfaceSdlGraphicsManager::activateManager() {
-	GraphicsManager::activateManager();
-	initEventSource();
+	SdlGraphicsManager::activateManager();
 
 	// Register the graphics manager as a event observer
 	g_system->getEventManager()->getEventDispatcher()->registerObserver(this, 10, false);
@@ -211,8 +210,7 @@ void SurfaceSdlGraphicsManager::deactivateManager() {
 		g_system->getEventManager()->getEventDispatcher()->unregisterObserver(this);
 	}
 
-	deinitEventSource();
-	GraphicsManager::deactivateManager();
+	SdlGraphicsManager::deactivateManager();
 }
 
 bool SurfaceSdlGraphicsManager::hasFeature(OSystem::Feature f) {
@@ -267,7 +265,11 @@ const OSystem::GraphicsMode *SurfaceSdlGraphicsManager::getSupportedGraphicsMode
 }
 
 int SurfaceSdlGraphicsManager::getDefaultGraphicsMode() const {
+#ifdef USE_SCALERS
 	return GFX_DOUBLESIZE;
+#else
+	return GFX_NORMAL;
+#endif
 }
 
 void SurfaceSdlGraphicsManager::resetGraphicsScale() {
@@ -742,6 +744,8 @@ bool SurfaceSdlGraphicsManager::loadGFXMode() {
 	if (_screen == NULL)
 		error("allocating _screen failed");
 
+	// Avoid having SDL_SRCALPHA set even if we supplied an alpha-channel in the format.
+	SDL_SetAlpha(_screen, 0, 255);
 #else
 	_screen = SDL_CreateRGBSurface(SDL_SWSURFACE, _videoMode.screenWidth, _videoMode.screenHeight, 8, 0, 0, 0, 0);
 	if (_screen == NULL)
@@ -1076,7 +1080,9 @@ void SurfaceSdlGraphicsManager::internUpdateScreen() {
 		for (r = _dirtyRectList; r != lastRect; ++r) {
 			register int dst_y = r->y + _currentShakePos;
 			register int dst_h = 0;
+#ifdef USE_SCALERS
 			register int orig_dst_y = 0;
+#endif
 			register int rx1 = r->x * scale1;
 
 			if (dst_y < height) {
@@ -1084,7 +1090,9 @@ void SurfaceSdlGraphicsManager::internUpdateScreen() {
 				if (dst_h > height - dst_y)
 					dst_h = height - dst_y;
 
+#ifdef USE_SCALERS
 				orig_dst_y = dst_y;
+#endif
 				dst_y = dst_y * scale1;
 
 				if (_videoMode.aspectRatioCorrection && !_overlayVisible)

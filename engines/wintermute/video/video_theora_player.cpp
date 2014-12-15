@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -127,6 +127,7 @@ bool VideoTheoraPlayer::initialize(const Common::String &filename, const Common:
 #if defined (USE_THEORADEC)
 	_theoraDecoder = new Video::TheoraDecoder();
 #else
+	warning("VideoTheoraPlayer::initialize - Theora support not compiled in, video will be skipped: %s", filename.c_str());
 	return STATUS_FAILED;
 #endif
 	_theoraDecoder->loadStream(_file);
@@ -305,8 +306,15 @@ bool VideoTheoraPlayer::update() {
 			if (!_theoraDecoder->endOfVideo() && _theoraDecoder->getTimeToNextFrame() == 0) {
 				const Graphics::Surface *decodedFrame = _theoraDecoder->decodeNextFrame();
 				if (decodedFrame) {
-					_surface.free();
-					_surface.copyFrom(*decodedFrame);
+					if (decodedFrame->format == _surface.format && decodedFrame->pitch == _surface.pitch && decodedFrame->h == _surface.h) {
+						const byte *src = (const byte *)decodedFrame->getBasePtr(0, 0);
+						byte *dst = (byte *)_surface.getBasePtr(0, 0);
+						memcpy(dst, src, _surface.pitch * _surface.h);
+					} else {
+						_surface.free();
+						_surface.copyFrom(*decodedFrame);
+					}
+
 					if (_texture) {
 						writeVideo();
 					}
@@ -491,16 +499,16 @@ bool VideoTheoraPlayer::persist(BasePersistenceManager *persistMgr) {
 	}
 
 	persistMgr->transferPtr(TMEMBER_PTR(_gameRef));
-	persistMgr->transfer(TMEMBER(_savedPos));
-	persistMgr->transfer(TMEMBER(_savedState));
-	persistMgr->transfer(TMEMBER(_filename));
-	persistMgr->transfer(TMEMBER(_alphaFilename));
-	persistMgr->transfer(TMEMBER(_posX));
-	persistMgr->transfer(TMEMBER(_posY));
+	persistMgr->transferUint32(TMEMBER(_savedPos));
+	persistMgr->transferSint32(TMEMBER(_savedState));
+	persistMgr->transferString(TMEMBER(_filename));
+	persistMgr->transferString(TMEMBER(_alphaFilename));
+	persistMgr->transferSint32(TMEMBER(_posX));
+	persistMgr->transferSint32(TMEMBER(_posY));
 	persistMgr->transferFloat(TMEMBER(_playZoom));
-	persistMgr->transfer(TMEMBER_INT(_playbackType));
+	persistMgr->transferSint32(TMEMBER_INT(_playbackType));
 	persistMgr->transferBool(TMEMBER(_looping));
-	persistMgr->transfer(TMEMBER(_volume));
+	persistMgr->transferSint32(TMEMBER(_volume));
 
 	if (!persistMgr->getIsSaving() && (_savedState != THEORA_STATE_NONE)) {
 		initializeSimple();

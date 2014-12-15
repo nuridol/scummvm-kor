@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -73,7 +73,10 @@ bool LinuxmotoSdlEventSource::remapKey(SDL_Event &ev, Common::Event &event) {
 	}
 	// VirtualKeyboard - Camera key
 	else if (ev.key.keysym.sym == SDLK_PAUSE) {
-		ev.key.keysym.sym = SDLK_F7;
+#ifdef ENABLE_VKEYBD
+                event.type = Common::EVENT_VIRTUAL_KEYBOARD;
+                return true;
+#endif
 	}
 	// Enter - mod+fire key
 	else if (ev.key.keysym.sym == SDLK_b) {
@@ -117,7 +120,10 @@ bool LinuxmotoSdlEventSource::remapKey(SDL_Event &ev, Common::Event &event) {
 	}
 	// VirtualKeyboard - Right Soft key
 	else if (ev.key.keysym.sym == SDLK_F11) {
-		ev.key.keysym.sym = SDLK_F7;
+#ifdef ENABLE_VKEYBD
+                event.type = Common::EVENT_VIRTUAL_KEYBOARD;
+                return true;
+#endif
 	}
 #endif
 

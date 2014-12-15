@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #include "common/hash-str.h"
@@ -625,28 +626,16 @@ String operator+(const String &x, char y) {
 }
 
 char *ltrim(char *t) {
-#ifdef SCUMMVMKOR
-	while (isSpace(*t) && !(*t & 0x80))
-		t++;
-	return t;
-#else
 	while (isSpace(*t))
 		t++;
 	return t;
-#endif
 }
 
 char *rtrim(char *t) {
 	int l = strlen(t) - 1;
-#ifdef SCUMMVMKOR
-	while (l >= 0 && isSpace(t[l]) && !(t[l] & 0x80))
-		t[l--] = 0;
-	return t;
-#else
 	while (l >= 0 && isSpace(t[l]))
 		t[l--] = 0;
 	return t;
-#endif
 }
 
 char *trim(char *t) {

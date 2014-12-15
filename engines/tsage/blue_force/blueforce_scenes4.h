@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -116,10 +116,12 @@ public:
 	SpeakerDriver _driverSpeaker;
 	SpeakerShooter _shooterSpeaker;
 	ASoundExt _sound1;
-	int _action1Count, _talkCount, _field1FBA;
-	int _cuffedDriverFl, _field1FBE;
-	int _field1FC0; // Useless variable
-	int _field1FC2, _harrisonMovedFl; 
+	int _action1Count, _talkCount;
+	bool _harrissonTalkFl;
+	bool _cuffedDriverFl;
+	bool _cuffedPassengerFl;
+	bool _getDriverFl;
+	bool _driverOutOfTruckFl, _harrisonMovedFl;
 
 	Scene410();
 	virtual void postInit(SceneObjectList *OwnerList = NULL);
@@ -255,7 +257,8 @@ public:
 	NamedObject _door, _counterDoor;
 	Exit _exit;
 	NamedHotspot _interior, _shelf, _counter;
-	int _field19AC, _field19AE;
+	bool _managerCallsWeaselFl;
+	bool _talkManagerFl;
 
 	Scene450();
 	virtual void synchronize(Serializer &s);

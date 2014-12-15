@@ -5,7 +5,6 @@ MODULE_OBJS := \
 	cursorman.o \
 	font.o \
 	fontman.o \
-	korfont.o \
 	fonts/bdf.o \
 	fonts/consolefont.o \
 	fonts/newfont_big.o \
@@ -18,18 +17,14 @@ MODULE_OBJS := \
 	scaler/thumbnail_intern.o \
 	sjis.o \
 	surface.o \
+	transform_struct.o \
+	transform_tools.o \
+	transparent_surface.o \
 	thumbnail.o \
 	VectorRenderer.o \
 	VectorRendererSpec.o \
 	wincursor.o \
-	yuv_to_rgb.o \
-	decoders/bmp.o \
-	decoders/iff.o \
-	decoders/jpeg.o \
-	decoders/pcx.o \
-	decoders/pict.o \
-	decoders/png.o \
-	decoders/tga.o
+	yuv_to_rgb.o
 
 ifdef USE_SCALERS
 MODULE_OBJS += \

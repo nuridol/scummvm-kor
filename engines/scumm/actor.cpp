@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -37,10 +37,6 @@
 #include "scumm/he/sprite_he.h"
 #include "scumm/usage_bits.h"
 #include "scumm/util.h"
-
-#ifdef SCUMMVMKOR
-#include "scumm/korean.h"
-#endif
 
 namespace Scumm {
 
@@ -2275,11 +2271,6 @@ void ScummEngine_v7::actorTalk(const byte *msg) {
 
 	_charsetBufPos = 0;
 	_talkDelay = 0;
-
-#ifdef SCUMMVMKOR
-	INIT_KOR_DELAYS;
-#endif
-
 	_haveMsg = 1;
 	if (_game.id == GID_FT)
 		VAR(VAR_HAVE_MSG) = 0xFF;
@@ -2357,11 +2348,6 @@ void ScummEngine::actorTalk(const byte *msg) {
 	}
 	_charsetBufPos = 0;
 	_talkDelay = 0;
-
-#ifdef SCUMMVMKOR
-	INIT_KOR_DELAYS;
-#endif
-
 	_haveMsg = 0xFF;
 	VAR(VAR_HAVE_MSG) = 0xFF;
 	if (VAR_CHARCOUNT != 0xFF)
@@ -2400,10 +2386,6 @@ void ScummEngine::stopTalk() {
 
 	_haveMsg = 0;
 	_talkDelay = 0;
-
-#ifdef SCUMMVMKOR
-	INIT_KOR_DELAYS;
-#endif
 
 	act = getTalkingActor();
 	if (act && act < 0x80) {

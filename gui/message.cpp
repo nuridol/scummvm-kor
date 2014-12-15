@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #include "common/str.h"
@@ -73,11 +74,7 @@ MessageDialog::MessageDialog(const Common::String &message, const char *defaultB
 
 	// Center the dialog
 	_x = (screenW - _w) / 2;
-// #ifdef SCUMMVMKOR
-//     _y = (screenH - _h) / 4;
-// #else
 	_y = (screenH - _h) / 2;
-// #endif
 
 	// Each line is represented by one static text item.
 	for (int i = 0; i < lineCount; i++) {

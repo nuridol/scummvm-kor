@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -197,7 +197,7 @@ static Common::Error runGame(const EnginePlugin *plugin, OSystem &system, const 
 	//
 
 	// Add the game path to the directory search list
-	SearchMan.addDirectory(dir.getPath(), dir, 0, 4);
+	engine->initializePath(dir);
 
 	// Add extrapath (if any) to the directory search list
 	if (ConfMan.hasKey("extrapath")) {
@@ -222,7 +222,9 @@ static Common::Error runGame(const EnginePlugin *plugin, OSystem &system, const 
 	Common::StringTokenizer tokenizer(edebuglevels, " ,");
 	while (!tokenizer.empty()) {
 		Common::String token = tokenizer.nextToken();
-		if (!DebugMan.enableDebugChannel(token))
+		if (token.equalsIgnoreCase("all"))
+			DebugMan.enableAllDebugChannels();
+		else if (!DebugMan.enableDebugChannel(token))
 			warning(_("Engine does not support debug level '%s'"), token.c_str());
 	}
 
@@ -407,11 +409,6 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 	// the command line params) was read.
 	system.initBackend();
 
-#ifdef SCUMMVMKOR
-	// KOR: 한글 폰트를 로드한다
-	Graphics::loadKoreanGUIFont();
-#endif
-
 	// If we received an invalid graphics mode parameter via command line
 	// we check this here. We can't do it until after the backend is inited,
 	// or there won't be a graphics manager to ask for the supported modes.
@@ -543,12 +540,6 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 		setupGraphics(system);
 		launcherDialog();
 	}
-
-#ifdef SCUMMVMKOR
-	// KOR: 한글 폰트를 언로드한다
-	Graphics::unloadKoreanGUIFont();
-#endif
-
 	PluginManager::instance().unloadAllPlugins();
 	PluginManager::destroy();
 	GUI::GuiManager::destroy();

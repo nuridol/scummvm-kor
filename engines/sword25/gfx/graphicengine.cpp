@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -183,7 +183,7 @@ bool GraphicEngine::fill(const Common::Rect *fillRectPtr, uint color) {
 
 	if (rect.width() > 0 && rect.height() > 0) {
 		if (ca == 0xff) {
-			_backSurface.fillRect(rect, color);
+			_backSurface.fillRect(rect, BS_ARGB(cr, cg, cb, ca));
 		} else {
 			byte *outo = (byte *)_backSurface.getBasePtr(rect.left, rect.top);
 			byte *out;
@@ -192,22 +192,22 @@ bool GraphicEngine::fill(const Common::Rect *fillRectPtr, uint color) {
 				out = outo;
 				for (int j = rect.left; j < rect.right; j++) {
 #if defined(SCUMM_LITTLE_ENDIAN)
+					*out = 255;
+					out++;
 					*out += (byte)(((cb - *out) * ca) >> 8);
 					out++;
 					*out += (byte)(((cg - *out) * ca) >> 8);
 					out++;
 					*out += (byte)(((cr - *out) * ca) >> 8);
-					out++;
-					*out = 255;
 					out++;
 #else
-					*out = 255;
-					out++;
 					*out += (byte)(((cr - *out) * ca) >> 8);
 					out++;
 					*out += (byte)(((cg - *out) * ca) >> 8);
 					out++;
 					*out += (byte)(((cb - *out) * ca) >> 8);
+					out++;
+					*out = 255;
 					out++;
 #endif
 				}
