@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- *
+
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -46,6 +46,10 @@
 #include "scumm/smush/smush_player.h"
 
 #include "scumm/insane/insane.h"
+
+#ifdef SCUMMVMKOR
+#include "scumm/korean.h"
+#endif
 
 #include "audio/mixer.h"
 #include "audio/decoders/mp3.h"
@@ -613,6 +617,11 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 		str = string2;
 	}
 
+#ifdef SCUMMVMKOR
+	char kr_color = (color != -1) ? color : 1;
+	const char *strKorean = str;
+#endif
+
 	// flags:
 	// bit 0 - center       1
 	// bit 1 - not used     2
@@ -620,10 +629,20 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 	// bit 3 - wrap around  8
 	switch (flags & 9) {
 	case 0:
+#ifdef SCUMMVMKOR
+        if (_koreanMode) strKorean = convertToKorean(str, 0);
+        sf->drawString(strKorean, _dst, _width, _height, pos_x, pos_y, false);
+#else
 		sf->drawString(str, _dst, _width, _height, pos_x, pos_y, false);
+#endif
 		break;
 	case 1:
+#ifdef SCUMMVMKOR
+		if (_koreanMode) strKorean = convertToKorean(str, 0);
+		sf->drawString(strKorean, _dst, _width, _height, pos_x, MAX(pos_y, top), true);
+#else
 		sf->drawString(str, _dst, _width, _height, pos_x, MAX(pos_y, top), true);
+#endif
 		break;
 	case 8:
 		// FIXME: Is 'right' the maximum line width here, just
@@ -631,7 +650,12 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 		// in The Dig's intro, where 'left' and 'right' are
 		// always 0 and 321 respectively, and apparently we
 		// handle that correctly.
+#ifdef SCUMMVMKOR
+            if (_koreanMode) strKorean = convertToKorean(str, 0);
+            sf->drawStringWrap(strKorean, _dst, _width, _height, pos_x, MAX(pos_y, top), left, right, false);
+#else
 		sf->drawStringWrap(str, _dst, _width, _height, pos_x, MAX(pos_y, top), left, right, false);
+#endif
 		break;
 	case 9:
 		// In this case, the 'right' parameter is actually the
@@ -640,7 +664,12 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 		//
 		// Note that in The Dig's "Spacetime Six" movie it's
 		// 621. I have no idea what that means.
+#ifdef SCUMMVMKOR
+		if (_koreanMode) strKorean = convertToKorean(str, 0);
+		sf->drawStringWrap(strKorean, _dst, _width, _height, pos_x, MAX(pos_y, top), left, MIN(left + right, _width), true);
+#else
 		sf->drawStringWrap(str, _dst, _width, _height, pos_x, MAX(pos_y, top), left, MIN(left + right, _width), true);
+#endif
 		break;
 	default:
 		error("SmushPlayer::handleTextResource. Not handled flags: %d", flags);

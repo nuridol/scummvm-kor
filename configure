@@ -1509,6 +1509,8 @@ if test "$_release_build" = yes; then
 	DEFINES="$DEFINES -DRELEASE_BUILD"
 fi
 
+#scummvmkor
+	DEFINES="$DEFINES -DSCUMMVMKOR"
 
 #
 # Determine extension used for executables

@@ -17,7 +17,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
  */
 
 #ifndef SCUMM_CHARSET_H
@@ -35,6 +34,20 @@ namespace Scumm {
 class ScummEngine;
 class NutRenderer;
 struct VirtScreen;
+
+#ifdef SCUMMVMKOR
+static inline bool checkKSCode(byte hi, byte lo) {
+	//hi : xx
+	//lo : yy
+	if ((0xA1 > lo) || (0xFE < lo)) {
+		return false;
+	}
+	if ((hi >= 0xB0) && (hi <= 0xC8)) {
+		return true;
+	}
+	return false;
+}
+#endif
 
 static inline bool checkSJISCode(byte c) {
 	if ((c >= 0x80 && c <= 0x9f) || (c >= 0xe0 && c <= 0xfd))
@@ -89,6 +102,10 @@ public:
 
 	virtual void setColor(byte color) { _color = color; translateColor(); }
 
+#ifdef SCUMMVMKOR
+    virtual byte getColor() { return _color; }
+#endif
+
 	void saveLoadWithSerializer(Serializer *ser);
 };
 
@@ -101,6 +118,9 @@ protected:
 
 	byte _shadowColor;
 	bool _shadowMode;
+#ifdef SCUMMVMKOR
+    virtual void drawBits1(const Graphics::Surface &s, byte *dst, const byte *src, int drawTop, int width, int height, uint8 bitDepth);
+#endif
 
 public:
 	CharsetRendererCommon(ScummEngine *vm);
@@ -112,7 +132,11 @@ public:
 
 class CharsetRendererClassic : public CharsetRendererCommon {
 protected:
+#ifdef SCUMMVMKOR
+    virtual void drawBitsN(bool is2byte, const Graphics::Surface &s, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height);
+#else
 	virtual void drawBitsN(const Graphics::Surface &s, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height);
+#endif
 	void printCharIntern(bool is2byte, const byte *charPtr, int origWidth, int origHeight, int width, int height, VirtScreen *vs, bool ignoreCharsetMask);
 	virtual bool prepareDraw(uint16 chr);
 
@@ -122,6 +146,11 @@ protected:
 
 	// On which virtual screen will be drawn right now
 	VirtScreenNumber _drawScreen;
+
+#ifdef SCUMMVMKOR
+protected:
+    virtual void enableShadow(bool enable);
+#endif
 
 public:
 	CharsetRendererClassic(ScummEngine *vm) : CharsetRendererCommon(vm) {}
@@ -142,7 +171,11 @@ public:
 	int getFontHeight();
 
 private:
+#ifdef SCUMMVMKOR
+    void drawBitsN(bool is2byte, const Graphics::Surface &s, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height);
+#else
 	void drawBitsN(const Graphics::Surface &s, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height);
+#endif
 	bool prepareDraw(uint16 chr);
 	void setupShadowMode();
 	bool useFontRomCharacter(uint16 chr);
