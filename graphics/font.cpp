@@ -40,7 +40,7 @@ int getStringWidthImpl(const Font &font, const StringType &str) {
 
 #ifdef SCUMMVMKOR
     bool isKorean = 1;
-    const char *s = str.c_str();
+    //const char *s = str.c_str();
     uint len = str.size();
     
     for (uint i = 0; i < len; ++i) {
@@ -85,11 +85,12 @@ void drawStringImpl(const Font &font, Surface *dst, const StringType &str, int x
 	typename StringType::unsigned_type last = 0;
 	for (typename StringType::const_iterator i = str.begin(), end = str.end(); i != end; ++i) {
 #ifdef SCUMMVMKOR
+        bool isKorean = 1;
         typename StringType::unsigned_type c;
-        c = str[i];
+        c = *i;
         if (c >= 0x80 && isKorean && i+1 < end) {
-            if (checkKorCode(c, str[i + 1])) {
-                c += str[i + 1] * 256;	//LE
+            if (checkKorCode(c, *(i+1))) {
+                c += *(i+1) * 256;	//LE
                 i++;
             } else {
                 // 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
@@ -264,7 +265,7 @@ void Font::drawString(Surface *dst, const Common::String &sOld, int x, int y, in
 		for (i = 0; i < s.size(); ++i) {
 #ifdef SCUMMVMKOR
             int charWidth = 0;
-            typename StringType::unsigned_type c;
+            Common::String::unsigned_type c;
             c = s[i];
             if (c >= 0x80 && isKorean && i+1 < s.size()) {
                 if (checkKorCode(c, s[i + 1])) {
@@ -309,7 +310,7 @@ void Font::drawString(Surface *dst, const Common::String &sOld, int x, int y, in
 		int skip = width + ellipsisWidth - w;
 		for (; i < s.size() && skip > 0; ++i) {
 #ifdef SCUMMVMKOR
-            typename StringType::unsigned_type c;
+            Common::String::unsigned_type c;
             c = s[i];
             if (c >= 0x80 && isKorean && i+1 < s.size()) {
                 if (checkKorCode(c, s[i + 1])) {

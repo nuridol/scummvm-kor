@@ -1238,6 +1238,7 @@ public:
 
 protected:
 	byte *_2byteFontPtr;
+#endif
 
 public:
 
