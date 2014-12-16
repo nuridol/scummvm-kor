@@ -16,4 +16,8 @@
 #define SCUMMVM_REVISION
 #endif
 
+#ifdef SCUMMVMKOR
+#define SCUMMVM_VERSION "1.7.0-kor" SCUMMVM_REVISION
+#else
 #define SCUMMVM_VERSION "1.7.0" SCUMMVM_REVISION
+#endif

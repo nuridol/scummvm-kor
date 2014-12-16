@@ -42,11 +42,15 @@
 - (id)initWithKeyboard:(SoftKeyboard *)keyboard {
 	self = [super initWithFrame:CGRectMake(0.0f, 0.0f, 0.0f, 0.0f)];
 	softKeyboard = keyboard;
-
+#ifdef SCUMMVMKOR
+	self.autocorrectionType = UITextAutocorrectionTypeNo;
+	self.autocapitalizationType = UITextAutocapitalizationTypeNone;
+	self.enablesReturnKeyAutomatically = NO;
+#else
 	[[self textInputTraits] setAutocorrectionType:(UITextAutocorrectionType)1];
 	[[self textInputTraits] setAutocapitalizationType:(UITextAutocapitalizationType)0];
 	[[self textInputTraits] setEnablesReturnKeyAutomatically:NO];
-
+#endif
 	return self;
 }
 

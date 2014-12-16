@@ -317,13 +317,14 @@ bool ROQPlayer::processBlockQuadCodebook(ROQBlockHeader &blockHeader) {
 		// Read the subsampled Cb and Cr
 		byte u = _file->readByte();
 		byte v = _file->readByte();
-
+#ifdef USE_RGB_COLOR
 		// Convert the codebook to RGB right here
 		for (int j = 0; j < 4; j++) {
 			byte r, g, b;
 			Graphics::YUV2RGB(y[j], u, v, r, g, b);
 			*codebook++ = _vm->_pixelFormat.ARGBToColor(a[j], r, g, b);
 		}
+#endif
 	}
 
 	// Read the 4x4 codebook

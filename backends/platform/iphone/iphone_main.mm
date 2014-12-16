@@ -81,10 +81,13 @@ int main(int argc, char **argv) {
 	CGRect  rect = [[UIScreen mainScreen] bounds];
 
 	// hide the status bar
-	[application setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
+#ifdef SCUMMVMKOR
+    application.statusBarHidden = YES;
+#else
+    [application setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
 	[application setStatusBarHidden:YES animated:YES];
-
-	_window = [[UIWindow alloc] initWithFrame:rect];
+#endif
+    _window = [[UIWindow alloc] initWithFrame:rect];
 	[_window retain];
 
 	_view = [[iPhoneView alloc] initWithFrame:rect];
@@ -123,9 +126,13 @@ int main(int argc, char **argv) {
 
 	// Workaround, need to "hide" and unhide the statusbar to properly remove it,
 	// since the Springboard has put it back without apparently flagging our application.
+#ifdef SCUMMVMKOR
+    self.statusBarHidden = YES;
+#else
+    [self setStatusBarHidden:YES animated:YES];
+    [self setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
 	[self setStatusBarHidden:YES animated:YES];
-	[self setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
-	[self setStatusBarHidden:YES animated:YES];
+#endif
 }
 
 - (void)didRotate:(NSNotification *)notification {
