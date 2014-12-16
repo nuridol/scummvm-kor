@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -32,7 +32,7 @@
 
 #include "engines/wintermute/coll_templ.h"
 #include "engines/wintermute/base/base_script_holder.h"
-#include "engines/wintermute/graphics/transform_tools.h"
+#include "graphics/transform_tools.h"
 
 namespace Wintermute {
 class BaseFrame;
@@ -45,17 +45,17 @@ public:
 	void setDefaults();
 	DECLARE_PERSISTENT(BaseSprite, BaseScriptHolder)
 
-	bool getBoundingRect(Rect32 *rect, int x, int y, float scaleX = kDefaultZoomX, float scaleY = kDefaultZoomY);
+	bool getBoundingRect(Rect32 *rect, int x, int y, float scaleX = Graphics::kDefaultZoomX, float scaleY = Graphics::kDefaultZoomY);
 	int32 _moveY;
 	int32 _moveX;
-	bool display(int x, int y, BaseObject *registerOwner = nullptr, float zoomX = kDefaultZoomX, float zoomY = kDefaultZoomY, uint32 alpha = kDefaultRgbaMod, float rotate = kDefaultAngle, TSpriteBlendMode blendMode = BLEND_NORMAL);
-	bool getCurrentFrame(float zoomX = kDefaultZoomX, float zoomY = kDefaultZoomY);
+	bool display(int x, int y, BaseObject *registerOwner = nullptr, float zoomX = Graphics::kDefaultZoomX, float zoomY = Graphics::kDefaultZoomY, uint32 alpha = Graphics::kDefaultRgbaMod, float rotate = Graphics::kDefaultAngle, Graphics::TSpriteBlendMode blendMode = Graphics::BLEND_NORMAL);
+	bool getCurrentFrame(float zoomX = Graphics::kDefaultZoomX, float zoomY = Graphics::kDefaultZoomY);
 	void reset();
 	bool isChanged();
 	bool isFinished();
 	bool loadBuffer(char *buffer, bool compete = true, int lifeTime = -1, TSpriteCacheType cacheType = CACHE_ALL);
 	bool loadFile(const Common::String &filename, int lifeTime = -1, TSpriteCacheType cacheType = CACHE_ALL);
-	bool draw(int x, int y, BaseObject *Register = nullptr, float zoomX = kDefaultZoomX, float zoomY = kDefaultZoomY, uint32 alpha = kDefaultRgbaMod);
+	bool draw(int x, int y, BaseObject *Register = nullptr, float zoomX = Graphics::kDefaultZoomX, float zoomY = Graphics::kDefaultZoomY, uint32 alpha = Graphics::kDefaultRgbaMod);
 	bool _looping;
 	int32 _currentFrame;
 	bool addFrame(const char *filename, uint32 delay = 0, int hotspotX = 0, int hotspotY = 0, Rect32 *rect = nullptr);

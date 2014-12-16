@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -101,7 +101,7 @@ public:
 
 	// Savepoints
 	void push(EntityIndex entity2, EntityIndex entity1, ActionIndex action, uint32 param = 0);
-	void push(EntityIndex entity2, EntityIndex entity1, ActionIndex action, const char *param);
+	void push(EntityIndex entity2, EntityIndex entity1, ActionIndex action, const Common::String param);
 	void pushAll(EntityIndex entity, ActionIndex action, uint32 param = 0);
 	void process();
 	void reset();
@@ -113,7 +113,7 @@ public:
 	void setCallback(EntityIndex index, Callback *callback);
 	Callback *getCallback(EntityIndex entity) const;
 	void call(EntityIndex entity2, EntityIndex entity1, ActionIndex action, uint32 param = 0) const;
-	void call(EntityIndex entity2, EntityIndex entity1, ActionIndex action, const char *param) const;
+	void call(EntityIndex entity2, EntityIndex entity1, ActionIndex action, const Common::String param) const;
 	void callAndProcess();
 
 	// Serializable

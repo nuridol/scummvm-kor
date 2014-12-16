@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -173,12 +173,12 @@ void BaseRenderer::endSaveLoad() {
 }
 
 void BaseRenderer::persistSaveLoadImages(BasePersistenceManager *persistMgr) {
-	persistMgr->transfer(TMEMBER(_loadImageName));
-	persistMgr->transfer(TMEMBER(_saveImageName));
-	persistMgr->transfer(TMEMBER(_saveImageX));
-	persistMgr->transfer(TMEMBER(_saveImageY));
-	persistMgr->transfer(TMEMBER(_loadImageX));
-	persistMgr->transfer(TMEMBER(_loadImageY));
+	persistMgr->transferString(TMEMBER(_loadImageName));
+	persistMgr->transferString(TMEMBER(_saveImageName));
+	persistMgr->transferSint32(TMEMBER(_saveImageX));
+	persistMgr->transferSint32(TMEMBER(_saveImageY));
+	persistMgr->transferSint32(TMEMBER(_loadImageX));
+	persistMgr->transferSint32(TMEMBER(_loadImageY));
 }
 
 //////////////////////////////////////////////////////////////////////

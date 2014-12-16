@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -40,22 +40,6 @@ namespace Sword25 {
 
 class BitmapResource : public Resource {
 public:
-	/**
-	    @brief Die möglichen Flippingparameter für die Blit-Methode.
-	*/
-	enum FLIP_FLAGS {
-		/// Das Bild wird nicht gespiegelt.
-		FLIP_NONE = 0,
-		/// Das Bild wird an der horizontalen Achse gespiegelt.
-		FLIP_H = 1,
-		/// Das Bild wird an der vertikalen Achse gespiegelt.
-		FLIP_V = 2,
-		/// Das Bild wird an der horizontalen und vertikalen Achse gespiegelt.
-		FLIP_HV = FLIP_H | FLIP_V,
-		/// Das Bild wird an der horizontalen und vertikalen Achse gespiegelt.
-		FLIP_VH = FLIP_H | FLIP_V
-	};
-
 	BitmapResource(const Common::String &filename, Image *pImage) :
 					_pImage(pImage), Resource(filename, Resource::TYPE_BITMAP) {}
 	virtual ~BitmapResource() { delete _pImage; }
@@ -120,7 +104,7 @@ public:
 	            - IsColorModulationAllowed()
 	*/
 	bool blit(int posX = 0, int posY = 0,
-	          int flipping = FLIP_NONE,
+	          int flipping = Graphics::FLIP_NONE,
 	          Common::Rect *pSrcPartRect = NULL,
 	          uint color = BS_ARGB(255, 255, 255, 255),
 	          int width = -1, int height = -1,

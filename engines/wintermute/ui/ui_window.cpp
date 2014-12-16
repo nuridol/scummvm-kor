@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -1263,15 +1263,15 @@ bool UIWindow::persist(BasePersistenceManager *persistMgr) {
 	persistMgr->transferBool(TMEMBER(_dragging));
 	persistMgr->transferRect32(TMEMBER(_dragRect));
 	persistMgr->transferBool(TMEMBER(_fadeBackground));
-	persistMgr->transfer(TMEMBER(_fadeColor));
+	persistMgr->transferUint32(TMEMBER(_fadeColor));
 	persistMgr->transferPtr(TMEMBER_PTR(_fontInactive));
 	persistMgr->transferPtr(TMEMBER_PTR(_imageInactive));
 	persistMgr->transferBool(TMEMBER(_inGame));
 	persistMgr->transferBool(TMEMBER(_isMenu));
-	persistMgr->transfer(TMEMBER_INT(_mode));
+	persistMgr->transferSint32(TMEMBER_INT(_mode));
 	persistMgr->transferPtr(TMEMBER_PTR(_shieldButton));
 	persistMgr->transferPtr(TMEMBER_PTR(_shieldWindow));
-	persistMgr->transfer(TMEMBER_INT(_titleAlign));
+	persistMgr->transferSint32(TMEMBER_INT(_titleAlign));
 	persistMgr->transferRect32(TMEMBER(_titleRect));
 	persistMgr->transferBool(TMEMBER(_transparent));
 	persistMgr->transferPtr(TMEMBER_PTR(_viewport));

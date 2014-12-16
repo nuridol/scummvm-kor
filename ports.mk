@@ -97,15 +97,16 @@ endif
 ifneq ($(BACKEND), iphone)
 # Static libaries, used for the scummvm-static and iphone targets
 OSX_STATIC_LIBS := `$(STATICLIBPATH)/bin/sdl-config --static-libs`
-ifdef USE_FREETYPE2
-OSX_STATIC_LIBS += /opt/local/lib/libfreetype.a $(STATICLIBPATH)/lib/libbz2.a
 endif
+
+ifdef USE_FREETYPE2
+OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libfreetype.a $(STATICLIBPATH)/lib/libbz2.a
 endif
 
 ifdef USE_VORBIS
 OSX_STATIC_LIBS += \
-		/opt/local/lib/libvorbisfile.a \
-		/opt/local/lib/libvorbis.a \
+		$(STATICLIBPATH)/lib/libvorbisfile.a \
+		$(STATICLIBPATH)/lib/libvorbis.a \
 		$(STATICLIBPATH)/lib/libogg.a
 endif
 
@@ -124,7 +125,7 @@ OSX_STATIC_LIBS += \
 endif
 
 ifdef USE_MAD
-OSX_STATIC_LIBS += /opt/local/lib/libmad.a
+OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libmad.a
 endif
 
 ifdef USE_PNG
@@ -155,10 +156,6 @@ ifdef USE_SPARKLE
 OSX_STATIC_LIBS += -framework Sparkle -F$(STATICLIBPATH)
 endif
 
-ifdef USE_TERMCONV
-OSX_ICONV ?= -liconv
-endif
-
 # Special target to create a static linked binary for Mac OS X.
 # We use -force_cpusubtype_ALL to ensure the binary runs on every
 # PowerPC machine.
@@ -166,17 +163,15 @@ scummvm-static: $(OBJS)
 	$(CXX) $(LDFLAGS) -force_cpusubtype_ALL -o scummvm-static $(OBJS) \
 		-framework CoreMIDI \
 		$(OSX_STATIC_LIBS) \
-		$(OSX_ZLIB) \
-		$(OSX_ICONV)
+		$(OSX_ZLIB)
 
 # Special target to create a static linked binary for the iPhone
 iphone: $(OBJS)
 	$(CXX) $(LDFLAGS) -o scummvm $(OBJS) \
 		$(OSX_STATIC_LIBS) \
 		-framework UIKit -framework CoreGraphics -framework OpenGLES \
-		-framework GraphicsServices -framework CoreFoundation -framework QuartzCore \
-		-framework Foundation -framework AudioToolbox -framework CoreAudio \
-		-lobjc -lz
+		-framework CoreFoundation -framework QuartzCore -framework Foundation \
+		-framework AudioToolbox -framework CoreAudio -lobjc -lz
 
 # Special target to create a snapshot disk image for Mac OS X
 # TODO: Replace AUTHORS by Credits.rtf
@@ -252,7 +247,6 @@ win32dist: $(EXECUTABLE)
 	mkdir -p $(WIN32PATH)/doc/no-nb
 	mkdir -p $(WIN32PATH)/doc/se
 	$(STRIP) $(EXECUTABLE) -o $(WIN32PATH)/$(EXECUTABLE)
-	cp $(DIST_FILES_THEMES) $(WIN32PATH)
 	cp $(srcdir)/AUTHORS $(WIN32PATH)/AUTHORS.txt
 	cp $(srcdir)/COPYING $(WIN32PATH)/COPYING.txt
 	cp $(srcdir)/COPYING.BSD $(WIN32PATH)/COPYING.BSD.txt
@@ -318,15 +312,13 @@ else ifeq "$(CUR_BRANCH)" ""
 	$(error You must be on a release branch) 
 endif
 	@echo Creating Code::Blocks project files...
-	@cd $(srcdir)/dists/codeblocks && ../../devtools/create_project/create_project ../.. --codeblocks >/dev/null && git add -f *.workspace *.cbp
-	@echo Creating MSVC8 project files...
-	@cd $(srcdir)/dists/msvc8 && ../../devtools/create_project/create_project ../.. --msvc --msvc-version 8 >/dev/null && git add -f *.sln *.vcproj *.vsprops
+	@cd $(srcdir)/dists/codeblocks && ../../devtools/create_project/create_project ../.. --codeblocks >/dev/null && git add -f engines/plugins_table.h *.workspace *.cbp
 	@echo Creating MSVC9 project files...
-	@cd $(srcdir)/dists/msvc9 && ../../devtools/create_project/create_project ../.. --msvc --msvc-version 9 >/dev/null && git add -f *.sln *.vcproj *.vsprops
+	@cd $(srcdir)/dists/msvc9 && ../../devtools/create_project/create_project ../.. --msvc --msvc-version 9 >/dev/null && git add -f engines/plugins_table.h *.sln *.vcproj *.vsprops
 	@echo Creating MSVC10 project files...
-	@cd $(srcdir)/dists/msvc10 && ../../devtools/create_project/create_project ../.. --msvc --msvc-version 10 >/dev/null && git add -f *.sln *.vcxproj *.vcxproj.filters *.props
+	@cd $(srcdir)/dists/msvc10 && ../../devtools/create_project/create_project ../.. --msvc --msvc-version 10 >/dev/null && git add -f engines/plugins_table.h *.sln *.vcxproj *.vcxproj.filters *.props
 	@echo Creating MSVC11 project files...
-	@cd $(srcdir)/dists/msvc11 && ../../devtools/create_project/create_project ../.. --msvc --msvc-version 11 >/dev/null && git add -f *.sln *.vcxproj *.vcxproj.filters *.props
+	@cd $(srcdir)/dists/msvc11 && ../../devtools/create_project/create_project ../.. --msvc --msvc-version 11 >/dev/null && git add -f engines/plugins_table.h *.sln *.vcxproj *.vcxproj.filters *.props
 	@echo
 	@echo All is done.
 	@echo Now run
@@ -349,33 +341,5 @@ ifdef DIST_FILES_ENGINEDATA
 endif
 	cp $(DIST_FILES_DOCS) $(AOS4PATH)
 
-#
-# PlayStation 3 specific
-#
-ps3pkg: $(EXECUTABLE)
-	$(STRIP) $(EXECUTABLE)
-	sprxlinker $(EXECUTABLE)
-	mkdir -p ps3pkg/USRDIR/data/
-	mkdir -p ps3pkg/USRDIR/doc/
-	mkdir -p ps3pkg/USRDIR/saves/
-	make_self_npdrm "$(EXECUTABLE)" ps3pkg/USRDIR/EBOOT.BIN UP0001-SCUM12000_00-0000000000000000
-	cp $(DIST_FILES_THEMES) ps3pkg/USRDIR/data/
-ifdef DIST_FILES_ENGINEDATA
-	cp $(DIST_FILES_ENGINEDATA) ps3pkg/USRDIR/data/
-endif
-	cp $(DIST_FILES_DOCS) ps3pkg/USRDIR/doc/
-	cp $(srcdir)/dists/ps3/readme-ps3.md ps3pkg/USRDIR/doc/
-	cp $(srcdir)/backends/vkeybd/packs/vkeybd_default.zip ps3pkg/USRDIR/data/
-	cp $(srcdir)/dists/ps3/ICON0.PNG ps3pkg/
-	cp $(srcdir)/dists/ps3/PIC1.PNG ps3pkg/
-	sfo.py -f $(srcdir)/dists/ps3/sfo.xml ps3pkg/PARAM.SFO
-	pkg.py --contentid UP0001-SCUM12000_00-0000000000000000 ps3pkg/ scummvm-ps3.pkg
-
-ps3run: $(EXECUTABLE)
-	$(STRIP) $(EXECUTABLE)
-	sprxlinker $(EXECUTABLE)
-	make_self $(EXECUTABLE) $(EXECUTABLE).self
-	ps3load $(EXECUTABLE).self
-
 # Mark special targets as phony
-.PHONY: deb bundle osxsnap win32dist install uninstall ps3pkg ps3run
+.PHONY: deb bundle osxsnap win32dist install uninstall

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -44,13 +44,13 @@
 #include "lastexpress/entities/pascale.h"
 #include "lastexpress/entities/rebecca.h"
 #include "lastexpress/entities/salko.h"
-#include "lastexpress/entities/servers0.h"
-#include "lastexpress/entities/servers1.h"
 #include "lastexpress/entities/sophie.h"
 #include "lastexpress/entities/tatiana.h"
 #include "lastexpress/entities/vassili.h"
 #include "lastexpress/entities/verges.h"
 #include "lastexpress/entities/vesna.h"
+#include "lastexpress/entities/waiter1.h"
+#include "lastexpress/entities/waiter2.h"
 #include "lastexpress/entities/yasmin.h"
 
 #include "lastexpress/game/action.h"
@@ -77,7 +77,7 @@ Chapters::Chapters(LastExpressEngine *engine) : Entity(engine, kEntityChapters) 
 	ADD_CALLBACK_FUNCTION(Chapters, exitStation);
 	ADD_CALLBACK_FUNCTION(Chapters, chapter1);
 	ADD_CALLBACK_FUNCTION(Chapters, resetMainEntities);
-	ADD_CALLBACK_FUNCTION(Chapters, chapter1End);
+	ADD_CALLBACK_FUNCTION(Chapters, firstDream);
 	ADD_CALLBACK_FUNCTION(Chapters, chapter1Init);
 	ADD_CALLBACK_FUNCTION(Chapters, chapter1Handler);
 	ADD_CALLBACK_FUNCTION(Chapters, chapter1Next);
@@ -154,7 +154,8 @@ IMPLEMENT_FUNCTION(5, Chapters, resetMainEntities)
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(6, Chapters, chapter1End)
+IMPLEMENT_FUNCTION(6, Chapters, firstDream)
+	// Chapter 1 end
 	switch (savepoint.action) {
 	default:
 		break;
@@ -207,9 +208,9 @@ IMPLEMENT_FUNCTION(6, Chapters, chapter1End)
 
 	case kActionDefault:
 		RESET_ENTITY_STATE(kEntityPascale, Pascale, setup_function19);
-		RESET_ENTITY_STATE(kEntityServers0, Servers0, setup_function22);
-		RESET_ENTITY_STATE(kEntityServers1, Servers1, setup_function16);
-		RESET_ENTITY_STATE(kEntityCooks, Cooks, setup_function7);
+		RESET_ENTITY_STATE(kEntityWaiter1, Waiter1, setup_function22);
+		RESET_ENTITY_STATE(kEntityWaiter2, Waiter2, setup_function16);
+		RESET_ENTITY_STATE(kEntityCooks, Cooks, setup_lockUp);
 
 		RESET_ENTITY_STATE(kEntityMertens, Mertens, setup_function42);
 		RESET_ENTITY_STATE(kEntityCoudert, Coudert, setup_chapter1Handler);
@@ -220,8 +221,8 @@ IMPLEMENT_FUNCTION(6, Chapters, chapter1End)
 		getSavePoints()->push(kEntityChapters, kEntityVerges, kAction201431954);
 
 		RESET_ENTITY_STATE(kEntityKronos, Kronos, setup_function10);
-		RESET_ENTITY_STATE(kEntityKahina, Kahina, setup_function13);
-		RESET_ENTITY_STATE(kEntityAnna, Anna, setup_function34);
+		RESET_ENTITY_STATE(kEntityKahina, Kahina, setup_cathDone);
+		RESET_ENTITY_STATE(kEntityAnna, Anna, setup_asleep);
 		RESET_ENTITY_STATE(kEntityAugust, August, setup_function34);
 		RESET_ENTITY_STATE(kEntityTatiana, Tatiana, setup_function24);
 		RESET_ENTITY_STATE(kEntityVassili, Vassili, setup_function7);
@@ -269,7 +270,6 @@ IMPLEMENT_FUNCTION(6, Chapters, chapter1End)
 
 		if (getSoundQueue()->isBuffered("ZFX1007B"))
 			getSoundQueue()->processEntry("ZFX1007B");
-
 
 		getSound()->playSound(kEntityPlayer, "MUS008", kFlagDefault);
 		getInventory()->unselectItem();
@@ -349,19 +349,19 @@ IMPLEMENT_FUNCTION(7, Chapters, chapter1Init)
 	getObjects()->update(kObjectOutsideTylerCompartment, kEntityPlayer, kObjectLocationNone, kCursorKeepValue, kCursorKeepValue);
 
 	for (uint i = kObjectCompartment1; i <= kObjectCompartment8; i++) {
-		getObjects()->updateLocation2((ObjectIndex)i, kObjectLocation2);
+		getObjects()->updateModel((ObjectIndex) i, kObjectModel2);
 	}
 
 	for (uint i = kObjectCompartmentA; i <= kObjectCompartmentH; i++) {
-		getObjects()->updateLocation2((ObjectIndex)i, kObjectLocation2);
+		getObjects()->updateModel((ObjectIndex) i, kObjectModel2);
 	}
 
 	params->param1 = 40;
 
-	getObjects()->updateLocation2(kObject25, kObjectLocation1);
-	getObjects()->updateLocation2(kObjectTrainTimeTable, kObjectLocation1);
-	getObjects()->updateLocation2(kObject98, kObjectLocation1);
-	getObjects()->updateLocation2(kObjectRestaurantCar, kObjectLocation1);
+	getObjects()->updateModel(kObject25, kObjectModel1);
+	getObjects()->updateModel(kObjectTrainTimeTable, kObjectModel1);
+	getObjects()->updateModel(kObject98, kObjectModel1);
+	getObjects()->updateModel(kObjectRestaurantCar, kObjectModel1);
 
 	getObjects()->update(kObject25, kEntityPlayer, kObjectLocationNone, kCursorNormal, kCursorForward);
 	getObjects()->update(kObjectTrainTimeTable, kEntityPlayer, kObjectLocationNone, kCursorNormal, kCursorForward);
@@ -385,6 +385,7 @@ IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION(8, Chapters, chapter1Handler)
+	// Moving at night
 	switch (savepoint.action) {
 	default:
 		break;
@@ -705,7 +706,7 @@ label_chapter1_next:
 			setup_chapter1Next();
 		} else {
 			setCallback(23);
-			setup_chapter1End();
+			setup_firstDream();
 		}
 		break;
 	}
@@ -792,11 +793,11 @@ IMPLEMENT_FUNCTION(11, Chapters, chapter2Init)
 	getInventory()->setLocationAndProcess(kItem3, kObjectLocation1);
 
 	for (uint i = 1; i < 9; i++) {
-		getObjects()->updateLocation2((ObjectIndex)i, kObjectLocation2);
+		getObjects()->updateModel((ObjectIndex) i, kObjectModel2);
 	}
 
 	for (uint i = 33; i < 40; i++) {
-		getObjects()->updateLocation2((ObjectIndex)i, kObjectLocation2);
+		getObjects()->updateModel((ObjectIndex) i, kObjectModel2);
 	}
 
 	params->param1 = 40;
@@ -893,7 +894,7 @@ IMPLEMENT_FUNCTION(14, Chapters, chapter3Init)
 		getObjects()->update(kObjectHandleOutsideRight, kEntityPlayer, kObjectLocation1, kCursorNormal, kCursorHand);
 		getInventory()->setLocationAndProcess(kItemBriefcase, kObjectLocation1);
 		getInventory()->setLocationAndProcess(kItem3, kObjectLocation1);
-		getObjects()->updateLocation2(kObjectCompartment1, kObjectLocation2);
+		getObjects()->updateModel(kObjectCompartment1, kObjectModel2);
 		getObjects()->update(kObject107, kEntityPlayer, kObjectLocation3, kCursorKeepValue, kCursorKeepValue);
 
 		if (ENTITY_PARAM(0, 2) || ENTITY_PARAM(0, 3)) {
@@ -918,6 +919,7 @@ IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION(15, Chapters, chapter3Handler)
+	// Moving during the afternoon
 	switch (savepoint.action) {
 	default:
 		break;
@@ -1078,6 +1080,7 @@ IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION(16, Chapters, viennaEvents)
+	// End in Vienna
 	switch (savepoint.action) {
 	default:
 		break;
@@ -1204,7 +1207,7 @@ IMPLEMENT_FUNCTION(18, Chapters, chapter4Init)
 	if (getInventory()->get(kItemBeetle)->location == kObjectLocation3)
 		getScenes()->loadSceneFromItemPosition(kItemBeetle);
 
-	getObjects()->updateLocation2(kObject25, kObjectLocation2);
+	getObjects()->updateModel(kObject25, kObjectModel2);
 	getObjects()->update(kObject107, kEntityPlayer, kObjectLocation3, kCursorKeepValue, kCursorKeepValue);
 
 	if (ENTITY_PARAM(0, 2) || ENTITY_PARAM(0, 3)) {
@@ -1225,6 +1228,7 @@ IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION(19, Chapters, chapter4Handler)
+	// Moving during the second night
 	switch (savepoint.action) {
 	default:
 		break;
@@ -1265,7 +1269,7 @@ label_exitPozsony:
 			break;
 
 label_enterGalanta:
-		if (getObjects()->get(kObjectCompartment1).location2 == kObjectLocation1) {
+		if (getObjects()->get(kObjectCompartment1).model == kObjectModel1) {
 			if (getState()->time > kTime2403000 && !CURRENT_PARAM(1, 2)) {
 				CURRENT_PARAM(1, 2) = 1;
 				getProgress().field_18 = 2;
@@ -1440,7 +1444,7 @@ label_callback_4:
 
 		case 10:
 			getAction()->playAnimation(kEventDefuseBomb);
-			RESET_ENTITY_STATE(kEntityAbbot, Abbot, setup_function48);
+			RESET_ENTITY_STATE(kEntityAbbot, Abbot, setup_afterBomb);
 			getSavePoints()->push(kEntityChapters, kEntityAnna, kAction191001984);
 			getSavePoints()->push(kEntityChapters, kEntityCoudert, kAction191001984);
 			getScenes()->loadSceneFromItemPosition(kItem2);
@@ -1514,12 +1518,12 @@ label_callback_4:
 
 		if (getInventory()->hasItem(kItemBomb)) {
 			RESET_ENTITY_STATE(kEntityAlexei, Alexei, setup_function47);
-			RESET_ENTITY_STATE(kEntityAnna, Anna, setup_function68);
+			RESET_ENTITY_STATE(kEntityAnna, Anna, setup_sulking);
 			RESET_ENTITY_STATE(kEntityAugust, August, setup_function65);
 			RESET_ENTITY_STATE(kEntityMertens, Mertens, setup_function48);
 			RESET_ENTITY_STATE(kEntityCoudert, Coudert, setup_function53);
-			RESET_ENTITY_STATE(kEntityServers0, Servers0, setup_chapter4Handler);
-			RESET_ENTITY_STATE(kEntityServers1, Servers1, setup_chapter4Handler);
+			RESET_ENTITY_STATE(kEntityWaiter1, Waiter1, setup_serving4);
+			RESET_ENTITY_STATE(kEntityWaiter2, Waiter2, setup_serving4);
 			RESET_ENTITY_STATE(kEntityPascale, Pascale, setup_chapter4Handler);
 			RESET_ENTITY_STATE(kEntityVerges, Verges, setup_chapter4Handler);
 			RESET_ENTITY_STATE(kEntityTatiana, Tatiana, setup_function49);
@@ -1535,12 +1539,12 @@ label_callback_4:
 			RESET_ENTITY_STATE(kEntityYasmin, Yasmin, setup_function17);
 			RESET_ENTITY_STATE(kEntityHadija, Hadija, setup_function19);
 			RESET_ENTITY_STATE(kEntityAlouan, Alouan, setup_function19);
-			RESET_ENTITY_STATE(kEntityMax, Max, setup_chapter4Handler);
+			RESET_ENTITY_STATE(kEntityMax, Max, setup_inCageFriendly);
 			getSavePoints()->push(kEntityChapters, kEntityAnna, kAction201431954);
 			getSavePoints()->push(kEntityChapters, kEntityMertens, kAction201431954);
 			getSavePoints()->push(kEntityChapters, kEntityCoudert, kAction201431954);
-			getSavePoints()->push(kEntityChapters, kEntityServers0, kAction201431954);
-			getSavePoints()->push(kEntityChapters, kEntityServers1, kAction201431954);
+			getSavePoints()->push(kEntityChapters, kEntityWaiter1, kAction201431954);
+			getSavePoints()->push(kEntityChapters, kEntityWaiter2, kAction201431954);
 			getSavePoints()->push(kEntityChapters, kEntityPascale, kAction201431954);
 			getSavePoints()->push(kEntityChapters, kEntityVerges, kAction201431954);
 
@@ -1675,8 +1679,8 @@ IMPLEMENT_FUNCTION(21, Chapters, chapter5Init)
 		getObjects()->update(kObject94, kEntityPlayer, kObjectLocationNone, kCursorKeepValue, kCursorKeepValue);
 		getObjects()->update(kObject101, kEntityPlayer, kObjectLocationNone, kCursorHandKnock, kCursorHand);
 
-		getObjects()->updateLocation2(kObject98, kObjectLocation2);
-		getObjects()->updateLocation2(kObjectRestaurantCar, kObjectLocation2);
+		getObjects()->updateModel(kObject98, kObjectModel2);
+		getObjects()->updateModel(kObjectRestaurantCar, kObjectModel2);
 
 		if (ENTITY_PARAM(0, 2) || ENTITY_PARAM(0, 3)) {
 			getSoundQueue()->removeFromQueue(kEntityChapters);
@@ -1753,7 +1757,6 @@ IMPLEMENT_FUNCTION(22, Chapters, chapter5Handler)
 		break;
 	}
 IMPLEMENT_FUNCTION_END
-
 
 //////////////////////////////////////////////////////////////////////////
 // Private functions

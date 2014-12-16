@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -89,7 +89,7 @@ public:
 	 */
 	DECLARE_FUNCTION(chapter1Handler)
 
-	DECLARE_FUNCTION(function9)
+	DECLARE_FUNCTION(greetCath)
 	DECLARE_FUNCTION(function10)
 	DECLARE_FUNCTION(function11)
 
@@ -109,14 +109,14 @@ public:
 	DECLARE_FUNCTION(chapter3Handler)
 
 	DECLARE_FUNCTION(function15)
-	DECLARE_FUNCTION(function16)
-	DECLARE_FUNCTION(function17)
-	DECLARE_FUNCTION(function18)
-	DECLARE_FUNCTION(function19)
-	DECLARE_FUNCTION(function20)
-	DECLARE_FUNCTION(function21)
-	DECLARE_FUNCTION(function22)
-	DECLARE_FUNCTION(function23)
+	DECLARE_FUNCTION(visitSalon)
+	DECLARE_FUNCTION(returnCompartment)
+	DECLARE_FUNCTION(preConcert)
+	DECLARE_FUNCTION(startConcert)
+	DECLARE_FUNCTION(duringConcert)
+	DECLARE_FUNCTION(afterConcert)
+	DECLARE_FUNCTION(awaitingCath)
+	DECLARE_FUNCTION(finished)
 
 	/**
 	 * Setup Chapter 4

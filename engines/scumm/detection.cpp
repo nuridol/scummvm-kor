@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -79,10 +79,12 @@ Common::String ScummEngine::generateFilename(const int room) const {
 	} else {
 		switch (_filenamePattern.genMethod) {
 		case kGenDiskNum:
+		case kGenDiskNumSteam:
 			result = Common::String::format(_filenamePattern.pattern, diskNumber);
 			break;
 
 		case kGenRoomNum:
+		case kGenRoomNumSteam:
 			result = Common::String::format(_filenamePattern.pattern, room);
 			break;
 
@@ -209,7 +211,32 @@ Common::String ScummEngine_v70he::generateFilename(const int room) const {
 	return result;
 }
 
-static Common::String generateFilenameForDetection(const char *pattern, FilenameGenMethod genMethod) {
+// The following table includes all the index files, which are embedded in the
+// main game executables in Steam versions.
+static const SteamIndexFile steamIndexFiles[] = {
+	{ GID_INDY3, Common::kPlatformWindows,   "%02d.LFL",      "00.LFL",        "Indiana Jones and the Last Crusade.exe",     162056,  6295 },
+	{ GID_INDY3, Common::kPlatformMacintosh, "%02d.LFL",      "00.LFL",        "The Last Crusade",                           150368,  6295 },
+	{ GID_INDY4, Common::kPlatformWindows,   "atlantis.%03d", "ATLANTIS.000",  "Indiana Jones and the Fate of Atlantis.exe", 224336, 12035 },
+	{ GID_INDY4, Common::kPlatformMacintosh, "atlantis.%03d", "ATLANTIS.000",  "The Fate of Atlantis",                       260224, 12035 },
+	{ GID_LOOM,  Common::kPlatformWindows,   "%03d.LFL",      "000.LFL",       "Loom.exe",                                   187248,  8307 },
+	{ GID_LOOM,  Common::kPlatformMacintosh, "%03d.LFL",      "000.LFL",       "Loom",                                       170464,  8307 },
+#ifdef ENABLE_SCUMM_7_8
+	{ GID_DIG,   Common::kPlatformWindows,   "dig.la%d",      "DIG.LA0",       "The Dig.exe",                                340632, 16304 },
+	{ GID_DIG,   Common::kPlatformMacintosh, "dig.la%d",      "DIG.LA0",       "The Dig",                                    339744, 16304 },
+#endif
+	{ 0,         Common::kPlatformUnknown,   nullptr,         nullptr,         nullptr,                                           0,     0 }
+};
+
+const SteamIndexFile *lookUpSteamIndexFile(Common::String pattern, Common::Platform platform) {
+	for (const SteamIndexFile *indexFile = steamIndexFiles; indexFile->len; ++indexFile) {
+		if (platform == indexFile->platform && pattern.equalsIgnoreCase(indexFile->pattern))
+			return indexFile;
+	}
+
+	return nullptr;
+}
+
+static Common::String generateFilenameForDetection(const char *pattern, FilenameGenMethod genMethod, Common::Platform platform) {
 	Common::String result;
 
 	switch (genMethod) {
@@ -217,6 +244,16 @@ static Common::String generateFilenameForDetection(const char *pattern, Filename
 	case kGenRoomNum:
 		result = Common::String::format(pattern, 0);
 		break;
+	
+	case kGenDiskNumSteam:
+	case kGenRoomNumSteam: {
+		const SteamIndexFile *indexFile = lookUpSteamIndexFile(pattern, platform);
+		if (!indexFile) {
+			error("Unable to find Steam executable from detection pattern");
+		} else {
+			result = indexFile->executableName;
+		}
+		} break;
 
 	case kGenHEPC:
 	case kGenHEIOS:
@@ -528,7 +565,8 @@ static void detectGames(const Common::FSList &fslist, Common::List<DetectorResul
 	DetectorResult dr;
 
 	// Dive one level down since mac indy3/loom has its files split into directories. See Bug #1438631
-	composeFileHashMap(fileMD5Map, fslist, 2, directoryGlobs);
+	// Dive two levels down for Mac Steam games
+	composeFileHashMap(fileMD5Map, fslist, 3, directoryGlobs);
 
 	// Iterate over all filename patterns.
 	for (const GameFilenamePattern *gfp = gameFilenamesTable; gfp->gameid; ++gfp) {
@@ -540,7 +578,7 @@ static void detectGames(const Common::FSList &fslist, Common::List<DetectorResul
 		// Generate the detectname corresponding to the gfp. If the file doesn't
 		// exist in the directory we are looking at, we can skip to the next
 		// one immediately.
-		Common::String file(generateFilenameForDetection(gfp->pattern, gfp->genMethod));
+		Common::String file(generateFilenameForDetection(gfp->pattern, gfp->genMethod, gfp->platform));
 		if (!fileMD5Map.contains(file))
 			continue;
 
@@ -1025,7 +1063,7 @@ Common::Error ScummMetaEngine::createInstance(OSystem *syst, Engine **engine) co
 	Common::FSNode dir(ConfMan.get("path"));
 	if (!dir.isDirectory())
 		return Common::kPathNotDirectory;
-	if (!dir.getChildren(fslist, Common::FSNode::kListFilesOnly))
+	if (!dir.getChildren(fslist, Common::FSNode::kListAll))
 		return Common::kNoGameDataFoundError;
 
 	// Invoke the detector, but fixed to the specified gameid.
@@ -1081,7 +1119,7 @@ Common::Error ScummMetaEngine::createInstance(OSystem *syst, Engine **engine) co
 
 		md5Warning += Common::String::format("  SCUMM gameid '%s', file '%s', MD5 '%s'\n\n",
 				res.game.gameid,
-				generateFilenameForDetection(res.fp.pattern, res.fp.genMethod).c_str(),
+				generateFilenameForDetection(res.fp.pattern, res.fp.genMethod, Common::kPlatformUnknown).c_str(),
 				res.md5.c_str());
 
 		g_system->logMessage(LogMessageType::kWarning, md5Warning.c_str());
@@ -1223,8 +1261,8 @@ const char *ScummMetaEngine::getOriginalCopyright() const {
 }
 
 namespace Scumm {
-	extern bool getSavegameName(Common::InSaveFile *in, Common::String &desc, int heversion);
-}
+bool getSavegameName(Common::InSaveFile *in, Common::String &desc, int heversion);
+} // End of namespace Scumm
 
 int ScummMetaEngine::getMaximumSaveSlot() const { return 99; }
 
@@ -1262,25 +1300,21 @@ void ScummMetaEngine::removeSaveState(const char *target, int slot) const {
 }
 
 SaveStateDescriptor ScummMetaEngine::querySaveMetaInfos(const char *target, int slot) const {
-	Common::String filename = ScummEngine::makeSavegameName(target, slot, false);
-	Common::InSaveFile *in = g_system->getSavefileManager()->openForLoading(filename);
-
-	if (!in)
-		return SaveStateDescriptor();
-
 	Common::String saveDesc;
-	Scumm::getSavegameName(in, saveDesc, 0);	// FIXME: heversion?!?
-	delete in;
+	Graphics::Surface *thumbnail = nullptr;
+	SaveStateMetaInfos infos;
+	memset(&infos, 0, sizeof(infos));
+	SaveStateMetaInfos *infoPtr = &infos;
 
-	// TODO: Cleanup
-	Graphics::Surface *thumbnail = ScummEngine::loadThumbnailFromSlot(target, slot);
+	// FIXME: heversion?!?
+	if (!ScummEngine::querySaveMetaInfos(target, slot, 0, saveDesc, thumbnail, infoPtr)) {
+		return SaveStateDescriptor();
+	}
 
 	SaveStateDescriptor desc(slot, saveDesc);
 	desc.setThumbnail(thumbnail);
 
-	SaveStateMetaInfos infos;
-	memset(&infos, 0, sizeof(infos));
-	if (ScummEngine::loadInfosFromSlot(target, slot, &infos)) {
+	if (infoPtr) {
 		int day = (infos.date >> 24) & 0xFF;
 		int month = (infos.date >> 16) & 0xFF;
 		int year = infos.date & 0xFFFF;

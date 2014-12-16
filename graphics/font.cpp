@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #include "graphics/font.h"
@@ -26,155 +27,32 @@
 
 namespace Graphics {
 
-int Font::getKerningOffset(byte left, byte right) const {
+int Font::getKerningOffset(uint32 left, uint32 right) const {
 	return 0;
 }
 
-int Font::getStringWidth(const Common::String &str) const {
-	int space = 0;
-	uint last = 0;
+namespace {
 
-#ifdef SCUMMVMKOR
-    bool isKorean = 1;
-    const char *s = str.c_str();
-    uint len = str.size();
-    
-    for (uint i = 0; i < len; ++i) {
-        uint16 c;
-        c = str[i];
-        if (c >= 0x80 && isKorean && i+1 < len) {
-            if (checkKorCode(c, str[i + 1])) {
-                c += str[i + 1] * 256;	// LE
-                i++;
-            } else {
-                // 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-                isKorean = 0;
-            }
-        }
-        space += getCharWidth(c);
-    }
-#else
+template<class StringType>
+int getStringWidthImpl(const Font &font, const StringType &str) {
+	int space = 0;
+	typename StringType::unsigned_type last = 0;
+
 	for (uint i = 0; i < str.size(); ++i) {
-		const uint cur = str[i];
-		space += getCharWidth(cur) + getKerningOffset(last, cur);
+		const typename StringType::unsigned_type cur = str[i];
+		space += font.getCharWidth(cur) + font.getKerningOffset(last, cur);
 		last = cur;
 	}
-#endif
 
 	return space;
 }
 
-void Font::drawString(Surface *dst, const Common::String &sOld, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
+template<class StringType>
+void drawStringImpl(const Font &font, Surface *dst, const StringType &str, int x, int y, int w, uint32 color, TextAlign align, int deltax) {
 	assert(dst != 0);
+
 	const int leftX = x, rightX = x + w;
-	uint i;
-	Common::String s = sOld;
-	int width = getStringWidth(s);
-	Common::String str;
-#ifdef SCUMMVMKOR
-        bool isKorean = 1;
-#endif
-
-	if (useEllipsis && width > w && s.hasSuffix("...")) {
-		// String is too wide. Check whether it ends in an ellipsis
-		// ("..."). If so, remove that and try again!
-		s.deleteLastChar();
-		s.deleteLastChar();
-		s.deleteLastChar();
-		width = getStringWidth(s);
-	}
-
-	if (useEllipsis && width > w) {
-		// String is too wide. So we shorten it "intelligently" by
-		// replacing parts of the string by an ellipsis. There are
-		// three possibilities for this: replace the start, the end, or
-		// the middle of the string. What is best really depends on the
-		// context; but unless we want to make this configurable,
-		// replacing the middle seems to be a good compromise.
-
-		const int ellipsisWidth = getStringWidth("...");
-
-		// SLOW algorithm to remove enough of the middle. But it is good enough
-		// for now.
-		const int halfWidth = (w - ellipsisWidth) / 2;
-		int w2 = 0;
-		uint last = 0;
-
-		for (i = 0; i < s.size(); ++i) {
-#ifdef SCUMMVMKOR
-            int charWidth = 0;
-            uint16 c;
-            c = s[i];
-            if (c >= 0x80 && isKorean) {
-                if (checkKorCode(c, str[i + 1])) {
-                    c += s[i + 1] * 256;	// LE
-                    str += s[i];	// 한글을 한 글자씩 넣어준다
-                    i++;
-                } else {
-                    // 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-                    isKorean = 0;
-                }
-            }
-            charWidth = getCharWidth(c);
-            if (w2 + charWidth > halfWidth) {
-                if (c > 0xff)
-                    str += s[i];
-                break;
-            }
-            uint16 cur = s[i];
-#else
-			const uint cur = s[i];
-			int charWidth = getCharWidth(cur) + getKerningOffset(last, cur);
-			if (w2 + charWidth > halfWidth)
-				break;
-			last = cur;
-#endif
-			w2 += charWidth;
-			str += cur;
-		}
-
-		// At this point we know that the first 'i' chars are together 'w2'
-		// pixels wide. We took the first i-1, and add "..." to them.
-		str += "...";
-		last = '.';
-
-		// The original string is width wide. Of those we already skipped past
-		// w2 pixels, which means (width - w2) remain.
-		// The new str is (w2+ellipsisWidth) wide, so we can accommodate about
-		// (w - (w2+ellipsisWidth)) more pixels.
-		// Thus we skip ((width - w2) - (w - (w2+ellipsisWidth))) =
-		// (width + ellipsisWidth - w)
-		int skip = width + ellipsisWidth - w;
-		for (; i < s.size() && skip > 0; ++i) {
-#ifdef SCUMMVMKOR
-            uint16 c;
-            c = s[i];
-            if (c >= 0x80 && isKorean) {
-                if (checkKorCode(c, str[i + 1])) {
-                    c += s[i + 1] * 256;	//LE
-                    i++;
-                } else {
-                    // 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-                    isKorean = 0;
-                }
-            }
-            skip -= getCharWidth(c);
-#else
-			const uint cur = s[i];
-			skip -= getCharWidth(cur) + getKerningOffset(last, cur);
-			last = cur;
-#endif
-		}
-
-		// Append the remaining chars, if any
-		for (; i < s.size(); ++i) {
-			str += s[i];
-		}
-
-		width = getStringWidth(str);
-	} else {
-		str = s;
-	}
+	int width = font.getStringWidth(str);
 
 	if (align == kTextAlignCenter)
 		x = x + (w - width)/2;
@@ -182,50 +60,29 @@ void Font::drawString(Surface *dst, const Common::String &sOld, int x, int y, in
 		x = x + w - width;
 	x += deltax;
 
-	uint last = 0;
-	for (i = 0; i < str.size(); ++i) {
-#ifdef SCUMMVMKOR
-        uint16 c;
-        c = str[i];
-        if (c >= 0x80 && isKorean) {
-            if (checkKorCode(c, str[i + 1])) {
-                c += s[i + 1] * 256;	//LE
-                i++;
-            } else {
-                // 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-                isKorean = 0;
-            }
-        }
-        w = getCharWidth(c);
-        if (x+w > rightX)
-            break;
-// TEST
-//        if (x >= leftX)
-		if (x+w >= leftX)
-            drawChar(dst, c, x, y, color);
-#else
-		const uint cur = str[i];
-		x += getKerningOffset(last, cur);
+	typename StringType::unsigned_type last = 0;
+	for (typename StringType::const_iterator i = str.begin(), end = str.end(); i != end; ++i) {
+		const typename StringType::unsigned_type cur = *i;
+		x += font.getKerningOffset(last, cur);
 		last = cur;
-		w = getCharWidth(cur);
+		w = font.getCharWidth(cur);
 		if (x+w > rightX)
 			break;
 		if (x+w >= leftX)
-			drawChar(dst, str[i], x, y, color);
-#endif
+			font.drawChar(dst, cur, x, y, color);
 		x += w;
 	}
 }
 
-
+template<class StringType>
 struct WordWrapper {
-	Common::Array<Common::String> &lines;
+	Common::Array<StringType> &lines;
 	int actualMaxLineWidth;
 
-	WordWrapper(Common::Array<Common::String> &l) : lines(l), actualMaxLineWidth(0) {
+	WordWrapper(Common::Array<StringType> &l) : lines(l), actualMaxLineWidth(0) {
 	}
 
-	void add(Common::String &line, int &w) {
+	void add(StringType &line, int &w) {
 		if (actualMaxLineWidth < w)
 			actualMaxLineWidth = w;
 
@@ -236,10 +93,11 @@ struct WordWrapper {
 	}
 };
 
-int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Common::String> &lines) const {
-	WordWrapper wrapper(lines);
-	Common::String line;
-	Common::String tmpStr;
+template<class StringType>
+int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Common::Array<StringType> &lines) {
+	WordWrapper<StringType> wrapper(lines);
+	StringType line;
+	StringType tmpStr;
 	int lineWidth = 0;
 	int tmpWidth = 0;
 
@@ -256,10 +114,10 @@ int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Co
 	// of a line. If we encounter such a word, we have to wrap it over multiple
 	// lines.
 
-	uint last = 0;
-	for (Common::String::const_iterator x = str.begin(); x != str.end(); ++x) {
-		const byte c = *x;
-		const int w = getCharWidth(c) + getKerningOffset(last, c);
+	typename StringType::unsigned_type last = 0;
+	for (typename StringType::const_iterator x = str.begin(); x != str.end(); ++x) {
+		const typename StringType::unsigned_type c = *x;
+		const int w = font.getCharWidth(c) + font.getKerningOffset(last, c);
 		last = c;
 		const bool wouldExceedWidth = (lineWidth + tmpWidth + w > maxWidth);
 
@@ -295,7 +153,7 @@ int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Co
 					tmpStr.deleteChar(0);
 					// This is not very fast, but it is the simplest way to
 					// assure we do not mess something up because of kerning.
-					tmpWidth = getStringWidth(tmpStr);
+					tmpWidth = font.getStringWidth(tmpStr);
 				}
 			} else {
 				wrapper.add(tmpStr, tmpWidth);
@@ -315,5 +173,98 @@ int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Co
 	return wrapper.actualMaxLineWidth;
 }
 
+} // End of anonymous namespace
+
+int Font::getStringWidth(const Common::String &str) const {
+	return getStringWidthImpl(*this, str);
+}
+
+int Font::getStringWidth(const Common::U32String &str) const {
+	return getStringWidthImpl(*this, str);
+}
+
+void Font::drawString(Surface *dst, const Common::String &sOld, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
+	Common::String s = sOld;
+	int width = getStringWidth(s);
+	Common::String str;
+
+	if (useEllipsis && width > w && s.hasSuffix("...")) {
+		// String is too wide. Check whether it ends in an ellipsis
+		// ("..."). If so, remove that and try again!
+		s.deleteLastChar();
+		s.deleteLastChar();
+		s.deleteLastChar();
+		width = getStringWidth(s);
+	}
+
+	if (useEllipsis && width > w) {
+		// String is too wide. So we shorten it "intelligently" by
+		// replacing parts of the string by an ellipsis. There are
+		// three possibilities for this: replace the start, the end, or
+		// the middle of the string. What is best really depends on the
+		// context; but unless we want to make this configurable,
+		// replacing the middle seems to be a good compromise.
+
+		const int ellipsisWidth = getStringWidth("...");
+
+		// SLOW algorithm to remove enough of the middle. But it is good enough
+		// for now.
+		const int halfWidth = (w - ellipsisWidth) / 2;
+		int w2 = 0;
+		Common::String::unsigned_type last = 0;
+		uint i;
+
+		for (i = 0; i < s.size(); ++i) {
+			const Common::String::unsigned_type cur = s[i];
+			int charWidth = getCharWidth(cur) + getKerningOffset(last, cur);
+			if (w2 + charWidth > halfWidth)
+				break;
+			last = cur;
+			w2 += charWidth;
+			str += cur;
+		}
+
+		// At this point we know that the first 'i' chars are together 'w2'
+		// pixels wide. We took the first i-1, and add "..." to them.
+		str += "...";
+		last = '.';
+
+		// The original string is width wide. Of those we already skipped past
+		// w2 pixels, which means (width - w2) remain.
+		// The new str is (w2+ellipsisWidth) wide, so we can accommodate about
+		// (w - (w2+ellipsisWidth)) more pixels.
+		// Thus we skip ((width - w2) - (w - (w2+ellipsisWidth))) =
+		// (width + ellipsisWidth - w)
+		int skip = width + ellipsisWidth - w;
+		for (; i < s.size() && skip > 0; ++i) {
+			const Common::String::unsigned_type cur = s[i];
+			skip -= getCharWidth(cur) + getKerningOffset(last, cur);
+			last = cur;
+		}
+
+		// Append the remaining chars, if any
+		for (; i < s.size(); ++i) {
+			str += s[i];
+		}
+
+		width = getStringWidth(str);
+	} else {
+		str = s;
+	}
+
+	drawStringImpl(*this, dst, str, x, y, w, color, align, deltax);
+}
+
+void Font::drawString(Surface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align) const {
+	drawStringImpl(*this, dst, str, x, y, w, color, align, 0);
+}
+
+int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Common::String> &lines) const {
+	return wordWrapTextImpl(*this, str, maxWidth, lines);
+}
+
+int Font::wordWrapText(const Common::U32String &str, int maxWidth, Common::Array<Common::U32String> &lines) const {
+	return wordWrapTextImpl(*this, str, maxWidth, lines);
+}
 
 } // End of namespace Graphics

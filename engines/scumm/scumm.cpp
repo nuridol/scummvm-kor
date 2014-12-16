@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -45,26 +45,26 @@
 #include "scumm/imuse_digi/dimuse.h"
 #include "scumm/smush/smush_mixer.h"
 #include "scumm/smush/smush_player.h"
-#include "scumm/player_towns.h"
+#include "scumm/players/player_towns.h"
 #include "scumm/insane/insane.h"
 #include "scumm/he/animation_he.h"
 #include "scumm/he/intern_he.h"
 #include "scumm/he/logic_he.h"
 #include "scumm/he/sound_he.h"
 #include "scumm/object.h"
-#include "scumm/player_ad.h"
-#include "scumm/player_nes.h"
-#include "scumm/player_sid.h"
-#include "scumm/player_pce.h"
-#include "scumm/player_apple2.h"
-#include "scumm/player_v1.h"
-#include "scumm/player_v2.h"
-#include "scumm/player_v2cms.h"
-#include "scumm/player_v2a.h"
-#include "scumm/player_v3a.h"
-#include "scumm/player_v3m.h"
-#include "scumm/player_v4a.h"
-#include "scumm/player_v5m.h"
+#include "scumm/players/player_ad.h"
+#include "scumm/players/player_nes.h"
+#include "scumm/players/player_sid.h"
+#include "scumm/players/player_pce.h"
+#include "scumm/players/player_apple2.h"
+#include "scumm/players/player_v1.h"
+#include "scumm/players/player_v2.h"
+#include "scumm/players/player_v2cms.h"
+#include "scumm/players/player_v2a.h"
+#include "scumm/players/player_v3a.h"
+#include "scumm/players/player_v3m.h"
+#include "scumm/players/player_v4a.h"
+#include "scumm/players/player_v5m.h"
 #include "scumm/resource.h"
 #include "scumm/he/resource_he.h"
 #include "scumm/scumm_v0.h"
@@ -81,10 +81,6 @@
 #include "backends/audiocd/audiocd.h"
 
 #include "audio/mixer.h"
-
-#ifdef SCUMMVMKOR
-#include "scumm/korean.h"
-#endif
 
 using Common::File;
 
@@ -209,7 +205,7 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_lastInputScriptTime = 0;
 	_bootParam = 0;
 	_dumpScripts = false;
-	_debugMode = 0;
+	_debugMode = false;
 	_objectOwnerTable = NULL;
 	_objectRoomTable = NULL;
 	_objectStateTable = NULL;
@@ -323,10 +319,6 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_costumeLoader = NULL;
 	_costumeRenderer = NULL;
 	_2byteFontPtr = 0;
-#ifdef SCUMMVMKOR
-    for(int i = 0; i < 20; i++)
-        _2byteMultiFontPtr[i] = NULL;
-#endif
 	_V1TalkingActor = 0;
 	_NESStartStrip = 0;
 
@@ -484,10 +476,6 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_debugMode = (gDebugLevel >= 0);
 	_dumpScripts = ConfMan.getBool("dump_scripts");
 	_bootParam = ConfMan.getInt("boot_param");
-#ifdef SCUMMVMKOR
-    if (_game.id==GID_MONKEY2 && _bootParam == 0)
-        _bootParam = 10001;
-#endif
 	// Boot params often need debugging switched on to work
 	if (_bootParam)
 		_debugMode = true;
@@ -609,16 +597,7 @@ ScummEngine::~ScummEngine() {
 
 	delete[] _sortedActors;
 
-#ifdef SCUMMVMKOR
-	if (_koreanMode) unloadKoreanFiles();
-	if (_2byteFontPtr && !_useMultiFont)
-		delete _2byteFontPtr;
-	for (int i = 0; i < 20; i++)
-		if (_2byteMultiFontPtr[i])
-			delete _2byteMultiFontPtr[i];
-#else
 	delete[] _2byteFontPtr;
-#endif
 	delete _charset;
 	delete _messageDialog;
 	delete _pauseDialog;
@@ -1047,6 +1026,35 @@ Common::Error ScummEngine::init() {
 	}
 #endif
 
+	// Extra directories needed for the Steam versions
+	if (_filenamePattern.genMethod == kGenDiskNumSteam || _filenamePattern.genMethod == kGenRoomNumSteam) {
+		if (_game.platform == Common::kPlatformWindows) {
+			switch (_game.id) {
+			case GID_INDY3 :
+				SearchMan.addSubDirectoryMatching(gameDataDir, "indy3");
+				break;
+			case GID_INDY4 :
+				SearchMan.addSubDirectoryMatching(gameDataDir, "atlantis");
+				break;
+			case GID_LOOM :
+				SearchMan.addSubDirectoryMatching(gameDataDir, "loom");
+				break;
+#ifdef ENABLE_SCUMM_7_8
+			case GID_DIG :
+				SearchMan.addSubDirectoryMatching(gameDataDir, "dig");
+				SearchMan.addSubDirectoryMatching(gameDataDir, "dig/video");
+				break;
+#endif
+			default:
+				break;
+			}
+		} else {
+			SearchMan.addSubDirectoryMatching(gameDataDir, "Contents");
+			SearchMan.addSubDirectoryMatching(gameDataDir, "Contents/MacOS");
+			SearchMan.addSubDirectoryMatching(gameDataDir, "Contents/Resources");
+			SearchMan.addSubDirectoryMatching(gameDataDir, "Contents/Resources/video");
+		}
+	}
 
 	// The	kGenUnchanged method is only used for 'container files', i.e. files
 	// that contain the real game files bundled together in an archive format.
@@ -1147,53 +1155,33 @@ Common::Error ScummEngine::init() {
 				error("Couldn't find known subfile inside container file '%s'", _containerFile.c_str());
 
 			_fileHandle->close();
-
 		} else {
 			error("kGenUnchanged used with unsupported platform");
 		}
 	} else {
-		// Regular access, no container file involved
-		_fileHandle = new ScummFile();
+		if (_filenamePattern.genMethod == kGenDiskNumSteam || _filenamePattern.genMethod == kGenRoomNumSteam) {
+			// Steam game versions have the index file embedded in the main executable
+			const SteamIndexFile *indexFile = lookUpSteamIndexFile(_filenamePattern.pattern, _game.platform);
+			if (!indexFile || indexFile->id != _game.id) {
+				error("Couldn't find index file description for Steam version");
+			} else {
+				_fileHandle = new ScummSteamFile(*indexFile);
+			}
+		} else {
+			// Regular access, no container file involved
+			_fileHandle = new ScummFile();
+		}
 	}
+
+	// Steam Win and Mac versions share the same DOS data files. We show Windows or Mac
+	// for the platform the detector, but internally we force the platform to DOS, so that
+	// the code for handling the original DOS data files is used.
+	if (_filenamePattern.genMethod == kGenDiskNumSteam || _filenamePattern.genMethod == kGenRoomNumSteam)
+		_game.platform = Common::kPlatformDOS;
 
 	// Load CJK font, if present
 	// Load it earlier so _useCJKMode variable could be set
 	loadCJKFont();
-
-#ifdef SCUMMVMKOR
-	// 개선의 여지가 약간 있지만, 일단은 그대로 남겨둠
-	_koreanMode = 0;
-	_koreanOnly = 0;
-	_highRes = 0;
-	
-	if(_language == Common::KO_KOR) {
-		_koreanMode = ConfMan.getBool("v1_korean_mode");
-		_koreanOnly = ConfMan.getBool("v1_korean_only") && _koreanMode;
-		if((_game.version == 8 || _game.heversion > 72) && _koreanMode)
-			_highRes = true;
-		if((_game.id == GID_DIG || _game.id == GID_CMI) && _koreanMode) {
-			warning("V1 시스템을 사용할 수 없는 게임입니다");
-			_koreanMode = 0;
-			_koreanOnly = 0;
-			_highRes = 0;
-		}
-		if(_koreanMode) {
-			warning("Korean V1 translation mode. \n");
-			loadKoreanFiles(/*getGameName()*/_game.gameid);
-			//_useCJKMode = 0;	// V1과 V2를 동시에 사용하지 않는다
-			_useCJKMode = 1;	// V1과 V2를 동시에 사용한다
-		} else {
-			if(_useCJKMode) {
-				warning("Korean V2 mode for DUMB edition or COMI Korean version\n");
-			}
-		}
-	}
-	warning("_game.id = %d\n", _game.id);
-	warning("_game.gameid = %s\n", _game.gameid);
-	warning("_game.version = %d, _game.heversion = %d\n", _game.version, _game.heversion);
-	warning("_koreanMode = %d, _koreanOnly = %d, _useCJKMode = %d\n", _koreanMode, _koreanOnly, _useCJKMode);
-	warning("_highRes = %d\n", _highRes);
-#endif
 
 	// Initialize backend
 	if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG) {
@@ -1274,7 +1262,7 @@ Common::Error ScummEngine::init() {
 
 void ScummEngine::setupScumm() {
 	// On some systems it's not safe to run CD audio games from the CD.
-	if (_game.features & GF_AUDIOTRACKS) {
+	if (_game.features & GF_AUDIOTRACKS && !Common::File::exists("CDDA.SOU")) {
 		checkCD();
 
 		int cd_num = ConfMan.getInt("cdrom");
@@ -2147,21 +2135,6 @@ void ScummEngine::scummLoop(int delta) {
 	if (_talkDelay < 0)
 		_talkDelay = 0;
 
-#ifdef SCUMMVMKOR
-	for(int numb = 0; numb < MAX_KOR; numb++) {
-		if (_strKSet1[numb].delay != -1) { // kor
-			_strKSet1[numb].delay -= delta;
-			if (_strKSet1[numb].delay < 0)
-				_strKSet1[numb].delay = 0;
-		}
-		if (_strKDesc[numb].delay != -1) { // kor
-			_strKDesc[numb].delay -= 5;
-			if (_strKDesc[numb].delay < 0)
-				_strKDesc[numb].delay = 0;
-		}
-	}
-#endif
-
 	// Record the current ego actor before any scripts (including input scripts)
 	// get a chance to run.
 	int oldEgo = 0;
@@ -2352,7 +2325,7 @@ void ScummEngine::scummLoop_updateScummVars() {
 		VAR(VAR_MOUSE_Y) = _mouse.y;
 		if (VAR_DEBUGMODE != 0xFF) {
 			// This is NOT for the Mac version of Indy3/Loom
-			VAR(VAR_DEBUGMODE) = _debugMode;
+			VAR(VAR_DEBUGMODE) = (_debugMode ? 1 : 0);
 		}
 	} else if (_game.version >= 1) {
 		// We use shifts below instead of dividing by V12_X_MULTIPLIER resp.
@@ -2378,15 +2351,16 @@ void ScummEngine::scummLoop_handleSaveLoad() {
 		if (_game.version == 8 && _saveTemporaryState)
 			VAR(VAR_GAME_LOADED) = 0;
 
+		Common::String filename;
 		if (_saveLoadFlag == 1) {
-			success = saveState(_saveLoadSlot, _saveTemporaryState);
+			success = saveState(_saveLoadSlot, _saveTemporaryState, filename);
 			if (!success)
 				errMsg = _("Failed to save game state to file:\n\n%s");
 
 			if (success && _saveTemporaryState && VAR_GAME_LOADED != 0xFF && _game.version <= 7)
 				VAR(VAR_GAME_LOADED) = 201;
 		} else {
-			success = loadState(_saveLoadSlot, _saveTemporaryState);
+			success = loadState(_saveLoadSlot, _saveTemporaryState, filename);
 			if (!success)
 				errMsg = _("Failed to load game state from file:\n\n%s");
 
@@ -2394,7 +2368,6 @@ void ScummEngine::scummLoop_handleSaveLoad() {
 				VAR(VAR_GAME_LOADED) = (_game.version == 8) ? 1 : 203;
 		}
 
-		Common::String filename = makeSavegameName(_saveLoadSlot, _saveTemporaryState);
 		if (!success) {
 			displayMessage(0, errMsg, filename.c_str());
 		} else if (_saveLoadFlag == 1 && _saveLoadSlot != 0 && !_saveTemporaryState) {

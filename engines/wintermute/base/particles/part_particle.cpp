@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -230,32 +230,32 @@ bool PartParticle::fadeOut(uint32 currentTime, int fadeTime) {
 
 //////////////////////////////////////////////////////////////////////////
 bool PartParticle::persist(BasePersistenceManager *persistMgr) {
-	persistMgr->transfer(TMEMBER(_alpha1));
-	persistMgr->transfer(TMEMBER(_alpha2));
+	persistMgr->transferSint32(TMEMBER(_alpha1));
+	persistMgr->transferSint32(TMEMBER(_alpha2));
 	persistMgr->transferRect32(TMEMBER(_border));
 	persistMgr->transferVector2(TMEMBER(_pos));
 	persistMgr->transferFloat(TMEMBER(_posZ));
 	persistMgr->transferVector2(TMEMBER(_velocity));
 	persistMgr->transferFloat(TMEMBER(_scale));
-	persistMgr->transfer(TMEMBER(_creationTime));
-	persistMgr->transfer(TMEMBER(_lifeTime));
+	persistMgr->transferUint32(TMEMBER(_creationTime));
+	persistMgr->transferSint32(TMEMBER(_lifeTime));
 	persistMgr->transferBool(TMEMBER(_isDead));
-	persistMgr->transfer(TMEMBER_INT(_state));
-	persistMgr->transfer(TMEMBER(_fadeStart));
-	persistMgr->transfer(TMEMBER(_fadeTime));
-	persistMgr->transfer(TMEMBER(_currentAlpha));
+	persistMgr->transferSint32(TMEMBER_INT(_state));
+	persistMgr->transferUint32(TMEMBER(_fadeStart));
+	persistMgr->transferSint32(TMEMBER(_fadeTime));
+	persistMgr->transferSint32(TMEMBER(_currentAlpha));
 	persistMgr->transferFloat(TMEMBER(_angVelocity));
 	persistMgr->transferFloat(TMEMBER(_rotation));
 	persistMgr->transferFloat(TMEMBER(_growthRate));
 	persistMgr->transferBool(TMEMBER(_exponentialGrowth));
-	persistMgr->transfer(TMEMBER(_fadeStartAlpha));
+	persistMgr->transferSint32(TMEMBER(_fadeStartAlpha));
 
 	if (persistMgr->getIsSaving()) {
 		const char *filename = _sprite->getFilename();
-		persistMgr->transfer(TMEMBER(filename));
+		persistMgr->transferConstChar(TMEMBER(filename));
 	} else {
 		char *filename;
-		persistMgr->transfer(TMEMBER(filename));
+		persistMgr->transferCharPtr(TMEMBER(filename));
 		SystemClassRegistry::getInstance()->_disabled = true;
 		setSprite(filename);
 		SystemClassRegistry::getInstance()->_disabled = false;

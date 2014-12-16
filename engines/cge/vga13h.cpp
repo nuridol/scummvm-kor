@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -26,6 +26,7 @@
  */
 
 #include "common/array.h"
+#include "common/config-manager.h"
 #include "common/rect.h"
 #include "graphics/palette.h"
 #include "cge/general.h"
@@ -210,12 +211,11 @@ Sprite *Sprite::expand() {
 			error("Bad SPR [%s]", fname);
 		Common::String line;
 		char tmpStr[kLineMax + 1];
-		int len = 0, lcnt = 0;
+		int lcnt = 0;
 
 		for (line = sprf.readLine(); !sprf.eos(); line = sprf.readLine()) {
-			len = line.size();
-			assert(len <= 513);
-			strcpy(tmpStr, line.c_str());
+			int len = line.size();
+			Common::strlcpy(tmpStr, line.c_str(), sizeof(tmpStr));
 			lcnt++;
 			if (len == 0 || *tmpStr == '.')
 				continue;
@@ -482,39 +482,39 @@ void Sprite::sync(Common::Serializer &s) {
 	uint16 flags = 0;
 	if (s.isLoading()) {
 		s.syncAsUint16LE(flags);
-		_flags._hide = flags & 0x0001 ? true : false;
-		_flags._near = flags & 0x0002 ? true : false;
-		_flags._drag = flags & 0x0004 ? true : false;
-		_flags._hold = flags & 0x0008 ? true : false;
-		_flags._dummy = flags & 0x0010 ? true : false;
-		_flags._slav = flags & 0x0020 ? true : false;
-		_flags._syst = flags & 0x0040 ? true : false;
-		_flags._kill = flags & 0x0080 ? true : false;
-		_flags._xlat = flags & 0x0100 ? true : false;
-		_flags._port = flags & 0x0200 ? true : false;
-		_flags._kept = flags & 0x0400 ? true : false;
-		_flags._east = flags & 0x0800 ? true : false;
-		_flags._shad = flags & 0x1000 ? true : false;
-		_flags._back = flags & 0x2000 ? true : false;
-		_flags._bDel = flags & 0x4000 ? true : false;
-		_flags._tran = flags & 0x8000 ? true : false;
+		_flags._hide = flags & 0x0001;
+		_flags._near = flags & 0x0002;
+		_flags._drag = flags & 0x0004;
+		_flags._hold = flags & 0x0008;
+		_flags._dummy = flags & 0x0010;
+		_flags._slav = flags & 0x0020;
+		_flags._syst = flags & 0x0040;
+		_flags._kill = flags & 0x0080;
+		_flags._xlat = flags & 0x0100;
+		_flags._port = flags & 0x0200;
+		_flags._kept = flags & 0x0400;
+		_flags._east = flags & 0x0800;
+		_flags._shad = flags & 0x1000;
+		_flags._back = flags & 0x2000;
+		_flags._bDel = flags & 0x4000;
+		_flags._tran = flags & 0x8000;
 	} else {
-		flags = (flags << 1) | _flags._tran;
-		flags = (flags << 1) | _flags._bDel;
-		flags = (flags << 1) | _flags._back;
-		flags = (flags << 1) | _flags._shad;
-		flags = (flags << 1) | _flags._east;
-		flags = (flags << 1) | _flags._kept;
-		flags = (flags << 1) | _flags._port;
-		flags = (flags << 1) | _flags._xlat;
-		flags = (flags << 1) | _flags._kill;
-		flags = (flags << 1) | _flags._syst;
-		flags = (flags << 1) | _flags._slav;
-		flags = (flags << 1) | _flags._dummy;
-		flags = (flags << 1) | _flags._hold;
-		flags = (flags << 1) | _flags._drag;
-		flags = (flags << 1) | _flags._near;
-		flags = (flags << 1) | _flags._hide;
+		flags = (flags << 1) | (_flags._tran ? 1 : 0);
+		flags = (flags << 1) | (_flags._bDel ? 1 : 0);
+		flags = (flags << 1) | (_flags._back ? 1 : 0);
+		flags = (flags << 1) | (_flags._shad ? 1 : 0);
+		flags = (flags << 1) | (_flags._east ? 1 : 0);
+		flags = (flags << 1) | (_flags._kept ? 1 : 0);
+		flags = (flags << 1) | (_flags._port ? 1 : 0);
+		flags = (flags << 1) | (_flags._xlat ? 1 : 0);
+		flags = (flags << 1) | (_flags._kill ? 1 : 0);
+		flags = (flags << 1) | (_flags._syst ? 1 : 0);
+		flags = (flags << 1) | (_flags._slav ? 1 : 0);
+		flags = (flags << 1) | (_flags._dummy ? 1 : 0);
+		flags = (flags << 1) | (_flags._hold ? 1 : 0);
+		flags = (flags << 1) | (_flags._drag ? 1 : 0);
+		flags = (flags << 1) | (_flags._near ? 1 : 0);
+		flags = (flags << 1) | (_flags._hide ? 1 : 0);
 		s.syncAsUint16LE(flags);
 	}
 
@@ -638,6 +638,10 @@ Vga::Vga(CGEEngine *vm) : _frmCnt(0), _msg(NULL), _name(NULL), _setPal(false), _
 		_page[idx]->create(320, 200, Graphics::PixelFormat::createFormatCLUT8());
 	}
 
+	if (ConfMan.getBool("enable_color_blind"))
+		_mono = 1;
+	
+
 	_oldColors = (Dac *)malloc(sizeof(Dac) * kPalCount);
 	_newColors = (Dac *)malloc(sizeof(Dac) * kPalCount);
 	getColors(_oldColors);
@@ -757,7 +761,7 @@ void Vga::setColors(Dac *tab, int lum) {
 	if (_mono) {
 		destP = _newColors;
 		for (int idx = 0; idx < kPalCount; idx++, destP++) {
-			// Form a greyscalce colour from 30% R, 59% G, 11% B
+			// Form a greyscalce color from 30% R, 59% G, 11% B
 			uint8 intensity = (((int)destP->_r * 77) + ((int)destP->_g * 151) + ((int)destP->_b * 28)) >> 8;
 			destP->_r = intensity;
 			destP->_g = intensity;
@@ -815,14 +819,14 @@ void Vga::update() {
 		_setPal = false;
 	}
 	if (_vm->_showBoundariesFl) {
-		Vga::_page[0]->hLine(0, 200 - kPanHeight, 320, 0xee);
+		Vga::_page[0]->hLine(0, kScrHeight - kPanHeight, kScrWidth, 0xee);
 		if (_vm->_barriers[_vm->_now]._horz != 255) {
 			for (int i = 0; i < 8; i++)
-				Vga::_page[0]->vLine((_vm->_barriers[_vm->_now]._horz * 8) + i, 0, 200, 0xff);
+				Vga::_page[0]->vLine((_vm->_barriers[_vm->_now]._horz * 8) + i, 0, kScrHeight, 0xff);
 		}
 		if (_vm->_barriers[_vm->_now]._vert != 255) {
 			for (int i = 0; i < 4; i++)
-				Vga::_page[0]->hLine(0, 80 + (_vm->_barriers[_vm->_now]._vert * 4) + i, 320, 0xff);
+				Vga::_page[0]->hLine(0, 80 + (_vm->_barriers[_vm->_now]._vert * 4) + i, kScrWidth, 0xff);
 		}
 	}
 

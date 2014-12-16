@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -70,18 +70,9 @@ public:
 	 */
 	DECLARE_FUNCTION_2(savegame, SavegameType savegameType, uint32 param)
 
-	/**
-	 * Handle Chapter 1 & 2 events
-	 */
-	DECLARE_FUNCTION(chapter12_handler)
-
-	DECLARE_FUNCTION(function7)
-
-	/**
-	 * Handle Chapter 4 events
-	 */
-	DECLARE_FUNCTION(chapter4Handler)
-
+	DECLARE_FUNCTION(withAnna)
+	DECLARE_FUNCTION(guardingCompartment)
+	DECLARE_FUNCTION(inCageFriendly)
 	DECLARE_FUNCTION(function9)
 
 	/**
@@ -104,8 +95,8 @@ public:
 	 */
 	DECLARE_FUNCTION(chapter3Handler)
 
-	DECLARE_FUNCTION(freeFromCage)
-	DECLARE_FUNCTION(function15)
+	DECLARE_FUNCTION(inCageMad)
+	DECLARE_FUNCTION(letMeIn)
 
 	/**
 	 * Setup Chapter 4

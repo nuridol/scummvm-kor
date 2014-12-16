@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -189,14 +189,14 @@ bool Animation::doRender(RectangleList *updateRects) {
 	bool result;
 	if (isScalingAllowed() && (_width != pBitmapResource->getWidth() || _height != pBitmapResource->getHeight())) {
 		result = pBitmapResource->blit(_absoluteX, _absoluteY,
-		                               (animationDescriptionPtr->getFrame(_currentFrame).flipV ? BitmapResource::FLIP_V : 0) |
-		                               (animationDescriptionPtr->getFrame(_currentFrame).flipH ? BitmapResource::FLIP_H : 0),
+		                               (animationDescriptionPtr->getFrame(_currentFrame).flipV ? Graphics::FLIP_V : 0) |
+		                               (animationDescriptionPtr->getFrame(_currentFrame).flipH ? Graphics::FLIP_H : 0),
 		                               0, _modulationColor, _width, _height,
 									   updateRects);
 	} else {
 		result = pBitmapResource->blit(_absoluteX, _absoluteY,
-		                               (animationDescriptionPtr->getFrame(_currentFrame).flipV ? BitmapResource::FLIP_V : 0) |
-		                               (animationDescriptionPtr->getFrame(_currentFrame).flipH ? BitmapResource::FLIP_H : 0),
+		                               (animationDescriptionPtr->getFrame(_currentFrame).flipV ? Graphics::FLIP_V : 0) |
+		                               (animationDescriptionPtr->getFrame(_currentFrame).flipH ? Graphics::FLIP_H : 0),
 		                               0, _modulationColor, -1, -1,
 									   updateRects);
 	}

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -194,33 +194,25 @@ public:
 	int _safeCombination;
 	int _gateStatus;
 	int _greenDay5TalkCtr;
-	int _v4CEC4; // Useless variable
 	int _v4CEC8;
 	int _v4CECA;
 	int _v4CECC;
 	int8 _breakerBoxStatusArr[18];
 	int _hiddenDoorStatus;
 	int _nico910State;
-	int _v4CEE4;
-	int _v4CEE6;
-	int _v4CEE8;
+	int _stuart910State;
+	int _nico910Talk;
+	int _stuart910Talk;
 	int _deziTopic;
 	int _deathReason;
 	int _driveFromScene;
 	int _driveToScene;
-	int _v501F8; // Useless variable
-	int _v501FA; // Useless variable
-	int _v501FC; // Useless variable
-	int _v5020C; // Useless variable
-	int _v50696; // Useless variable
 	uint8 _subFlagBitArr1;
 	uint8 _subFlagBitArr2;
-	int _v50CC2;
+	bool _scene410HarrisonTalkFl;
 	int _scene410Action1Count;
 	int _scene410TalkCount;
-	int _scene410HarrisonMovedFl;
-	int _v51C42; // Useless variable
-	int _v51C44; // Useless variable
+	bool _scene410HarrisonMovedFl;
 	Bookmark _bookmark;
 	int _mapLocationId;
 	int _clip1Bullets, _clip2Bullets;
@@ -260,16 +252,11 @@ public:
 	byte _paletteMap[4096];
 	int _insetUp;
 	int _frameEdgeColor;
-	Rect _v5589E;
-	Rect _v558B6;
-	int _v558C2; // Unused variable. The original seems to use it only in the context of the cheat mode
 	int _animationCtr;
 	int _electromagnetChangeAmount;
 	int _electromagnetZoom;
-	int _v565E5;
-	int _v565E7;
-	int _v565E9;
-	int _v565EB; // CHECKME: IS it a constant?
+	bool _tractorField;
+	bool _cableAttached;
 	int _foodCount;
 	int _rimLocation;
 	int _rimTransportLocation;
@@ -288,16 +275,16 @@ public:
 	byte _balloonAltitude;
 	int _scene1925CurrLevel; //_v56A9C
 	int _walkwaySceneNumber;
-	byte _v56AA0;
+	byte _mirandaJailState;
 	byte _scientistConvIndex;
 	Common::Point _ventCellPos;
-	byte _v56AA6;
-	byte _v56AA7;
-	byte _v56AA8;
+	byte _ductMazePanel1State;
+	byte _ductMazePanel2State;
+	byte _ductMazePanel3State;
 	int _scene180Mode;	// _v575f7
 	int _v57709;
 	int _v5780C;
-	int _v5780E;
+	int _mouseCursorId;
 	int _v57810;
 	int _speechSubtitles;
 	Common::Point _s1550PlayerArea[3]; // only used for Quinn and Seeker
@@ -305,6 +292,7 @@ public:
 	byte _stripManager_lookupList[12];
 	byte _scene1550JunkLocations[508];
 	Common::Point _balloonPosition;
+	bool _debugCardGame;               // moved from scene 1337 so it can be easily set in the debugger
 
 	ScannerDialog *_scannerDialog;
 

@@ -24,11 +24,11 @@
 		<string>uk</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>ScummVM Kor.</string>
+	<string>ScummVM</string>
 	<key>CFBundleExecutable</key>
 	<string>scummvm</string>
 	<key>CFBundleGetInfoString</key>
-	<string>1.7.0git-kor, Copyright 2001-2013 The ScummVM team</string>
+	<string>1.7.0, Copyright 2001-2014 The ScummVM Team</string>
 	<key>CFBundleIconFile</key>
 	<string>scummvm.icns</string>
 	<key>CFBundleIdentifier</key>
@@ -40,13 +40,13 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.7.0git-kor</string>
+	<string>1.7.0</string>
 	<key>CFBundleVersion</key>
-	<string>1.7.0git-kor</string>
+	<string>1.7.0</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright 2001-2013 The ScummVM team</string>
+	<string>Copyright 2001-2014 The ScummVM Team</string>
 	<key>SUFeedURL</key>
 	<string>http://www.scummvm.org/appcasts/macosx/release.xml</string>
 	<key>SUPublicDSAKeyFile</key>

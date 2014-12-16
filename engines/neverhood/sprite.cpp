@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -31,8 +31,20 @@ Sprite::Sprite(NeverhoodEngine *vm, int objectPriority)
 	: Entity(vm, objectPriority), _x(0), _y(0), _spriteUpdateCb(NULL), _filterXCb(NULL), _filterYCb(NULL),
 	_dataResource(vm), _doDeltaX(false), _doDeltaY(false), _needRefresh(false), _flags(0), _surface(NULL) {
 
-	SetMessageHandler(&Sprite::handleMessage);
+	_drawOffset.x = 0;
+	_drawOffset.y = 0;
+	_drawOffset.width = 0;
+	_drawOffset.height = 0;
+	_collisionBounds.x1 = 0;
+	_collisionBounds.y1 = 0;
+	_collisionBounds.x2 = 0;
+	_collisionBounds.y2 = 0;
+	_collisionBoundsOffset.x = 0;
+	_collisionBoundsOffset.y = 0;
+	_collisionBoundsOffset.width = 0;
+	_collisionBoundsOffset.height = 0;
 
+	SetMessageHandler(&Sprite::handleMessage);
 }
 
 Sprite::~Sprite() {
@@ -372,7 +384,7 @@ void AnimatedSprite::updateFrameIndex() {
 		} else {
 			// Inform self about end of current animation
 			// The caller can then e.g. set a new animation fileHash
-			sendMessage(this, 0x3002, 0);
+			sendMessage(this, NM_ANIMATION_STOP, 0);
 			if (_newAnimFileHash == 0)
 				_currFrameIndex = 0;
 		}
@@ -380,7 +392,7 @@ void AnimatedSprite::updateFrameIndex() {
 		if (_currFrameIndex > 0) {
 			_currFrameIndex--;
 		} else {
-			sendMessage(this, 0x3002, 0);
+			sendMessage(this, NM_ANIMATION_STOP, 0);
 			if (_newAnimFileHash == 0)
 				_currFrameIndex = _lastFrameIndex;
 		}
@@ -399,7 +411,7 @@ void AnimatedSprite::updateFrameInfo() {
 	updateBounds();
 	_needRefresh = true;
 	if (frameInfo.frameHash != 0)
-		sendMessage(this, 0x100D, frameInfo.frameHash);
+		sendMessage(this, NM_ANIMATION_START, frameInfo.frameHash);
 }
 
 void AnimatedSprite::createSurface1(uint32 fileHash, int surfacePriority) {

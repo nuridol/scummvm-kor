@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -373,12 +373,12 @@ bool AdInventoryBox::persist(BasePersistenceManager *persistMgr) {
 
 	persistMgr->transferPtr(TMEMBER_PTR(_closeButton));
 	persistMgr->transferBool(TMEMBER(_hideSelected));
-	persistMgr->transfer(TMEMBER(_itemHeight));
+	persistMgr->transferSint32(TMEMBER(_itemHeight));
 	persistMgr->transferRect32(TMEMBER(_itemsArea));
-	persistMgr->transfer(TMEMBER(_itemWidth));
-	persistMgr->transfer(TMEMBER(_scrollBy));
-	persistMgr->transfer(TMEMBER(_scrollOffset));
-	persistMgr->transfer(TMEMBER(_spacing));
+	persistMgr->transferSint32(TMEMBER(_itemWidth));
+	persistMgr->transferSint32(TMEMBER(_scrollBy));
+	persistMgr->transferSint32(TMEMBER(_scrollOffset));
+	persistMgr->transferSint32(TMEMBER(_spacing));
 	persistMgr->transferBool(TMEMBER(_visible));
 	persistMgr->transferPtr(TMEMBER_PTR(_window));
 	persistMgr->transferBool(TMEMBER(_exclusive));

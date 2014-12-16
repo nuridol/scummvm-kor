@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -102,7 +102,7 @@ public:
 	 */
 	DECLARE_FUNCTION_2(savegame, SavegameType savegameType, uint32 param)
 
-	DECLARE_FUNCTION(function11)
+	DECLARE_FUNCTION(goCompartment)
 	DECLARE_FUNCTION(sitAtTableWithSalko)
 	DECLARE_FUNCTION(leaveTableWithSalko)
 
@@ -116,7 +116,7 @@ public:
 	 */
 	DECLARE_FUNCTION(chapter1Handler)
 
-	DECLARE_FUNCTION(function16)
+	DECLARE_FUNCTION(inCompartment)
 	DECLARE_FUNCTION(function17)
 
 	/**
@@ -124,8 +124,8 @@ public:
 	 */
 	DECLARE_FUNCTION(chapter2)
 
-	DECLARE_FUNCTION(function19)
-	DECLARE_FUNCTION(function20)
+	DECLARE_FUNCTION(goBreakfast)
+	DECLARE_FUNCTION(atBreakfast)
 	DECLARE_FUNCTION(function21)
 
 	/**
@@ -148,9 +148,9 @@ public:
 	 */
 	DECLARE_FUNCTION(chapter4Handler)
 
-	DECLARE_FUNCTION(function26)
-	DECLARE_FUNCTION(function27)
-	DECLARE_FUNCTION(function28)
+	DECLARE_FUNCTION(returnCompartment4)
+	DECLARE_FUNCTION(inCompartment4)
+	DECLARE_FUNCTION(hiding)
 	DECLARE_FUNCTION(function29)
 
 	/**
@@ -163,8 +163,8 @@ public:
 	 */
 	DECLARE_FUNCTION(chapter5Handler)
 
-	DECLARE_FUNCTION(fight)
-	DECLARE_FUNCTION(function33)
+	DECLARE_FUNCTION(fightCath)
+	DECLARE_FUNCTION(knockedOut)
 	DECLARE_FUNCTION(function34)
 };
 

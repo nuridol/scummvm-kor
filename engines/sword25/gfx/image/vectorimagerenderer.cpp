@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -52,7 +52,7 @@ void art_rgb_fill_run1(byte *buf, byte r, byte g, byte b, int n) {
 		memset(buf, g, n + n + n + n);
 	} else {
 		uint32 *alt = (uint32 *)buf;
-		uint32 color = Graphics::ARGBToColor<Graphics::ColorMasks<8888> >(0xff, r, g, b);
+		uint32 color = Graphics::ARGBToColor<Graphics::ColorMasks<8888> >(r, g, b, 0xff);
 
 		for (i = 0; i < n; i++)
 			*alt++ = color;
@@ -66,22 +66,22 @@ void art_rgb_run_alpha1(byte *buf, byte r, byte g, byte b, int alpha, int n) {
 	for (i = 0; i < n; i++) {
 #if defined(SCUMM_LITTLE_ENDIAN)
 		v = *buf;
+		*buf++ = MIN(v + alpha, 0xff);
+		v = *buf;
 		*buf++ = v + (((b - v) * alpha + 0x80) >> 8);
 		v = *buf;
 		*buf++ = v + (((g - v) * alpha + 0x80) >> 8);
 		v = *buf;
 		*buf++ = v + (((r - v) * alpha + 0x80) >> 8);
-		v = *buf;
-		*buf++ = MIN(v + alpha, 0xff);
 #else
 		v = *buf;
-		*buf++ = MIN(v + alpha, 0xff);
-		v = *buf;
 		*buf++ = v + (((r - v) * alpha + 0x80) >> 8);
 		v = *buf;
 		*buf++ = v + (((g - v) * alpha + 0x80) >> 8);
 		v = *buf;
 		*buf++ = v + (((b - v) * alpha + 0x80) >> 8);
+		v = *buf;
+		*buf++ = MIN(v + alpha, 0xff);
 #endif
 	}
 }

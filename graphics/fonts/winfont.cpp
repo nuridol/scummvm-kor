@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #include "common/file.h"
@@ -200,7 +201,7 @@ char WinFont::indexToCharacter(uint16 index) const {
 	return index + _firstChar;
 }
 
-uint16 WinFont::characterToIndex(byte character) const {
+uint16 WinFont::characterToIndex(uint32 character) const {
 	// Go to the default character if we didn't find a mapping
 	if (character < _firstChar || character > _lastChar)
 		character = _defaultChar;
@@ -208,13 +209,7 @@ uint16 WinFont::characterToIndex(byte character) const {
 	return character - _firstChar;
 }
 
-#ifdef SCUMMVMKOR
-int WinFont::getCharWidth(uint16 chr) const {
-        if (chr > 0xff)
-            return getKorFontWidth();
-#else
-int WinFont::getCharWidth(byte chr) const {
-#endif
+int WinFont::getCharWidth(uint32 chr) const {
 	return _glyphs[characterToIndex(chr)].charWidth;
 }
 
@@ -330,15 +325,7 @@ bool WinFont::loadFromFNT(Common::SeekableReadStream &stream) {
 	return true;
 }
 
-#ifdef SCUMMVMKOR
-void WinFont::drawChar(Surface *dst, uint16 chr, int x, int y, uint32 color) const {
-        if (chr > 0xff) {
-            drawKorChar(dst, chr, x, y, color);
-            return;
-        }
-#else
-void WinFont::drawChar(Surface *dst, byte chr, int x, int y, uint32 color) const {
-#endif
+void WinFont::drawChar(Surface *dst, uint32 chr, int x, int y, uint32 color) const {
 	assert(dst);
 	assert(dst->format.bytesPerPixel == 1 || dst->format.bytesPerPixel == 2 || dst->format.bytesPerPixel == 4);
 	assert(_glyphs);

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -449,7 +449,19 @@ int ConversationChoiceDialog::execute(const Common::StringArray &choiceList) {
 
 	// Draw the dialog
 	draw();
+
 	g_globals->_events.showCursor();
+
+	// Force the display of an arrow cursor during discussions in R2R
+	if (g_vm->getGameID() == GType_Ringworld2)
+		R2_GLOBALS._events.setCursor(CURSOR_ARROW);
+
+	// WORKAROUND: On-screen dialogs are really meant to use a GfxManager instance
+	// for their lifetime, which prevents saving or loading. Since I don't want to spend a lot
+	// of time refactoring this already working dialog, fake it by putting a dummy gfxmanager at
+	// the end of the gfx manager list so as to prevent saving or loading
+	GfxManager gfxManager;
+	GLOBALS._gfxManagers.push_back(&gfxManager);
 
 	// Event handling loop
 	Event event;
@@ -502,6 +514,7 @@ int ConversationChoiceDialog::execute(const Common::StringArray &choiceList) {
 
 	// Remove the dialog
 	remove();
+	GLOBALS._gfxManagers.remove(&gfxManager);
 
 	return _selectedIndex;
 }
@@ -640,11 +653,11 @@ void StripManager::reset() {
 	_delayFrames = 0;
 	_owner = NULL;
 	_endHandler = NULL;
-	_field2E6 = false;
+	_uselessFl = false;
 	_stripNum = -1;
-	_obj44Index = 0;
-	_field2E8 = 0;
-	_field20 = 0;
+	_obj44ListIndex = 0;
+	_currObj44Id = 0;
+	_useless = 0;
 	_activeSpeaker = NULL;
 	_textShown = false;
 	_callbackObject = NULL;
@@ -688,14 +701,14 @@ void StripManager::synchronize(Serializer &s) {
 		Action::synchronize(s);
 
 	s.syncAsSint32LE(_stripNum);
-	s.syncAsSint32LE(_obj44Index);
-	s.syncAsSint32LE(_field20);
+	s.syncAsSint32LE(_obj44ListIndex);
+	s.syncAsSint32LE(_useless);
 	s.syncAsSint32LE(_sceneNumber);
 	_sceneBounds.synchronize(s);
 	SYNC_POINTER(_activeSpeaker);
 	s.syncAsByte(_textShown);
-	s.syncAsByte(_field2E6);
-	s.syncAsSint32LE(_field2E8);
+	s.syncAsByte(_uselessFl);
+	s.syncAsSint32LE(_currObj44Id);
 	if (g_vm->getGameID() == GType_Ringworld2)
 		s.syncAsSint16LE(_exitMode);
 
@@ -727,10 +740,10 @@ void StripManager::synchronize(Serializer &s) {
 }
 
 void StripManager::remove() {
-	if (g_vm->getGameID() == GType_Ringworld2) { 
+	if (g_vm->getGameID() == GType_Ringworld2) {
 		for (uint i = 0; i < _speakerList.size(); ++i) {
 			if (_activeSpeaker != _speakerList[i])
-				_speakerList[i]->proc16();
+				_speakerList[i]->stopSpeaking();
 		}
 	}
 
@@ -741,7 +754,7 @@ void StripManager::remove() {
 	}
 
 	if (_activeSpeaker) {
-		if (g_vm->getGameID() == GType_Ringworld2) 
+		if (g_vm->getGameID() == GType_Ringworld2)
 			static_cast<Ringworld2::VisualSpeaker *>(_activeSpeaker)->_speakerMode = 0xff;
 		_activeSpeaker->remove();
 	}
@@ -777,14 +790,14 @@ void StripManager::signal() {
 		_textShown = false;
 	}
 
-	if (_obj44Index < 0) {
+	if (_obj44ListIndex < 0) {
 		EventHandler *owner = _endHandler;
-		int stripNum = ABS(_obj44Index);
+		int stripNum = ABS(_obj44ListIndex);
 		remove();
 
 		start(stripNum, owner);
 		return;
-	} else if (_obj44Index == 10000) {
+	} else if (_obj44ListIndex == 10000) {
 		// Reached end of strip
 		EventHandler *endHandler = _endHandler;
 		remove();
@@ -801,7 +814,7 @@ void StripManager::signal() {
 		// Load the data for the strip
 		load();
 
-	Obj44 &obj44 = _obj44List[_obj44Index];
+	Obj44 &obj44 = _obj44List[_obj44ListIndex];
 
 	if (g_vm->getGameID() == GType_Ringworld2) {
 		// Return to Ringworld specific handling
@@ -822,8 +835,8 @@ void StripManager::signal() {
 			break;
 		}
 	}
-	
-	_field2E8 = obj44._id;
+
+	_currObj44Id = obj44._id;
 	Common::StringArray choiceList;
 
 	// Build up a list of script entries
@@ -836,7 +849,7 @@ void StripManager::signal() {
 			int f16Index = _lookupList[obj44._field16[0] - 1];
 			int entryId = obj44._field16[f16Index];
 
-			Obj0A &entry = obj44._list[idx]; 
+			Obj0A &entry = obj44._list[idx];
 			if (entry._id == entryId) {
 				// Get the next one
 				choiceList.push_back((const char *)&_script[0] + entry._scriptOffset);
@@ -864,7 +877,7 @@ void StripManager::signal() {
 
 			// Get the next one
 			const char *choiceStr = (const char *)&_script[0] + obj44._list[idx]._scriptOffset;
-			
+
 			if (!*choiceStr) {
 				// Choice is empty
 				assert(g_vm->getGameID() == GType_Ringworld2);
@@ -872,7 +885,7 @@ void StripManager::signal() {
 				if (obj44._list[1]._id) {
 					// it's a reference to another list slot
 					int listId = obj44._list[idx]._id;
-					
+
 					int obj44Idx = 0;
 					while (_obj44List[obj44Idx]._id != listId)
 						++obj44Idx;
@@ -882,7 +895,7 @@ void StripManager::signal() {
 						// seems to be set to the R2_GLOBALS._stripManager_lookupList, so manually set it
 						if (!_lookupList)
 							_lookupList = R2_GLOBALS._stripManager_lookupList;
-						
+
 						int f16Index = _lookupList[_obj44List[obj44Idx]._field16[0] - 1];
 						listId = _obj44List[obj44Idx]._field16[f16Index];
 
@@ -917,7 +930,7 @@ void StripManager::signal() {
 		// Get the user to select a conversation option
 		strIndex = _choiceDialog.execute(choiceList);
 
-	if ((delayFlag || choiceList.size() != 1) && !_field2E6)
+	if ((delayFlag || choiceList.size() != 1) && !_uselessFl)
 		_delayFrames = 1;
 	else {
 		Speaker *speakerP = getSpeaker((const char *)&_script[0] + obj44._speakerOffset);
@@ -948,11 +961,11 @@ void StripManager::signal() {
 
 		if (g_vm->getGameID() == GType_Ringworld2) {
 			Ringworld2::VisualSpeaker *speaker = static_cast<Ringworld2::VisualSpeaker *>(_activeSpeaker);
-			
+
 			if (speaker) {
 				speaker->_speakerMode = obj44._speakerMode;
 				if (!choiceList[strIndex].empty())
-					speaker->proc15();
+					speaker->animateSpeaker();
 			}
 
 			if (!choiceList[strIndex].empty()) {
@@ -962,7 +975,7 @@ void StripManager::signal() {
 				_delayFrames = 1;
 			} else {
 				_delayFrames = 0;
-				speaker->proc15();
+				speaker->animateSpeaker();
 			}
 		} else {
 			_textShown = true;
@@ -970,10 +983,10 @@ void StripManager::signal() {
 		}
 	}
 
-	_obj44Index = getNewIndex(obj44._list[strIndex]._id);
-	if (_obj44Index == 10001) {
+	_obj44ListIndex = getNewIndex(obj44._list[strIndex]._id);
+	if (_obj44ListIndex == 10001) {
 		MessageDialog::show("Strip Failure: Node not found", OK_BTN_STRING);
-		_obj44Index = 0;
+		_obj44ListIndex = 0;
 	}
 }
 
@@ -983,16 +996,16 @@ void StripManager::process(Event &event) {
 		return;
 
 	if ((event.eventType == EVENT_KEYPRESS) && (event.kbd.keycode == Common::KEYCODE_ESCAPE)) {
-		if (_obj44Index != 10000) {
-			int currIndex = _obj44Index;
-			while (!_obj44List[_obj44Index]._list[1]._id) {
-				_obj44Index = getNewIndex(_obj44List[_obj44Index]._list[0]._id);
-				if ((_obj44Index < 0) || (_obj44Index == 10000))
+		if (_obj44ListIndex != 10000) {
+			int currIndex = _obj44ListIndex;
+			while (!_obj44List[_obj44ListIndex]._list[1]._id) {
+				_obj44ListIndex = getNewIndex(_obj44List[_obj44ListIndex]._list[0]._id);
+				if ((_obj44ListIndex < 0) || (_obj44ListIndex == 10000))
 					break;
-				currIndex = _obj44Index;
+				currIndex = _obj44ListIndex;
 			}
 
-			_field2E8 = _obj44List[currIndex]._id;
+			_currObj44Id = _obj44List[currIndex]._id;
 		}
 
 		// Signal the end of the strip

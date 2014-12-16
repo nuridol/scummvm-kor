@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -91,7 +91,7 @@ OSystem_SDL::~OSystem_SDL() {
 	delete _savefileManager;
 	_savefileManager = 0;
 	if (_graphicsManager) {
-		_graphicsManager->deactivateManager();
+		dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->deactivateManager();
 	}
 	delete _graphicsManager;
 	_graphicsManager = 0;
@@ -157,6 +157,14 @@ void OSystem_SDL::init() {
 void OSystem_SDL::initBackend() {
 	// Check if backend has not been initialized
 	assert(!_inited);
+
+	const int maxNameLen = 20;
+	char sdlDriverName[maxNameLen];
+	sdlDriverName[0] = '\0';
+	SDL_VideoDriverName(sdlDriverName, maxNameLen);
+	// Using printf rather than debug() here as debug()/logging
+	// is not active by this point.
+	debug(1, "Using SDL Video Driver \"%s\"", sdlDriverName);
 
 	// Create the default event source, in case a custom backend
 	// manager didn't provide one yet.
@@ -240,7 +248,7 @@ void OSystem_SDL::initBackend() {
 	// so the virtual keyboard can be initialized, but we have to add the
 	// graphics manager as an event observer after initializing the event
 	// manager.
-	_graphicsManager->activateManager();
+	dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->activateManager();
 }
 
 #if defined(USE_TASKBAR)
@@ -369,17 +377,6 @@ Common::String OSystem_SDL::getSystemLanguage() const {
 
 	const LCID languageIdentifier = GetThreadLocale();
 
-	// GetLocalInfo is only supported starting from Windows 2000, according to this:
-	// http://msdn.microsoft.com/en-us/library/dd318101%28VS.85%29.aspx
-	// On the other hand the locale constants used, seem to exist on Windows 98 too,
-	// check this for that: http://msdn.microsoft.com/en-us/library/dd464799%28v=VS.85%29.aspx
-	//
-	// I am not exactly sure what is the truth now, it might be very well that this breaks
-	// support for systems older than Windows 2000....
-	//
-	// TODO: Check whether this (or ScummVM at all ;-) works on a system with Windows 98 for
-	// example and if it does not and we still want Windows 9x support, we should definitly
-	// think of another solution.
 	if (GetLocaleInfo(languageIdentifier, LOCALE_SISO639LANGNAME, langName, sizeof(langName)) != 0 &&
 		GetLocaleInfo(languageIdentifier, LOCALE_SISO3166CTRYNAME, ctryName, sizeof(ctryName)) != 0) {
 		Common::String localeName = langName;
@@ -392,10 +389,15 @@ Common::String OSystem_SDL::getSystemLanguage() const {
 	}
 #else // WIN32
 	// Activating current locale settings
-	const char *locale = setlocale(LC_ALL, "");
+	const Common::String locale = setlocale(LC_ALL, "");
+ 
+	// Restore default C locale to prevent issues with
+	// portability of sscanf(), atof(), etc.
+	// See bug #3615148
+	setlocale(LC_ALL, "C");
 
 	// Detect the language from the locale
-	if (!locale) {
+	if (locale.empty()) {
 		return ModularBackend::getSystemLanguage();
 	} else {
 		int length = 0;
@@ -404,14 +406,14 @@ Common::String OSystem_SDL::getSystemLanguage() const {
 		// ".UTF-8" or the like. We do this, since
 		// our translation languages are usually
 		// specified without any charset information.
-		for (int i = 0; locale[i]; ++i, ++length) {
+		for (int size = locale.size(); length < size; ++length) {
 			// TODO: Check whether "@" should really be checked
 			// here.
-			if (locale[i] == '.' || locale[i] == ' ' || locale[i] == '@')
+			if (locale[length] == '.' || locale[length] == ' ' || locale[length] == '@')
 				break;
 		}
 
-		return Common::String(locale, length);
+		return Common::String(locale.c_str(), length);
 	}
 #endif // WIN32
 #else // USE_DETECTLANG
@@ -585,14 +587,14 @@ bool OSystem_SDL::setGraphicsMode(int mode) {
 	// manager, delete and create the new mode graphics manager
 	if (_graphicsMode >= _firstGLMode && mode < _firstGLMode) {
 		debug(1, "switching to plain SDL graphics");
-		_graphicsManager->deactivateManager();
+		dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->deactivateManager();
 		delete _graphicsManager;
 		_graphicsManager = new SurfaceSdlGraphicsManager(_eventSource);
 
 		switchedManager = true;
 	} else if (_graphicsMode < _firstGLMode && mode >= _firstGLMode) {
 		debug(1, "switching to OpenGL graphics");
-		_graphicsManager->deactivateManager();
+		dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->deactivateManager();
 		delete _graphicsManager;
 		_graphicsManager = new OpenGLSdlGraphicsManager(_desktopWidth, _desktopHeight, _eventSource);
 
@@ -602,7 +604,7 @@ bool OSystem_SDL::setGraphicsMode(int mode) {
 	_graphicsMode = mode;
 
 	if (switchedManager) {
-		_graphicsManager->activateManager();
+		dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->activateManager();
 
 		_graphicsManager->beginGFXTransaction();
 #ifdef USE_RGB_COLOR

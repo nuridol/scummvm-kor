@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -1417,8 +1417,8 @@ bool AdGame::persist(BasePersistenceManager *persistMgr) {
 
 	_objects.persist(persistMgr);
 
-	persistMgr->transfer(TMEMBER(_prevSceneName));
-	persistMgr->transfer(TMEMBER(_prevSceneFilename));
+	persistMgr->transferCharPtr(TMEMBER(_prevSceneName));
+	persistMgr->transferCharPtr(TMEMBER(_prevSceneFilename));
 
 	persistMgr->transferPtr(TMEMBER_PTR(_responseBox));
 	_responsesBranch.persist(persistMgr);
@@ -1426,23 +1426,23 @@ bool AdGame::persist(BasePersistenceManager *persistMgr) {
 	persistMgr->transferPtr(TMEMBER_PTR(_scene));
 	_sceneStates.persist(persistMgr);
 	persistMgr->transferBool(TMEMBER(_scheduledFadeIn));
-	persistMgr->transfer(TMEMBER(_scheduledScene));
+	persistMgr->transferCharPtr(TMEMBER(_scheduledScene));
 	persistMgr->transferPtr(TMEMBER_PTR(_selectedItem));
-	persistMgr->transfer(TMEMBER_INT(_talkSkipButton));
+	persistMgr->transferSint32(TMEMBER_INT(_talkSkipButton));
 
 	_sentences.persist(persistMgr);
 
 	persistMgr->transferPtr(TMEMBER_PTR(_sceneViewport));
-	persistMgr->transfer(TMEMBER_INT(_stateEx));
+	persistMgr->transferSint32(TMEMBER_INT(_stateEx));
 	persistMgr->transferBool(TMEMBER(_initialScene));
-	persistMgr->transfer(TMEMBER(_debugStartupScene));
+	persistMgr->transferCharPtr(TMEMBER(_debugStartupScene));
 
 	persistMgr->transferPtr(TMEMBER_PTR(_invObject));
 	persistMgr->transferPtr(TMEMBER_PTR(_inventoryOwner));
 	persistMgr->transferBool(TMEMBER(_tempDisableSaveState));
 	_items.persist(persistMgr);
 
-	persistMgr->transfer(TMEMBER(_itemsFile));
+	persistMgr->transferCharPtr(TMEMBER(_itemsFile));
 
 	_speechDirs.persist(persistMgr);
 	persistMgr->transferBool(TMEMBER(_smartItemCursor));
@@ -1451,7 +1451,7 @@ bool AdGame::persist(BasePersistenceManager *persistMgr) {
 		_initialScene = false;
 	}
 
-	persistMgr->transfer(TMEMBER(_startupScene));
+	persistMgr->transferCharPtr(TMEMBER(_startupScene));
 
 
 	return STATUS_OK;
