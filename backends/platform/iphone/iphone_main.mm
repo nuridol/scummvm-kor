@@ -83,10 +83,10 @@ int main(int argc, char **argv) {
 	// hide the status bar
 #ifdef SCUMMVMKOR
     application.statusBarHidden = YES;
-#else
+#endif
     [application setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
 	[application setStatusBarHidden:YES animated:YES];
-#endif
+
     _window = [[UIWindow alloc] initWithFrame:rect];
 	[_window retain];
 
@@ -128,11 +128,11 @@ int main(int argc, char **argv) {
 	// since the Springboard has put it back without apparently flagging our application.
 #ifdef SCUMMVMKOR
     self.statusBarHidden = YES;
-#else
+#endif
     [self setStatusBarHidden:YES animated:YES];
     [self setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
 	[self setStatusBarHidden:YES animated:YES];
-#endif
+
 }
 
 - (void)didRotate:(NSNotification *)notification {
