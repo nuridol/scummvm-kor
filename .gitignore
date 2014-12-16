@@ -3,7 +3,7 @@
 .*.swp
 .*.swo
 *.o
-lib*.a
+#lib*.a
 .deps
 
 /config.log
