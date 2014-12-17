@@ -5,6 +5,7 @@ MODULE_OBJS := \
 	cursorman.o \
 	font.o \
 	fontman.o \
+	korfont.o \
 	fonts/bdf.o \
 	fonts/consolefont.o \
 	fonts/newfont_big.o \
