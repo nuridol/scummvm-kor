@@ -31,46 +31,71 @@ int Font::getKerningOffset(uint32 left, uint32 right) const {
 	return 0;
 }
 
+Common::Rect Font::getBoundingBox(uint32 chr) const {
+	return Common::Rect(getCharWidth(chr), getFontHeight());
+}
+
 namespace {
+
+template<class StringType>
+Common::Rect getBoundingBoxImpl(const Font &font, const StringType &str, int x, int y, int w, TextAlign align, int deltax) {
+	// We follow the logic of drawStringImpl here. The only exception is
+	// that we do allow an empty width to be specified here. This allows us
+	// to obtain the complete bounding box of a string.
+	const int leftX = x, rightX = w ? (x + w) : 0x7FFFFFFF;
+	int width = font.getStringWidth(str);
+
+	if (align == kTextAlignCenter)
+		x = x + (w - width)/2;
+	else if (align == kTextAlignRight)
+		x = x + w - width;
+	x += deltax;
+
+	bool first = true;
+	Common::Rect bbox;
+
+	typename StringType::unsigned_type last = 0;
+	for (typename StringType::const_iterator i = str.begin(), end = str.end(); i != end; ++i) {
+		const typename StringType::unsigned_type cur = *i;
+		x += font.getKerningOffset(last, cur);
+		last = cur;
+		w = font.getCharWidth(cur);
+		if (x+w > rightX)
+			break;
+		if (x+w >= leftX) {
+			Common::Rect charBox = font.getBoundingBox(cur);
+			charBox.translate(x, y);
+			if (first) {
+				bbox = charBox;
+				first = false;
+			} else {
+				bbox.extend(charBox);
+			}
+		}
+		x += w;
+	}
+
+	return bbox;
+}
 
 template<class StringType>
 int getStringWidthImpl(const Font &font, const StringType &str) {
 	int space = 0;
 	typename StringType::unsigned_type last = 0;
 
-#ifdef SCUMMVMKOR
-    bool isKorean = 1;
-    //const char *s = str.c_str();
-    uint len = str.size();
-    
-    for (uint i = 0; i < len; ++i) {
-        typename StringType::unsigned_type c;
-        c = str[i];
-        if (c >= 0x80 && isKorean && i+1 < len) {
-            if (checkKorCode(c, str[i + 1])) {
-                c += str[i + 1] * 256;	// LE
-                i++;
-            } else {
-                // 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-                isKorean = 0;
-            }
-        }
-        const typename StringType::unsigned_type cur = str[i];
-        space += font.getCharWidth(c) + font.getKerningOffset(last, cur);
-        last = cur;
-    }
-#else
 	for (uint i = 0; i < str.size(); ++i) {
 		const typename StringType::unsigned_type cur = str[i];
 		space += font.getCharWidth(cur) + font.getKerningOffset(last, cur);
 		last = cur;
 	}
-#endif
+
 	return space;
 }
 
 template<class StringType>
 void drawStringImpl(const Font &font, Surface *dst, const StringType &str, int x, int y, int w, uint32 color, TextAlign align, int deltax) {
+	// The logic in getBoundingImpl is the same as we use here. In case we
+	// ever change something here we will need to change it there too.
 	assert(dst != 0);
 
 	const int leftX = x, rightX = x + w;
@@ -84,28 +109,6 @@ void drawStringImpl(const Font &font, Surface *dst, const StringType &str, int x
 
 	typename StringType::unsigned_type last = 0;
 	for (typename StringType::const_iterator i = str.begin(), end = str.end(); i != end; ++i) {
-#ifdef SCUMMVMKOR
-        bool isKorean = 1;
-        typename StringType::unsigned_type c;
-        c = *i;
-        if (c >= 0x80 && isKorean && i+1 < end) {
-            if (checkKorCode(c, *(i+1))) {
-                c += *(i+1) * 256;	//LE
-                i++;
-            } else {
-                // 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-                isKorean = 0;
-            }
-        }
-		const typename StringType::unsigned_type cur = *i;
-		x += font.getKerningOffset(last, cur);
-		last = cur;
-        w = font.getCharWidth(c);
-        if (x+w > rightX)
-            break;
-		if (x+w >= leftX)
-            font.drawChar(dst, c, x, y, color);
-#else
 		const typename StringType::unsigned_type cur = *i;
 		x += font.getKerningOffset(last, cur);
 		last = cur;
@@ -114,7 +117,6 @@ void drawStringImpl(const Font &font, Surface *dst, const StringType &str, int x
 			break;
 		if (x+w >= leftX)
 			font.drawChar(dst, cur, x, y, color);
-#endif
 		x += w;
 	}
 }
@@ -220,6 +222,40 @@ int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Comm
 
 } // End of anonymous namespace
 
+Common::Rect Font::getBoundingBox(const Common::String &input, int x, int y, const int w, TextAlign align, int deltax, bool useEllipsis) const {
+	// In case no width was given we cannot use ellipsis or any alignment
+	// apart from left alignment.
+	if (w == 0) {
+		if (useEllipsis) {
+			warning("Font::getBoundingBox: Requested ellipsis when no width was specified");
+		}
+
+		if (align != kTextAlignLeft) {
+			warning("Font::getBoundingBox: Requested text alignment when no width was specified");
+		}
+
+		useEllipsis = false;
+		align = kTextAlignLeft;
+	}
+
+	const Common::String str = useEllipsis ? handleEllipsis(input, w) : input;
+	return getBoundingBoxImpl(*this, str, x, y, w, align, deltax);
+}
+
+Common::Rect Font::getBoundingBox(const Common::U32String &str, int x, int y, const int w, TextAlign align) const {
+	// In case no width was given we cannot any alignment apart from left
+	// alignment.
+	if (w == 0) {
+		if (align != kTextAlignLeft) {
+			warning("Font::getBoundingBox: Requested text alignment when no width was specified");
+		}
+
+		align = kTextAlignLeft;
+	}
+
+	return getBoundingBoxImpl(*this, str, x, y, w, align, 0);
+}
+
 int Font::getStringWidth(const Common::String &str) const {
 	return getStringWidthImpl(*this, str);
 }
@@ -228,15 +264,28 @@ int Font::getStringWidth(const Common::U32String &str) const {
 	return getStringWidthImpl(*this, str);
 }
 
-void Font::drawString(Surface *dst, const Common::String &sOld, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
-	Common::String s = sOld;
-	int width = getStringWidth(s);
-	Common::String str;
-#ifdef SCUMMVMKOR
-        bool isKorean = 1;
-#endif
+void Font::drawString(Surface *dst, const Common::String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
+	Common::String renderStr = useEllipsis ? handleEllipsis(str, w) : str;
+	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax);
+}
 
-	if (useEllipsis && width > w && s.hasSuffix("...")) {
+void Font::drawString(Surface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align) const {
+	drawStringImpl(*this, dst, str, x, y, w, color, align, 0);
+}
+
+int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Common::String> &lines) const {
+	return wordWrapTextImpl(*this, str, maxWidth, lines);
+}
+
+int Font::wordWrapText(const Common::U32String &str, int maxWidth, Common::Array<Common::U32String> &lines) const {
+	return wordWrapTextImpl(*this, str, maxWidth, lines);
+}
+
+Common::String Font::handleEllipsis(const Common::String &input, int w) const {
+	Common::String s = input;
+	int width = getStringWidth(s);
+
+	if (width > w && s.hasSuffix("...")) {
 		// String is too wide. Check whether it ends in an ellipsis
 		// ("..."). If so, remove that and try again!
 		s.deleteLastChar();
@@ -245,7 +294,9 @@ void Font::drawString(Surface *dst, const Common::String &sOld, int x, int y, in
 		width = getStringWidth(s);
 	}
 
-	if (useEllipsis && width > w) {
+	if (width > w) {
+		Common::String str;
+
 		// String is too wide. So we shorten it "intelligently" by
 		// replacing parts of the string by an ellipsis. There are
 		// three possibilities for this: replace the start, the end, or
@@ -260,37 +311,13 @@ void Font::drawString(Surface *dst, const Common::String &sOld, int x, int y, in
 		const int halfWidth = (w - ellipsisWidth) / 2;
 		int w2 = 0;
 		Common::String::unsigned_type last = 0;
-		uint i;
+		uint i = 0;
 
-		for (i = 0; i < s.size(); ++i) {
-#ifdef SCUMMVMKOR
-            int charWidth = 0;
-            Common::String::unsigned_type c;
-            c = s[i];
-            if (c >= 0x80 && isKorean && i+1 < s.size()) {
-                if (checkKorCode(c, s[i + 1])) {
-                    c += s[i + 1] * 256;	// LE
-                    str += s[i];	// 한글을 한 글자씩 넣어준다
-                    i++;
-                } else {
-                    // 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-                    isKorean = 0;
-                }
-            }
-            //uint16 cur = s[i];
-            const Common::String::unsigned_type cur = s[i];
-            charWidth = getCharWidth(c) + getKerningOffset(last, cur);
-            if (w2 + charWidth > halfWidth) {
-                if (c > 0xff)
-                    str += s[i];
-                break;
-            }
-#else
+		for (; i < s.size(); ++i) {
 			const Common::String::unsigned_type cur = s[i];
 			int charWidth = getCharWidth(cur) + getKerningOffset(last, cur);
 			if (w2 + charWidth > halfWidth)
 				break;
-#endif
 			last = cur;
 			w2 += charWidth;
 			str += cur;
@@ -309,24 +336,8 @@ void Font::drawString(Surface *dst, const Common::String &sOld, int x, int y, in
 		// (width + ellipsisWidth - w)
 		int skip = width + ellipsisWidth - w;
 		for (; i < s.size() && skip > 0; ++i) {
-#ifdef SCUMMVMKOR
-            Common::String::unsigned_type c;
-            c = s[i];
-            if (c >= 0x80 && isKorean && i+1 < s.size()) {
-                if (checkKorCode(c, s[i + 1])) {
-                    c += s[i + 1] * 256;	//LE
-                    i++;
-                } else {
-                    // 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-                    isKorean = 0;
-                }
-            }
-			const Common::String::unsigned_type cur = s[i];
-            skip -= getCharWidth(c) + getKerningOffset(last, cur);
-#else
 			const Common::String::unsigned_type cur = s[i];
 			skip -= getCharWidth(cur) + getKerningOffset(last, cur);
-#endif
 			last = cur;
 		}
 
@@ -335,24 +346,10 @@ void Font::drawString(Surface *dst, const Common::String &sOld, int x, int y, in
 			str += s[i];
 		}
 
-		width = getStringWidth(str);
+		return str;
 	} else {
-		str = s;
+		return s;
 	}
-
-	drawStringImpl(*this, dst, str, x, y, w, color, align, deltax);
-}
-
-void Font::drawString(Surface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align) const {
-	drawStringImpl(*this, dst, str, x, y, w, color, align, 0);
-}
-
-int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Common::String> &lines) const {
-	return wordWrapTextImpl(*this, str, maxWidth, lines);
-}
-
-int Font::wordWrapText(const Common::U32String &str, int maxWidth, Common::Array<Common::U32String> &lines) const {
-	return wordWrapTextImpl(*this, str, maxWidth, lines);
 }
 
 } // End of namespace Graphics

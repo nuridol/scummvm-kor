@@ -1082,6 +1082,7 @@ int ThreadResource::doApt() {
 		break;
 	case 2:
 		_vm->_voy->_aptLoadMode = 142;
+		break;
 	case 5:
 		_vm->_voy->_aptLoadMode = 141;
 		break;
@@ -1389,7 +1390,7 @@ int ThreadResource::doInterface() {
 				Common::Point(pt.x - MANSION_VIEW_X, pt.y - MANSION_VIEW_Y);
 		regionIndex = -1;
 
-		for (int hotspotIdx = 0; hotspotIdx < (int)hotspots->size(); ++hotspotIdx) {
+		for (uint hotspotIdx = 0; hotspotIdx < hotspots->size(); ++hotspotIdx) {
 			if ((*hotspots)[hotspotIdx].contains(pt)) {
 				// Rect check done
 				for (int arrIndex = 0; arrIndex < 3; ++arrIndex) {
@@ -1445,7 +1446,7 @@ int ThreadResource::doInterface() {
 		_vm->flipPageAndWait();
 
 		pt = _vm->_eventsManager->getMousePos();
-		if ((_vm->_voy->_RTVNum >= _vm->_voy->_RTVLimit) || ((_vm->_voy->_eventFlags & 0x80) &&
+		if ((_vm->_voy->_RTVNum >= _vm->_voy->_RTVLimit) || ((_vm->_voy->_eventFlags & EVTFLAG_VICTIM_PRESET) &&
 				_vm->_eventsManager->_rightClick && (pt.x == 0))) {
 			// Time to transition to the next time period
 			_vm->_eventsManager->getMouseInfo();

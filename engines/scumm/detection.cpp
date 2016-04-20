@@ -244,7 +244,7 @@ static Common::String generateFilenameForDetection(const char *pattern, Filename
 	case kGenRoomNum:
 		result = Common::String::format(pattern, 0);
 		break;
-	
+
 	case kGenDiskNumSteam:
 	case kGenRoomNumSteam: {
 		const SteamIndexFile *indexFile = lookUpSteamIndexFile(pattern, platform);
@@ -323,6 +323,8 @@ static BaseScummFile *openDiskImage(const Common::FSNode &node, const GameFilena
 		gs.gameid = gfp->gameid;
 		gs.id = (Common::String(gfp->gameid) == "maniac" ? GID_MANIAC : GID_ZAK);
 		gs.platform = gfp->platform;
+		if (strcmp(gfp->pattern, "maniacdemo.d64") == 0)
+			gs.features |= GF_DEMO;
 
 		// determine second disk file name
 		Common::String disk2(disk1);
@@ -502,12 +504,7 @@ static void computeGameSettingsFromMD5(const Common::FSList &fslist, const GameF
 				// (since they have identical MD5):
 				if (dr.game.id == GID_MANIAC && !strcmp(gfp->pattern, "%02d.MAN")) {
 					dr.extra = "V1 Demo";
-				}
-
-				// HACK: If 'Demo' occurs in the extra string, set the GF_DEMO flag,
-				// required by some game demos (e.g. Dig, FT and COMI).
-				if (dr.extra && strstr(dr.extra, "Demo")) {
-					dr.game.features |= GF_DEMO;
+					dr.game.features = GF_DEMO;
 				}
 
 				// HACK: Try to detect languages for translated games
@@ -1271,7 +1268,7 @@ SaveStateList ScummMetaEngine::listSaves(const char *target) const {
 	Common::StringArray filenames;
 	Common::String saveDesc;
 	Common::String pattern = target;
-	pattern += ".s??";
+	pattern += ".s##";
 
 	filenames = saveFileMan->listSavefiles(pattern);
 	sort(filenames.begin(), filenames.end());	// Sort (hopefully ensuring we are sorted numerically..)

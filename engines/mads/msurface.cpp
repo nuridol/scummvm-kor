@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -87,7 +87,6 @@ void MSurface::drawSprite(const Common::Point &pt, SpriteInfo &info, const Commo
 	// rectangle is always 0, 0
 	assert(clipRect.top == 0 && clipRect.left == 0);
 
-	// TODO: Put err* and scaled* into SpriteInfo
 	int errX = info.hotX * info.scaleX % 100;
 	int errY = info.hotY * info.scaleY % 100;
 	int scaledWidth = scaleValue(info.width, info.scaleX, errX);
@@ -160,7 +159,6 @@ void MSurface::drawSprite(const Common::Point &pt, SpriteInfo &info, const Commo
 
 			if (status == kStatusDraw && clipY == 0) {
 				// Draw previously scaled line
-				// TODO Implement different drawing types (depth, shadow etc.)
 				byte *tempDst = dst;
 				for (int lineX = 0; lineX < scaledWidth; lineX++) {
 					byte pixel = scaledLineBuf[lineX];
@@ -186,8 +184,6 @@ void MSurface::drawSprite(const Common::Point &pt, SpriteInfo &info, const Commo
 				}
 				dst += pitch;
 				heightAmt--;
-				// TODO depth etc.
-				//depthAddress += Destination -> Width;
 
 				errY += 100;
 				if (errY >= 0)
@@ -266,11 +262,11 @@ void MSurface::copyFrom(MSurface *src, const Common::Point &destPos, int depth,
 
 	int highestDim = MAX(frameWidth, frameHeight);
 	bool lineDist[MADS_SCREEN_WIDTH];
-	int distIndex = 0;
 	int distXCount = 0, distYCount = 0;
 
 	if (scale != -1) {
 		int distCtr = 0;
+		int distIndex = 0;
 		do {
 			distCtr += scale;
 			if (distCtr < 100) {
@@ -311,6 +307,9 @@ void MSurface::copyFrom(MSurface *src, const Common::Point &destPos, int depth,
 
 		if (!copyRect.isValidRect())
 			return;
+
+		if (flipped)
+			copyRect.moveTo(0, copyRect.top);
 
 		byte *data = src->getData();
 		byte *srcPtr = data + (src->getWidth() * copyRect.top + copyRect.left);
@@ -356,9 +355,10 @@ void MSurface::copyFrom(MSurface *src, const Common::Point &destPos, int depth,
 	if (widthAmount > 0)
 		spriteWidth -= widthAmount;
 
-	int spriteRight = spriteLeft + spriteWidth;
 	if (spriteWidth <= 0)
 		return;
+
+	int spriteRight = spriteLeft + spriteWidth;
 	if (flipped) {
 		destX += distXCount - 1;
 		spriteLeft = -(distXCount - spriteRight);
@@ -400,12 +400,14 @@ void MSurface::copyFrom(MSurface *src, const Common::Point &destPos, int depth,
 		const byte *srcP = srcPixelsP;
 		byte *destP = destPixelsP;
 
-		for (int xp = 0, sprX = 0; xp < frameWidth; ++xp, ++srcP) {
-			if (xp < spriteLeft)
-				// Not yet reached start of display area
-				continue;
-			if (!lineDist[sprX++])
+		for (int xp = 0, sprX = -1; xp < frameWidth; ++xp, ++srcP) {
+			if (!lineDist[xp])
 				// Not a display pixel
+				continue;
+
+			++sprX;
+			if (sprX < spriteLeft || sprX >= spriteRight)
+				// Skip pixel if it's not in horizontal display portion
 				continue;
 
 			// Get depth of current output pixel in depth surface
@@ -488,7 +490,6 @@ void MSurface::scrollY(int yAmount) {
 	delete[] tempData;
 }
 
-
 void MSurface::translate(Common::Array<RGB6> &palette) {
 	for (int y = 0; y < this->h; ++y) {
 		byte *pDest = getBasePtr(0, y);
@@ -524,10 +525,24 @@ MSurface *MSurface::flipHorizontal() const {
 	return dest;
 }
 
+void MSurface::copyRectTranslate(MSurface &srcSurface, const byte *paletteMap,
+		const Common::Point &destPos, const Common::Rect &srcRect) {
+	// Loop through the lines
+	for (int yCtr = 0; yCtr < srcRect.height(); ++yCtr) {
+		const byte *srcP = srcSurface.getBasePtr(srcRect.left, srcRect.top + yCtr);
+		byte *destP = getBasePtr(destPos.x, destPos.y + yCtr);
+
+		// Copy the line over
+		for (int xCtr = 0; xCtr < srcRect.width(); ++xCtr, ++srcP, ++destP) {
+			*destP = paletteMap[*srcP];
+		}
+	}
+}
+
 /*------------------------------------------------------------------------*/
 
 int DepthSurface::getDepth(const Common::Point &pt) {
-	if (_vm->_game->_scene._sceneInfo->_depthStyle == 2) {
+	if (_depthStyle == 2) {
 		int bits = (3 - (pt.x % 4)) * 2;
 		byte v = *getBasePtr(pt.x >> 2, pt.y);
 		return v >> bits;
@@ -540,7 +555,7 @@ int DepthSurface::getDepth(const Common::Point &pt) {
 }
 
 int DepthSurface::getDepthHighBit(const Common::Point &pt) {
-	if (_vm->_game->_scene._sceneInfo->_depthStyle == 2) {
+	if (_depthStyle == 2) {
 		int bits = (3 - (pt.x % 4)) * 2;
 		byte v = *getBasePtr(pt.x >> 2, pt.y);
 		return (v >> bits) & 2;
@@ -551,6 +566,5 @@ int DepthSurface::getDepthHighBit(const Common::Point &pt) {
 		return *getBasePtr(pt.x, pt.y) & 0x80;
 	}
 }
-
 
 } // End of namespace MADS

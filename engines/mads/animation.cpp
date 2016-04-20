@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -32,10 +32,8 @@ void AAHeader::load(Common::SeekableReadStream *f) {
 	_miscEntriesCount = f->readUint16LE();
 	_frameEntriesCount = f->readUint16LE();
 	_messagesCount = f->readUint16LE();
-	f->skip(1);
-	_flags = f->readByte();
-
-	f->skip(2);
+	_loadFlags = f->readUint16LE();
+	_charSpacing = f->readSint16LE();
 	_bgType = (AnimBgType)f->readUint16LE();
 	_roomNumber = f->readUint16LE();
 	f->skip(2);
@@ -43,13 +41,13 @@ void AAHeader::load(Common::SeekableReadStream *f) {
 	_spritesIndex = f->readUint16LE();
 	_scrollPosition.x = f->readSint16LE();
 	_scrollPosition.y = f->readSint16LE();
-	_scrollTicks = f->readUint32LE();
+	_scrollTicks = f->readUint32LE() & 0xffff;
 	f->skip(6);
 
 	char buffer[FILENAME_SIZE];
 	f->read(buffer, FILENAME_SIZE);
 	buffer[FILENAME_SIZE - 1] = '\0';
-	_interfaceFile = Common::String(buffer);
+	_backgroundFile = Common::String(buffer);
 
 	for (int i = 0; i < 50; ++i) {
 		f->read(buffer, FILENAME_SIZE);
@@ -134,7 +132,8 @@ void AnimMiscEntry::load(Common::SeekableReadStream *f) {
 	_numTicks = f->readUint16LE();
 	_posAdjust.x = f->readSint16LE();
 	_posAdjust.y = f->readSint16LE();
-	_field8 = f->readUint16LE();
+	_scroll.x = f->readSByte();
+	_scroll.y = f->readSByte();
 }
 
 /*------------------------------------------------------------------------*/
@@ -160,8 +159,10 @@ Animation *Animation::init(MADSEngine *vm, Scene *scene) {
 }
 
 Animation::Animation(MADSEngine *vm, Scene *scene) : _vm(vm), _scene(scene) {
+	_flags = 0;
 	_font = nullptr;
 	_resetFlag = false;
+	_canChangeView = false;
 	_messageCtr = 0;
 	_skipLoad = false;
 	_freeFlag = false;
@@ -175,6 +176,9 @@ Animation::Animation(MADSEngine *vm, Scene *scene) : _vm(vm), _scene(scene) {
 	_actionDetails._indirectObjectId = -1;
 	_currentFrame = 0;
 	_oldFrameEntry = 0;
+	_rgbResult = -1;
+	_palIndex1 = _palIndex2 = -1;
+	_dynamicHotspotIndex = -1;
 }
 
 Animation::~Animation() {
@@ -189,7 +193,7 @@ Animation::~Animation() {
 	}
 }
 
-void Animation::load(UserInterface &interfaceSurface, DepthSurface &depthSurface,
+void Animation::load(MSurface &backSurface, DepthSurface &depthSurface,
 		const Common::String &resName, int flags, Common::Array<PaletteCycle> *palCycles,
 		SceneInfo *sceneInfo) {
 	Common::String resourceName = resName;
@@ -205,9 +209,10 @@ void Animation::load(UserInterface &interfaceSurface, DepthSurface &depthSurface
 
 	if (_header._bgType == ANIMBG_INTERFACE)
 		flags |= PALFLAG_RESERVED;
+	_flags = flags;
 
 	if (flags & ANIMFLAG_LOAD_BACKGROUND) {
-		loadInterface(interfaceSurface, depthSurface, _header, flags, palCycles, sceneInfo);
+		loadBackground(backSurface, depthSurface, _header, flags, palCycles, sceneInfo);
 	}
 	if (flags & ANIMFLAG_LOAD_BACKGROUND_ONLY) {
 		// No data
@@ -243,7 +248,7 @@ void Animation::load(UserInterface &interfaceSurface, DepthSurface &depthSurface
 
 		for (int i = 0; i < _header._frameEntriesCount; i++) {
 			AnimFrameEntry rec;
-			rec.load(frameStream, flags & ANIMFLAG_LOAD_BACKGROUND);
+			rec.load(frameStream, _header._bgType == ANIMBG_INTERFACE);
 			_frameEntries.push_back(rec);
 		}
 
@@ -256,7 +261,7 @@ void Animation::load(UserInterface &interfaceSurface, DepthSurface &depthSurface
 		// Chunk 4: Misc Data
 		Common::SeekableReadStream *miscStream = madsPack.getItemStream(streamIndex++);
 
-		if (flags & ANIMFLAG_LOAD_BACKGROUND) {
+		if (_header._bgType == ANIMBG_INTERFACE) {
 			for (int i = 0; i < _header._miscEntriesCount; ++i) {
 				AnimUIEntry rec;
 				rec.load(miscStream);
@@ -275,7 +280,7 @@ void Animation::load(UserInterface &interfaceSurface, DepthSurface &depthSurface
 
 	// If the animation specifies a font, then load it for access
 	delete _font;
-	if (_header._flags & ANIMFLAG_CUSTOM_FONT) {
+	if (_header._loadFlags & ANIMFLAG_CUSTOM_FONT) {
 		Common::String fontName = "*" + _header._fontResource;
 		_font = _vm->_font->getFont(fontName.c_str());
 	} else {
@@ -337,9 +342,6 @@ void Animation::startAnimation(int endTrigger) {
 		_unkIndex = -1;
 		//SpriteAsset *asset = _scene->_sprites[_spriteListIndexes[_header._spritesIndex]];
 
-		// TODO: Weird stuff with _unkList. Seems like it's treated as pointers
-		// here, but in processText, it's used as POINTs?
-
 		loadFrame(1);
 	}
 
@@ -375,6 +377,7 @@ void Animation::loadFrame(int frameNumber) {
 		pt.x = _unkList[_unkIndex].x;
 		pt.y = _unkList[_unkIndex].y;
 		_unkIndex = 1 - _unkIndex;
+		warning("LoadFrame - Using unknown array");
 	}
 
 	if (drawFrame(spriteSet, pt, frameNumber))
@@ -385,12 +388,12 @@ bool Animation::drawFrame(SpriteAsset &spriteSet, const Common::Point &pt, int f
 	return 0;
 }
 
-void Animation::loadInterface(UserInterface &interfaceSurface, DepthSurface &depthSurface,
+void Animation::loadBackground(MSurface &backSurface, DepthSurface &depthSurface,
 		AAHeader &header, int flags, Common::Array<PaletteCycle> *palCycles, SceneInfo *sceneInfo) {
 	_scene->_depthStyle = 0;
 	if (header._bgType <= ANIMBG_FULL_SIZE) {
 		_vm->_palette->_paletteUsage.setEmpty();
-		sceneInfo->load(header._roomNumber, flags, header._interfaceFile, 0, depthSurface, interfaceSurface);
+		sceneInfo->load(header._roomNumber, 0, header._backgroundFile, flags, depthSurface, backSurface);
 		_scene->_depthStyle = sceneInfo->_depthStyle == 2 ? 1 : 0;
 		if (palCycles) {
 			palCycles->clear();
@@ -399,8 +402,8 @@ void Animation::loadInterface(UserInterface &interfaceSurface, DepthSurface &dep
 		}
 	} else if (header._bgType == ANIMBG_INTERFACE) {
 		// Load a scene interface
-		Common::String resourceName = "*" + header._interfaceFile;
-		interfaceSurface.load(resourceName);
+		Common::String resourceName = "*" + header._backgroundFile;
+		backSurface.load(resourceName);
 
 		if (palCycles)
 			palCycles->clear();
@@ -415,6 +418,7 @@ bool Animation::hasScroll() const {
 
 void Animation::update() {
 	Scene &scene = _vm->_game->_scene;
+	Palette &palette = *_vm->_palette;
 
 	if (_header._manualFlag) {
 		int spriteListIndex = _spriteListIndexes[_header._spritesIndex];
@@ -435,10 +439,8 @@ void Animation::update() {
 	if (_vm->_game->_scene._frameStartTime < _nextFrameTimer)
 		return;
 
-	for (uint idx = 0; idx < scene._spriteSlots.size(); ++idx) {
-		if (scene._spriteSlots[idx]._seqIndex >= 0x80)
-			scene._spriteSlots[idx]._flags = IMG_ERASE;
-	}
+	// Erase any active sprites
+	eraseSprites();
 
 	// Validate the current frame
 	if (_currentFrame >= (int)_miscEntries.size()) {
@@ -464,21 +466,25 @@ void Animation::update() {
 		scene._spriteSlots.fullRefresh();
 	}
 
-	// Handle any offset adjustment for sprites as of this frame
-	bool paChanged = false;
-	if (scene._posAdjust.x != misc._posAdjust.x) {
-		scene._posAdjust.x = misc._posAdjust.x;
-		paChanged = true;
-	}
-	if (scene._posAdjust.y != misc._posAdjust.y) {
-		scene._posAdjust.y = misc._posAdjust.y;
-		paChanged = true;
-	}
+	bool isV2 = (_vm->getGameID() != GType_RexNebular);
+	if (isV2 && _canChangeView) {
+		// Handle any offset adjustment for sprites as of this frame
+		bool paChanged = false;
+		if (getFramePosAdjust(_currentFrame).x != scene._posAdjust.x) {
+			scene._posAdjust.x = getFramePosAdjust(_currentFrame).x;
+			paChanged = true;
+		}
 
-	if (paChanged) {
-		int newIndex = scene._spriteSlots.add();
-		scene._spriteSlots[newIndex]._seqIndex = -1;
-		scene._spriteSlots[newIndex]._flags = IMG_REFRESH;
+		if (getFramePosAdjust(_currentFrame).y != scene._posAdjust.y) {
+			scene._posAdjust.y = getFramePosAdjust(_currentFrame).y;
+			paChanged = true;
+		}
+
+		if (paChanged) {
+			int newIndex = scene._spriteSlots.add();
+			scene._spriteSlots[newIndex]._seqIndex = -1;
+			scene._spriteSlots[newIndex]._flags = IMG_REFRESH;
+		}
 	}
 
 	// Main frame animation loop - frames get animated by being placed, as necessary, into the
@@ -534,28 +540,43 @@ void Animation::update() {
 			// Start displaying the message
 			AnimMessage &me = _messages[idx];
 
-			// The color index to use is dependant on how many messages are currently on-screen
-			uint8 colIndex;
-			switch (_messageCtr) {
-			case 1:
-				colIndex = 252;
-				break;
-			case 2:
-				colIndex = 16;
-				break;
-			default:
-				colIndex = 250;
-				break;
+			if (_flags & ANIMFLAG_ANIMVIEW) {
+				_rgbResult = palette._paletteUsage.checkRGB(me._rgb1, -1, true, &_palIndex1);
+				_rgbResult = palette._paletteUsage.checkRGB(me._rgb2, _rgbResult, true, &_palIndex2);
+
+				// Update the palette with the two needed colors
+				int palStart = MIN(_palIndex1, _palIndex2);
+				int palCount = ABS(_palIndex2 - _palIndex1) + 1;
+				palette.setPalette(&palette._mainPalette[palStart * 3], palStart, palCount);
+			} else {
+				// The color index to use is dependant on how many messages are currently on-screen
+				switch (_messageCtr) {
+				case 1:
+					_palIndex1 = 252;
+					break;
+				case 2:
+					_palIndex1 = 16;
+					break;
+				default:
+					_palIndex1 = 250;
+					break;
+				}
+				_palIndex2 = _palIndex1 + 1;
+
+				_vm->_palette->setEntry(_palIndex1, me._rgb1[0], me._rgb1[1], me._rgb1[2]);
+				_vm->_palette->setEntry(_palIndex2, me._rgb2[0], me._rgb2[1], me._rgb2[2]);
 			}
 
-			_vm->_palette->setEntry(colIndex, me._rgb1[0], me._rgb1[1], me._rgb1[2]);
-			_vm->_palette->setEntry(colIndex + 1, me._rgb2[0], me._rgb2[1], me._rgb2[2]);
-
 			// Add a kernel message to display the given text
-			me._kernelMsgIndex = scene._kernelMessages.add(me._pos, colIndex * 0x101 + 0x100,
+			me._kernelMsgIndex = scene._kernelMessages.add(me._pos,
+				_palIndex1 | (_palIndex2 << 8),
 				0, 0, INDEFINITE_TIMEOUT, me._msg);
 			assert(me._kernelMsgIndex >= 0);
 			++_messageCtr;
+
+			// If there's an accompanying sound, also play it
+			if (me._soundId > 0)
+				_vm->_audio->playSound(me._soundId - 1);
 		}
 	}
 
@@ -582,12 +603,24 @@ void Animation::setCurrentFrame(int frameNumber) {
 	_currentFrame = frameNumber;
 	_oldFrameEntry = 0;
 	_freeFlag = false;
-
-	_nextScrollTimer = _nextFrameTimer = _vm->_game->_scene._frameStartTime;
 }
 
-void Animation::setNextFrameTimer(int frameNumber) {
-	_nextFrameTimer = frameNumber;
+void Animation::setNextFrameTimer(uint32 newTimer) {
+	_nextFrameTimer = newTimer;
 }
 
+void Animation::eraseSprites() {
+	Scene &scene = _vm->_game->_scene;
+
+	for (uint idx = 0; idx < scene._spriteSlots.size(); ++idx) {
+		if (scene._spriteSlots[idx]._seqIndex >= 0x80)
+			scene._spriteSlots[idx]._flags = IMG_ERASE;
+	}
+}
+
+Common::Point Animation::getFramePosAdjust(int idx) {
+	warning("TODO: Implement getFramePosAdjust");
+
+	return Common::Point(0, 0);
+}
 } // End of namespace MADS

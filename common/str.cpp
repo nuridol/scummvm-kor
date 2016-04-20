@@ -626,28 +626,16 @@ String operator+(const String &x, char y) {
 }
 
 char *ltrim(char *t) {
-#ifdef SCUMMVMKOR
-	while (isSpace(*t) && !(*t & 0x80))
-		t++;
-	return t;
-#else
 	while (isSpace(*t))
 		t++;
 	return t;
-#endif
 }
 
 char *rtrim(char *t) {
 	int l = strlen(t) - 1;
-#ifdef SCUMMVMKOR
-	while (l >= 0 && isSpace(t[l]) && !(t[l] & 0x80))
-		t[l--] = 0;
-	return t;
-#else
 	while (l >= 0 && isSpace(t[l]))
 		t[l--] = 0;
 	return t;
-#endif
 }
 
 char *trim(char *t) {
@@ -761,6 +749,13 @@ bool matchString(const char *str, const char *pat, bool ignoreCase, bool pathMod
 			// If pattern ended with * -> match
 			if (!*pat)
 				return true;
+			break;
+
+		case '#':
+			if (!isDigit(*str))
+				return false;
+			pat++;
+			str++;
 			break;
 
 		default:

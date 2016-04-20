@@ -152,8 +152,17 @@ static Common::Error runGame(const EnginePlugin *plugin, OSystem &system, const 
 		err = Common::kPathNotDirectory;
 
 	// Create the game engine
-	if (err.getCode() == Common::kNoError)
+	if (err.getCode() == Common::kNoError) {
+		// Set default values for all of the custom engine options
+		// Appareantly some engines query them in their constructor, thus we
+		// need to set this up before instance creation.
+		const ExtraGuiOptions engineOptions = (*plugin)->getExtraGuiOptions(Common::String());
+		for (uint i = 0; i < engineOptions.size(); i++) {
+			ConfMan.registerDefault(engineOptions[i].configOption, engineOptions[i].defaultState);
+		}
+
 		err = (*plugin)->createInstance(&system, &engine);
+	}
 
 	// Check for errors
 	if (!engine || err.getCode() != Common::kNoError) {
@@ -230,12 +239,6 @@ static Common::Error runGame(const EnginePlugin *plugin, OSystem &system, const 
 
 	// Initialize any game-specific keymaps
 	engine->initKeymap();
-
-	// Set default values for all of the custom engine options
-	const ExtraGuiOptions engineOptions = (*plugin)->getExtraGuiOptions(Common::String());
-	for (uint i = 0; i < engineOptions.size(); i++) {
-		ConfMan.registerDefault(engineOptions[i].configOption, engineOptions[i].defaultState);
-	}
 
 	// Inform backend that the engine is about to be run
 	system.engineInit();
@@ -323,7 +326,7 @@ static void setupKeymapper(OSystem &system) {
 	act = new Action(primaryGlobalKeymap, "REMP", _("Remap keys"));
 	act->addEvent(EVENT_KEYMAPPER_REMAP);
 
-	act = new Action(primaryGlobalKeymap, "FULS", _("Toggle FullScreen"));
+	act = new Action(primaryGlobalKeymap, "FULS", _("Toggle fullscreen"));
 	act->addKeyEvent(KeyState(KEYCODE_RETURN, ASCII_RETURN, KBD_ALT));
 
 	mapper->addGlobalKeymap(primaryGlobalKeymap);
@@ -408,11 +411,6 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 	// Init the backend. Must take place after all config data (including
 	// the command line params) was read.
 	system.initBackend();
-
-#ifdef SCUMMVMKOR
-	// KOR: 한글 폰트를 로드한다
-	Graphics::loadKoreanGUIFont();
-#endif
 
 	// If we received an invalid graphics mode parameter via command line
 	// we check this here. We can't do it until after the backend is inited,
@@ -528,29 +526,46 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 			}
 			#endif
 
+			// At this point, we usually return to the launcher. However, the
+			// game may have requested that one or more other games be "chained"
+			// to the current one, with optional save slots to start the games
+			// at. At the time of writing, this is used for the Maniac Mansion
+			// easter egg in Day of the Tentacle.
+
+			Common::String chainedGame;
+			int saveSlot = -1;
+
+			ChainedGamesMan.pop(chainedGame, saveSlot);
+
 			// Discard any command line options. It's unlikely that the user
 			// wanted to apply them to *all* games ever launched.
 			ConfMan.getDomain(Common::ConfigManager::kTransientDomain)->clear();
 
-			// Clear the active config domain
-			ConfMan.setActiveDomain("");
+			if (!chainedGame.empty()) {
+				if (saveSlot != -1) {
+					ConfMan.setInt("save_slot", saveSlot, Common::ConfigManager::kTransientDomain);
+				}
+				// Start the chained game
+				ConfMan.setActiveDomain(chainedGame);
+			} else {
+				// Clear the active config domain
+				ConfMan.setActiveDomain("");
+			}
 
 			PluginManager::instance().loadAllPlugins(); // only for cached manager
-
 		} else {
 			GUI::displayErrorDialog(_("Could not find any engine capable of running the selected game"));
+
+			// Clear the active domain
+			ConfMan.setActiveDomain("");
 		}
 
 		// reset the graphics to default
 		setupGraphics(system);
-		launcherDialog();
+		if (0 == ConfMan.getActiveDomain()) {
+			launcherDialog();
+		}
 	}
-
-#ifdef SCUMMVMKOR
-	// KOR: 한글 폰트를 언로드한다
-	Graphics::unloadKoreanGUIFont();
-#endif
-
 	PluginManager::instance().unloadAllPlugins();
 	PluginManager::destroy();
 	GUI::GuiManager::destroy();

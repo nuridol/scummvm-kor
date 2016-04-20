@@ -110,11 +110,12 @@ class GfxPalette;
 class GfxScreen;
 
 /**
- * Frameout class, kFrameout and relevant functions for SCI32 games
+ * Frameout class, kFrameout and relevant functions for SCI32 games.
+ * Roughly equivalent to GraphicsMgr in the actual SCI engine.
  */
 class GfxFrameout {
 public:
-	GfxFrameout(SegManager *segMan, ResourceManager *resMan, GfxCoordAdjuster *coordAdjuster, GfxCache *cache, GfxScreen *screen, GfxPalette *palette, GfxPaint32 *paint32);
+	GfxFrameout(SegManager *segMan, ResourceManager *resMan, GfxCoordAdjuster *coordAdjuster, GfxCache *cache, GfxScreen *screen, GfxPalette32 *palette, GfxPaint32 *paint32);
 	~GfxFrameout();
 
 	void kernelAddPlane(reg_t object);
@@ -152,6 +153,8 @@ public:
 	void printPlaneItemList(Console *con, reg_t planeObject);
 
 private:
+	bool _isHiRes;
+
 	void showVideo();
 	void createPlaneItemList(reg_t planeObject, FrameoutList &itemList);
 	bool isPictureOutOfView(FrameoutEntry *itemEntry, Common::Rect planeRect, int16 planeOffsetX, int16 planeOffsetY);
@@ -161,7 +164,7 @@ private:
 	ResourceManager *_resMan;
 	GfxCoordAdjuster32 *_coordAdjuster;
 	GfxCache *_cache;
-	GfxPalette *_palette;
+	GfxPalette32 *_palette;
 	GfxScreen *_screen;
 	GfxPaint32 *_paint32;
 

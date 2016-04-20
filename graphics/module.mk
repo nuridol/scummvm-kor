@@ -5,7 +5,6 @@ MODULE_OBJS := \
 	cursorman.o \
 	font.o \
 	fontman.o \
-	korfont.o \
 	fonts/bdf.o \
 	fonts/consolefont.o \
 	fonts/newfont_big.o \
@@ -13,6 +12,7 @@ MODULE_OBJS := \
 	fonts/ttf.o \
 	fonts/winfont.o \
 	maccursor.o \
+	pixelformat.o \
 	primitives.o \
 	scaler.o \
 	scaler/thumbnail_intern.o \

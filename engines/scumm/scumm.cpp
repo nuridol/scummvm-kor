@@ -82,10 +82,6 @@
 
 #include "audio/mixer.h"
 
-#ifdef SCUMMVMKOR
-#include "scumm/korean.h"
-#endif
-
 using Common::File;
 
 namespace Scumm {
@@ -320,13 +316,10 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_NES_lastTalkingActor = 0;
 	_NES_talkColor = 0;
 	_keepText = false;
+	_msgCount = 0;
 	_costumeLoader = NULL;
 	_costumeRenderer = NULL;
 	_2byteFontPtr = 0;
-#ifdef SCUMMVMKOR
-    for(int i = 0; i < 20; i++)
-        _2byteMultiFontPtr[i] = NULL;
-#endif
 	_V1TalkingActor = 0;
 	_NESStartStrip = 0;
 
@@ -475,6 +468,8 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	VAR_NUM_SCRIPT_CYCLES = 0xFF;
 	VAR_SCRIPT_CYCLE = 0xFF;
 
+	VAR_QUIT_SCRIPT = 0xFF;
+
 	VAR_NUM_GLOBAL_OBJS = 0xFF;
 
 	// Use g_scumm from error() ONLY
@@ -484,10 +479,6 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_debugMode = (gDebugLevel >= 0);
 	_dumpScripts = ConfMan.getBool("dump_scripts");
 	_bootParam = ConfMan.getInt("boot_param");
-#ifdef SCUMMVMKOR
-    if (_game.id==GID_MONKEY2 && _bootParam == 0)
-        _bootParam = 10001;
-#endif
 	// Boot params often need debugging switched on to work
 	if (_bootParam)
 		_debugMode = true;
@@ -609,16 +600,7 @@ ScummEngine::~ScummEngine() {
 
 	delete[] _sortedActors;
 
-#ifdef SCUMMVMKOR
-	if (_koreanMode) unloadKoreanFiles();
-	if (_2byteFontPtr && !_useMultiFont)
-		delete _2byteFontPtr;
-	for (int i = 0; i < 20; i++)
-		if (_2byteMultiFontPtr[i])
-			delete _2byteMultiFontPtr[i];
-#else
 	delete[] _2byteFontPtr;
-#endif
 	delete _charset;
 	delete _messageDialog;
 	delete _pauseDialog;
@@ -735,7 +717,7 @@ ScummEngine_v2::ScummEngine_v2(OSystem *syst, const DetectorResult &dr)
 
 ScummEngine_v0::ScummEngine_v0(OSystem *syst, const DetectorResult &dr)
 	: ScummEngine_v2(syst, dr) {
-
+	_drawDemo = false;
 	_currentMode = 0;
 	_currentLights = 0;
 
@@ -750,6 +732,9 @@ ScummEngine_v0::ScummEngine_v0(OSystem *syst, const DetectorResult &dr)
 	VAR_ACTIVE_OBJECT2 = 0xFF;
 	VAR_IS_SOUND_RUNNING = 0xFF;
 	VAR_ACTIVE_VERB = 0xFF;
+
+	if (strcmp(dr.fp.pattern, "maniacdemo.d64") == 0 )
+		_game.features |= GF_DEMO; 
 }
 
 ScummEngine_v6::ScummEngine_v6(OSystem *syst, const DetectorResult &dr)
@@ -1110,8 +1095,13 @@ Common::Error ScummEngine::init() {
 			const char *tmpBuf1, *tmpBuf2;
 			assert(_game.id == GID_MANIAC || _game.id == GID_ZAK);
 			if (_game.id == GID_MANIAC) {
-				tmpBuf1 = "maniac1.d64";
-				tmpBuf2 = "maniac2.d64";
+				if (_game.features & GF_DEMO) {
+					tmpBuf1 = "maniacdemo.d64";
+					tmpBuf2 = "maniacdemo.d64";
+				} else {
+					tmpBuf1 = "maniac1.d64";
+					tmpBuf2 = "maniac2.d64";
+				}
 			} else {
 				tmpBuf1 = "zak1.d64";
 				tmpBuf2 = "zak2.d64";
@@ -1203,41 +1193,6 @@ Common::Error ScummEngine::init() {
 	// Load CJK font, if present
 	// Load it earlier so _useCJKMode variable could be set
 	loadCJKFont();
-
-#ifdef SCUMMVMKOR
-	// 개선의 여지가 약간 있지만, 일단은 그대로 남겨둠
-	_koreanMode = 0;
-	_koreanOnly = 0;
-	_highRes = 0;
-	
-	if(_language == Common::KO_KOR) {
-		_koreanMode = ConfMan.getBool("v1_korean_mode");
-		_koreanOnly = ConfMan.getBool("v1_korean_only") && _koreanMode;
-		if((_game.version == 8 || _game.heversion > 72) && _koreanMode)
-			_highRes = true;
-		if((_game.id == GID_DIG || _game.id == GID_CMI) && _koreanMode) {
-			warning("You can not use V1 mode in this game\n");
-			_koreanMode = 0;
-			_koreanOnly = 0;
-			_highRes = 0;
-		}
-		if(_koreanMode) {
-			warning("Korean V1 translation mode. \n");
-			loadKoreanFiles(/*getGameName()*/_game.gameid);
-			//_useCJKMode = 0;	// V1과 V2를 동시에 사용하지 않는다
-			_useCJKMode = 1;	// V1과 V2를 동시에 사용한다
-		} else {
-			if(_useCJKMode) {
-				warning("Korean V2 mode for DUMB edition or COMI Korean version\n");
-			}
-		}
-	}
-	warning("_game.id = %d\n", _game.id);
-	warning("_game.gameid = %s\n", _game.gameid);
-	warning("_game.version = %d, _game.heversion = %d\n", _game.version, _game.heversion);
-	warning("_koreanMode = %d, _koreanOnly = %d, _useCJKMode = %d\n", _koreanMode, _koreanOnly, _useCJKMode);
-	warning("_highRes = %d\n", _highRes);
-#endif
 
 	// Initialize backend
 	if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG) {
@@ -1950,7 +1905,7 @@ void ScummEngine::setupMusic(int midi) {
 		// EGA/VGA. However, we support multi MIDI for that game and we cannot
 		// support this with the Player_AD code at the moment. The reason here
 		// is that multi MIDI is supported internally by our iMuse output.
-		_musicEngine = new Player_AD(this, _mixer);
+		_musicEngine = new Player_AD(this);
 	} else if (_game.version >= 3 && _game.heversion <= 62) {
 		MidiDriver *nativeMidiDriver = 0;
 		MidiDriver *adlibMidiDriver = 0;
@@ -2129,6 +2084,7 @@ Common::Error ScummEngine::go() {
 
 		if (shouldQuit()) {
 			// TODO: Maybe perform an autosave on exit?
+			runQuitScript();
 		}
 	}
 
@@ -2190,21 +2146,6 @@ void ScummEngine::scummLoop(int delta) {
 	_talkDelay -= delta;
 	if (_talkDelay < 0)
 		_talkDelay = 0;
-
-#ifdef SCUMMVMKOR
-	for(int numb = 0; numb < MAX_KOR; numb++) {
-		if (_strKSet1[numb].delay != -1) { // kor
-			_strKSet1[numb].delay -= delta;
-			if (_strKSet1[numb].delay < 0)
-				_strKSet1[numb].delay = 0;
-		}
-		if (_strKDesc[numb].delay != -1) { // kor
-			_strKDesc[numb].delay -= 5;
-			if (_strKDesc[numb].delay < 0)
-				_strKDesc[numb].delay = 0;
-		}
-	}
-#endif
 
 	// Record the current ego actor before any scripts (including input scripts)
 	// get a chance to run.
@@ -2640,7 +2581,7 @@ void ScummEngine::runBootscript() {
 	int args[NUM_SCRIPT_LOCAL];
 	memset(args, 0, sizeof(args));
 	args[0] = _bootParam;
-	if (_game.id == GID_MANIAC && (_game.features & GF_DEMO))
+	if (_game.id == GID_MANIAC && (_game.features & GF_DEMO) && (_game.platform != Common::kPlatformC64))
 		runScript(9, 0, 0, args);
 	else
 		runScript(1, 0, 0, args);
@@ -2657,9 +2598,52 @@ void ScummEngine_v90he::runBootscript() {
 }
 #endif
 
-void ScummEngine::startManiac() {
-	debug(0, "stub startManiac()");
-	displayMessage(0, "%s", _("Usually, Maniac Mansion would start now. But ScummVM doesn't do that yet. To play it, go to 'Add Game' in the ScummVM start menu and select the 'Maniac' directory inside the Tentacle game directory."));
+bool ScummEngine::startManiac() {
+	Common::String currentPath = ConfMan.get("path");
+	Common::String maniacTarget;
+
+	if (!ConfMan.hasKey("easter_egg")) {
+		// Look for a game with a game path pointing to a 'Maniac' directory
+		// as a subdirectory to the current game.
+		Common::ConfigManager::DomainMap::iterator iter = ConfMan.beginGameDomains();
+		for (; iter != ConfMan.endGameDomains(); ++iter) {
+			Common::ConfigManager::Domain &dom = iter->_value;
+			Common::String path = dom.getVal("path");
+
+			if (path.hasPrefix(currentPath)) {
+				path.erase(0, currentPath.size() + 1);
+				if (path.equalsIgnoreCase("maniac")) {
+					maniacTarget = iter->_key;
+					break;
+				}
+			}
+		}
+	} else {
+		maniacTarget = ConfMan.get("easter_egg");
+	}
+
+	if (!maniacTarget.empty()) {
+		// Request a temporary save game to be made.
+		_saveLoadFlag = 1;
+		_saveLoadSlot = 100;
+		_saveTemporaryState = true;
+
+		// Set up the chanined games to Maniac Mansion, and then back
+		// to the current game again with that save slot.
+		ChainedGamesMan.push(maniacTarget);
+		ChainedGamesMan.push(ConfMan.getActiveDomainName(), 100);
+
+		// Force a return to the launcher. This will start the first
+		// chained game.
+		Common::EventManager *eventMan = g_system->getEventManager();
+		Common::Event event;
+		event.type = Common::EVENT_RTL;
+		eventMan->pushEvent(event);
+		return true;
+	} else {
+		displayMessage(0, "%s", _("Usually, Maniac Mansion would start now. But for that to work, the game files for Maniac Mansion have to be in the 'Maniac' directory inside the Tentacle game directory, and the game has to be added to ScummVM."));
+		return false;
+	}
 }
 
 #pragma mark -

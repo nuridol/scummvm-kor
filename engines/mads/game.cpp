@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -57,8 +57,7 @@ Game *Game::init(MADSEngine *vm) {
 }
 
 Game::Game(MADSEngine *vm)
-	: _vm(vm), _surface(nullptr), _objects(vm), _scene(vm),
-	  _screenObjects(vm), _player(vm) {
+	: _vm(vm), _surface(nullptr), _objects(vm), _scene(vm), _screenObjects(vm), _player(vm), _camX(vm), _camY(vm) {
 	_sectionNumber = 1;
 	_priorSectionNumber = 0;
 	_loadGameSlot = -1;
@@ -82,6 +81,7 @@ Game::Game(MADSEngine *vm)
 	_winStatus = 0;
 	_widepipeCtr = 0;
 	_fx = kTransitionNone;
+	_panningSpeed = 1; // Medium speed
 
 	// Load the inventory object list
 	_objects.load();
@@ -100,13 +100,12 @@ Game::~Game() {
 	}
 
 	delete _saveFile;
+	_surface->free();
 	delete _surface;
 	delete _sectionHandler;
 }
 
 void Game::run() {
-	initializeGlobals();
-
 	// If requested, load a savegame instead of showing the intro
 	if (ConfMan.hasKey("save_slot")) {
 		int saveSlot = ConfMan.getInt("save_slot");
@@ -116,15 +115,17 @@ void Game::run() {
 
 	_statusFlag = true;
 
-	if (_loadGameSlot == -1) {
-		startGame();
+	while (!_vm->shouldQuit()) {
+		if (_loadGameSlot == -1) {
+			startGame();
+		}
+
+		// Get the initial starting time for the first scene
+		_scene._frameStartTime = _vm->_events->getFrameCounter();
+
+		if (!_vm->shouldQuit())
+			gameLoop();
 	}
-
-	// Get the initial starting time for the first scene
-	_scene._frameStartTime = _vm->_events->getFrameCounter();
-
-	if (!_vm->shouldQuit())
-		gameLoop();
 }
 
 void Game::splitQuote(const Common::String &source, Common::String &line1, Common::String &line2) {
@@ -140,7 +141,7 @@ void Game::splitQuote(const Common::String &source, Common::String &line1, Commo
 }
 
 void Game::gameLoop() {
-	while (!_vm->shouldQuit() && _statusFlag) {
+	while (!_vm->shouldQuit() && _statusFlag && !_winStatus) {
 		if (_loadGameSlot != -1) {
 			loadGame(_loadGameSlot);
 			_loadGameSlot = -1;
@@ -158,7 +159,7 @@ void Game::gameLoop() {
 			sectionLoop();
 
 		_player.releasePlayerSprites();
-		assert(_scene._sprites._assetCount == 0);
+		assert(_scene._sprites.size() == 0);
 
 		_vm->_palette->unlock();
 		_vm->_events->waitCursor();
@@ -168,7 +169,8 @@ void Game::gameLoop() {
 }
 
 void Game::sectionLoop() {
-	while (!_vm->shouldQuit() && _statusFlag && (_sectionNumber == _currentSectionNumber)) {
+	while (!_vm->shouldQuit() && _statusFlag && !_winStatus &&
+			(_sectionNumber == _currentSectionNumber)) {
 		_kernelMode = KERNEL_ROOM_PRELOAD;
 		_player._spritesChanged = true;
 		_quoteEmergency = false;
@@ -216,6 +218,10 @@ void Game::sectionLoop() {
 		}
 
 		_scene.loadScene(_scene._nextSceneId, _aaName, 0);
+		camInitDefault();
+		camSetSpeed();
+
+
 		_vm->_sound->pauseNewCommands();
 
 		if (!_player._spritesLoaded) {
@@ -240,7 +246,7 @@ void Game::sectionLoop() {
 			_fx = kTransitionFadeOutIn;
 			break;
 		case SCREEN_FADE_FAST:
-			_fx = kCenterVertTransition;
+			_fx = kNullPaletteCopy;
 			break;
 		default:
 			_fx = kTransitionNone;
@@ -295,8 +301,10 @@ void Game::sectionLoop() {
 		_vm->_events->waitCursor();
 		_kernelMode = KERNEL_ROOM_PRELOAD;
 
-		delete _scene._activeAnimation;
-		_scene._activeAnimation = nullptr;
+		for (int i = 0; i < 10; i++) {
+			delete _scene._animation[i];
+			_scene._animation[i] = nullptr;
+		}
 
 		_scene._reloadSceneFlag = false;
 
@@ -324,7 +332,7 @@ void Game::initSection(int sectionNumber) {
 	_vm->_palette->resetGamePalette(18, 10);
 	_vm->_palette->setLowRange();
 
-	if (_scene._layer == LAYER_GUI)
+	if (_scene._mode == SCREENMODE_VGA)
 		_vm->_palette->setPalette(_vm->_palette->_mainPalette, 0, 4);
 
 	_vm->_events->loadCursors("*CURSOR.SS");
@@ -403,12 +411,12 @@ Common::StringArray Game::getMessage(uint32 id) {
 
 static const char *const DEBUG_STRING = "WIDEPIPE";
 
-void Game::handleKeypress(const Common::Event &event) {
-	if (event.kbd.flags & Common::KBD_CTRL) {
+void Game::handleKeypress(const Common::KeyState &kbd) {
+	if (kbd.flags & Common::KBD_CTRL) {
 		if (_widepipeCtr == 8) {
 			// Implement original game cheating keys here someday
 		} else {
-			if (event.kbd.keycode == (Common::KEYCODE_a +
+			if (kbd.keycode == (Common::KEYCODE_a +
 					(DEBUG_STRING[_widepipeCtr] - 'a'))) {
 				if (++_widepipeCtr == 8) {
 					MessageDialog *dlg = new MessageDialog(_vm, 2,
@@ -420,7 +428,8 @@ void Game::handleKeypress(const Common::Event &event) {
 		}
 	}
 
-	switch (event.kbd.keycode) {
+	Scene &scene = _vm->_game->_scene;
+	switch (kbd.keycode) {
 	case Common::KEYCODE_F1:
 		_vm->_dialogs->_pendingDialog = DIALOG_GAME_MENU;
 		break;
@@ -430,11 +439,19 @@ void Game::handleKeypress(const Common::Event &event) {
 	case Common::KEYCODE_F7:
 		_vm->_dialogs->_pendingDialog = DIALOG_RESTORE;
 		break;
+	case Common::KEYCODE_PAGEUP:
+		scene._userInterface._scrollbarStrokeType = SCROLLBAR_UP;
+		scene._userInterface.changeScrollBar();
+		break;
+	case Common::KEYCODE_PAGEDOWN:
+		scene._userInterface._scrollbarStrokeType = SCROLLBAR_DOWN;
+		scene._userInterface.changeScrollBar();
+		break;
+
+
 	default:
 		break;
 	}
-
-	warning("TODO: handleKeypress - %d", (int)event.kbd.keycode);
 }
 
 void Game::synchronize(Common::Serializer &s, bool phase1) {
@@ -558,7 +575,7 @@ void Game::writeSavegameHeader(Common::OutSaveFile *out, MADSSavegameHeader &hea
 	if (!_saveThumb)
 		createThumbnail();
 	Graphics::saveThumbnail(*out, *_saveThumb);
-	
+
 	_saveThumb->free();
 	delete _saveThumb;
 	_saveThumb = nullptr;
@@ -584,6 +601,80 @@ void Game::createThumbnail() {
 	_vm->_palette->grabPalette(thumbPalette, 0, PALETTE_COUNT);
 	_saveThumb = new Graphics::Surface();
 	::createThumbnail(_saveThumb, _vm->_screen.getData(), MADS_SCREEN_WIDTH, MADS_SCREEN_HEIGHT, thumbPalette);
+}
+
+void Game::syncTimers(SyncType slaveType, int slaveId, SyncType masterType, int masterId) {
+	uint32 syncTime = 0;
+
+	switch (masterType) {
+	case SYNC_SEQ:
+		syncTime = _scene._sequences[masterId]._timeout;
+		break;
+
+	case SYNC_ANIM:
+		syncTime = _scene._animation[masterId]->getNextFrameTimer();
+		break;
+
+	case SYNC_CLOCK:
+		syncTime = _scene._frameStartTime + masterId;
+		break;
+
+	case SYNC_PLAYER:
+		syncTime = _player._priorTimer;
+		break;
+	}
+
+
+	switch (slaveType) {
+	case SYNC_SEQ:
+		_scene._sequences[slaveId]._timeout = syncTime;
+		break;
+
+	case SYNC_PLAYER:
+		_player._priorTimer = syncTime;
+		break;
+
+	case SYNC_ANIM:
+		_scene._animation[slaveId]->setNextFrameTimer(syncTime);
+		break;
+
+	case SYNC_CLOCK:
+		error("syncTimer is trying to force _frameStartTime");
+	}
+}
+
+void Game::camInitDefault() {
+	_camX.setDefaultPanX();
+	_camY.setDefaultPanY();
+}
+
+void Game::camSetSpeed() {
+	switch (_panningSpeed) {
+	case 1:
+		_camX._speed = 8;
+		_camY._speed = 4;
+		break;
+
+	case 2:
+		_camX._speed = 320;
+		_camY._speed = 160;
+		break;
+
+	default:
+		_camX._speed = 4;
+		_camY._speed = 2;
+		break;
+	}
+}
+
+void Game::camUpdate() {
+	bool any_pan = _camX.camPan(&_scene._posAdjust.x, &_player._playerPos.x, 320, _scene._sceneInfo->_width);
+	any_pan |= _camY.camPan(&_scene._posAdjust.y, &_player._playerPos.y, 156, _scene._sceneInfo->_height);
+
+	if (any_pan) {
+		_scene.setCamera(_scene._posAdjust);
+		_screenObjects._forceRescan = true;
+	}
 }
 
 } // End of namespace MADS

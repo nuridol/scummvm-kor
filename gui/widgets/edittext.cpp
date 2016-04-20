@@ -62,6 +62,9 @@ void EditTextWidget::reflowLayout() {
 
 
 void EditTextWidget::handleMouseDown(int x, int y, int button, int clickCount) {
+	if (!isEnabled())
+		return;
+
 	// First remove caret
 	if (_caretVisible)
 		drawCaret(true);
@@ -94,7 +97,7 @@ void EditTextWidget::drawWidget() {
 
 	// Draw the text
 	adjustOffset();
-	
+
 	const Common::Rect &r = Common::Rect(_x + 2 + _leftPadding, _y + 2, _x + _leftPadding + getEditRect().width() + 8, _y + _h);
 	setTextDrawableArea(r);
 

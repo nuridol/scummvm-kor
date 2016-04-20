@@ -1,6 +1,111 @@
-Umfangreichere Änderungsaufzeichnungen des neusten experimentellen Codes finden
-Sie auf Englisch unter:
+Umfangreichere Informationen über die Änderungen des aktuellen experimentellen
+Programmcodes finden Sie auf Englisch unter:
         https://github.com/scummvm/scummvm/commits/
+
+1.8.0 (04.03.2016)
+ Neue Spiele:
+   - Unterstützung für Rex Nebular and the Cosmic Gender Bender hinzugefügt.
+   - Unterstützung für Sfinx hinzugefügt.
+   - Unterstützung für Zork Nemesis: Das verbotene Land hinzugefügt.
+   - Unterstützung für Zork: Der Großinquisitor hinzugefügt.
+   - Unterstützung für Die ungelösten Fälle von Sherlock Holmes: Das gezackte
+     Skalpell hinzugefügt.
+   - Unterstützung für Die ungelösten Fälle von Sherlock Holmes: Das Geheimnis
+     der tätowierten Rose hinzugefügt.
+   - Unterstützung für Beavis and Butthead in Virtual Stupidity hinzugefügt.
+   - Unterstützung für Amazon: Guardians of Eden hinzugefügt.
+   - Unterstützung für Baphomets Fluch 2.5: Die Rückkehr der Tempelritter
+     hinzugefügt.
+   - Unterstützung für Labyrinth of Time hinzugefügt.
+
+Neue Portierungen:
+   - Portierung für den Raspberry Pi hinzugefügt.
+   - Portierung für den GCW Zero (GCW0) hinzugefügt.
+
+ Allgemein:
+   - Code für Munt-MT-32-Emulation auf Version 1.5.0 aktualisiert.
+
+ SDL:
+   - Alt+x beendet ScummVM nicht mehr. Verwenden Sie stattdessen
+     Cmd+q/Strg+q/Strg+z und beachten Sie die Hinweise in der Liesmich-Datei.
+  -  Auf POSIX-Systemen befolgen wir nun die Spezifikation XDG Base Directory
+     für die Speicherung von Benutzerdaten. Dies führt zu neuen
+     Speicherorten für unsere Konfigurationsdatei, unsere Log-Datei sowie für
+     den standardmäßig voreingestellten Speicherort für Spielstände. Wir
+     unterstützen weiterhin die vorherigen Speicherorte. Solange diese vorhanden
+     sind, werden wir diese weiter verwenden. Bitte beachten Sie die
+     Liesmich-Datei für weitere Informationen. Speicherorte auf Mac OS X sind
+     von dieser Änderung nicht betroffen.
+
+ 3 Skulls of the Toltecs:
+   - Unterstützung für AdLib-Musik verbessert.
+
+ AGI:
+   - Es ist nun möglich, die Maus-Unterstützung zu deaktivieren (außer bei
+     Amiga-Versionen und Fan-Spielen, die eine Maus benötigen).
+   - Fehlerhafte Lautstärke in PCjr-Spielen korrigiert.
+   - Umfangreiche Änderung im Grafik-Subsystem.
+   - Unterstützung für Übergänge, Schriftarten und Mauszeigern für Apple IIgs,
+     Amiga und Atari (die Systemschriftart Atari ST 8x8 ist nicht in ScummVM
+     enthalten)
+   - Eine PC-Version kann jetzt wie eine Apple IIgs-Version dargestellt werden
+     (inklusive Farbpalette, Cursor, Übergänge und Schriftart). Sie müssen
+     lediglich den gewünschten Darstellungsmodus auswählen.
+   - Apple IIgs-Spiele laufen nicht mehr zu schnell.
+   - Unterstützung für automatisches Speichern / Laden hinzugefügt
+     (verwendet von Mixed Up Mother Goose).
+   - Feste Verzögerung von 2 Sekunden bei Raumwechseln entfernt und durch
+     Heuristik ersetzt.
+   - Fehlerhafte Tastenbelegungen nach abspeichern/laden behoben
+
+ AGOS:
+   - Arpeggio-Effekt in der Musik der Amiga-Version von Elvira 1 repariert.
+   - Lade- und Speicherfortschritt in der PC-Version von Waxworks repariert.
+   - Verb-Feld in der Amiga-Version von Simon the Sorcerer 1 repariert.
+   - Accolade AdLib- und MT32-Treiber für folgende Spiele hinzugefügt:
+     Elvira 1, Elvira 2, Waxworks und Simon the Sorcerer 1 (Demoversion)
+   - AdLib-Ausgabe in Simon the Sorcerer 1 hinzugefügt. Dies verbessert die
+     AdLib-Ausgabe erheblich und erhöht die Originaltreue.
+
+ Baphomets Fluch 1:
+   - Sprachausgabe in Macintosh-Versionen korrigiert, wenn ScumMVM
+     auf Big-Endian-Systemen ausgeführt wird.
+   - Fehler beim Laden eines Spielstandes aus dem Hauptmenü in der
+     Bull's Head Hill-Szene korrigiert. Dieser Fehler trat womöglich auch
+     in anderen Szenen auf.
+
+ CinE:
+   - Unterstützung für Musik in der CD-Version von Future Wars hinzugefügt.
+
+ MADE:
+   - Unterstützung für AdLib-Musik in Return to Zork verbessert.
+
+ SAGA:
+   - Unterstützung für AdLib-Musik verbessert.
+
+ SCI:
+   - Behandlung der Musik-Priorität extrem verbessert.
+   - Viele Fehler in den originalen Skripten behoben, die auch bei
+     Verwendung des originalen Interpreters auftreten.
+     Folgende Spiele sind davon betroffen:
+     KQ6 (Sprache und Untertitel), LSL5, PQ1, QfG1 (EGA), QfG (VGA),
+     QfG2, QfG3, SQ1, SQ4 (CD)
+   - Rückkehr aus dem ScummVM-Menü im Spiel sollte nun immer funktionieren.
+   - Verbesserte Unterstützung für japanische PC-9801-Spiele
+   - Verwende standardmäßig die hochauflösende Version von KQ6
+     (kann in den Spieloptionen umgeschaltet werden)
+
+ SCUMM:
+   - Umfangreiche Verbesserung der Textdarstellung in koreanischen Versionen
+   - Originaler Code der Geh-Animation in Maniac Mansion v0-v1 hinzugefügt.
+   - Es ist nun möglich, Maniac Mansion innerhalb von Day of the
+     Tentacle zu spielen. Bitte Liesmich-Datei für weitere Details lesen.
+   - Alt+x kann jetzt auf allen Plattformen dazu verwendet werden, SCUMM-Spiele
+     zu beenden.
+   - Lippensynchronisation in neueren Spielen von Humongous Entertainment verbessert.
+
+ Tinsel:
+   - Unterstützung für AdLib-Musik in Discworld 1 verbessert.
 
 1.7.0 (21.07.2014)
  Neue Spiele:
@@ -31,7 +136,7 @@ Sie auf Englisch unter:
    - Unterstützung für Mausrad bei Inventar und Spielstandliste hinzugefügt.
    - Anzeige der Interaktionsverben in Simon the Sorcerer 2 aktiviert.
    - Fehler bei Loyalitätseinstufung in englischer 4CD-Version von
-     Floyd - Es gibt noch Helden beseitigt. (Dies war offensichtlich ein Fehler
+     Floyd – Es gibt noch Helden beseitigt. (Dies war offensichtlich ein Fehler
      im ursprünglichen Spiel. Es ist zurzeit nicht bekannt, ob noch weitere
      Versionen hiervon betroffen sind.)
 
@@ -591,7 +696,7 @@ SCUMM:
    - Unterstützung für King's Quest VI (hohe und niedrige Auflösung)
      hinzugefügt.
    - Unterstützung für Laura Bow: The Colonel's Bequest hinzugefügt.
-   - Unterstützung für Laura Bow 2: The Dagger of Amon Ra hinzugefügt.
+   - Unterstützung für Laura Bow 2: Der Dolch des Amon Ra hinzugefügt.
    - Unterstützung für Leisure Suit Larry 1 (SCI-Remake) (EGA und VGA)
      hinzugefügt.
    - Unterstützung für Leisure Suit Larry 2 hinzugefügt.

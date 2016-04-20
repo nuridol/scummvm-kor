@@ -67,7 +67,7 @@ static const char HELP_STRING[] =
 	"  -h, --help               Display a brief help text and exit\n"
 	"  -z, --list-games         Display list of supported games and exit\n"
 	"  -t, --list-targets       Display list of configured targets and exit\n"
-	"  --list-saves=TARGET      Display a list of savegames for the game (TARGET) specified\n"
+	"  --list-saves=TARGET      Display a list of saved games for the game (TARGET) specified\n"
 #if defined(WIN32) && !defined(_WIN32_WCE) && !defined(__SYMBIAN32__)
 	"  --console                Enable the console window (default:enabled)\n"
 #endif
@@ -106,7 +106,7 @@ static const char HELP_STRING[] =
 	"  --platform=WORD          Specify platform of game (allowed values: 2gs, 3do,\n"
 	"                           acorn, amiga, atari, c64, fmtowns, nes, mac, pc, pc98,\n"
 	"                           pce, segacd, wii, windows)\n"
-	"  --savepath=PATH          Path to where savegames are stored\n"
+	"  --savepath=PATH          Path to where saved games are stored\n"
 	"  --extrapath=PATH         Extra path to additional game data\n"
 	"  --soundfont=FILE         Select the SoundFont for MIDI playback (only\n"
 	"                           supported by some MIDI drivers)\n"
@@ -116,8 +116,9 @@ static const char HELP_STRING[] =
 	"  --output-rate=RATE       Select output sample rate in Hz (e.g. 22050)\n"
 	"  --opl-driver=DRIVER      Select AdLib (OPL) emulator (db, mame)\n"
 	"  --aspect-ratio           Enable aspect ratio correction\n"
-	"  --render-mode=MODE       Enable additional render modes (cga, ega, hercGreen,\n"
-	"                           hercAmber, amiga)\n"
+	"  --render-mode=MODE       Enable additional render modes (hercGreen, hercAmber,\n"
+	"                           cga, ega, vga, amiga, fmtowns, pc9821, pc9801, 2gs,\n"
+	"                           atari, macintosh)\n"
 #ifdef ENABLE_EVENTRECORDER
 	"  --record-mode=MODE       Specify record mode for event recorder (record, playback,\n"
 	"                           passthrough [default])\n"
@@ -267,13 +268,6 @@ void registerDefaults() {
 
 	ConfMan.registerDefault("fluidsynth_misc_interpolation", "4th");
 #endif
-
-#ifdef SCUMMVMKOR
-	ConfMan.registerDefault("language", "kr");
-	ConfMan.registerDefault("subtitles", true);
-	ConfMan.registerDefault("v1_korean_mode", false);
-	ConfMan.registerDefault("v1_korean_only", false);
-#endif
 }
 
 //
@@ -408,7 +402,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 
 			DO_LONG_OPTION("list-saves")
 				// FIXME: Need to document this.
-				// TODO: Make the argument optional. If no argument is given, list all savegames
+				// TODO: Make the argument optional. If no argument is given, list all saved games
 				// for all configured targets.
 				return "list-saves";
 			END_OPTION
@@ -536,9 +530,9 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_LONG_OPTION("savepath")
 				Common::FSNode path(option);
 				if (!path.exists()) {
-					usage("Non-existent savegames path '%s'", option);
+					usage("Non-existent saved games path '%s'", option);
 				} else if (!path.isWritable()) {
-					usage("Non-writable savegames path '%s'", option);
+					usage("Non-writable saved games path '%s'", option);
 				}
 			END_OPTION
 
@@ -700,7 +694,7 @@ static Common::Error listSaves(const char *target) {
 		return Common::Error(Common::kEnginePluginNotSupportSaves,
 						Common::String::format("target '%s', gameid '%s", target, gameid.c_str()));
 	} else {
-		// Query the plugin for a list of savegames
+		// Query the plugin for a list of saved games
 		SaveStateList saveList = (*plugin)->listSaves(target);
 
 		if (saveList.size() > 0) {

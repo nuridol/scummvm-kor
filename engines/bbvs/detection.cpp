@@ -30,7 +30,7 @@
 #include "graphics/thumbnail.h"
 
 static const PlainGameDescriptor bbvsGames[] = {
-	{ "bbvs", "Beavis and Butthead in Virtual Stupidity" },
+	{ "bbvs", "Beavis and Butt-head in Virtual Stupidity" },
 	{ 0, 0 }
 };
 
@@ -40,10 +40,19 @@ static const ADGameDescription gameDescriptions[] = {
 	{
 		"bbvs",
 		0,
-		AD_ENTRY1s("game0001.vnm", "637e5411751c7065bc385dd73d224561", 64004),
+		AD_ENTRY1s("vspr0001.vnm", "7ffe9b9e7ca322db1d48e86f5130578e", 1166628),
 		Common::EN_ANY,
 		Common::kPlatformWindows,
-		ADGF_NO_FLAGS,
+		ADGF_NO_FLAGS | ADGF_TESTING,
+		GUIO0()
+	},
+	{
+		"bbvs",
+		0,
+		AD_ENTRY1s("vspr0001.vnm", "91c76b1048f93208cd7b1a05ebccb408", 1176976),
+		Common::RU_RUS,
+		Common::kPlatformWindows,
+		GF_GUILANGSWITCH | ADGF_TESTING,
 		GUIO0()
 	},
 
@@ -66,7 +75,7 @@ public:
 	}
 
 	virtual const char *getName() const {
-		return "MTV's Beavis and Butt-Head in Virtual Stupidity";
+		return "MTV's Beavis and Butt-head in Virtual Stupidity";
 	}
 
 	virtual const char *getOriginalCopyright() const {
@@ -104,7 +113,7 @@ SaveStateList BbvsMetaEngine::listSaves(const char *target) const {
 	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
 	Bbvs::BbvsEngine::SaveHeader header;
 	Common::String pattern = target;
-	pattern += ".???";
+	pattern += ".###";
 	Common::StringArray filenames;
 	filenames = saveFileMan->listSavefiles(pattern.c_str());
 	Common::sort(filenames.begin(), filenames.end());	// Sort (hopefully ensuring we are sorted numerically..)
@@ -133,7 +142,7 @@ SaveStateDescriptor BbvsMetaEngine::querySaveMetaInfos(const char *target, int s
 		Bbvs::BbvsEngine::kReadSaveHeaderError error;
 		error = Bbvs::BbvsEngine::readSaveHeader(in, true, header);
 		delete in;
-		if (error == Bbvs::BbvsEngine::kRSHENoError) {		
+		if (error == Bbvs::BbvsEngine::kRSHENoError) {
 			SaveStateDescriptor desc(slot, header.description);
 			// Slot 0 is used for the "Continue" save
 			desc.setDeletableFlag(slot != 0);

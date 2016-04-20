@@ -42,7 +42,9 @@ void BbvsEngine::playVideo(int videoNum) {
 		warning("Couldn't switch to a RGB color video mode to play a video.");
 		return;
 	}
-		
+
+	debug(0, "Screen format: %s", _system->getScreenFormat().toString().c_str());
+
 	Video::VideoDecoder *videoDecoder = new Video::AVIDecoder();
 	if (!videoDecoder->loadFile(videoFilename)) {
 		delete videoDecoder;
@@ -58,7 +60,14 @@ void BbvsEngine::playVideo(int videoNum) {
 		if (videoDecoder->needsUpdate()) {
 			const Graphics::Surface *frame = videoDecoder->decodeNextFrame();
 			if (frame) {
-				_system->copyRectToScreen(frame->getPixels(), frame->pitch, 0, 0, frame->w, frame->h);
+				if (frame->format.bytesPerPixel > 1) {
+					Graphics::Surface *frame1 = frame->convertTo(_system->getScreenFormat());
+					_system->copyRectToScreen(frame1->getPixels(), frame1->pitch, 0, 0, frame1->w, frame1->h);
+					frame1->free();
+					delete frame1;
+				} else {
+					_system->copyRectToScreen(frame->getPixels(), frame->pitch, 0, 0, frame->w, frame->h);
+				}
 				_system->updateScreen();
 			}
 		}
@@ -74,7 +83,7 @@ void BbvsEngine::playVideo(int videoNum) {
 	}
 
 	delete videoDecoder;
-	
+
 	initGraphics(320, 240, false);
 
 }

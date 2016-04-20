@@ -123,6 +123,8 @@ void playVideo(Video::VideoDecoder *videoDecoder, VideoState videoState) {
 			if ((event.type == Common::EVENT_KEYDOWN && event.kbd.keycode == Common::KEYCODE_ESCAPE) || event.type == Common::EVENT_LBUTTONUP)
 				skipVideo = true;
 		}
+		if (g_sci->getEngineState()->_delayedRestoreGame)
+			skipVideo = true;
 
 		g_system->delayMillis(10);
 	}
@@ -179,7 +181,7 @@ reg_t kShowMovie(EngineState *s, int argc, reg_t *argv) {
 		// for the video, so we'll just play it from there for now.
 
 #ifdef ENABLE_SCI32
-		if (getSciVersion() >= SCI_VERSION_2_1) {
+		if (getSciVersion() >= SCI_VERSION_2_1_EARLY) {
 			// SCI2.1 always has argv[0] as 1, the rest of the arguments seem to
 			// follow SCI1.1/2.
 			if (argv[0].toUint16() != 1)
@@ -229,7 +231,7 @@ reg_t kShowMovie(EngineState *s, int argc, reg_t *argv) {
 			initGraphics(screenWidth, screenHeight, screenWidth > 320);
 		else {
 			g_sci->_gfxScreen->kernelSyncWithFramebuffer();
-			g_sci->_gfxPalette->kernelSyncScreenPalette();
+			g_sci->_gfxPalette16->kernelSyncScreenPalette();
 		}
 	}
 

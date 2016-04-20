@@ -1,6 +1,7 @@
 DINGUX_EXE_STRIPPED := scummvm_stripped$(EXEEXT)
 
 bundle_name = dingux-dist/scummvm
+gcw0_bundle = gcw0-opk
 
 all: $(DINGUX_EXE_STRIPPED)
 
@@ -30,3 +31,53 @@ endif
 	$(CP) $(srcdir)/backends/platform/dingux/scummvm.gpe $(bundle_name)/
 	$(CP) $(srcdir)/backends/platform/dingux/README.DINGUX $(bundle_name)/
 	$(CP) $(srcdir)/backends/platform/dingux/scummvm.png $(bundle_name)/
+
+# Special target for generationg GCW-Zero OPK bundle
+$(gcw0_bundle): all
+	$(MKDIR) $(gcw0_bundle)
+	$(CP) $(DIST_FILES_DOCS) $(gcw0_bundle)/
+	$(MKDIR) $(gcw0_bundle)/themes
+	$(CP) $(DIST_FILES_THEMES) $(gcw0_bundle)/themes/
+ifdef DIST_FILES_ENGINEDATA
+	$(MKDIR) $(gcw0_bundle)/engine-data
+	$(CP) $(DIST_FILES_ENGINEDATA) $(gcw0_bundle)/engine-data/
+endif
+ifdef DYNAMIC_MODULES
+	$(MKDIR) $(gcw0_bundle)/plugins
+	$(CP) $(PLUGINS) $(gcw0_bundle)/plugins/
+endif
+	$(CP) $(EXECUTABLE) $(gcw0_bundle)/scummvm
+
+	$(CP) $(srcdir)/backends/vkeybd/packs/vkeybd_default.zip $(gcw0_bundle)/
+	$(CP) $(srcdir)/backends/vkeybd/packs/vkeybd_small.zip $(gcw0_bundle)/
+
+	$(CP) $(srcdir)/dists/gcw0/scummvm.png $(gcw0_bundle)/
+	$(CP) $(srcdir)/dists/gcw0/default.gcw0.desktop $(gcw0_bundle)/
+	$(CP) $(srcdir)/dists/gcw0/scummvmrc $(gcw0_bundle)/
+	$(CP) $(srcdir)/dists/gcw0/scummvm.sh $(gcw0_bundle)/
+	$(CP) $(srcdir)/backends/platform/dingux/README.GCW0 $(gcw0_bundle)/README.man.txt
+	echo >> $(gcw0_bundle)/README.man.txt
+	echo '[General README]' >> $(gcw0_bundle)/README.man.txt
+	echo >> $(gcw0_bundle)/README.man.txt
+	cat README | sed -e 's/\[/{/g;s/\]/}/g' >> $(gcw0_bundle)/README.man.txt
+
+#	$(CP) GeneralUser\ GS\ FluidSynth\ v1.44.sf2 $(gcw0_bundle)/
+
+gcw0-opk-unstripped: $(gcw0_bundle)
+	$(CP) $(PLUGINS) $(gcw0_bundle)/plugins/
+	$(CP) $(EXECUTABLE) $(gcw0_bundle)/scummvm
+	./dists/gcw0/opk_make.sh -d $(gcw0_bundle) -o scummvm
+
+gcw-opk: $(gcw0_bundle)
+	$(STRIP) $(gcw0_bundle)/plugins/*
+	$(STRIP) $(gcw0_bundle)/scummvm
+	./dists/gcw0/opk_make.sh -d $(gcw0_bundle) -o scummvm
+
+GeneralUser_GS_1.44-FluidSynth.zip:
+	curl -s http://www.scummvm.org/frs/extras/SoundFont/GeneralUser_GS_1.44-FluidSynth.zip -o GeneralUser_GS_1.44-FluidSynth.zip
+
+GeneralUser\ GS\ FluidSynth\ v1.44.sf2: GeneralUser_GS_1.44-FluidSynth.zip
+	unzip -n GeneralUser_GS_1.44-FluidSynth.zip
+	mv "GeneralUser GS 1.44 FluidSynth/GeneralUser GS FluidSynth v1.44.sf2" .
+	mv "GeneralUser GS 1.44 FluidSynth/README.txt" README.soundfont
+	mv "GeneralUser GS 1.44 FluidSynth/LICENSE.txt" LICENSE.soundfont

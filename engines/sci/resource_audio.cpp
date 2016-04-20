@@ -110,7 +110,7 @@ bool Resource::loadFromAudioVolumeSCI11(Common::SeekableReadStream *file) {
 			unalloc();
 			return false;
 		}
-	
+
 		_headerSize = file->readByte();
 
 		if (type == kResourceTypeAudio) {
@@ -579,6 +579,7 @@ SoundResource::SoundResource(uint32 resourceNr, ResourceManager *resMan, SciVers
 		return;
 
 	_innerResource = resource;
+	_soundPriority = 0xFF;
 
 	byte *data, *data2;
 	byte *dataEnd;
@@ -636,7 +637,7 @@ SoundResource::SoundResource(uint32 resourceNr, ResourceManager *resMan, SciVers
 
 	case SCI_VERSION_1_EARLY:
 	case SCI_VERSION_1_LATE:
-	case SCI_VERSION_2_1:
+	case SCI_VERSION_2_1_EARLY:
 		data = resource->data;
 		// Count # of tracks
 		_trackCount = 0;
@@ -710,7 +711,6 @@ SoundResource::SoundResource(uint32 resourceNr, ResourceManager *resMan, SciVers
 
 						// 0x20 is set on rhythm channels to prevent remapping
 						// CHECKME: Which SCI versions need that set manually?
-						channel->flags = (*channel->data) >> 4;
 						if (channel->number == 9)
 							channel->flags |= 2;
 						// Note: flag 1: channel start offset is 0 instead of 10
@@ -726,6 +726,9 @@ SoundResource::SoundResource(uint32 resourceNr, ResourceManager *resMan, SciVers
 					data += 6;
 				}
 			} else {
+				// The first byte of the 0xF0 track's channel list is priority
+				_soundPriority = *data;
+
 				// Skip over digital track
 				data += 6;
 			}

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -39,6 +39,12 @@ enum CursorType { CURSOR_NONE = 0, CURSOR_ARROW = 1, CURSOR_WAIT = 2, CURSOR_GO_
 
 class MADSEngine;
 
+class EventTarget {
+public:
+	virtual ~EventTarget() {}
+	virtual bool onEvent(Common::Event &event) { return false; }
+};
+
 class EventsManager {
 private:
 	MADSEngine *_vm;
@@ -46,16 +52,12 @@ private:
 	uint32 _priorFrameTime;
 	Common::Point _mousePos;
 	Common::Point _currentPos;
+	EventTarget *_eventTarget;
 
 	/**
 	 * Updates the cursor image when the current cursor changes
 	 */
 	void changeCursor();
-
-	/**
-	 * Checks for whether the next game frame number has been reached.
-	 */
-	void checkForNextFrameCounter();
 public:
 	SpriteAsset *_cursorSprites;
 	CursorType _cursorId;
@@ -65,11 +67,10 @@ public:
 	byte _mouseButtons;
 	bool _rightMousePressed;
 	int _mouseStatus;
-	int _vD2;
+	int _strokeGoing;
 	int _mouseStatusCopy;
 	bool _mouseMoved;
-	int _vD8;
-	Common::Stack<Common::Event> _pendingKeys;
+	Common::Stack<Common::KeyState> _pendingKeys;
 public:
 	/**
 	 * Constructor
@@ -127,6 +128,11 @@ public:
 	void pollEvents();
 
 	/**
+	 * Sets an event handler other than the events manager
+	 */
+	void setEventTarget(EventTarget *target) { _eventTarget = target; }
+
+	/**
 	 * Return the current mouse position
 	 */
 	Common::Point mousePos() const { return _mousePos; }
@@ -147,6 +153,11 @@ public:
 	void waitForNextFrame();
 
 	/**
+	* Checks for whether the next game frame number has been reached.
+	*/
+	bool checkForNextFrameCounter();
+
+	/**
 	 * Gets the current frame counter
 	 */
 	uint32 getFrameCounter() const { return _frameCounter; }
@@ -154,9 +165,19 @@ public:
 	void initVars();
 
 	/**
+	 * Clears all currently pending keypresses
+	 */
+	void clearEvents();
+
+	/**
 	 * Returns true if there's any pending keys to be processed
 	 */
 	bool isKeyPressed() const { return !_pendingKeys.empty(); }
+
+	/**
+	 * Gets the next pending keypress
+	 */
+	Common::KeyState getKey() { return _pendingKeys.pop(); }
 };
 
 } // End of namespace MADS

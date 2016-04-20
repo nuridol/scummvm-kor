@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #ifndef SCUMM_CHARSET_H
@@ -34,20 +35,6 @@ namespace Scumm {
 class ScummEngine;
 class NutRenderer;
 struct VirtScreen;
-
-#ifdef SCUMMVMKOR
-static inline bool checkKSCode(byte hi, byte lo) {
-	//hi : xx
-	//lo : yy
-	if ((0xA1 > lo) || (0xFE < lo)) {
-		return false;
-	}
-	if ((hi >= 0xB0) && (hi <= 0xC8)) {
-		return true;
-	}
-	return false;
-}
-#endif
 
 static inline bool checkSJISCode(byte c) {
 	if ((c >= 0x80 && c <= 0x9f) || (c >= 0xe0 && c <= 0xfd))
@@ -102,10 +89,6 @@ public:
 
 	virtual void setColor(byte color) { _color = color; translateColor(); }
 
-#ifdef SCUMMVMKOR
-    virtual byte getColor() { return _color; }
-#endif
-
 	void saveLoadWithSerializer(Serializer *ser);
 };
 
@@ -117,10 +100,7 @@ protected:
 	int _numChars;
 
 	byte _shadowColor;
-	bool _shadowMode;
-#ifdef SCUMMVMKOR
-    virtual void drawBits1(const Graphics::Surface &s, byte *dst, const byte *src, int drawTop, int width, int height, uint8 bitDepth);
-#endif
+	bool _enableShadow;
 
 public:
 	CharsetRendererCommon(ScummEngine *vm);
@@ -130,13 +110,26 @@ public:
 	virtual int getFontHeight();
 };
 
-class CharsetRendererClassic : public CharsetRendererCommon {
+class CharsetRendererPC : public CharsetRendererCommon {
+	enum ShadowType {
+		kNoShadowType,
+		kNormalShadowType,
+		kHorizontalShadowType
+	};
+
+	ShadowType _shadowType;
+
 protected:
-#ifdef SCUMMVMKOR
-    virtual void drawBitsN(bool is2byte, const Graphics::Surface &s, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height);
-#else
+	virtual void enableShadow(bool enable);
+	virtual void drawBits1(Graphics::Surface &dest, int x, int y, const byte *src, int drawTop, int width, int height);
+
+public:
+	CharsetRendererPC(ScummEngine *vm) : CharsetRendererCommon(vm), _shadowType(kNoShadowType) { }
+};
+
+class CharsetRendererClassic : public CharsetRendererPC {
+protected:
 	virtual void drawBitsN(const Graphics::Surface &s, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height);
-#endif
 	void printCharIntern(bool is2byte, const byte *charPtr, int origWidth, int origHeight, int width, int height, VirtScreen *vs, bool ignoreCharsetMask);
 	virtual bool prepareDraw(uint16 chr);
 
@@ -147,13 +140,8 @@ protected:
 	// On which virtual screen will be drawn right now
 	VirtScreenNumber _drawScreen;
 
-#ifdef SCUMMVMKOR
-protected:
-    virtual void enableShadow(bool enable);
-#endif
-
 public:
-	CharsetRendererClassic(ScummEngine *vm) : CharsetRendererCommon(vm) {}
+	CharsetRendererClassic(ScummEngine *vm) : CharsetRendererPC(vm) {}
 
 	void printChar(int chr, bool ignoreCharsetMask);
 	void drawChar(int chr, Graphics::Surface &s, int x, int y);
@@ -171,11 +159,7 @@ public:
 	int getFontHeight();
 
 private:
-#ifdef SCUMMVMKOR
-    void drawBitsN(bool is2byte, const Graphics::Surface &s, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height);
-#else
 	void drawBitsN(const Graphics::Surface &s, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height);
-#endif
 	bool prepareDraw(uint16 chr);
 	void setupShadowMode();
 	bool useFontRomCharacter(uint16 chr);
@@ -203,10 +187,8 @@ public:
 	int getCharWidth(uint16 chr) { return 8; }
 };
 
-class CharsetRendererV3 : public CharsetRendererCommon {
+class CharsetRendererV3 : public CharsetRendererPC {
 protected:
-	virtual void enableShadow(bool enable);
-	virtual void drawBits1(Graphics::Surface &dest, int x, int y, const byte *src, int drawTop, int width, int height);
 	virtual int getDrawWidthIntern(uint16 chr);
 	virtual int getDrawHeightIntern(uint16 chr);
 	virtual void setDrawCharIntern(uint16 chr) {}
@@ -214,7 +196,7 @@ protected:
 	const byte *_widthTable;
 
 public:
-	CharsetRendererV3(ScummEngine *vm) : CharsetRendererCommon(vm) {}
+	CharsetRendererV3(ScummEngine *vm) : CharsetRendererPC(vm) {}
 
 	void printChar(int chr, bool ignoreCharsetMask);
 	void drawChar(int chr, Graphics::Surface &s, int x, int y);

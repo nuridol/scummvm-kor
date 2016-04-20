@@ -27,6 +27,13 @@
 #include "common/debug-channels.h"
 #include "common/system.h"
 
+#ifndef DISABLE_MD5
+#include "common/md5.h"
+#include "common/archive.h"
+#include "common/macresman.h"
+#include "common/stream.h"
+#endif
+
 #include "engines/engine.h"
 
 #include "gui/debugger.h"
@@ -61,6 +68,10 @@ Debugger::Debugger() {
 
 	registerCmd("help",				WRAP_METHOD(Debugger, cmdHelp));
 	registerCmd("openlog",			WRAP_METHOD(Debugger, cmdOpenLog));
+#ifndef DISABLE_MD5
+	registerCmd("md5",				WRAP_METHOD(Debugger, cmdMd5));
+	registerCmd("md5mac",			WRAP_METHOD(Debugger, cmdMd5Mac));
+#endif
 
 	registerCmd("debuglevel",		WRAP_METHOD(Debugger, cmdDebugLevel));
 	registerCmd("debugflag_list",		WRAP_METHOD(Debugger, cmdDebugFlagsList));
@@ -76,6 +87,19 @@ Debugger::~Debugger() {
 
 
 // Initialisation Functions
+int Debugger::getCharsPerLine() {
+#ifndef USE_TEXT_CONSOLE_FOR_DEBUGGER
+	const int charsPerLine = _debuggerDialog->getCharsPerLine();
+#elif defined(USE_READLINE)
+	int charsPerLine, rows;
+	rl_get_screen_size(&rows, &charsPerLine);
+#else
+	// Can we do better?
+	const int charsPerLine = 80;
+#endif
+	return charsPerLine;
+}
+
 int Debugger::debugPrintf(const char *format, ...) {
 	va_list	argptr;
 
@@ -88,6 +112,37 @@ int Debugger::debugPrintf(const char *format, ...) {
 #endif
 	va_end (argptr);
 	return count;
+}
+
+void Debugger::debugPrintColumns(const Common::StringArray &list) {
+	uint maxLength = 0;
+	uint i, j;
+
+	for (i = 0; i < list.size(); i++) {
+		if (list[i].size() > maxLength)
+			maxLength = list[i].size();
+	}
+
+	uint charsPerLine = getCharsPerLine();
+	uint columnWidth = maxLength + 2;
+	uint columns = charsPerLine / columnWidth;
+
+	uint lines = list.size() / columns;
+
+	if (list.size() % columns)
+		lines++;
+
+	// This won't always use all available columns, but even if it did the
+	// number of lines should be the same so that's good enough.
+	for (i = 0; i < lines; i++) {
+		for (j = 0; j < columns; j++) {
+			uint pos = i + j * lines;
+			if (pos < list.size()) {
+				debugPrintf("%*s", -columnWidth, list[pos].c_str());
+			}
+		}
+		debugPrintf("\n");
+	}
 }
 
 void Debugger::preEnter() {
@@ -436,15 +491,7 @@ bool Debugger::cmdExit(int argc, const char **argv) {
 // Print a list of all registered commands (and variables, if any),
 // nicely word-wrapped.
 bool Debugger::cmdHelp(int argc, const char **argv) {
-#ifndef USE_TEXT_CONSOLE_FOR_DEBUGGER
-	const int charsPerLine = _debuggerDialog->getCharsPerLine();
-#elif defined(USE_READLINE)
-	int charsPerLine, rows;
-	rl_get_screen_size(&rows, &charsPerLine);
-#else
-	// Can we do better?
-	const int charsPerLine = 80;
-#endif
+	const int charsPerLine = getCharsPerLine();
 	int width, size;
 	uint i;
 
@@ -502,6 +549,104 @@ bool Debugger::cmdOpenLog(int argc, const char **argv) {
 	return true;
 }
 
+#ifndef DISABLE_MD5
+struct ArchiveMemberLess {
+	bool operator()(const Common::ArchiveMemberPtr &x, const Common::ArchiveMemberPtr &y) const {
+		return (*x).getDisplayName().compareToIgnoreCase((*y).getDisplayName()) < 0;
+	}
+};
+
+bool Debugger::cmdMd5(int argc, const char **argv) {
+	if (argc < 2) {
+		debugPrintf("md5 [-n length] <filename | pattern>\n");
+	} else {
+		uint32 length = 0;
+		uint paramOffset = 0;
+
+		// If the user supplied an -n parameter, set the bytes to read
+		if (!strcmp(argv[1], "-n")) {
+			// Make sure that we have at least two more parameters
+			if (argc < 4) {
+				debugPrintf("md5 [-n length] <filename | pattern>\n");
+				return true;
+			}
+			length = atoi(argv[2]);
+			paramOffset = 2;
+		}
+		
+		// Assume that spaces are part of a single filename.
+		Common::String filename = argv[1 + paramOffset];
+		for (int i = 2 + paramOffset; i < argc; i++) {
+			filename = filename + " " + argv[i];
+		}
+		Common::ArchiveMemberList list;
+		SearchMan.listMatchingMembers(list, filename);
+		if (list.empty()) {
+			debugPrintf("File '%s' not found\n", filename.c_str());
+		} else {
+			sort(list.begin(), list.end(), ArchiveMemberLess());
+			for (Common::ArchiveMemberList::iterator iter = list.begin(); iter != list.end(); ++iter) {
+				Common::SeekableReadStream *stream = (*iter)->createReadStream();
+				Common::String md5 = Common::computeStreamMD5AsString(*stream, length);
+				debugPrintf("%s  %s  %d\n", md5.c_str(), (*iter)->getDisplayName().c_str(), stream->size());
+				delete stream;
+			}
+		}
+	}
+	return true;
+}
+
+bool Debugger::cmdMd5Mac(int argc, const char **argv) {
+	if (argc < 2) {
+		debugPrintf("md5mac [-n length] <base filename>\n");
+	} else {
+		uint32 length = 0;
+		uint paramOffset = 0;
+
+		// If the user supplied an -n parameter, set the bytes to read
+		if (!strcmp(argv[1], "-n")) {
+			// Make sure that we have at least two more parameters
+			if (argc < 4) {
+				debugPrintf("md5mac [-n length] <base filename>\n");
+				return true;
+			}
+			length = atoi(argv[2]);
+			paramOffset = 2;
+		}
+		
+		// Assume that spaces are part of a single filename.
+		Common::String filename = argv[1 + paramOffset];
+		for (int i = 2 + paramOffset; i < argc; i++) {
+			filename = filename + " " + argv[i];
+		}
+		Common::MacResManager macResMan;
+		// FIXME: There currently isn't any way to tell the Mac resource
+		// manager to open a specific file. Instead, it takes a "base name"
+		// and constructs a file name out of that. While usually a desirable
+		// thing, it's not ideal here.
+		if (!macResMan.open(filename)) {
+			debugPrintf("Resource file '%s' not found\n", filename.c_str());
+		} else {
+			if (!macResMan.hasResFork() && !macResMan.hasDataFork()) {
+				debugPrintf("'%s' has neither data not resource fork\n", macResMan.getBaseFileName().c_str());
+			} else {
+				// The resource fork is probably the most relevant one.
+				if (macResMan.hasResFork()) {
+					Common::String md5 = macResMan.computeResForkMD5AsString(length);
+					debugPrintf("%s  %s (resource)  %d\n", md5.c_str(), macResMan.getBaseFileName().c_str(), macResMan.getResForkDataSize());
+				}
+				if (macResMan.hasDataFork()) {
+					Common::SeekableReadStream *stream = macResMan.getDataFork();
+					Common::String md5 = Common::computeStreamMD5AsString(*stream, length);
+					debugPrintf("%s  %s (data)  %d\n", md5.c_str(), macResMan.getBaseFileName().c_str(), stream->size());
+				}
+			}
+			macResMan.close();
+		}
+	}
+	return true;
+}
+#endif
 
 bool Debugger::cmdDebugLevel(int argc, const char **argv) {
 	if (argc == 1) { // print level

@@ -151,9 +151,6 @@ protected:
 	CheckboxWidget *_globalMIDIOverride;
 	CheckboxWidget *_globalMT32Override;
 	CheckboxWidget *_globalVolumeOverride;
-#ifdef SCUMMVMKOR
-	CheckboxWidget *_koreanModeCheckbox;
-#endif
 
 	ExtraGuiOptions _engineOptions;
 };
@@ -197,10 +194,10 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 
 	// GUI:  Label & edit widget for the game ID
 	if (g_system->getOverlayWidth() > 320)
-		new StaticTextWidget(tab, "GameOptions_Game.Id", _("ID:"), _("Short game identifier used for referring to savegames and running the game from the command line"));
+		new StaticTextWidget(tab, "GameOptions_Game.Id", _("ID:"), _("Short game identifier used for referring to saved games and running the game from the command line"));
 	else
-		new StaticTextWidget(tab, "GameOptions_Game.Id", _c("ID:", "lowres"), _("Short game identifier used for referring to savegames and running the game from the command line"));
-	_domainWidget = new DomainEditTextWidget(tab, "GameOptions_Game.Domain", _domain, _("Short game identifier used for referring to savegames and running the game from the command line"));
+		new StaticTextWidget(tab, "GameOptions_Game.Id", _c("ID:", "lowres"), _("Short game identifier used for referring to saved games and running the game from the command line"));
+	_domainWidget = new DomainEditTextWidget(tab, "GameOptions_Game.Domain", _domain, _("Short game identifier used for referring to saved games and running the game from the command line"));
 
 	// GUI:  Label & edit widget for the description
 	if (g_system->getOverlayWidth() > 320)
@@ -216,9 +213,7 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	_langPopUp->appendEntry("", (uint32)Common::UNK_LANG);
 	const Common::LanguageDescription *l = Common::g_languages;
 	for (; l->code; ++l) {
-#ifndef SCUMMVMKOR
 		if (checkGameGUIOptionLanguage(l->id, _guioptionsString))
-#endif
 			_langPopUp->appendEntry(l->description, l->id);
 	}
 
@@ -234,14 +229,6 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	for (; p->code; ++p) {
 		_platformPopUp->appendEntry(p->description, p->id);
 	}
-
-#ifdef SCUMMVMKOR
-    // Korean Mode popup
-    if (g_system->getOverlayWidth() > 320)
-        _koreanModeCheckbox = new CheckboxWidget(tab, "GameOptions_Game.V1modeCheckbox", _("Use V1 Korean Mode"), 0, 0);
-    else
-        _koreanModeCheckbox = new CheckboxWidget(tab, "GameOptions_Game.V1modeCheckbox", _c("Use V1 Korean Mode", "lowres"), 0, 0);
-#endif
 
 	//
 	// 2) The engine tab (shown only if there are custom engine options)
@@ -340,19 +327,19 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 
 	// GUI:  Button + Label for the additional path
 	if (g_system->getOverlayWidth() > 320)
-		new ButtonWidget(tab, "GameOptions_Paths.Extrapath", _("Extra Path:"), _("Specifies path to additional data used the game"), kCmdExtraBrowser);
+		new ButtonWidget(tab, "GameOptions_Paths.Extrapath", _("Extra Path:"), _("Specifies path to additional data used by the game"), kCmdExtraBrowser);
 	else
-		new ButtonWidget(tab, "GameOptions_Paths.Extrapath", _c("Extra Path:", "lowres"), _("Specifies path to additional data used the game"), kCmdExtraBrowser);
-	_extraPathWidget = new StaticTextWidget(tab, "GameOptions_Paths.ExtrapathText", extraPath, _("Specifies path to additional data used the game"));
+		new ButtonWidget(tab, "GameOptions_Paths.Extrapath", _c("Extra Path:", "lowres"), _("Specifies path to additional data used by the game"), kCmdExtraBrowser);
+	_extraPathWidget = new StaticTextWidget(tab, "GameOptions_Paths.ExtrapathText", extraPath, _("Specifies path to additional data used by the game"));
 
 	_extraPathClearButton = addClearButton(tab, "GameOptions_Paths.ExtraPathClearButton", kCmdExtraPathClear);
 
 	// GUI:  Button + Label for the save path
 	if (g_system->getOverlayWidth() > 320)
-		new ButtonWidget(tab, "GameOptions_Paths.Savepath", _("Save Path:"), _("Specifies where your savegames are put"), kCmdSaveBrowser);
+		new ButtonWidget(tab, "GameOptions_Paths.Savepath", _("Save Path:"), _("Specifies where your saved games are put"), kCmdSaveBrowser);
 	else
-		new ButtonWidget(tab, "GameOptions_Paths.Savepath", _c("Save Path:", "lowres"), _("Specifies where your savegames are put"), kCmdSaveBrowser);
-	_savePathWidget = new StaticTextWidget(tab, "GameOptions_Paths.SavepathText", savePath, _("Specifies where your savegames are put"));
+		new ButtonWidget(tab, "GameOptions_Paths.Savepath", _c("Save Path:", "lowres"), _("Specifies where your saved games are put"), kCmdSaveBrowser);
+	_savePathWidget = new StaticTextWidget(tab, "GameOptions_Paths.SavepathText", savePath, _("Specifies where your saved games are put"));
 
 	_savePathClearButton = addClearButton(tab, "GameOptions_Paths.SavePathClearButton", kCmdSavePathClear);
 
@@ -421,11 +408,7 @@ void EditGameDialog::open() {
 	if (ConfMan.hasKey("language", _domain)) {
 		_langPopUp->setSelectedTag(lang);
 	} else {
-#ifdef SCUMMVMKOR
-        _langPopUp->setSelectedTag(Common::parseLanguage("kr"));
-#else
 		_langPopUp->setSelectedTag((uint32)Common::UNK_LANG);
-#endif
 	}
 
 	if (_langPopUp->numEntries() <= 3) { // If only one language is avaliable
@@ -455,10 +438,6 @@ void EditGameDialog::open() {
 			sel = i + 2;
 	}
 	_platformPopUp->setSelected(sel);
-#ifdef SCUMMVMKOR
-	if (ConfMan.hasKey("v1_korean_mode", _domain))
-		_koreanModeCheckbox->setState(ConfMan.getBool("v1_korean_mode", _domain));
-#endif
 }
 
 
@@ -493,11 +472,6 @@ void EditGameDialog::close() {
 			ConfMan.removeKey("platform", _domain);
 		else
 			ConfMan.set("platform", Common::getPlatformCode(platform), _domain);
-
-#ifdef SCUMMVMKOR
-		ConfMan.setBool("v1_korean_mode", _koreanModeCheckbox->getState(), _domain);
-		ConfMan.setBool("v1_korean_only", _koreanModeCheckbox->getState(), _domain);
-#endif
 
 		// Set the state of engine-specific checkboxes
 		for (uint i = 0; i < _engineOptions.size(); i++) {
@@ -656,7 +630,7 @@ LauncherDialog::LauncherDialog()
 		new ButtonWidget(this, "Launcher.StartButton", _("~S~tart"), _("Start selected game"), kStartCmd);
 
 	_loadButton =
-		new ButtonWidget(this, "Launcher.LoadGameButton", _("~L~oad..."), _("Load savegame for selected game"), kLoadGameCmd);
+		new ButtonWidget(this, "Launcher.LoadGameButton", _("~L~oad..."), _("Load saved game for selected game"), kLoadGameCmd);
 
 	// Above the lowest button rows: two more buttons (directly below the list box)
 	if (g_system->getOverlayWidth() > 320) {
@@ -709,6 +683,8 @@ LauncherDialog::LauncherDialog()
 
 	// Create Load dialog
 	_loadDialog = new SaveLoadChooser(_("Load game:"), _("Load"), false);
+
+	GUI::GuiManager::instance()._launched = true;
 }
 
 void LauncherDialog::selectTarget(const String &target) {
@@ -1022,7 +998,7 @@ void LauncherDialog::loadGameButtonPressed(int item) {
 #ifdef ENABLE_EVENTRECORDER
 void LauncherDialog::recordGame(int item) {
 	RecorderDialog recorderDialog;
-	MessageDialog alert(_("Do you want to load savegame?"),
+	MessageDialog alert(_("Do you want to load saved game?"),
 		_("Yes"), _("No"));
 	switch(recorderDialog.runModal(_domains[item])) {
 	case RecorderDialog::kRecordDialogClose:
@@ -1182,9 +1158,9 @@ void LauncherDialog::updateButtons() {
 		_loadButton->setEnabled(en);
 		_loadButton->draw();
 	}
-	switchButtonsText(_addButton, "~A~dd Game...", "Mass Add...");
+	switchButtonsText(_addButton, "~A~dd Game...", _s("Mass Add..."));
 #ifdef ENABLE_EVENTRECORDER
-	switchButtonsText(_loadButton, "~L~oad...", "Record...");
+	switchButtonsText(_loadButton, "~L~oad...", _s("Record..."));
 #endif
 }
 

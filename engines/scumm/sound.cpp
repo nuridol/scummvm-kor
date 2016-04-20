@@ -658,7 +658,11 @@ void Sound::startTalkSound(uint32 offset, uint32 b, int mode, Audio::SoundHandle
 			_vm->_imuseDigital->startVoice(kTalkSoundID, input);
 #endif
 		} else {
-			_mixer->playStream(Audio::Mixer::kSpeechSoundType, handle, input, id);
+			if (mode == 1) {
+				_mixer->playStream(Audio::Mixer::kSFXSoundType, handle, input, id);
+			} else {
+				_mixer->playStream(Audio::Mixer::kSpeechSoundType, handle, input, id);
+			}
 		}
 	}
 }
@@ -847,9 +851,6 @@ void Sound::soundKludge(int *list, int num) {
 }
 
 void Sound::talkSound(uint32 a, uint32 b, int mode, int channel) {
-	if (_vm->_game.version >= 5 && ConfMan.getBool("speech_mute"))
-		return;
-
 	if (mode == 1) {
 		_talk_sound_a1 = a;
 		_talk_sound_b1 = b;
@@ -1065,9 +1066,9 @@ void Sound::playCDTrackInternal(int track, int numLoops, int startFrame, int dur
 		Common::File *cddaFile = new Common::File();
 		if (cddaFile->open("CDDA.SOU")) {
 			Audio::Timestamp start = Audio::Timestamp(0, startFrame, 75);
-			Audio::Timestamp end = Audio::Timestamp(0, startFrame + duration, 75);				
+			Audio::Timestamp end = Audio::Timestamp(0, startFrame + duration, 75);
 			Audio::SeekableAudioStream *stream = makeCDDAStream(cddaFile, DisposeAfterUse::YES);
-			
+
 			_mixer->playStream(Audio::Mixer::kMusicSoundType, &_loomSteamCDAudioHandle,
 			                    Audio::makeLoopingAudioStream(stream, start, end, (numLoops < 1) ? numLoops + 1 : numLoops));
 		} else {

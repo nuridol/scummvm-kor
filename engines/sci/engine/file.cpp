@@ -66,13 +66,29 @@ reg_t file_open(EngineState *s, const Common::String &filename, int mode, bool u
 
 	bool isCompressed = true;
 	const SciGameId gameId = g_sci->getGameId();
-	if ((gameId == GID_QFG1 || gameId == GID_QFG1VGA || gameId == GID_QFG2 || gameId == GID_QFG3)
-		&& englishName.hasSuffix(".sav")) {
-		// QFG Characters are saved via the CharSave object.
-		// We leave them uncompressed so that they can be imported in later QFG
-		// games.
-		// Rooms/Scripts: QFG1: 601, QFG2: 840, QFG3/4: 52
-		isCompressed = false;
+
+	// QFG Characters are saved via the CharSave object.
+	// We leave them uncompressed so that they can be imported in later QFG
+	// games, even when using the original interpreter.
+	// We check for room numbers in here, because the file suffix can be changed by the user.
+	// Rooms/Scripts: QFG1(EGA/VGA): 601, QFG2: 840, QFG3/4: 52
+	switch (gameId) {
+	case GID_QFG1:
+	case GID_QFG1VGA:
+		if (s->currentRoomNumber() == 601)
+			isCompressed = false;
+		break;
+	case GID_QFG2:
+		if (s->currentRoomNumber() == 840)
+			isCompressed = false;
+		break;
+	case GID_QFG3:
+	case GID_QFG4:
+		if (s->currentRoomNumber() == 52)
+			isCompressed = false;
+		break;
+	default:
+		break;
 	}
 
 	if (mode == _K_FILE_MODE_OPEN_OR_FAIL) {
@@ -129,7 +145,7 @@ reg_t file_open(EngineState *s, const Common::String &filename, int mode, bool u
 }
 
 FileHandle *getFileFromHandle(EngineState *s, uint handle) {
-	if (handle == 0 || handle == VIRTUALFILE_HANDLE) {
+	if ((handle == 0) || ((handle >= VIRTUALFILE_HANDLE_START) && (handle <= VIRTUALFILE_HANDLE_END))) {
 		error("Attempt to use invalid file handle (%d)", handle);
 		return 0;
 	}
@@ -252,6 +268,9 @@ void DirSeeker::addAsVirtualFiles(Common::String title, Common::String fileMask)
 	Common::SaveFileManager *saveFileMan = g_sci->getSaveFileManager();
 	Common::StringArray foundFiles = saveFileMan->listSavefiles(fileMask);
 	if (!foundFiles.empty()) {
+		// Sort all filenames alphabetically
+		Common::sort(foundFiles.begin(), foundFiles.end());
+
 		_files.push_back(title);
 		_virtualFiles.push_back("");
 		Common::StringArray::iterator it;

@@ -185,6 +185,19 @@ static const QueenGameDescription gameDescriptions[] = {
 		},
 	},
 
+	// DOS Floppy - Russian
+	{
+		{
+			"queen",
+			"Floppy",
+			AD_ENTRY1s("queen.1", "0d1c10d5c3a1bd90bc0b3859a3258093", 22677657),
+			Common::RU_RUS,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NOSPEECH)
+		},
+	},
+
 	// DOS CD - French
 	{
 		{
@@ -461,7 +474,7 @@ SaveStateList QueenMetaEngine::listSaves(const char *target) const {
 	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
 	Common::StringArray filenames;
 	char saveDesc[32];
-	Common::String pattern("queen.s??");
+	Common::String pattern("queen.s##");
 
 	filenames = saveFileMan->listSavefiles(pattern);
 	sort(filenames.begin(), filenames.end());	// Sort (hopefully ensuring we are sorted numerically..)

@@ -117,6 +117,9 @@ SagaEngine::SagaEngine(OSystem *syst, const SAGAGameDescription *gameDesc)
 	SearchMan.addSubDirectoryMatching(gameDataDir, "music");
 	SearchMan.addSubDirectoryMatching(gameDataDir, "sound");
 
+	// Location of Miles audio files (sample.ad and sample.opl) in IHNM
+	SearchMan.addSubDirectoryMatching(gameDataDir, "drivers");
+
 	// The Multi-OS version puts the voices file in the root directory of
 	// the CD. The rest of the data files are in game/itedata
 	SearchMan.addSubDirectoryMatching(gameDataDir, "game/itedata");
@@ -341,7 +344,6 @@ Common::Error SagaEngine::run() {
 		syncSoundSettings();
 	} else {
 		_framesEsc = 0;
-		//_sndRes->playVoice(0);    // SAGA 2 sound test
 		_scene->startScene();
 	}
 
@@ -501,6 +503,9 @@ const char *SagaEngine::getTextString(int textStringId) {
 		case Common::ES_ESP:
 			lang = 3;
 			break;
+		case Common::RU_RUS:
+			lang = 4;
+			break;
 		default:
 			lang = 0;
 			break;
@@ -635,6 +640,9 @@ void SagaEngine::syncSoundSettings() {
 }
 
 void SagaEngine::pauseEngineIntern(bool pause) {
+	if (!_render || !_music)
+		return;
+
 	bool engineIsPaused = (_render->getFlags() & RF_RENDERPAUSE);
 	if (engineIsPaused == pause)
 		return;
