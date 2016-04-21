@@ -41,7 +41,6 @@
 
 		<def var = 'Predictive.Button.Width' value = '45' />
 		<def var = 'Predictive.Button.Height' value = '15' />
-		<def var = 'Predictive.ShowDeletePic' value = '0'/>
 
 		<widget name = 'Button'
 				size = '72, 16'
@@ -181,29 +180,6 @@
 							type = 'Button'
 					/>
 					<space/>
-					<widget name = 'Cancel'
-							type = 'Button'
-					/>
-					<widget name = 'Choose'
-							type = 'Button'
-					/>
-				</layout>
-			</layout>
-		</layout>
-	</dialog>
-
-	<dialog name = 'FileBrowser' overlays = 'screen' inset = '16' shading = 'dim'>
-		<layout type = 'vertical' padding = '16, 16, 16, 16'>
-			<widget name = 'Headline'
-					height = 'Globals.Line.Height'
-			/>
-			<widget name = 'Filename'
-					height = 'Globals.Line.Height'
-			/>
-			<space size = '5' />
-			<widget name = 'List'/>
-			<layout type = 'vertical' padding = '0, 0, 16, 0'>
-				<layout type = 'horizontal' padding = '0, 0, 0, 0'>
 					<widget name = 'Cancel'
 							type = 'Button'
 					/>
@@ -642,6 +618,12 @@
 						type = 'PopUp'
 				/>
 			</layout>
+			<space size = '4'/>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '6' center = 'true'>
+				<widget name = 'V1modeCheckbox'
+						type = 'Checkbox'
+				/>
+			</layout>
 		</layout>
 	</dialog>
 
@@ -707,7 +689,7 @@
 			/>
 		</layout>
 	</dialog>
-
+	
 	<dialog name = 'GlobalMenu' overlays = 'screen_center'>
 		<layout type = 'vertical' padding = '4, 4, 4, 4' center = 'true' spacing='2'>
 			<widget name = 'Title'
@@ -1129,15 +1111,15 @@
 			<layout type = 'horizontal'  spacing = '5' padding = '0, 0, 0, 10'>
 				<widget name = 'AuthorLabel'
 						type = 'EditRecordLabel'
-				/>
+				/>		
 				<widget name = 'AuthorEdit'
 						type = 'EditRecord'
-				/>
+				/>		
 			</layout>
 			<layout type = 'horizontal'  spacing = '5' padding = '0, 0, 0, 10'>
 				<widget name = 'NameLabel'
 						type = 'EditRecordLabel'
-				/>
+				/>		
 				<widget name = 'NameEdit'
 							type = 'EditRecord'
 				/>
@@ -1156,11 +1138,11 @@
 				/>
 				<widget name = 'OK'
 						type = 'Button'
-				/>
+				/>			
 			</layout>
 		</layout>
 	</dialog>
-
+	
 	<dialog name = 'ScummHelp' overlays = 'screen' inset = '8'>
 		<layout type = 'vertical' padding = '8, 8, 8, 8'>
 			<widget name = 'Title'
@@ -1261,7 +1243,7 @@
 			<layout type = 'horizontal' padding = '0, 0, 2, 2'>
 				<widget name = 'Word'
 					width  = '120'
-					height = 'Globals.Button.Height'
+					height = 'Globals.Button.Height' 
 				/>
 				<widget name = 'Delete'
 					width  = '20'

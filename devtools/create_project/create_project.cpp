@@ -348,6 +348,10 @@ int main(int argc, char *argv[]) {
 		setup.defines.push_back("MACOSX");
 		setup.defines.push_back("IPHONE");
 	}
+	
+	// Define scummvm-kor
+	setup.defines.push_back("SCUMMVMKOR");
+	
 	setup.defines.push_back("SDL_BACKEND");
 	if (!useSDL2) {
 		cout << "\nLinking to SDL 1.2\n\n";
