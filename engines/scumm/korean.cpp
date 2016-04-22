@@ -340,7 +340,7 @@ namespace Scumm {
             if (i > 0)
                 _KBuffer[i] = _KBuffer[i-1] + strlen(_KBuffer[i-1])+1;
             if (len > 1000)
-                warning("_KBuffer[%d]:%x, len=%d\n", i, (long)_KBuffer[i], len);
+                warning("_KBuffer[%d]:%lx, len=%d\n", i, (long)_KBuffer[i], len);
             if(strlen(buf)) {
                 strcpy(_KBuffer[i], buf);
                 char *b = _KBuffer[i];
@@ -353,16 +353,16 @@ namespace Scumm {
         }
         fp.close();
         
-        warning("Korean subtitle file loaded -- total %d lines, %d bytes\n", _numKLines, _KBuffer[_numKLines-1]-_KBuffer[0]+len);
+        warning("Korean subtitle file loaded -- total %d lines, %ld bytes\n", _numKLines, _KBuffer[_numKLines-1]-_KBuffer[0]+len);
         
-        delete buf;
+        delete[] buf;
         
         return;
     }
     
     bool unloadKorString()
     {
-        if (_KBuffer[0]) delete []_KBuffer[0];
+        if (_KBuffer && _KBuffer[0]) delete []_KBuffer[0];
         if (_KBuffer) delete []_KBuffer;
         return true;
     }

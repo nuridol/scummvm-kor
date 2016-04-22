@@ -1227,27 +1227,27 @@ Common::Error ScummEngine::init() {
         if((_game.version == 8 || _game.heversion > 72) && _koreanMode)
             _highRes = true;
         if((_game.id == GID_DIG || _game.id == GID_CMI) && _koreanMode) {
-            warning("You can not use V1 mode in this game\n");
+            debug("You can not use V1 mode in this game");
             _koreanMode = 0;
             _koreanOnly = 0;
             _highRes = 0;
         }
         if(_koreanMode) {
-            warning("Korean V1 translation mode. \n");
+            debug("Korean V1 translation mode.");
             loadKoreanFiles(/*getGameName()*/_game.gameid);
             //_useCJKMode = 0;	// V1과 V2를 동시에 사용하지 않는다
             _useCJKMode = 1;	// V1과 V2를 동시에 사용한다
         } else {
             if(_useCJKMode) {
-                warning("Korean V2 mode for DUMB edition or COMI Korean version\n");
+                debug("Korean V2 mode for DUMB edition or COMI Korean version");
             }
         }
     }
-    warning("_game.id = %d\n", _game.id);
-    warning("_game.gameid = %s\n", _game.gameid);
-    warning("_game.version = %d, _game.heversion = %d\n", _game.version, _game.heversion);
-    warning("_koreanMode = %d, _koreanOnly = %d, _useCJKMode = %d\n", _koreanMode, _koreanOnly, _useCJKMode);
-    warning("_highRes = %d\n", _highRes);
+    debug("_game.id = %d", _game.id);
+    debug("_game.gameid = %s", _game.gameid);
+    debug("_game.version = %d, _game.heversion = %d", _game.version, _game.heversion);
+    debug("_koreanMode = %d, _koreanOnly = %d, _useCJKMode = %d", _koreanMode, _koreanOnly, _useCJKMode);
+    debug("_highRes = %d", _highRes);
 #endif
 
 	// Initialize backend

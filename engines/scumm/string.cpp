@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- *
+
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -120,7 +120,7 @@ void ScummEngine::showMessageDialog(const byte *msg) {
 	InfoDialog dialog(this, (char *)buf);
 	VAR(VAR_KEYPRESS) = runDialog(dialog);
 }
-
+ 
 #ifdef SCUMMVMKOR
 static int _krStrPost = 0;	// 0: 받침 없음, 1: 'ㄹ'외 받침 있음, 3: 'ㄹ' 받침 있음
 static char _c1KorBufferStr[1024];
@@ -221,7 +221,7 @@ void ScummEngine_v6::drawBlastTexts() {
 						if (_language == Common::JA_JPN && !checkSJISCode(c)) {
 							c = 0x20; //not in S-JIS
 						} else {
-							c += *buf++ * 256;
+                            c += *buf++ * 256;
 #ifdef SCUMMVMKOR
                             // HACK to put Korean subtitles in place.
                             if (_game.id == GID_CMI && _charset->getCurID() == 0) {
@@ -230,7 +230,7 @@ void ScummEngine_v6::drawBlastTexts() {
                             }
 #endif
                         }
-					}
+                    }
 #ifdef SCUMMVMKOR
                     if (!_koreanMode)
                         _charset->printChar(c, true);
@@ -241,17 +241,17 @@ void ScummEngine_v6::drawBlastTexts() {
                         _charset->_top -= 6;
                     }
 #else
-					_charset->printChar(c, true);
+                    _charset->printChar(c, true);
 #endif
-                }
+				}
 			} while (c && c != '\n');
 #ifdef SCUMMVMKOR
             if (!_koreanMode)
                 _charset->_top += _charset->getFontHeight();
 #else
-            _charset->_top += _charset->getFontHeight();
+			_charset->_top += _charset->getFontHeight();
 #endif
-        } while (c);
+		} while (c);
 #ifdef SCUMMVMKOR
         *kr_buffer++=0;
         if(_koreanMode && strlen(kr_buffs)) {
@@ -270,7 +270,7 @@ void ScummEngine_v6::drawBlastTexts() {
         } else
             _blastTextQueue[i].rect = _charset->_str;
 #else
-        _blastTextQueue[i].rect = _charset->_str;
+		_blastTextQueue[i].rect = _charset->_str;
 #endif
 	}
 }
@@ -360,7 +360,6 @@ bool ScummEngine::handleNextCharsetCode(Actor *a, int *code) {
             *_c1KorBuffer++='>';
 #endif
 			c = 13; // new line
-			_msgCount = _screenWidth;
 			endLoop = true;
 			break;
 		case 2:
@@ -371,7 +370,6 @@ bool ScummEngine::handleNextCharsetCode(Actor *a, int *code) {
 		case 3:
 			_haveMsg = (_game.version >= 7) ? 1 : 0xFF;
 			_keepText = false;
-			_msgCount = 0;
 			endLoop = true;
 			break;
 		case 8:
@@ -407,10 +405,10 @@ bool ScummEngine::handleNextCharsetCode(Actor *a, int *code) {
 			else
 				_charset->setColor(color);
 #ifdef SCUMMVMKOR
-                *_c1KorBuffer++='<';
-                *_c1KorBuffer++='c';
-                *_c1KorBuffer++='>';
-                *_c1KorBuffer++=_charset->getColor();
+	            *_c1KorBuffer++='<';
+	            *_c1KorBuffer++='c';
+	            *_c1KorBuffer++='>';
+	            *_c1KorBuffer++=_charset->getColor();
 #endif
 			break;
 		case 13:
@@ -425,8 +423,8 @@ bool ScummEngine::handleNextCharsetCode(Actor *a, int *code) {
 			_nextTop -= _charset->getFontHeight() - oldy;
 			break;
 #ifndef SCUMMVMKOR
-        default:
-            error("handleNextCharsetCode: invalid code %d", c);
+		default:
+			error("handleNextCharsetCode: invalid code %d", c);
 #endif
 		}
 	}
@@ -553,7 +551,7 @@ void ScummEngine::CHARSET_1() {
 #endif
 
 #ifdef SCUMMVMKOR
-    _c1KorBuffer = _c1KorBufferStr;
+        _c1KorBuffer = _c1KorBufferStr;
 #endif
 
 	if (_game.heversion >= 70 && _haveMsg == 3) {
@@ -624,7 +622,6 @@ void ScummEngine::CHARSET_1() {
     if(_game.id == GID_INDY3 && _useCJKMode && _language == Common::KO_KOR && !_koreanMode)
         _charset->setCurID(1); // HACK: Make "Indy3" use big font
 #endif
-
 	if (_game.version >= 5)
 		memcpy(_charsetColorMap, _charsetData[_charset->getCurID()], 4);
 
@@ -671,9 +668,6 @@ void ScummEngine::CHARSET_1() {
 #endif
 				restoreCharsetBg();
 		}
-		_msgCount = 0;
-	} else if (_game.version <= 2) {
-		_talkDelay += _msgCount * _defaultTalkDelay;
 	}
 
 	if (_game.version > 3) {
@@ -707,7 +701,6 @@ void ScummEngine::CHARSET_1() {
 			// End of text reached, set _haveMsg accordingly
 			_haveMsg = (_game.version >= 7) ? 2 : 1;
 			_keepText = false;
-			_msgCount = 0;
 			break;
 		}
 
@@ -719,15 +712,15 @@ void ScummEngine::CHARSET_1() {
 #ifdef ENABLE_SCUMM_7_8
 			if (_game.version >= 7 && subtitleLine != subtitleBuffer) {
 #ifdef SCUMMVMKOR
-                if (_koreanMode) {	// korean v1 mode compaitbility hack: do not broke the line
-                    *subtitleLine++ = ' ';
-                    *subtitleLine = '\0';
-                } else {
-                    ((ScummEngine_v7 *)this)->addSubtitleToQueue(subtitleBuffer, subtitlePos, _charsetColor, _charset->getCurID());
-                    subtitleLine = subtitleBuffer;
-                }
+	            if (_koreanMode) {	// korean v1 mode compaitbility hack: do not broke the line
+	                *subtitleLine++ = ' ';
+	                *subtitleLine = '\0';
+	            } else {
+	                ((ScummEngine_v7 *)this)->addSubtitleToQueue(subtitleBuffer, subtitlePos, _charsetColor, _charset->getCurID());
+	                subtitleLine = subtitleBuffer;
+	            }
 #else
-                ((ScummEngine_v7 *)this)->addSubtitleToQueue(subtitleBuffer, subtitlePos, _charsetColor, _charset->getCurID());
+				((ScummEngine_v7 *)this)->addSubtitleToQueue(subtitleBuffer, subtitlePos, _charsetColor, _charset->getCurID());
 				subtitleLine = subtitleBuffer;
 #endif
 			}
@@ -763,10 +756,14 @@ void ScummEngine::CHARSET_1() {
 		} else {
 #ifdef SCUMMVMKOR
             if (c & 0x80 && _useCJKMode && !_koreanMode) {
-                if (checkSJISCode(c)) {
+                if (_language == Common::JA_JPN && !checkSJISCode(c)) {
+                    c = 0x20; // not in S-JIS
+                } else {
                     byte *buffer = _charsetBuffer + _charsetBufPos;
-                    c += *buffer++ * 256; //LE
-                    _charsetBufPos = buffer - _charsetBuffer;
+                    if (checkHangul(c, *buffer)) {
+                        c += *buffer++ * 256; // LE
+                        _charsetBufPos = buffer - _charsetBuffer;
+                    }
                 }
             }
 #else
@@ -785,9 +782,8 @@ void ScummEngine::CHARSET_1() {
                 else
                     _c1KorBuffer = addKoreanBuffer(_c1KorBuffer, c);
 #else
-				_charset->printChar(c, false);
+                _charset->printChar(c, false);
 #endif
-                _msgCount += 1;
 			} else {
 				if (_game.features & GF_16BIT_COLOR) {
 					// HE games which use sprites for subtitles
@@ -800,12 +796,12 @@ void ScummEngine::CHARSET_1() {
 					// of this message -> don't print it.
 				} else {
 #ifdef SCUMMVMKOR
-                    if(!_koreanOnly)
-                        _charset->printChar(c, false);
-                    else
-                        _c1KorBuffer = addKoreanBuffer(_c1KorBuffer, c);
+	                if(!_koreanOnly)
+	                    _charset->printChar(c, false);
+	                else
+	                    _c1KorBuffer = addKoreanBuffer(_c1KorBuffer, c);
 #else
-					_charset->printChar(c, false);
+	                _charset->printChar(c, false);
 #endif
 				}
 			}
@@ -1772,10 +1768,10 @@ int ScummEngine::convertVerbMessage(byte *dst, int dstSize, int var) {
                     return convertMessageToString(ptr, dst, dstSize);
                 }
 #else
-                const byte *ptr = getResourceAddress(rtVerb, k);
+				const byte *ptr = getResourceAddress(rtVerb, k);
 				return convertMessageToString(ptr, dst, dstSize);
 #endif
-            }
+			}
 		}
 	}
 	return 0;
@@ -1833,7 +1829,6 @@ int ScummEngine::convertStringMessage(byte *dst, int dstSize, int var) {
 
 	if (_game.version == 3 || (_game.version >= 6 && _game.heversion < 72))
 		var = readVar(var);
-
 #ifdef SCUMMVMKOR
     if (_useCJKMode && var & (1 << 15)) {
         int idx;

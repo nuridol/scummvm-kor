@@ -422,10 +422,12 @@ Common::String Font::handleEllipsis(const Common::String &input, int w) const {
                     isKorean = 0;
                 }
             }
-#endif
+            const Common::String::unsigned_type cur = s[i];
+            skip -= getCharWidth(c) + getKerningOffset(last, cur);
+#else
 			const Common::String::unsigned_type cur = s[i];
 			skip -= getCharWidth(cur) + getKerningOffset(last, cur);
-
+#endif
 			last = cur;
 		}
 
