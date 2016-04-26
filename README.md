@@ -34,6 +34,22 @@ rm ScummVM-iOS-libraries.zip
 open scummvm.xcodeproj
 ```
 
+# 게임별 한국어 모드 지정 방법
+| 게임명              | 언어  | 모드  | 플랫폼 |
+| ----------------- |:----:|:-----:|:-----:|
+| 매니악 맨션          |Korean| V1   | DOS |
+| 풀 쓰로틀            |Korean| V1   | DOS |
+| 샘 & 맥스 히트 더 로드 |Korean| V1   | DOS |
+| 텐타클의 최후의 날     |Korean| V1   | DOS |
+| 더 디그             |Korean| V1   | DOS |
+| 룸 CD Ver.         |Korean| V1   | DOS |
+| 룸 플로피 Ver.       |Korean| V2   | DOS |
+| 인디아나 존스3        |Korean| V2   | DOS |
+| 인디아나 존스4        |Korean| V2   | DOS |
+| 원숭이 섬의 비밀1     |Korean| V2   | DOS |
+| 원숭이 섬의 비밀2     |Korean| V2   | DOS |
+
+
 # 링크들
 ## ScummVM
 http://scummvm.org
