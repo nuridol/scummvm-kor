@@ -37,9 +37,12 @@ open scummvm.xcodeproj
 # 링크들
 ## ScummVM
 http://scummvm.org
+
 ## Xcode 프로젝트 작성 방법
 http://forums.scummvm.org/viewtopic.php?t=13965&postdays=0&postorder=asc&start=60
+
 ## ScummVM Kor.(한글화)
 http://wonst719.cafe24.com/zbxe/about
+
 ## ScummVM Kor Patch v1.2.1k11(iOS 버전 기능 추가)
 http://www.nextcube.org/board/browse/1111/4188
