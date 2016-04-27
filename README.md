@@ -40,15 +40,16 @@ open scummvm.xcodeproj
 | 매니악 맨션          |Korean| V1   | DOS |
 | 풀 쓰로틀            |Korean| V1   | DOS |
 | 샘 & 맥스 히트 더 로드 |Korean| V1   | DOS |
-| 텐타클의 최후의 날     |Korean| V1   | DOS |
-| 더 디그             |Korean| V1   | DOS |
-| 룸 CD Ver.         |Korean| V1   | DOS |
-| 룸 플로피 Ver.       |Korean| V2   | DOS |
+| 룸 VGA Ver.        |Korean| V1   | DOS |
+| 텐타클의 최후의 날     |Korean| V2   | DOS |
+| 더 디그             |Korean| V2   | DOS |
+| 룸 EGA Ver.        |Korean| V2   | DOS |
 | 인디아나 존스3        |Korean| V2   | DOS |
 | 인디아나 존스4        |Korean| V2   | DOS |
 | 원숭이 섬의 비밀1     |Korean| V2   | DOS |
 | 원숭이 섬의 비밀2     |Korean| V2   | DOS |
 
+*V1 대상 게임은 sub 폴더 밑에 ``<게임ID>.dat`` 파일이 필요합니다.*
 
 # 링크들
 ## ScummVM

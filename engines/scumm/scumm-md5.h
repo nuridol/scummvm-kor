@@ -281,7 +281,7 @@ static const MD5Table md5table[] = {
 	{ "600abd3e9f47e63e670188b7e4e86ac7", "spyozon", "", "", 47128, Common::EN_USA, Common::kPlatformUnknown },
 	{ "6027e9ca9c35746d95dee2068cec17e5", "zak", "V2", "V2", -1, Common::DE_DEU, Common::kPlatformAmiga },
 	{ "60ba818dc3bede86d40357e3913f8505", "ft", "", "Version B", 19697, Common::EN_ANY, Common::kPlatformUnknown },
-  { "613f64f78ea26c7353b2a5940eb61d6a", "zak", "V2", "V2", -1, Common::FR_FRA, Common::kPlatformAtariST },
+	{ "613f64f78ea26c7353b2a5940eb61d6a", "zak", "V2", "V2", -1, Common::FR_FRA, Common::kPlatformAtariST },
 	{ "62050da376483d8edcbd98cd26b6cb57", "puttrace", "HE 99", "", -1, Common::RU_RUS, Common::kPlatformWindows },
 	{ "624cdb93654667c869d204a64af7e57f", "maniac", "V2", "V2", 1988, Common::EN_ANY, Common::kPlatformDOS },
 	{ "6269b8fbf51a353e5b501e4ad98cdc67", "arttime", "", "", -1, Common::EN_ANY, Common::kPlatformUnknown },
