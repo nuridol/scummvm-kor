@@ -963,6 +963,7 @@ void ScummEngine_v2::drawPreposition(int index) {
 			{ " ", " dans", " avec", " sur", " <" }, // French
 			{ " ", " in", " con", " su", " a" },     // Italian
 			{ " ", " en", " con", " en", " a" },     // Spanish
+			{ " ", " \x7f", " \x7f", " na", " \x7f" },// Russian
 			};
 		int lang;
 		switch (_language) {
@@ -977,6 +978,9 @@ void ScummEngine_v2::drawPreposition(int index) {
 			break;
 		case Common::ES_ESP:
 			lang = 4;
+			break;
+		case Common::RU_RUS:
+			lang = 5;
 			break;
 		default:
 			lang = 0;	// Default to english
@@ -1390,7 +1394,14 @@ void ScummEngine_v2::o2_loadRoomWithEgo() {
 
 	a = derefActor(VAR(VAR_EGO), "o2_loadRoomWithEgo");
 
-	a->putActor(0, 0, room);
+	// The original interpreter sets the actors new room X/Y to the last rooms X/Y
+	// This fixes a problem with MM: script 161 in room 12, the 'Oomph!' script
+	// This scripts runs before the actor position is set to the correct room entry location
+	if ((_game.id == GID_MANIAC) && (_game.platform != Common::kPlatformNES)) {
+		a->putActor(a->getPos().x, a->getPos().y, room);
+	} else {
+		a->putActor(0, 0, room);
+	}
 	_egoPositioned = false;
 
 	x = (int8)fetchScriptByte();

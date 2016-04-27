@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -117,6 +117,11 @@ public:
 
 			while (1) {
 				if (data_end[-2] == '\r' && data_end[-1] == '\n' && data_end[0] == '\r' && data_end[1] == '\n') {
+					break;
+				}
+				// In the Steam Mac version of The Dig, LF-LF is used
+				// instead of CR-LF
+				if (data_end[-2] == '\n' && data_end[-1] == '\n') {
 					break;
 				}
 				// In Russian Full Throttle strings are finished with
@@ -618,8 +623,8 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 	}
 
 #ifdef SCUMMVMKOR
-	char kr_color = (color != -1) ? color : 1;
-	const char *strKorean = str;
+    char kr_color = (color != -1) ? color : 1;
+    const char *strKorean = str;
 #endif
 
 	// flags:
@@ -633,13 +638,13 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
         if (_koreanMode) strKorean = convertToKorean(str, 0);
         sf->drawString(strKorean, _dst, _width, _height, pos_x, pos_y, false);
 #else
-		sf->drawString(str, _dst, _width, _height, pos_x, pos_y, false);
+        sf->drawString(str, _dst, _width, _height, pos_x, pos_y, false);
 #endif
-		break;
+        break;
 	case 1:
 #ifdef SCUMMVMKOR
-		if (_koreanMode) strKorean = convertToKorean(str, 0);
-		sf->drawString(strKorean, _dst, _width, _height, pos_x, MAX(pos_y, top), true);
+        if (_koreanMode) strKorean = convertToKorean(str, 0);
+        sf->drawString(strKorean, _dst, _width, _height, pos_x, MAX(pos_y, top), true);
 #else
 		sf->drawString(str, _dst, _width, _height, pos_x, MAX(pos_y, top), true);
 #endif
@@ -651,8 +656,8 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 		// always 0 and 321 respectively, and apparently we
 		// handle that correctly.
 #ifdef SCUMMVMKOR
-            if (_koreanMode) strKorean = convertToKorean(str, 0);
-            sf->drawStringWrap(strKorean, _dst, _width, _height, pos_x, MAX(pos_y, top), left, right, false);
+        if (_koreanMode) strKorean = convertToKorean(str, 0);
+        sf->drawStringWrap(strKorean, _dst, _width, _height, pos_x, MAX(pos_y, top), left, right, false);
 #else
 		sf->drawStringWrap(str, _dst, _width, _height, pos_x, MAX(pos_y, top), left, right, false);
 #endif
@@ -665,8 +670,8 @@ void SmushPlayer::handleTextResource(uint32 subType, int32 subSize, Common::Seek
 		// Note that in The Dig's "Spacetime Six" movie it's
 		// 621. I have no idea what that means.
 #ifdef SCUMMVMKOR
-		if (_koreanMode) strKorean = convertToKorean(str, 0);
-		sf->drawStringWrap(strKorean, _dst, _width, _height, pos_x, MAX(pos_y, top), left, MIN(left + right, _width), true);
+       if (_koreanMode) strKorean = convertToKorean(str, 0);
+       sf->drawStringWrap(strKorean, _dst, _width, _height, pos_x, MAX(pos_y, top), left, MIN(left + right, _width), true);
 #else
 		sf->drawStringWrap(str, _dst, _width, _height, pos_x, MAX(pos_y, top), left, MIN(left + right, _width), true);
 #endif

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -41,11 +41,11 @@ EventsManager::EventsManager(MADSEngine *vm) {
 	_mouseReleased = false;
 	_mouseButtons = 0;
 	_mouseStatus = 0;
-	_vD2 = 0;
+	_strokeGoing = 0;
 	_mouseStatusCopy = 0;
 	_mouseMoved = false;
-	_vD8 = 0;
 	_rightMousePressed = false;
+	_eventTarget = nullptr;
 }
 
 EventsManager::~EventsManager() {
@@ -84,8 +84,8 @@ void EventsManager::waitCursor() {
 	CursorType cursorId = (CursorType)MIN(_cursorSprites->getCount(), (int)CURSOR_WAIT);
 	_newCursorId = cursorId;
 	if (_cursorId != _newCursorId) {
-		changeCursor();
 		_cursorId = _newCursorId;
+		changeCursor();
 	}
 }
 
@@ -138,6 +138,12 @@ void EventsManager::pollEvents() {
 
 	Common::Event event;
 	while (g_system->getEventManager()->pollEvent(event)) {
+		// If an event target is specified, pass the event to it
+		if (_eventTarget) {
+			_eventTarget->onEvent(event);
+			continue;
+		}
+
 		// Handle keypress
 		switch (event.type) {
 		case Common::EVENT_QUIT:
@@ -151,10 +157,16 @@ void EventsManager::pollEvents() {
 				_vm->_debugger->attach();
 				_vm->_debugger->onFrame();
 			} else {
-				_pendingKeys.push(event);
+				_pendingKeys.push(event.kbd);
 			}
 			return;
 		case Common::EVENT_KEYUP:
+			return;
+		case Common::EVENT_WHEELUP:
+			_pendingKeys.push(Common::KeyState(Common::KEYCODE_PAGEUP));
+			return;
+		case Common::EVENT_WHEELDOWN:
+			_pendingKeys.push(Common::KeyState(Common::KEYCODE_PAGEDOWN));
 			return;
 		case Common::EVENT_LBUTTONDOWN:
 		case Common::EVENT_RBUTTONDOWN:
@@ -191,7 +203,7 @@ void EventsManager::pollEvents() {
 	}
 }
 
-void EventsManager::checkForNextFrameCounter() {
+bool EventsManager::checkForNextFrameCounter() {
 	// Check for next game frame
 	uint32 milli = g_system->getMillis();
 	if ((milli - _priorFrameTime) >= GAME_FRAME_TIME) {
@@ -209,7 +221,11 @@ void EventsManager::checkForNextFrameCounter() {
 
 		// Signal the ScummVM debugger
 		_vm->_debugger->onFrame();
+
+		return true;
 	}
+
+	return false;
 }
 
 void EventsManager::delay(int cycles) {
@@ -250,7 +266,12 @@ void EventsManager::waitForNextFrame() {
 void EventsManager::initVars() {
 	_mousePos = Common::Point(-1, -1);
 	_mouseStatusCopy = _mouseStatus;
-	_vD2 = _vD8 = 0;
+	_strokeGoing = 0;
 }
+
+void EventsManager::clearEvents() {
+	_pendingKeys.clear();
+}
+
 
 } // End of namespace MADS

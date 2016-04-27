@@ -24,6 +24,7 @@
 #include "common/events.h"
 #include "gui/gui-manager.h"
 #include "gui/ThemeEval.h"
+#include "engines/advancedDetector.h"
 
 namespace Bbvs {
 
@@ -34,7 +35,7 @@ struct MenuButton {
 
 static const MenuButton kMenuButtons[] = {
 	// Main menu
-	{"New Game", kCmdNewGame},	
+	{"New Game", kCmdNewGame},
 	{"Continue", kCmdContinue},
 	{"Options", kCmdOptions},
 	{"Mini Games", kCmdMiniGames},
@@ -53,6 +54,27 @@ static const MenuButton kMenuButtons[] = {
 	{"Back ..", kCmdBack}
 };
 
+static const MenuButton kMenuButtonsRu[] = {
+	// Main menu
+	{"\xBD\xDE\xD2\xD0\xEF \xD8\xD3\xE0\xD0", kCmdNewGame},
+	{"\xBF\xE0\xDE\xD4\xDE\xDB\xD6\xD8\xE2\xEC", kCmdContinue},
+	{"\xB5\xE9\xD5 ..", kCmdOptions},
+	{"\xBC\xD8\xDD\xD8 \xB8\xD3\xE0\xEB", kCmdMiniGames},
+	{"\xB2\xEB\xE5\xDE\xD4", kCmdQuit},
+	// Options
+	{"\xB4\xD5\xD8\xDD\xE1\xE2\xD0\xDB\xDB\xEF\xE6\xD8\xEF", kCmdUninstall},
+	{"\xB0\xD2\xE2\xDE\xE0\xEB", kCmdCredits},
+	{"\xBF\xE0\xDE\xDB\xDE\xD3", kCmdOpening},
+	{"\xC0\xD5\xDA\xDB\xD0\xDC\xD0", kCmdChicksNStuff},
+	{"\xBD\xD0\xD7\xD0\xD4 ..", kCmdBack},
+	// Minigames
+	{"\xC1\xDD\xD0\xD9\xDF\xD5\xE0", kCmdHockALoogie},
+	{"\xB6\xE3\xDA\xDE\xD6\xD0\xE0\xDA\xD0", kCmdBugJustice},
+	{"\xBF\xE2\xD5\xDD\xD8\xE1", kCmdCourtChaos},
+	{"\xB6\xD8\xD0\xDE\xD9 \xB7\xD2\xE3\xDA", kCmdAirGuitar},
+	{"\xBD\xD0\xD7\xD0\xD4 ..", kCmdBack}
+};
+
 MainMenu::MainMenu(BbvsEngine *vm) : Dialog(0, 0, 1, 1), _vm(vm) {
 	init();
 }
@@ -61,7 +83,7 @@ MainMenu::~MainMenu() {
 }
 
 void MainMenu::init() {
-	_buttons[0] = new GUI::ButtonWidget(this, 0, 0, 1, 1, "", 0, 0);	
+	_buttons[0] = new GUI::ButtonWidget(this, 0, 0, 1, 1, "", 0, 0);
 	_buttons[1] = new GUI::ButtonWidget(this, 0, 0, 1, 1, "", 0, 0);
 	_buttons[2] = new GUI::ButtonWidget(this, 0, 0, 1, 1, "", 0, 0);
 	_buttons[3] = new GUI::ButtonWidget(this, 0, 0, 1, 1, "", 0, 0);
@@ -76,14 +98,14 @@ void MainMenu::reflowLayout() {
 	const int buttonWidth = screenW * 70 / 320;
 	const int buttonHeight = screenH * 14 / 240;
 	const int buttonPadding = screenW * 3 / 320;
-	
+
 	_w = 2 * buttonWidth  + buttonPadding;
 	_h = 3 * buttonHeight + 3 * buttonPadding;
 	_x = (screenW - _w) / 2;
-	_y = screenH - _h;
+	_y = screenH - _h - 2;
 
 	int x = 0, y = 0;
-	
+
 	x = 0;
 	y = 0;
 	_buttons[0]->resize(x, y, buttonWidth, buttonHeight);
@@ -160,7 +182,13 @@ void MainMenu::handleCommand(GUI::CommandSender *sender, uint32 command, uint32 
 
 void MainMenu::gotoMenuScreen(int screen) {
 	for (int i = 0; i < 5; ++i) {
-		const MenuButton *btn = &kMenuButtons[screen * 5 + i];
+		const MenuButton *btn;
+
+		if (_vm->_gameDescription->language == Common::RU_RUS) {
+			btn = &kMenuButtonsRu[screen * 5 + i];
+		} else {
+			btn = &kMenuButtons[screen * 5 + i];
+		}
 		_buttons[i]->setLabel(btn->label);
 		_buttons[i]->setCmd(btn->cmd);
 		_buttons[i]->setEnabled(btn->cmd != 0);

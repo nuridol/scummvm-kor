@@ -241,6 +241,7 @@ void AnimationResource::load(byte *source, int size) {
 /* SoundResource */
 
 SoundResource::SoundResource() : _soundSize(0), _soundData(NULL) {
+	_soundEnergyArray = nullptr;
 }
 
 SoundResource::~SoundResource() {
@@ -377,6 +378,9 @@ void GenericResource::load(byte *source, int size) {
 ResourceReader::ResourceReader() {
 	_isV1 = false;
 	_cacheDataSize = 0;
+
+	_fd = _fdMusic = _fdPics = _fdSounds = nullptr;
+	_cacheCount = 0;
 }
 
 ResourceReader::~ResourceReader() {
@@ -441,7 +445,8 @@ void ResourceReader::openResourceBlocks() {
 }
 
 void ResourceReader::openResourceBlock(const char *filename, Common::File *blockFile, uint32 resType) {
-	blockFile->open(filename);
+	if (!blockFile->open(filename))
+		error("Failed to open '%s'", filename);
 
 	blockFile->readUint16LE(); // Skip unused
 	uint16 count = blockFile->readUint16LE();

@@ -544,7 +544,7 @@ void ScummEngine_v5::o5_setClass() {
 		} else if (cls == 0) {
 			// Class '0' means: clean all class data
 			_classData[obj] = 0;
-			if ((_game.features & GF_SMALL_HEADER) && obj <= _numActors) {
+			if ((_game.features & GF_SMALL_HEADER) && objIsActor(obj)) {
 				Actor *a = derefActor(obj, "o5_setClass");
 				a->_ignoreBoxes = false;
 				a->_forceClip = 0;
@@ -2497,10 +2497,6 @@ void ScummEngine_v5::walkActorToActor(int actor, int toActor, int dist) {
 		y = abr.y;
 	}
 	a->startWalkActor(x, y, -1);
-
-	// WORKAROUND: See bug #2971126 for details on why this is here.
-	if (_game.version == 0)
-		o5_breakHere();
 }
 
 void ScummEngine_v5::o5_walkActorToActor() {

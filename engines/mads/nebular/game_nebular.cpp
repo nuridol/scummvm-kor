@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -27,6 +27,7 @@
 #include "mads/game.h"
 #include "mads/screen.h"
 #include "mads/msurface.h"
+#include "mads/menu_views.h"
 #include "mads/nebular/game_nebular.h"
 #include "mads/nebular/dialogs_nebular.h"
 #include "mads/nebular/globals_nebular.h"
@@ -44,32 +45,90 @@ GameNebular::GameNebular(MADSEngine *vm)
 }
 
 ProtectionResult GameNebular::checkCopyProtection() {
-	/*
-	// DEBUG: Flag copy protection failure
-	_globals[kCopyProtectFailed] = -1;
+	//if (!ConfMan.getBool("copy_protection"))
+	//	return PROTECTION_SUCCEED;
 
-	if (!ConfMan.getBool("copy_protection"))
-	return true;
+	CopyProtectionDialog *dlg;
+	bool correctAnswer;
 
-	* DEBUG: Disabled for now
-	CopyProtectionDialog *dlg = new CopyProtectionDialog(_vm, false);
+	dlg = new CopyProtectionDialog(_vm, false);
 	dlg->show();
+	correctAnswer = dlg->isCorrectAnswer();
 	delete dlg;
-	*/
-	return PROTECTION_SUCCEED;
+
+	if (!correctAnswer && !_vm->shouldQuit()) {
+		dlg = new CopyProtectionDialog(_vm, true);
+		dlg->show();
+		correctAnswer = dlg->isCorrectAnswer();
+		delete dlg;
+	}
+
+	return correctAnswer ? PROTECTION_SUCCEED : PROTECTION_FAIL;
 }
 
 void GameNebular::startGame() {
-	// Show the main menu
-	// TODO: Show the main menu here
+	// First handle any ending credits from a just finished game session.
+	// Note that, with the exception of the decompression ending, which doesn't
+	// use animations, the remaining animations will automatically launch their
+	// own text view credits when the animation is completed
+	switch (_winStatus) {
+	case 1:
+		// No shields failure ending
+		AnimationView::execute(_vm, "rexend1");
+		break;
+	case 2:
+		// Shields, but no targetting failure ending
+		AnimationView::execute(_vm, "rexend2");
+		break;
+	case 3:
+		// Completed game successfully, so activate quotes item on the main menu
+		ConfMan.setBool("ShowQuotes", true);
+		ConfMan.flushToDisk();
+
+		AnimationView::execute(_vm, "rexend3");
+		break;
+	case 4:
+		// Decompression ending
+		TextView::execute(_vm, "ending4");
+		break;
+	}
+
+	do {
+		checkShowDialog();
+		_winStatus = 0;
+
+		_sectionNumber = 1;
+		initSection(_sectionNumber);
+		_vm->_events->setCursor(CURSOR_ARROW);
+		_statusFlag = true;
+
+		// Show the main menu
+		_vm->_dialogs->_pendingDialog = DIALOG_MAIN_MENU;
+		_vm->_dialogs->showDialog();
+	} while (!_vm->shouldQuit() && _vm->_dialogs->_pendingDialog != DIALOG_NONE);
+
+	if (_vm->shouldQuit())
+		return;
+
+	_priorSectionNumber = 0;
+	_priorSectionNumber = -1;
+	_scene._priorSceneId = 0;
+	_scene._currentSceneId = -1;
+	_scene._nextSceneId = 101;
+
+	initializeGlobals();
+
+	if (_loadGameSlot >= 0)
+		// User selected to resume a savegame
+		return;
 
 	// Check copy protection
 	ProtectionResult protectionResult = checkCopyProtection();
+
 	switch (protectionResult) {
 	case PROTECTION_FAIL:
 		// Copy protection failed
 		_scene._nextSceneId = 804;
-		initializeGlobals();
 		_globals[kCopyProtectFailed] = true;
 		return;
 	case PROTECTION_ESCAPE:
@@ -80,21 +139,6 @@ void GameNebular::startGame() {
 		// Copy protection check succeeded
 		break;
 	}
-
-	initSection(_sectionNumber);
-	_statusFlag = true;
-
-	_vm->_dialogs->_pendingDialog = DIALOG_DIFFICULTY;
-	_vm->_dialogs->showDialog();
-	_vm->_dialogs->_pendingDialog = DIALOG_NONE;
-
-	_priorSectionNumber = 0;
-	_priorSectionNumber = -1;
-	_scene._priorSceneId = 0;
-	_scene._currentSceneId = -1;
-	_scene._nextSceneId = 101;
-
-	initializeGlobals();
 }
 
 void GameNebular::initializeGlobals() {
@@ -244,10 +288,12 @@ void GameNebular::initializeGlobals() {
 	// Final setup based on selected difficulty level
 	switch (_difficulty) {
 	case DIFFICULTY_HARD:
-		_objects.setRoom(OBJ_PLANT_STALK, NOWHERE);
-		_objects.setRoom(OBJ_PENLIGHT, NOWHERE);
+		_objects.setRoom(OBJ_BLOWGUN, NOWHERE);
+		_objects.setRoom(OBJ_NOTE, NOWHERE);
 
-		_globals[kLeavesStatus] = LEAVES_ON_TRAP;
+		_globals[kLeavesStatus] = LEAVES_ON_GROUND;
+		_globals[kDurafailRecharged] = 0;
+		_globals[kPenlightCellStatus] = FIRST_TIME_UNCHARGED_DURAFAIL;
 		break;
 
 	case DIFFICULTY_MEDIUM:
@@ -259,12 +305,10 @@ void GameNebular::initializeGlobals() {
 		break;
 
 	case DIFFICULTY_EASY:
-		_objects.setRoom(OBJ_BLOWGUN, NOWHERE);
-		_objects.setRoom(OBJ_NOTE, NOWHERE);
+		_objects.setRoom(OBJ_PLANT_STALK, NOWHERE);
+		_objects.setRoom(OBJ_PENLIGHT, NOWHERE);
 
-		_globals[kLeavesStatus] = LEAVES_ON_GROUND;
-		_globals[kPenlightCellStatus] = FIRST_TIME_UNCHARGED_DURAFAIL;
-		_globals[kDurafailRecharged] = 0;
+		_globals[kLeavesStatus] = LEAVES_ON_TRAP;
 		break;
 	}
 
@@ -309,7 +353,9 @@ void GameNebular::setSectionHandler() {
 }
 
 void GameNebular::checkShowDialog() {
-	if (_vm->_dialogs->_pendingDialog && _player._stepEnabled && !_globals[kCopyProtectFailed]) {
+	// Loop for showing dialogs, if any need to be shown
+	if (_vm->_dialogs->_pendingDialog && (_player._stepEnabled || _winStatus)
+			&& !_globals[kCopyProtectFailed]) {
 		_player.releasePlayerSprites();
 
 		// Make a thumbnail in case it's needed for making a savegame
@@ -428,7 +474,7 @@ void GameNebular::doObjectAction() {
 		dialogs.show(464);
 	} else if (action.isAction(VERB_REFLECT)) {
 		dialogs.show(466);
-	} 	else if (action.isAction(VERB_GAZE_INTO, NOUN_REARVIEW_MIRROR)) {
+	} else if (action.isAction(VERB_GAZE_INTO, NOUN_REARVIEW_MIRROR)) {
 		dialogs.show(467);
 	} else if (action.isAction(VERB_EAT, NOUN_CHICKEN_BOMB)) {
 		dialogs.show(469);
@@ -599,7 +645,7 @@ void GameNebular::doObjectAction() {
 			_objects.addToInventory(OBJ_DURAFAIL_CELLS);
 			if (_difficulty == DIFFICULTY_HARD) {
 				dialogs.showItem(OBJ_DURAFAIL_CELLS, 416);
-			} 
+			}
 			_globals[kHandsetCellStatus] = 0;
 			break;
 		case 3:
@@ -647,8 +693,6 @@ void GameNebular::doObjectAction() {
 			_globals[kHandsetCellStatus] = _difficulty != DIFFICULTY_HARD || _globals[kHandsetCellStatus] ? 1 : 2;
 			dialogs.show(425);
 		}
-	} else if (action.isAction(VERB_SET, NOUN_TIMEBOMB)) {
-		dialogs.show(427);
 	} else if (action.isAction(VERB_PUT, NOUN_BOMB, NOUN_CHICKEN) || action.isAction(VERB_PUT, NOUN_BOMBS, NOUN_CHICKEN)) {
 		_objects.setRoom(OBJ_CHICKEN, NOWHERE);
 		if (_objects.isInInventory(OBJ_BOMBS)) {
@@ -782,9 +826,9 @@ void GameNebular::unhandledAction() {
 void GameNebular::step() {
 	if (_player._visible && _player._stepEnabled && !_player._moving &&
 		(_player._facing == _player._turnToFacing)) {
-		if (_scene._frameStartTime >= *((uint32 *)&_globals[kWalkerTiming])) {
-			if (!_player._stopWalkerIndex) {
-				int randomVal = _vm->getRandomNumber(29999);;
+		if (_scene._frameStartTime >= (uint32)_globals[kWalkerTiming]) {
+			if (_player._stopWalkers.empty()) {
+				int randomVal = _vm->getRandomNumber(29999);
 				if (_globals[kSexOfRex] == REX_MALE) {
 					switch (_player._facing) {
 					case FACING_SOUTHWEST:
@@ -831,19 +875,19 @@ void GameNebular::step() {
 				}
 			}
 
-			*((uint32 *)&_globals[kWalkerTiming]) += 6;
+			_globals[kWalkerTiming] += 6;
 		}
 	}
 
 	// Below is countdown to set the timebomb off in room 604
 	if (_globals[kTimebombStatus] == TIMEBOMB_ACTIVATED) {
-		int diff = _scene._frameStartTime - *((uint32 *)&_globals[kTimebombClock]);
-		if ((diff >= 0) && (diff <= 60)) {
-			*((uint32 *)&_globals[kTimebombTimer]) += diff;
-		} else {
-			++*((uint32 *)&_globals[kTimebombTimer]);
-		}
-		*((uint32 *)&_globals[kTimebombClock]) = _scene._frameStartTime;
+		int diff = _scene._frameStartTime - _globals[kTimebombClock];
+		if ((diff >= 0) && (diff <= 60))
+			_globals[kTimebombTimer] += diff;
+		else
+			++_globals[kTimebombTimer];
+
+		_globals[kTimebombClock] = (int) _scene._frameStartTime;
 	}
 }
 

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -34,10 +34,12 @@
 namespace MADS {
 
 enum AnimFlag {
-	ANIMFLAG_DITHER				= 0x0001,	// Dither to 16 colors
-	ANIMFLAG_CUSTOM_FONT		= 0x0020,	// Load ccustom font
-	ANIMFLAG_LOAD_BACKGROUND	= 0x0100,	// Load background
-	ANIMFLAG_LOAD_BACKGROUND_ONLY = 0x0200	// Load background only
+	ANIMFLAG_LOAD_BACKGROUND	  = 0x0100,	// Load background
+	ANIMFLAG_LOAD_BACKGROUND_ONLY = 0x0200,	// Load background only
+
+	ANIMFLAG_DITHER				  = 0x0001,	// Dither to 16 colors
+	ANIMFLAG_CUSTOM_FONT		  = 0x2000,	// Load custom fonts
+	ANIMFLAG_ANIMVIEW			  = 0x4000	// Cutscene animation
 };
 
 enum AnimBgType {
@@ -82,7 +84,7 @@ public:
 	int _msgIndex;
 	int _numTicks;
 	Common::Point _posAdjust;
-	int _field8;
+	Common::Point _scroll;
 
 	/**
 	* Loads data for the record
@@ -116,14 +118,15 @@ public:
 	int _miscEntriesCount;
 	int _frameEntriesCount;
 	int _messagesCount;
-	byte _flags;
+	int _loadFlags;
+	int _charSpacing;
 	AnimBgType _bgType;
 	int _roomNumber;
 	bool _manualFlag;
 	int _spritesIndex;
 	Common::Point _scrollPosition;
 	uint32 _scrollTicks;
-	Common::String _interfaceFile;
+	Common::String _backgroundFile;
 	Common::StringArray _spriteSetNames;
 	Common::String _lbmFilename;
 	Common::String _spritesFilename;
@@ -154,6 +157,9 @@ private:
 	uint32 _nextScrollTimer;
 	int _messageCtr;
 	int _trigger;
+	int _flags;
+	int _rgbResult;
+	int _palIndex1, _palIndex2;
 	TriggerMode _triggerMode;
 	ActionDetails _actionDetails;
 
@@ -166,9 +172,9 @@ private:
 	bool drawFrame(SpriteAsset &spriteSet, const Common::Point &pt, int frameNumber);
 
 	/**
-	 * Load the user interface display for an animation
+	 * Load the user interface display or background for an animation
 	 */
-	void loadInterface(UserInterface &interfaceSurface, DepthSurface &depthSurface,
+	void loadBackground(MSurface &backSurface, DepthSurface &depthSurface,
 		AAHeader &header, int flags, Common::Array<PaletteCycle> *palCycles, SceneInfo *sceneInfo);
 
 	/**
@@ -184,8 +190,10 @@ public:
 	Common::Array<AnimUIEntry> _uiEntries;
 	Common::Array<AnimMessage> _messages;
 	bool _resetFlag;
+	bool _canChangeView;
 	int _currentFrame;
 	int _oldFrameEntry;
+	int _dynamicHotspotIndex;
 
 	static Animation *init(MADSEngine *vm, Scene *scene);
 	/*
@@ -196,7 +204,7 @@ public:
 	/**
 	 * Loads animation data
 	 */
-	void load(UserInterface &interfaceSurface, DepthSurface &depthSurface, const Common::String &resName,
+	void load(MSurface &backSurface, DepthSurface &depthSurface, const Common::String &resName,
 		int flags, Common::Array<PaletteCycle> *palCycles, SceneInfo *sceneInfo);
 
 	/**
@@ -214,8 +222,13 @@ public:
 	 */
 	void update();
 
-	void setNextFrameTimer(int frameNumber);
-	int getNextFrameTimer() const { return _nextFrameTimer; }
+	/**
+	 * Erases any sprites from the previous animation frame
+	 */
+	void eraseSprites();
+
+	void setNextFrameTimer(uint32 newTimer);
+	uint32 getNextFrameTimer() const { return _nextFrameTimer; }
 	void setCurrentFrame(int frameNumber);
 	int getCurrentFrame() const { return _currentFrame; }
 
@@ -223,6 +236,10 @@ public:
 	int roomNumber() const { return _header._roomNumber; }
 
 	void resetSpriteSetsCount() { _header._spriteSetsCount = 0; } // CHECKME: See if it doesn't leak the memory when the destructor is called
+
+	SpriteAsset *getSpriteSet(int idx) { return _spriteSets[idx]; }
+
+	Common::Point getFramePosAdjust(int idx);
 };
 
 } // End of namespace MADS

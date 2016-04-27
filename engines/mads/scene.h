@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -40,6 +40,8 @@
 
 namespace MADS {
 
+enum { RETURNING_FROM_DIALOG = -2, RETURNING_FROM_LOADING = -1 };
+
 class Scene {
 private:
 	/**
@@ -51,11 +53,6 @@ private:
 	 * Secondary loading vocab list
 	 */
 	void loadVocabStrings();
-
-	/*
-	 * Initializes the data for palette animation within the scene
-	 */
-	void initPaletteAnimation(Common::Array<PaletteCycle> &palCycles, bool animFlag);
 
 	/**
 	 * Handles a single frame within the game scene
@@ -114,7 +111,7 @@ public:
 	Common::Array<PaletteCycle> _paletteCycles;
 	Common::StringArray _vocabStrings;
 	Animation *_animationData;
-	Animation *_activeAnimation;
+	Animation *_animation[10];
 	bool _freeAnimationFlag;
 	int _depthStyle;
 	int _bandsRange;
@@ -126,12 +123,11 @@ public:
 	bool _reloadSceneFlag;
 	Common::Point _posAdjust;
 	uint32 _frameStartTime;
-	Layer _layer;
+	ScreenMode _mode;
 	bool _lookFlag;
 	Common::Point _customDest;
 	Common::Array<PaletteUsage::UsageEntry> _paletteUsageF;
 	Common::Array<PaletteUsage::UsageEntry> _scenePaletteUsage;
-
 	/**
 	 * Constructor
 	 */
@@ -141,6 +137,8 @@ public:
 	 * Destructor
 	 */
 	~Scene();
+
+	void restrictScene();
 
 	/**
 	 * Clear the vocabulary list
@@ -202,6 +200,11 @@ public:
 	 */
 	void drawElements(ScreenTransition transitionType, bool surfaceFlag);
 
+	/*
+	* Initializes the data for palette animation within the scene
+	*/
+	void initPaletteAnimation(Common::Array<PaletteCycle> &palCycles, bool animFlag);
+
 	/**
 	* Handles cycling palette colors for the scene
 	*/
@@ -210,7 +213,7 @@ public:
 	/**
 	 * Load an animation
 	 */
-	void loadAnimation(const Common::String &resName, int trigger = 0);
+	int loadAnimation(const Common::String &resName, int trigger = 0);
 
 	/**
 	 * Returns a vocab entry
@@ -241,9 +244,28 @@ public:
 	void freeAnimation();
 
 	/**
+	 * Frees any given active animation for the scene
+	 */
+	void freeAnimation(int idx);
+
+	/**
 	* Synchronize the game
 	*/
 	void synchronize(Common::Serializer &s);
+
+	void setAnimFrame(int id, int val);
+	int getAnimFrame(int id);
+
+	void setDynamicAnim(int id, int anim_id, int segment);
+	void setCamera(Common::Point pos);
+	void drawToBackground(int spriteId, int frameId, Common::Point pos, int depth, int scale);
+	void deleteSequence(int idx);
+	void loadSpeech(int idx);
+	void playSpeech(int idx);
+	void sceneScale(int yFront, int maxScale, int yBack,  int minScale);
+	void animations_tick();
+
+	int _speechReady;
 };
 
 } // End of namespace MADS

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -140,7 +140,6 @@ private:
 	bool _scrollFlag;
 	int _noSegmentsActive;
 	int _someSegmentsActive;
-	ScrollbarActive _scrollbarStrokeType;
 
 	/**
 	 * Loads the elements of the user interface
@@ -192,8 +191,6 @@ private:
 	 */
 	void writeVocab(ScrCategory category, int id);
 
-	void refresh();
-
 	void updateRect(const Common::Rect &bounds);
 public:
 	MSurface _surface;
@@ -216,6 +213,7 @@ public:
 	bool _scrollbarQuickly;
 	uint32 _scrollbarMilliTime;
 	int _scrollbarElevator, _scrollbarOldElevator;
+	ScrollbarActive _scrollbarStrokeType;
 public:
 	/**
 	* Constructor
@@ -225,7 +223,7 @@ public:
 	/**
 	* Loads an interface from a specified resource
 	*/
-	void load(const Common::String &resName);
+	virtual void load(const Common::String &resName);
 
 	/**
 	* Set up the interface
@@ -275,6 +273,11 @@ public:
 
 	void updateSelection(ScrCategory category, int newIndex, int *idx);
 
+	/**
+	* Updates the current top visible item of the scrollbar
+	*/
+	void changeScrollBar();
+
 	void scrollerChanged();
 
 	void scrollInventory();
@@ -299,6 +302,8 @@ public:
 	 * Synchronize the data
 	 */
 	void synchronize(Common::Serializer &s);
+
+	void refresh();
 };
 
 } // End of namespace MADS

@@ -63,6 +63,10 @@ class SoundMan;
 #define BBVS_SAVEGAME_VERSION 0
 
 enum {
+	GF_GUILANGSWITCH =    (1 << 0) // If GUI language switch is required for menus
+};
+
+enum {
 	kVerbLook      = 0,
 	kVerbUse       = 1,
 	kVerbTalk      = 2,
@@ -149,7 +153,7 @@ struct BBPoint {
 
 struct BBRect {
 	int16 x, y, width, height;
-}; 
+};
 
 struct BBPolygon {
 	const BBPoint *points;
@@ -226,69 +230,75 @@ public:
 	void continueGameFromQuickSave();
 	void setNewSceneNum(int newSceneNum);
 	const Common::String getTargetName() { return _targetName; }
-private:
 	const ADGameDescription *_gameDescription;
+
+private:
 	Graphics::PixelFormat _pixelFormat;
-public:	
+
+#ifdef USE_TRANSLATION
+	Common::String _oldGUILanguage;
+#endif
+
+public:
 	Common::RandomSource *_random;
-	
+
 	GameModule *_gameModule;
 	SpriteModule *_spriteModule;
 	SoundMan *_sound;
-	
+
 	Screen *_screen;
-	
+
 	int _bootSaveSlot;
-	
+
 	int _mouseX, _mouseY;
 	uint _mouseButtons;
 	Common::KeyCode _keyCode;
-	
+
 	int _mouseCursorSpriteIndex;
 
 	int _gameState;
 	int _gameTicks;
-	
+
 	Common::Point _mousePos;
 	Common::Point _verbPos;
 	Common::Point _walkMousePos;
-	
+
 	int _activeItemType;
 	int _activeItemIndex;
 	int _currTalkObjectIndex;
-	
+
 	Common::Point _cameraPos, _newCameraPos;
-	
+
 	int _newSceneNum, _prevSceneNum, _currSceneNum;
 	int _playVideoNumber;
-	
+
 	int _dialogSlotCount;
 	byte _dialogItemStatus[kDialogItemStatusCount];
-	
+
 	byte _gameVars[kGameVarsCount];
 	byte _sceneVisited[kSceneVisitedCount];
 
 	int _currVerbNum;
-	
+
 	int _currInventoryItem;
 	byte _inventoryItemStatus[kInventoryItemStatusCount];
 	int _inventoryButtonIndex;
-	
+
 	Action *_currAction;
 	uint32 _currActionCommandTimeStamp;
 	int _currActionCommandIndex;
-	
+
 	Common::Array<Action*> _walkAreaActions;
-	
+
 	SceneObject _sceneObjects[kSceneObjectsCount];
 	Common::Array<SceneObjectAction> _sceneObjectActions;
-	
+
 	SceneObject *_buttheadObject, *_beavisObject;
 	int _currCameraNum;
-	
+
 	byte _backgroundSoundsActive[kSceneSoundsCount];
 	Audio::SoundHandle _speechSoundHandle;
-	
+
 	int _walkAreasCount;
 	WalkArea _walkAreas[80];
 	int _walkInfosCount;
@@ -298,40 +308,40 @@ public:
 	Common::Rect _tempWalkableRects1[256];
 	Common::Rect _tempWalkableRects2[256];
 	WalkInfo *_walkInfoPtrs[256];
-	
+
 	WalkArea *_sourceWalkArea, *_destWalkArea;
 	Common::Point _sourceWalkAreaPt, _destWalkAreaPt, _finalWalkPt;
 	int _currWalkDistance;
 	bool _walkReachedDestArea;
-	
+
 	bool _hasSnapshot;
 	byte *_snapshot;
 	Common::SeekableMemoryWriteStream *_snapshotStream;
-	
+
 	char _easterEggInput[7];
-	
+
 	void updateEvents();
 	int getRandom(int max);
 
 	void drawDebugInfo();
 	void drawScreen();
-	
+
 	void updateGame();
 
 	bool evalCondition(Conditions &conditions);
 	bool evalCameraCondition(Conditions &conditions, int value);
 	int evalDialogCondition(Conditions &conditions);
 	void evalActionResults(ActionResults &results);
-	
+
 	void updateBackgroundSounds();
 
 	void loadScene(int sceneNum);
 	void initScene(bool sounds);
-	bool changeScene();	
+	bool changeScene();
 	bool update(int mouseX, int mouseY, uint mouseButtons, Common::KeyCode keyCode);
-	
+
 	void buildDrawList(DrawList &drawList);
-	
+
 	void updateVerbs();
 	void updateDialog(bool clicked);
 	void updateInventory(bool clicked);
@@ -342,7 +352,7 @@ public:
 	void skipCurrAction();
 
 	void updateCommon();
-	
+
 	void updateWalkableRects();
 	void startWalkObject(SceneObject *sceneObject);
 	void updateWalkObject(SceneObject *sceneObject);
@@ -360,20 +370,20 @@ public:
 	void walkFindPath(WalkArea *sourceWalkArea, int infoCount);
 	int calcDistance(const Common::Point &pt1, const Common::Point &pt2);
 	void walkFoundPath(int count);
-	
+
 	void updateSceneObjectsTurnValue();
 	void updateDialogConditions();
-	
-	void playSpeech(int soundNum);	
+
+	void playSpeech(int soundNum);
 	void stopSpeech();
-	
+
 	void playSound(uint soundNum, bool loop = false);
 	void stopSound(uint soundNum);
 	void stopSounds();
-	
+
 	bool runMinigame(int minigameNum);
 	void playVideo(int videoNum);
-	
+
 	void runMainMenu();
 	void checkEasterEgg(char key);
 
@@ -409,13 +419,13 @@ public:
 	bool existsSavegame(int num);
 	static Common::String getSavegameFilename(const Common::String &target, int num);
 	static kReadSaveHeaderError readSaveHeader(Common::SeekableReadStream *in, bool loadThumbnail, SaveHeader &header);
-	
+
 	void allocSnapshot();
 	void freeSnapshot();
 	void saveSnapshot();
-	
+
 	void writeContinueSavegame();
-	
+
 };
 
 } // End of namespace Bbvs

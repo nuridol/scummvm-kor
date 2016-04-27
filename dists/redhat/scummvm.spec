@@ -7,7 +7,7 @@
 #   Prologue information
 #------------------------------------------------------------------------------
 Name		: scummvm
-Version		: 1.7.0
+Version		: 1.8.0
 Release		: 1
 Summary		: Graphic adventure game interpreter
 Group		: Interpreters
@@ -79,6 +79,9 @@ install -m644 -D dists/engine-data/hugo.dat %{buildroot}%{_datadir}/scummvm/hugo
 install -m644 -D dists/engine-data/tony.dat %{buildroot}%{_datadir}/scummvm/tony.dat
 install -m644 -D dists/engine-data/toon.dat %{buildroot}%{_datadir}/scummvm/toon.dat
 install -m644 -D dists/engine-data/wintermute.zip %{buildroot}%{_datadir}/scummvm/wintermute.zip
+install -m644 -D dists/engine-data/neverhood.dat %{buildroot}%{_datadir}/scummvm/neverhood.dat
+install -m644 -D dists/engine-data/mort.dat %{buildroot}%{_datadir}/scummvm/mort.dat
+install -m644 -D dists/engine-data/access.dat %{buildroot}%{_datadir}/scummvm/access.dat
 desktop-file-install --vendor scummvm --dir=%{buildroot}/%{_datadir}/applications dists/scummvm.desktop
 
 %clean
@@ -120,6 +123,9 @@ fi
 %{_datadir}/scummvm/tony.dat
 %{_datadir}/scummvm/toon.dat
 %{_datadir}/scummvm/wintermute.zip
+%{_datadir}/scummvm/neverhood.dat
+%{_datadir}/scummvm/mort.dat
+%{_datadir}/scummvm/access.dat
 %{_mandir}/man6/scummvm.6*
 
 #------------------------------------------------------------------------------

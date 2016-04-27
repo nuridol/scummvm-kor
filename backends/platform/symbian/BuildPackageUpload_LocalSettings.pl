@@ -1,35 +1,34 @@
 
 ##################################################################################################################
+####	sword25 ignored because of incompatible resolution 800*600
 
 	@WorkingEngines = qw(
-		agos agi cine cge composer cruise draci
-		drascula hugo gob groovie kyra
-		lure made mohawk parallaction pegasus queen
-		saga sci scumm sky sword1 sword2 teenagent tinsel
-		toltecs tony toon touche tsage tucker wintermute
-		dreamweb hopkins mortevielle
-		neverhood voyeur
+		access agi agos avalanche bbvs cge cge2
+		cine composer cruise draci drascula
+		dreamweb fullpipe gob groovie hopkins
+		hugo kyra lastexpress lure made mads
+		mohawk mortevielle neverhood parallaction
+		pegasus prince queen saga sci scumm
+		sherlock sky sword1 sword2 teenagent
+		testbed tinsel toltecs tony toon touche
+		tsage tucker voyeur wintermute zvision
 	);
-#### New engines
-####		sword25
 
 	@WorkingEngines_1st = qw(
-		cine composer cruise 
-		drascula groovie
-		lure made mohawk parallaction pegasus queen
-		saga scumm 
-		toltecs tony toon touche tucker wintermute
-		neverhood voyeur
+		access agi agos cge2 cine composer cruise
+		drascula gob groovie kyra lastexpress made
+		neverhood parallaction queen saga scumm
+		touche tucker voyeur wintermute
 	);
 
 	@WorkingEngines_2nd = qw(
-		agos agi cge draci
-		hugo gob kyra
-		sci sky sword1 sword2 teenagent tinsel
-		tsage
-		dreamweb hopkins mortevielle
+		avalanche bbvs cge draci dreamweb fullpipe
+		hopkins hugo lure mads mohawk mortevielle
+		pegasus prince sci sherlock sky sword1 sword2
+		teenagent testbed tinsel toltecs tony toon
+		tsage zvision
 	);
-####		sword25
+####	sword25 yet not added
 
 	@TestingEngines = qw(
 
@@ -326,8 +325,8 @@
 	{
 		# the first one includes all SDKs & release-ready engines
 
-			$VariationSets{'ALL'}{'all'} = "$DefaultFeatures @WorkingEngines @EnablableSubEngines";
-			#$VariationSets{'ALL'}{'split'} = "$DefaultFeatures @WorkingEngines @EnablableSubEngines";
+			# $VariationSets{'ALL'}{'all'} = "$DefaultFeatures @WorkingEngines @EnablableSubEngines";
+			$VariationSets{'ALL'}{'split'} = "$DefaultFeatures @WorkingEngines @EnablableSubEngines";
 			# $VariationSets{'ALL'}{'1St'} = "$DefaultFeatures @WorkingEngines_1st @EnablableSubEngines";
 			# $VariationSets{'ALL'}{'2nd'} = "$DefaultFeatures @WorkingEngines_2nd @EnablableSubEngines";
 		# now one for each ready-for-release engine

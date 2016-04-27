@@ -23,7 +23,7 @@
 #include "common/algorithm.h"
 #include "common/events.h"
 #include "common/keyboard.h"
-#include "common/list_intern.h"
+#include "common/list.h"
 #include "common/str.h"
 #include "common/system.h"
 #include "common/textconsole.h"
@@ -44,7 +44,7 @@
 #include "sci/graphics/view.h"
 #include "sci/graphics/screen.h"
 #include "sci/graphics/paint32.h"
-#include "sci/graphics/palette.h"
+#include "sci/graphics/palette32.h"
 #include "sci/graphics/picture.h"
 #include "sci/graphics/text32.h"
 #include "sci/graphics/frameout.h"
@@ -59,13 +59,20 @@ enum SciSpeciaPlanelPictureCodes {
 	kPlanePlainColored = 0xffff		// -1
 };
 
-GfxFrameout::GfxFrameout(SegManager *segMan, ResourceManager *resMan, GfxCoordAdjuster *coordAdjuster, GfxCache *cache, GfxScreen *screen, GfxPalette *palette, GfxPaint32 *paint32)
-	: _segMan(segMan), _resMan(resMan), _cache(cache), _screen(screen), _palette(palette), _paint32(paint32) {
+GfxFrameout::GfxFrameout(SegManager *segMan, ResourceManager *resMan, GfxCoordAdjuster *coordAdjuster, GfxCache *cache, GfxScreen *screen, GfxPalette32 *palette, GfxPaint32 *paint32)
+	: _segMan(segMan), _resMan(resMan), _cache(cache), _screen(screen), _palette(palette), _paint32(paint32), _isHiRes(false) {
 
 	_coordAdjuster = (GfxCoordAdjuster32 *)coordAdjuster;
 	_curScrollText = -1;
 	_showScrollText = false;
 	_maxScrollTexts = 0;
+
+	// TODO: Make hires detection work uniformly across all SCI engine
+	// versions (this flag is normally passed by SCI::MakeGraphicsMgr
+	// to the GraphicsMgr constructor depending upon video configuration)
+	if (getSciVersion() >= SCI_VERSION_2_1_EARLY && _resMan->detectHires()) {
+		_isHiRes = true;
+	}
 }
 
 GfxFrameout::~GfxFrameout() {
@@ -524,6 +531,10 @@ void GfxFrameout::showVideo() {
 	RobotDecoder *videoDecoder = g_sci->_robotDecoder;
 	uint16 x = videoDecoder->getPos().x;
 	uint16 y = videoDecoder->getPos().y;
+	uint16 screenWidth = _screen->getWidth();
+	uint16 screenHeight = _screen->getHeight();
+	uint16 outputWidth;
+	uint16 outputHeight;
 
 	if (videoDecoder->hasDirtyPalette())
 		g_system->getPaletteManager()->setPalette(videoDecoder->getPalette(), 0, 256);
@@ -532,7 +543,11 @@ void GfxFrameout::showVideo() {
 		if (videoDecoder->needsUpdate()) {
 			const Graphics::Surface *frame = videoDecoder->decodeNextFrame();
 			if (frame) {
-				g_system->copyRectToScreen(frame->getPixels(), frame->pitch, x, y, frame->w, frame->h);
+				// We need to clip here
+				//  At least Phantasmagoria shows a 640x390 video on a 630x450 screen during the intro
+				outputWidth = frame->w > screenWidth ? screenWidth : frame->w;
+				outputHeight = frame->h > screenHeight ? screenHeight : frame->h;
+				g_system->copyRectToScreen(frame->getPixels(), frame->pitch, x, y, outputWidth, outputHeight);
 
 				if (videoDecoder->hasDirtyPalette())
 					g_system->getPaletteManager()->setPalette(videoDecoder->getPalette(), 0, 256);
@@ -643,13 +658,108 @@ void GfxFrameout::drawPicture(FrameoutEntry *itemEntry, int16 planeOffsetX, int1
 	//	warning("picture cel %d %d", itemEntry->celNo, itemEntry->priority);
 }
 
+/* TODO: This is the proper implementation of GraphicsMgr::FrameOut transcribed from SQ6 SCI engine disassembly.
+static DrawList* g_drawLists[100];
+static RectList* g_rectLists[100];
+void GfxFrameout::FrameOut(bool shouldShowBits, SOL_Rect *rect) {
+	if (robot) {
+		robot.doRobot();
+	}
+
+	auto planeCount = screen.planeList.planeCount;
+	if (planeCount > 0) {
+		for (int planeIndex = 0; planeIndex < planeCount; ++planeIndex) {
+			Plane plane = *screen.planeList[planeIndex];
+
+			DrawList* drawList = new DrawList();
+			g_drawLists[planeIndex] = drawList;
+			RectList* rectList = new RectList();
+			g_rectLists[planeIndex] = rectList;
+		}
+	}
+ 
+	if (g_Remap_numActiveRemaps > 0 && remapNeeded) {
+		screen.RemapMarkRedraw();
+	}
+ 
+	CalcLists(&g_drawLists, &g_rectLists, rect);
+
+	// SCI engine stores reference *after* CalcLists
+	planeCount = screen.planeList.planeCount;
+	if (planeCount > 0) {
+		for (int drawListIndex = 0; drawListIndex < planeCount; ++i) {
+			DrawList* drawList = g_drawLists[drawListIndex];
+			drawList->Sort();
+		}
+
+		for (int drawListIndex = 0; drawListIndex < planeCount; ++i) {
+			DrawList* drawList = g_drawLists[drawListIndex];
+			if (drawList == nullptr || drawList->count == 0) {
+				continue;
+			}
+
+			for (int screenItemIndex = 0, screenItemCount = drawList->count; screenItemIndex < screenItemCount; ++screenItemIndex) {
+				ScreenItem* screenItem = drawList->items[screenItemIndex];
+				screenItem->GetCelObj()->SubmitPalette();
+			}
+		}
+	}
+
+	// UpdateForFrame is where all palette mutations occur (cycles, varies, etc.)
+	bool remapNeeded = GPalette().UpdateForFrame();
+	if (planeCount > 0) {
+		frameNowVisible = false;
+
+		for (int planeIndex = 0; planeIndex < planeCount; ++planeIndex) {
+			Plane* plane = screen.planeList[planeIndex];
+
+			DrawEraseList(g_rectLists[planeIndex], plane);
+			DrawScreenItemsList(g_drawLists[planeIndex]);
+		}
+	}
+
+	if (robot) {
+		robot.FrameAlmostVisible();
+	}
+
+	GPalette().UpdateHardware();
+
+	if (shouldShowBits) {
+		ShowBits();
+	}
+
+	frameNowVisible = true;
+
+	if (robot) {
+		robot.FrameNowVisible();
+	}
+
+	if (planeCount > 0) {
+		for (int planeIndex = 0; planeIndex < planeCount; ++planeIndex) {
+			if (g_rectLists[planeIndex] != nullptr) {
+				delete g_rectLists[planeIndex];
+			}
+			if (g_drawLists[planeIndex] != nullptr) {
+				delete g_drawLists[planeIndex];
+			}
+		}
+	}
+}
+void GfxFrameout::CalcLists(DrawList **drawLists, RectList **rectLists, SOL_Rect *rect) {
+	screen.CalcLists(&visibleScreen, drawLists, rectLists, rect);
+}
+*/
 void GfxFrameout::kernelFrameout() {
 	if (g_sci->_robotDecoder->isVideoLoaded()) {
 		showVideo();
 		return;
 	}
 
-	_palette->palVaryUpdate();
+	_palette->updateForFrame();
+
+	// TODO: Tons of drawing stuff should be here, see commented out implementation above
+
+	_palette->updateHardware();
 
 	for (PlaneList::iterator it = _planes.begin(); it != _planes.end(); it++) {
 		reg_t planeObject = it->object;
@@ -719,7 +829,7 @@ void GfxFrameout::kernelFrameout() {
 				if (view && view->isSci2Hires()) {
 					view->adjustToUpscaledCoordinates(itemEntry->y, itemEntry->x);
 					view->adjustToUpscaledCoordinates(itemEntry->z, dummyX);
-				} else if (getSciVersion() >= SCI_VERSION_2_1) {
+				} else if (getSciVersion() >= SCI_VERSION_2_1_EARLY) {
 					_coordAdjuster->fromScriptToDisplay(itemEntry->y, itemEntry->x);
 					_coordAdjuster->fromScriptToDisplay(itemEntry->z, dummyX);
 				}
@@ -774,7 +884,7 @@ void GfxFrameout::kernelFrameout() {
 						view->adjustBackUpscaledCoordinates(nsRect.top, nsRect.left);
 						view->adjustBackUpscaledCoordinates(nsRect.bottom, nsRect.right);
 						g_sci->_gfxCompare->setNSRect(itemEntry->object, nsRect);
-					} else if (getSciVersion() >= SCI_VERSION_2_1 && _resMan->detectHires()) {
+					} else if (getSciVersion() >= SCI_VERSION_2_1_EARLY && _isHiRes) {
 						_coordAdjuster->fromDisplayToScript(nsRect.top, nsRect.left);
 						_coordAdjuster->fromDisplayToScript(nsRect.bottom, nsRect.right);
 						g_sci->_gfxCompare->setNSRect(itemEntry->object, nsRect);
@@ -782,11 +892,12 @@ void GfxFrameout::kernelFrameout() {
 
 					// TODO: For some reason, the top left nsRect coordinates get
 					// swapped in the GK1 inventory screen, investigate why.
-					// HACK: Fix the coordinates by explicitly setting them here.
-					Common::Rect objNSRect = g_sci->_gfxCompare->getNSRect(itemEntry->object);
-					if (objNSRect.top == nsRect.left && objNSRect.left == nsRect.top && nsRect.top != 0 && nsRect.left != 0) {
+					// This is also needed for GK1 rooms 710 and 720 (catacombs, inner and
+					// outer circle), for handling the tiles and talking to Wolfgang.
+					// HACK: Fix the coordinates by explicitly setting them here for GK1.
+					// Also check bug #6729, for another case where this is needed.
+					if (g_sci->getGameId() == GID_GK1)
 						g_sci->_gfxCompare->setNSRect(itemEntry->object, nsRect);
-					}
 				}
 
 				// Don't attempt to draw sprites that are outside the visible

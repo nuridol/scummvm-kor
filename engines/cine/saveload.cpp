@@ -543,6 +543,15 @@ bool CineEngine::loadTempSaveOS(Common::SeekableReadStream &in) {
 			loadRel(currentRelName);
 		}
 
+		// Reset background music in CD version of Future Wars
+		if (getGameType() == GType_FW && (getFeatures() & GF_CD)) {
+			if (strlen(bgNames[0])) {
+				char buffer[20];
+				removeExtention(buffer, bgNames[0]);
+				g_sound->setBgMusic(atoi(buffer + 1));
+			}
+		}
+
 		// Load first background (Uses loadBg)
 		if (strlen(bgNames[0])) {
 			loadBg(bgNames[0]);
@@ -960,7 +969,7 @@ void CineEngine::makeSaveOS(Common::OutSaveFile &out) {
 	saveBgIncrustList(out);
 }
 
-void CineEngine::makeSave(char *saveFileName) {
+void CineEngine::makeSave(const Common::String &saveFileName) {
 	Common::SharedPtr<Common::OutSaveFile> fHandle(_saveFileMan->openForSaving(saveFileName));
 
 	setMouseCursor(MOUSE_CURSOR_DISK);

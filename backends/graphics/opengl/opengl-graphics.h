@@ -131,7 +131,7 @@ protected:
 	 *
 	 * @param defaultFormat      The new default format for the game screen
 	 *                           (this is used for the CLUT8 game screens).
-	 * @param defaultFromatAlpha The new default format with an alpha channel
+	 * @param defaultFormatAlpha The new default format with an alpha channel
 	 *                           (this is used for the overlay and cursor).
 	 */
 	void notifyContextCreate(const Graphics::PixelFormat &defaultFormat, const Graphics::PixelFormat &defaultFormatAlpha);
@@ -155,7 +155,7 @@ protected:
 	 * @param x X coordinate in physical coordinates.
 	 * @param y Y coordinate in physical coordinates.
 	 */
-	void setMousePosition(int x, int y) { _cursorX = x; _cursorY = y; }
+	void setMousePosition(int x, int y);
 
 	/**
 	 * Query the mouse position in physical coordinates.
@@ -261,6 +261,11 @@ protected:
 	 * @return true on success, false otherwise
 	 */
 	virtual bool loadVideoMode(uint requestedWidth, uint requestedHeight, const Graphics::PixelFormat &format) = 0;
+
+	/**
+	 * Refresh the screen contents.
+	 */
+	virtual void refreshScreen() = 0;
 
 	/**
 	 * Save a screenshot of the full display as BMP to the given file. This
@@ -394,6 +399,16 @@ private:
 	int _cursorY;
 
 	/**
+	 * X coordinate used for drawing the cursor.
+	 */
+	int _cursorDisplayX;
+
+	/**
+	 * Y coordinate used for drawing the cursor.
+	 */
+	int _cursorDisplayY;
+
+	/**
 	 * The X offset for the cursor hotspot in unscaled coordinates.
 	 */
 	int _cursorHotspotX;
@@ -453,6 +468,20 @@ private:
 	 * The special cursor palette in case enabled.
 	 */
 	byte _cursorPalette[3 * 256];
+
+	//
+	// Misc
+	//
+
+	/**
+	 * Whether the screen contents shall be forced to redrawn.
+	 */
+	bool _forceRedraw;
+
+	/**
+	 * Number of frames glClear shall ignore scissor testing.
+	 */
+	uint _scissorOverride;
 
 #ifdef USE_OSD
 	//

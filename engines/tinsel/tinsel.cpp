@@ -528,8 +528,6 @@ void SetNewScene(SCNHANDLE scene, int entrance, int transition) {
  * Store a scene as hooked
  */
 void SetHookScene(SCNHANDLE scene, int entrance, int transition) {
-	assert(g_HookScene.scene == 0); // scene already hooked
-
 	g_HookScene.scene = scene;
 	g_HookScene.entry = entrance;
 	g_HookScene.trans = transition;
@@ -821,7 +819,8 @@ const char *const TinselEngine::_textFiles[][3] = {
 
 
 TinselEngine::TinselEngine(OSystem *syst, const TinselGameDescription *gameDesc) :
-		Engine(syst), _gameDescription(gameDesc), _random("tinsel") {
+		Engine(syst), _gameDescription(gameDesc), _random("tinsel"),
+		_console(0), _sound(0), _midiMusic(0), _pcmMusic(0), _bmv(0) {
 	_vm = this;
 
 	_config = new Config(this);
@@ -845,13 +844,6 @@ TinselEngine::TinselEngine(OSystem *syst, const TinselGameDescription *gameDesc)
 	int cd_num = ConfMan.getInt("cdrom");
 	if (cd_num >= 0)
 		_system->getAudioCDManager()->openCD(cd_num);
-
-	_midiMusic = new MidiMusicPlayer();
-	_pcmMusic = new PCMMusicPlayer();
-
-	_sound = new SoundManager(this);
-
-	_bmv = new BMVPlayer();
 
 	_mousePos.x = 0;
 	_mousePos.y = 0;
@@ -891,11 +883,19 @@ void TinselEngine::initializePath(const Common::FSNode &gamePath) {
 	} else {
 		// Add DW2 subfolder to search path in case user is running directly from the CDs
 		SearchMan.addSubDirectoryMatching(gamePath, "dw2");
+
+		// Location of Miles audio files (sample.ad and sample.opl) in Discworld 1
+		SearchMan.addSubDirectoryMatching(gamePath, "drivers");
 		Engine::initializePath(gamePath);
 	}
 }
 
 Common::Error TinselEngine::run() {
+	_midiMusic = new MidiMusicPlayer(this);
+	_pcmMusic = new PCMMusicPlayer();
+	_sound = new SoundManager(this);
+	_bmv = new BMVPlayer();
+
 	// Initialize backend
 	if (getGameID() == GID_DW2) {
 #ifndef DW2_EXACT_SIZE

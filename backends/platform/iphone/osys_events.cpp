@@ -26,7 +26,7 @@
 #include "gui/message.h"
 #include "common/translation.h"
 
-#include "osys_main.h"
+#include "backends/platform/iphone/osys_main.h"
 
 static const int kQueuedInputEventDelay = 50;
 
@@ -266,11 +266,8 @@ bool OSystem_IPHONE::handleEvent_mouseSecondDragged(Common::Event &event, int x,
 	if (_gestureStartX == -1 || _gestureStartY == -1) {
 		return false;
 	}
-#ifdef SCUMMVMKOR
-	static const int kNeededLength = 70;
-#else
+
 	static const int kNeededLength = 100;
-#endif
 	static const int kMaxDeviation = 20;
 
 	int vecX = (x - _gestureStartX);

@@ -37,8 +37,7 @@ namespace Saga {
 
 enum MusicFlags {
 	MUSIC_NORMAL = 0,
-	MUSIC_LOOP = 0x0001,
-	MUSIC_DEFAULT = 0xffff
+	MUSIC_LOOP = 0x0001
 };
 
 class MusicDriver : public Audio::MidiPlayer {
@@ -62,6 +61,7 @@ public:
 protected:
 	MusicType _driverType;
 	bool _isGM;
+	bool _milesAudioMode;
 };
 
 class Music {
@@ -72,13 +72,15 @@ public:
 	bool isPlaying();
 	bool hasDigitalMusic() { return _digitalMusic; }
 
-	void play(uint32 resourceId, MusicFlags flags = MUSIC_DEFAULT);
+	void play(uint32 resourceId, MusicFlags flags = MUSIC_NORMAL);
 	void pause();
 	void resume();
 	void stop();
 
 	void setVolume(int volume, int time = 1);
 	int getVolume() { return _currentVolume; }
+
+	bool isAdlib() const { return _player->isAdlib(); }
 
 	Common::Array<int32> _songTable;
 

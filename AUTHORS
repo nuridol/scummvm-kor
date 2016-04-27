@@ -49,8 +49,9 @@ ScummVM Team
        Stuart George
        Matthew Hoops
        Filippos Karapetis
+       Martin Kiewitz
        Pawel Kolodziejski
-       Walter van Niftrik           - (retired)
+       Walter van Niftrik
        Kari Salminen
        Eugene Sandulenko
        David Symonds                - (retired)
@@ -62,11 +63,23 @@ ScummVM Team
        Oliver Kiehl                 - (retired)
        Ludvig Strigeus              - (retired)
 
+    Access:
+       Arnaud Boutonne
+       Paul Gilbert
+
     Avalanche:
        Peter Bozso
        Arnaud Boutonne
 
+    BBVS:
+       Benjamin Haisch
+
     CGE:
+       Arnaud Boutonne
+       Paul Gilbert
+
+    CGE2:
+       Peter Bozso
        Arnaud Boutonne
        Paul Gilbert
 
@@ -184,10 +197,14 @@ ScummVM Team
        Max Horn                     - (retired)
        Filippos Karapetis
        Martin Kiewitz
-       Walter van Niftrik           - (retired)
+       Walter van Niftrik
        Willem Jan Palenstijn
        Jordi Vilalta Prat
        Lars Skovlund
+
+    Sherlock:
+       Paul Gilbert
+       Martin Kiewitz
 
     Sky:
        Robert Goeffringmann         - (retired)
@@ -252,9 +269,12 @@ ScummVM Team
 
     Wintermute:
        Einar Johan T. Somaaen
+       Tobia Tesan
 
-    ZVision:
+    Z-Vision:
        Adrian Astley
+       Filippos Karapetis
+       Anton Yarcev
 
   Backend Teams
   -------------
@@ -265,11 +285,15 @@ ScummVM Team
     Dreamcast:
        Marcus Comstedt
 
+    GCW0:
+       Eugene Sandulenko
+
     GPH Devices (GP2X, GP2XWiz & Caanoo):
        John Willis
 
-    iPhone:
+    iPhone / iPad:
        Oystein Eftevaag
+       Vincent Benony
 
     LinuxMoto:
        Lubomyr Lisen
@@ -318,6 +342,9 @@ ScummVM Team
 
     Wii:
        Andre Heider
+
+    Raspberry Pi:
+       Manuel Alfayate
 
   Other subsystems
   ----------------
@@ -463,6 +490,9 @@ Other contributions
     Danish:
        Steffen Nyeland
 
+    Dutch:
+       Ben Castricum
+
     Finnish:
        Toni Saarela
 
@@ -474,7 +504,7 @@ Other contributions
 
     German:
        Simon Sawatzki
-       Lothar Serra Mari            - (retired)
+       Lothar Serra Mari
 
     Hungarian:
        Alex Bevilacqua
@@ -515,6 +545,12 @@ Other contributions
        Victor Gonzalez              - Soltys Spanish translation
        Alejandro Gomez de la Munoza - Soltys Spanish translation
 
+    CGE2:
+       Arnaud Boutonne              - Sfinx English translation
+       Thierry Crozat               - Sfinx English translation
+       Peter Bozso                  - Sfinx English translation editor
+       Ryan Clark                   - Sfinx English translation editor
+
     Drascula:
        Thierry Crozat               - Improve French translation
 
@@ -548,6 +584,7 @@ Other contributions
      Jeroen Janssen               - Numerous readability and bugfix patches
      Keith Kaisershot             - Several Pegasus Prime patches
      Andreas Karlsson             - Initial port for SymbianOS
+     Stefan Kristiansson          - Initial work on SDL2 support
      Claudio Matsuoka             - Daily Linux builds
      Thomas Mayer                 - PSP port contributions
      Sean Murray                  - ScummVM tools GUI application (GSoC 2007
@@ -643,7 +680,7 @@ Special thanks to
                        repository, planet and doxygen sites as well as tons
                        of HD space
    DOSBox Team       - For their awesome OPL2 and OPL3 emulator
-   Yusuke Kamiyamane - For contributing some GUI icons 
+   Yusuke Kamiyamane - For contributing some GUI icons
    Till Kresslein    - For design of modern ScummVM GUI
    Jezar             - For his freeverb filter implementation
    Jim Leiterman     - Various info on his FM-TOWNS/Marty SCUMM ports
@@ -652,7 +689,7 @@ Special thanks to
    Jimmi Thogersen   - For ScummRev, and much obscure code/documentation
    Tristan           - For additional work on the original MT-32 emulator
    James Woodcock    - Soundtrack enhancements
-   Anton Yartsev     - For the original re-implementation of the ZVision
+   Anton Yartsev     - For the original re-implementation of the Z-Vision
                        engine
 
    Tony Warriner and everyone at Revolution Software Ltd. for sharing with us
@@ -692,12 +729,20 @@ Special thanks to
    of Dreamweb and for their tremendous support.
 
    Janusz Wisniewski and Miroslaw Liminowicz from Laboratorium Komputerowe
-   Avalon for providing full source code for Soltys and letting us
-   redistribute the game.
+   Avalon for providing full source code for Soltys and Sfinx and letting us
+   redistribute the games.
 
    Jan Nedoma for providing the sources to the Wintermute-engine, and for his
    support while porting the engine to ScummVM.
 
    Bob Bell, Michel Kripalani, Tommy Yune, from Presto Studios for providing
    the source code of The Journeyman Project: Pegasus Prime.
+
+   Electronic Arts IP Preservation Team, particularly Stefan Serbicki, and
+   Vasyl Tsvirkunov of Electronic Arts for providing the source code of the
+   two Lost Files of Sherlock Holmes games. James M. Ferguson and Barry
+   Duncan for their tenacious efforts to recover the sources.
+
+   The mindFactory team for writing Broken Sword 2.5, a splendid fan-made
+   sequel, and for sharing the source code with us.
 

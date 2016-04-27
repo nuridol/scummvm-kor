@@ -49,9 +49,10 @@ OpenGLGraphicsManager::OpenGLGraphicsManager()
       _displayWidth(0), _displayHeight(0), _defaultFormat(), _defaultFormatAlpha(),
       _gameScreen(nullptr), _gameScreenShakeOffset(0), _overlay(nullptr),
       _overlayVisible(false), _cursor(nullptr),
-      _cursorX(0), _cursorY(0), _cursorHotspotX(0), _cursorHotspotY(0), _cursorHotspotXScaled(0),
-      _cursorHotspotYScaled(0), _cursorWidthScaled(0), _cursorHeightScaled(0), _cursorKeyColor(0),
-      _cursorVisible(false), _cursorDontScale(false), _cursorPaletteEnabled(false)
+      _cursorX(0), _cursorY(0), _cursorDisplayX(0),_cursorDisplayY(0), _cursorHotspotX(0), _cursorHotspotY(0),
+      _cursorHotspotXScaled(0), _cursorHotspotYScaled(0), _cursorWidthScaled(0), _cursorHeightScaled(0),
+      _cursorKeyColor(0), _cursorVisible(false), _cursorDontScale(false), _cursorPaletteEnabled(false),
+      _forceRedraw(false), _scissorOverride(3)
 #ifdef USE_OSD
       , _osdAlpha(0), _osdFadeStartTime(0), _osd(nullptr)
 #endif
@@ -343,7 +344,10 @@ void OpenGLGraphicsManager::fillScreen(uint32 col) {
 }
 
 void OpenGLGraphicsManager::setShakePos(int shakeOffset) {
-	_gameScreenShakeOffset = shakeOffset;
+	if (_gameScreenShakeOffset != shakeOffset) {
+		_gameScreenShakeOffset = shakeOffset;
+		_forceRedraw = true;
+	}
 }
 
 void OpenGLGraphicsManager::updateScreen() {
@@ -351,8 +355,30 @@ void OpenGLGraphicsManager::updateScreen() {
 		return;
 	}
 
-	// Clear the screen buffer
-	GLCALL(glClear(GL_COLOR_BUFFER_BIT));
+	// We only update the screen when there actually have been any changes.
+	if (   !_forceRedraw
+	    && !_gameScreen->isDirty()
+	    && !(_overlayVisible && _overlay->isDirty())
+	    && !(_cursorVisible && _cursor && _cursor->isDirty())
+	    && _osdAlpha == 0) {
+		return;
+	}
+	_forceRedraw = false;
+
+	// Clear the screen buffer.
+	if (_scissorOverride && !_overlayVisible) {
+		// In certain cases we need to assure that the whole screen area is
+		// cleared. For example, when switching from overlay visible to
+		// invisible, we need to assure that all contents are cleared to
+		// properly remove all overlay contents.
+		GLCALL(glDisable(GL_SCISSOR_TEST));
+		GLCALL(glClear(GL_COLOR_BUFFER_BIT));
+		GLCALL(glEnable(GL_SCISSOR_TEST));
+
+		--_scissorOverride;
+	} else {
+		GLCALL(glClear(GL_COLOR_BUFFER_BIT));
+	}
 
 	const GLfloat shakeOffset = _gameScreenShakeOffset * (GLfloat)_displayHeight / _gameScreen->getHeight();
 
@@ -370,7 +396,8 @@ void OpenGLGraphicsManager::updateScreen() {
 		// visible.
 		const GLfloat cursorOffset = _overlayVisible ? 0 : shakeOffset;
 
-		_cursor->draw(_cursorX - _cursorHotspotXScaled, _cursorY - _cursorHotspotYScaled + cursorOffset,
+		_cursor->draw(_cursorDisplayX - _cursorHotspotXScaled,
+		              _cursorDisplayY - _cursorHotspotYScaled + cursorOffset,
 		              _cursorWidthScaled, _cursorHeightScaled);
 	}
 
@@ -401,6 +428,8 @@ void OpenGLGraphicsManager::updateScreen() {
 		GLCALL(glColor4f(1.0f, 1.0f, 1.0f, 1.0f));
 	}
 #endif
+
+	refreshScreen();
 }
 
 Graphics::Surface *OpenGLGraphicsManager::lockScreen() {
@@ -435,10 +464,25 @@ int16 OpenGLGraphicsManager::getOverlayHeight() {
 
 void OpenGLGraphicsManager::showOverlay() {
 	_overlayVisible = true;
+	_forceRedraw = true;
+
+	// Allow drawing inside full screen area.
+	GLCALL(glDisable(GL_SCISSOR_TEST));
+
+	// Update cursor position.
+	setMousePosition(_cursorX, _cursorY);
 }
 
 void OpenGLGraphicsManager::hideOverlay() {
 	_overlayVisible = false;
+	_forceRedraw = true;
+
+	// Limit drawing to screen area.
+	GLCALL(glEnable(GL_SCISSOR_TEST));
+	_scissorOverride = 3;
+
+	// Update cursor position.
+	setMousePosition(_cursorX, _cursorY);
 }
 
 Graphics::PixelFormat OpenGLGraphicsManager::getOverlayFormat() const {
@@ -467,6 +511,12 @@ void OpenGLGraphicsManager::grabOverlay(void *buf, int pitch) {
 }
 
 bool OpenGLGraphicsManager::showMouse(bool visible) {
+	// In case the mouse cursor visibility changed we need to redraw the whole
+	// screen even when nothing else changed.
+	if (_cursorVisible != visible) {
+		_forceRedraw = true;
+	}
+
 	bool last = _cursorVisible;
 	_cursorVisible = visible;
 	return last;
@@ -489,7 +539,7 @@ void OpenGLGraphicsManager::warpMouse(int x, int y) {
 		if (!_overlay) {
 			return;
 		}
-	
+
 		// It might be confusing that we actually have to handle something
 		// here when the overlay is visible. This is because for very small
 		// resolutions we have a minimal overlay size and have to adjust
@@ -501,11 +551,8 @@ void OpenGLGraphicsManager::warpMouse(int x, int y) {
 			return;
 		}
 
-		x = (x * _displayWidth)  / _gameScreen->getWidth();
-		y = (y * _displayHeight) / _gameScreen->getHeight();
-
-		x += _displayX;
-		y += _displayY;
+		x = (x * _outputScreenWidth)  / _gameScreen->getWidth();
+		y = (y * _outputScreenHeight) / _gameScreen->getHeight();
 	}
 
 	setMousePosition(x, y);
@@ -815,6 +862,16 @@ void OpenGLGraphicsManager::notifyContextCreate(const Graphics::PixelFormat &def
 
 	GLCALL(glEnable(GL_TEXTURE_2D));
 
+	// Setup scissor state accordingly.
+	if (_overlayVisible) {
+		GLCALL(glDisable(GL_SCISSOR_TEST));
+	} else {
+		GLCALL(glEnable(GL_SCISSOR_TEST));
+	}
+	// Clear the whole screen for the first three frames to assure any
+	// leftovers are cleared.
+	_scissorOverride = 3;
+
 	// We use a "pack" alignment (when reading from textures) to 4 here,
 	// since the only place where we really use it is the BMP screenshot
 	// code and that requires the same alignment too.
@@ -886,18 +943,30 @@ void OpenGLGraphicsManager::adjustMousePosition(int16 &x, int16 &y) {
 			y = (y * _overlay->getHeight()) / _outputScreenHeight;
 		}
 	} else if (_gameScreen) {
-		x -= _displayX;
-		y -= _displayY;
-
 		const int16 width  = _gameScreen->getWidth();
 		const int16 height = _gameScreen->getHeight();
 
-		x = (x * width)  / _displayWidth;
-		y = (y * height) / _displayHeight;
+		x = (x * width)  / (int)_outputScreenWidth;
+		y = (y * height) / (int)_outputScreenHeight;
+	}
+}
 
-		// Make sure we only supply valid coordinates.
-		x = CLIP<int16>(x, 0, width - 1);
-		y = CLIP<int16>(y, 0, height - 1);
+void OpenGLGraphicsManager::setMousePosition(int x, int y) {
+	// Whenever the mouse position changed we force a screen redraw to reflect
+	// changes properly.
+	if (_cursorX != x || _cursorY != y) {
+		_forceRedraw = true;
+	}
+
+	_cursorX = x;
+	_cursorY = y;
+
+	if (_overlayVisible) {
+		_cursorDisplayX = x;
+		_cursorDisplayY = y;
+	} else {
+		_cursorDisplayX = _displayX + (x * _displayWidth)  / _outputScreenWidth;
+		_cursorDisplayY = _displayY + (y * _displayHeight) / _outputScreenHeight;
 	}
 }
 
@@ -1044,8 +1113,24 @@ void OpenGLGraphicsManager::recalculateDisplayArea() {
 	}
 
 	// We center the screen in the middle for now.
-	_displayX = (_outputScreenWidth  - _displayWidth ) / 2; 
-	_displayY = (_outputScreenHeight - _displayHeight) / 2; 
+	_displayX = (_outputScreenWidth  - _displayWidth ) / 2;
+	_displayY = (_outputScreenHeight - _displayHeight) / 2;
+
+	// Setup drawing limitation for game graphics.
+	// This invovles some trickery because OpenGL's viewport coordinate system
+	// is upside down compared to ours.
+	GLCALL(glScissor(_displayX,
+	                 _outputScreenHeight - _displayHeight - _displayY,
+	                 _displayWidth,
+	                 _displayHeight));
+	// Clear the whole screen for the first three frames to remove leftovers.
+	_scissorOverride = 3;
+
+	// Update the cursor position to adjust for new display area.
+	setMousePosition(_cursorX, _cursorY);
+
+	// Force a redraw to assure screen is properly redrawn.
+	_forceRedraw = true;
 }
 
 void OpenGLGraphicsManager::updateCursorPalette() {

@@ -76,14 +76,15 @@ MODULE_OBJS := \
 	sound/drivers/midi.o \
 	sound/drivers/pcjr.o \
 	video/seq_decoder.o
-	
-	
+
+
 ifdef ENABLE_SCI32
 MODULE_OBJS += \
 	engine/kgraphics32.o \
 	graphics/controls32.o \
 	graphics/frameout.o \
 	graphics/paint32.o \
+	graphics/palette32.o \
 	graphics/text32.o \
 	video/robot_decoder.o
 endif

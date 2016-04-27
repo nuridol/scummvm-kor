@@ -26,7 +26,7 @@
 #include <UIKit/UIKit.h>
 #include <Foundation/NSThread.h>
 
-#include "iphone_video.h"
+#include "backends/platform/iphone/iphone_video.h"
 
 void iphone_main(int argc, char *argv[]);
 
@@ -81,13 +81,10 @@ int main(int argc, char **argv) {
 	CGRect  rect = [[UIScreen mainScreen] bounds];
 
 	// hide the status bar
-#ifdef SCUMMVMKOR
-    application.statusBarHidden = YES;
-#endif
-    [application setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
+	[application setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
 	[application setStatusBarHidden:YES animated:YES];
 
-    _window = [[UIWindow alloc] initWithFrame:rect];
+	_window = [[UIWindow alloc] initWithFrame:rect];
 	[_window retain];
 
 	_view = [[iPhoneView alloc] initWithFrame:rect];
@@ -126,13 +123,9 @@ int main(int argc, char **argv) {
 
 	// Workaround, need to "hide" and unhide the statusbar to properly remove it,
 	// since the Springboard has put it back without apparently flagging our application.
-#ifdef SCUMMVMKOR
-    self.statusBarHidden = YES;
-#endif
-    [self setStatusBarHidden:YES animated:YES];
-    [self setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
 	[self setStatusBarHidden:YES animated:YES];
-
+	[self setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
+	[self setStatusBarHidden:YES animated:YES];
 }
 
 - (void)didRotate:(NSNotification *)notification {

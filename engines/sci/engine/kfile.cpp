@@ -257,16 +257,21 @@ reg_t kFileIOOpen(EngineState *s, int argc, reg_t *argv) {
 	}
 	debugC(kDebugLevelFile, "kFileIO(open): %s, 0x%x", name.c_str(), mode);
 
+	if (name.hasPrefix("sciAudio\\")) {
+		// fan-made sciAudio extension, don't create those files and instead return a virtual handle
+		return make_reg(0, VIRTUALFILE_HANDLE_SCIAUDIO);
+	}
+
 #ifdef ENABLE_SCI32
 	if (name == PHANTASMAGORIA_SAVEGAME_INDEX) {
 		if (s->_virtualIndexFile) {
-			return make_reg(0, VIRTUALFILE_HANDLE);
+			return make_reg(0, VIRTUALFILE_HANDLE_SCI32SAVE);
 		} else {
 			Common::String englishName = g_sci->getSciLanguageString(name, K_LANG_ENGLISH);
 			Common::String wrappedName = g_sci->wrapFilename(englishName);
 			if (!g_sci->getSaveFileManager()->listSavefiles(wrappedName).empty()) {
 				s->_virtualIndexFile = new VirtualIndexFile(wrappedName);
-				return make_reg(0, VIRTUALFILE_HANDLE);
+				return make_reg(0, VIRTUALFILE_HANDLE_SCI32SAVE);
 			}
 		}
 	}
@@ -319,7 +324,7 @@ reg_t kFileIOOpen(EngineState *s, int argc, reg_t *argv) {
 			s->_virtualIndexFile->write("\0", 1);
 			s->_virtualIndexFile->write("\0", 1);	// Spot description (empty)
 			s->_virtualIndexFile->seek(0, SEEK_SET);
-			return make_reg(0, VIRTUALFILE_HANDLE);
+			return make_reg(0, VIRTUALFILE_HANDLE_SCI32SAVE);
 		}
 	}
 #endif
@@ -345,11 +350,16 @@ reg_t kFileIOClose(EngineState *s, int argc, reg_t *argv) {
 	uint16 handle = argv[0].toUint16();
 
 #ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE) {
+	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE) {
 		s->_virtualIndexFile->close();
 		return SIGNAL_REG;
 	}
 #endif
+
+	if (handle >= VIRTUALFILE_HANDLE_START) {
+		// it's a virtual handle? ignore it
+		return SIGNAL_REG;
+	}
 
 	FileHandle *f = getFileFromHandle(s, handle);
 	if (f) {
@@ -372,7 +382,7 @@ reg_t kFileIOReadRaw(EngineState *s, int argc, reg_t *argv) {
 	debugC(kDebugLevelFile, "kFileIO(readRaw): %d, %d", handle, size);
 
 #ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE) {
+	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE) {
 		bytesRead = s->_virtualIndexFile->read(buf, size);
 	} else {
 #endif
@@ -402,7 +412,7 @@ reg_t kFileIOWriteRaw(EngineState *s, int argc, reg_t *argv) {
 	debugC(kDebugLevelFile, "kFileIO(writeRaw): %d, %d", handle, size);
 
 #ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE) {
+	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE) {
 		s->_virtualIndexFile->write(buf, size);
 		success = true;
 	} else {
@@ -479,7 +489,7 @@ reg_t kFileIOReadString(EngineState *s, int argc, reg_t *argv) {
 	uint32 bytesRead;
 
 #ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE)
+	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE)
 		bytesRead = s->_virtualIndexFile->readLine(buf, maxsize);
 	else
 #endif
@@ -502,7 +512,7 @@ reg_t kFileIOWriteString(EngineState *s, int argc, reg_t *argv) {
 	// We skip creating these files, and instead handle the calls
 	// directly. Since the sciAudio calls are only creating text files,
 	// this is probably the most straightforward place to handle them.
-	if (handle == 0xFFFF && str.hasPrefix("(sciAudio")) {
+	if (handle == VIRTUALFILE_HANDLE_SCIAUDIO) {
 		Common::List<ExecStack>::const_iterator iter = s->_executionStack.reverse_begin();
 		iter--;	// sciAudio
 		iter--;	// sciAudio child
@@ -511,7 +521,7 @@ reg_t kFileIOWriteString(EngineState *s, int argc, reg_t *argv) {
 	}
 
 #ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE) {
+	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE) {
 		s->_virtualIndexFile->write(str.c_str(), str.size());
 		return NULL_REG;
 	}
@@ -538,7 +548,7 @@ reg_t kFileIOSeek(EngineState *s, int argc, reg_t *argv) {
 	debugC(kDebugLevelFile, "kFileIO(seek): %d, %d, %d", handle, offset, whence);
 
 #ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE)
+	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE)
 		return make_reg(0, s->_virtualIndexFile->seek(offset, whence));
 #endif
 
@@ -590,6 +600,16 @@ reg_t kFileIOExists(EngineState *s, int argc, reg_t *argv) {
 #endif
 
 	bool exists = false;
+
+	if (g_sci->getGameId() == GID_PEPPER) {
+		// HACK: Special case for Pepper's Adventure in Time
+		// The game checks like crazy for the file CDAUDIO when entering the game menu.
+		// On at least Windows that makes the engine slow down to a crawl and takes at least 1 second.
+		// Should get solved properly by changing the code below. This here is basically for 1.8.0 release.
+		// TODO: Fix this properly.
+		if (name == "CDAUDIO")
+			return NULL_REG;
+	}
 
 	// Check for regular file
 	exists = Common::File::exists(name);
@@ -795,15 +815,15 @@ reg_t kSaveGame(EngineState *s, int argc, reg_t *argv) {
 			} else {
 				uint savegameNr;
 				// savegameId is in lower range, scripts expect us to create a new slot
-				for (savegameId = 0; savegameId < SAVEGAMEID_OFFICIALRANGE_START; savegameId++) {
+				for (savegameId = SAVEGAMESLOT_FIRST; savegameId <= SAVEGAMESLOT_LAST; savegameId++) {
 					for (savegameNr = 0; savegameNr < saves.size(); savegameNr++) {
 						if (savegameId == saves[savegameNr].id)
 							break;
 					}
-					if (savegameNr == saves.size())
+					if (savegameNr == saves.size()) // Slot not found, seems to be good to go
 						break;
 				}
-				if (savegameId == SAVEGAMEID_OFFICIALRANGE_START)
+				if (savegameId > SAVEGAMESLOT_LAST)
 					error("kSavegame: no more savegame slots available");
 			}
 		} else {
@@ -896,26 +916,8 @@ reg_t kRestoreGame(EngineState *s, int argc, reg_t *argv) {
 			gamestate_restore(s, in);
 			delete in;
 
-			switch (g_sci->getGameId()) {
-			case GID_MOTHERGOOSE:
-				// WORKAROUND: Mother Goose SCI0
-				//  Script 200 / rm200::newRoom will set global C5h directly right after creating a child to the
-				//   current number of children plus 1.
-				//  We can't trust that global, that's why we set the actual savedgame id right here directly after
-				//   restoring a saved game.
-				//  If we didn't, the game would always save to a new slot
-				s->variables[VAR_GLOBAL][0xC5].setOffset(SAVEGAMEID_OFFICIALRANGE_START + savegameId);
-				break;
-			case GID_MOTHERGOOSE256:
-				// WORKAROUND: Mother Goose SCI1/SCI1.1 does some weird things for
-				//  saving a previously restored game.
-				// We set the current savedgame-id directly and remove the script
-				//  code concerning this via script patch.
-				s->variables[VAR_GLOBAL][0xB3].setOffset(SAVEGAMEID_OFFICIALRANGE_START + savegameId);
-				break;
-			default:
-				break;
-			}
+			gamestate_afterRestoreFixUp(s, savegameId);
+
 		} else {
 			s->r_acc = TRUE_REG;
 			warning("Savegame #%d not found", savegameId);

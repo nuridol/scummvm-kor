@@ -23,6 +23,7 @@
 #include "common/config-manager.h"
 #include "common/events.h"
 #include "common/system.h"
+#include "common/translation.h"
 
 #include "gui/message.h"
 #include "gui/gui-manager.h"
@@ -129,6 +130,14 @@ void ScummEngine::parseEvent(Common::Event event) {
 			_debugger->attach();
 		} else if (event.kbd.hasFlags(Common::KBD_CTRL) && event.kbd.keycode == Common::KEYCODE_s) {
 			_res->resourceStats();
+		} else if (event.kbd.hasFlags(Common::KBD_ALT) && event.kbd.keycode == Common::KEYCODE_x) {
+			// TODO: Some SCUMM games quit when Alt-x is pressed. However, not
+			// all of them seem to exhibit this behavior. LordHoto found that
+			// the Loom manual does not mention this hotkey. On the other hand
+			// the Sam&Max manual mentions that Alt-x does so on "most"
+			// platforms. We should really check which games exhibit this
+			// behavior and only use it for them.
+			quitGame();
 		} else {
 			// Normal key press, pass on to the game.
 			_keyPressed = event.kbd;
@@ -435,8 +444,9 @@ void ScummEngine_v6::processKeyboard(Common::KeyState lastKeyHit) {
 			break;
 		}
 
-		if (VAR_VOICE_MODE != 0xFF)
-			VAR(VAR_VOICE_MODE) = _voiceMode;
+		// We need to sync the current sound settings here to make sure that
+		// we actually update the mute state of speech properly.
+		syncSoundSettings();
 
 		return;
 	}
@@ -451,8 +461,16 @@ void ScummEngine_v2::processKeyboard(Common::KeyState lastKeyHit) {
 		lastKeyHit = Common::KeyState(Common::KEYCODE_ESCAPE);
 	// F7 is used to skip cutscenes in the Commodote 64 version of Maniac Mansion
 	} else if (_game.id == GID_MANIAC &&_game.platform == Common::kPlatformC64) {
-		if (lastKeyHit.keycode == Common::KEYCODE_F7 && lastKeyHit.hasFlags(0))
-			lastKeyHit = Common::KeyState(Common::KEYCODE_ESCAPE);
+		// Demo always F7 to be pressed to restart
+		if (_game.features & GF_DEMO) {
+			if (_roomResource != 0x2D && lastKeyHit.keycode == Common::KEYCODE_F7 && lastKeyHit.hasFlags(0)) {
+				restart();
+				return;
+			}
+		} else {
+			if (lastKeyHit.keycode == Common::KEYCODE_F7 && lastKeyHit.hasFlags(0))
+				lastKeyHit = Common::KeyState(Common::KEYCODE_ESCAPE);
+		}
 	// 'B' is used to skip cutscenes in the NES version of Maniac Mansion
 	} else if (_game.id == GID_MANIAC &&_game.platform == Common::kPlatformNES) {
 		if (lastKeyHit.keycode == Common::KEYCODE_b && lastKeyHit.hasFlags(Common::KBD_SHIFT))
@@ -559,9 +577,9 @@ void ScummEngine::processKeyboard(Common::KeyState lastKeyHit) {
 		lastKeyHit.hasFlags(Common::KBD_CTRL)) {
 		_snapScroll ^= 1;
 		if (_snapScroll) {
-			messageDialog("Snap scroll on");
+			messageDialog(_("Snap scroll on"));
 		} else {
-			messageDialog("Snap scroll off");
+			messageDialog(_("Snap scroll off"));
 		}
 
 		if (VAR_CAMERA_FAST_X != 0xFF)
@@ -574,7 +592,7 @@ void ScummEngine::processKeyboard(Common::KeyState lastKeyHit) {
 			vol--;
 
 		// Display the music volume
-		ValueDisplayDialog dlg("Music volume: ", 0, 16, vol, ']', '[');
+		ValueDisplayDialog dlg(_("Music volume: "), 0, 16, vol, ']', '[');
 		vol = runDialog(dlg);
 
 		vol *= 16;
@@ -591,7 +609,7 @@ void ScummEngine::processKeyboard(Common::KeyState lastKeyHit) {
 			_defaultTalkDelay++;
 
 		// Display the talk speed
-		ValueDisplayDialog dlg("Subtitle speed: ", 0, 9, 9 - _defaultTalkDelay, '+', '-');
+		ValueDisplayDialog dlg(_("Subtitle speed: "), 0, 9, 9 - _defaultTalkDelay, '+', '-');
 		_defaultTalkDelay = 9 - runDialog(dlg);
 
 		// Save the new talkspeed value to ConfMan

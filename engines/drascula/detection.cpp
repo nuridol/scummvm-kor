@@ -352,7 +352,7 @@ SaveStateList DrasculaMetaEngine::listSaves(const char *target) const {
 	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
 	Common::StringArray filenames;
 	Common::String pattern = target;
-	pattern += ".???";
+	pattern += ".###";
 
 	filenames = saveFileMan->listSavefiles(pattern);
 	sort(filenames.begin(), filenames.end());	// Sort (hopefully ensuring we are sorted numerically..)
@@ -382,8 +382,7 @@ SaveStateList DrasculaMetaEngine::listSaves(const char *target) const {
 }
 
 SaveStateDescriptor DrasculaMetaEngine::querySaveMetaInfos(const char *target, int slot) const {
-	char fileName[MAXPATHLEN];
-	sprintf(fileName, "%s.%03d", target, slot);
+	Common::String fileName = Common::String::format("%s.%03d", target, slot);
 
 	Common::InSaveFile *in = g_system->getSavefileManager()->openForLoading(fileName);
 

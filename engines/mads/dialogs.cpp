@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -29,6 +29,12 @@
 
 namespace MADS {
 
+enum PopupEdge {
+	EDGE_UPPER_LEFT = 0, EDGE_UPPER_RIGHT = 1, EDGE_LOWER_LEFT = 2,
+	EDGE_LOWER_RIGHT = 3, EDGE_LEFT = 4, EDGE_RIGHT = 5, EDGE_TOP = 6,
+	EDGE_BOTTOM = 7, EDGE_UPPER_CENTER = 8
+};
+
 Dialog::Dialog(MADSEngine *vm)
 	: _vm(vm), _savedSurface(nullptr), _position(Common::Point(-1, -1)),
 	  _width(0), _height(0) {
@@ -43,6 +49,7 @@ Dialog::Dialog(MADSEngine *vm)
 }
 
 Dialog::~Dialog() {
+	delete _savedSurface;
 }
 
 void Dialog::save() {
@@ -139,15 +146,36 @@ void Dialog::drawContent(const Common::Rect &r, int seed, byte color1, byte colo
 TextDialog::TextDialog(MADSEngine *vm, const Common::String &fontName,
 		const Common::Point &pos, int maxChars)
 	: Dialog(vm) {
-	_vm = vm;
 	_font = _vm->_font->getFont(fontName);
 	_position = pos;
-
+	_icon = nullptr;
+	_edgeSeries = nullptr;
+	_piecesPerCenter = 0;
+	_fontSpacing = 0;
 	_vm->_font->setColors(TEXTDIALOG_BLACK, TEXTDIALOG_BLACK, TEXTDIALOG_BLACK, TEXTDIALOG_BLACK);
+	_piecesPerCenter = 0;
 
-	_innerWidth = (_font->maxWidth() + 1) * maxChars;
+	init(maxChars);
+}
+
+TextDialog::TextDialog(MADSEngine *vm, const Common::String &fontName,
+		const Common::Point &pos, MSurface *icon, int maxTextChars): Dialog(vm) {
+	_font = _vm->_font->getFont(fontName);
+	_position = pos;
+	_icon = icon;
+	_edgeSeries = new SpriteAsset(_vm, "box.ss", PALFLAG_RESERVED);
+	_vm->_font->setColors(TEXTDIALOG_BLACK, TEXTDIALOG_BLACK, TEXTDIALOG_BLACK, TEXTDIALOG_BLACK);
+	_piecesPerCenter = _edgeSeries->getFrame(EDGE_UPPER_CENTER)->w / _edgeSeries->getFrame(EDGE_BOTTOM)->w;
+	_fontSpacing = 0;
+
+	int maxLen = estimatePieces(maxTextChars);
+	init(maxLen);
+}
+
+void TextDialog::init(int maxTextChars) {
+	_innerWidth = (_font->maxWidth() + 1) * maxTextChars;
 	_width = _innerWidth + 10;
-	_lineSize = maxChars * 2;
+	_lineSize = maxTextChars * 2;
 	_lineWidth = 0;
 	_currentX = 0;
 	_numLines = 0;
@@ -156,7 +184,16 @@ TextDialog::TextDialog(MADSEngine *vm, const Common::String &fontName,
 	_askXp = 0;
 }
 
+int TextDialog::estimatePieces(int maxLen) {
+	int fontLen = (_font->maxWidth() + _fontSpacing) * maxLen;
+	int pieces = ((fontLen - 1) / _edgeSeries->getFrame(EDGE_TOP)->w) + 1;
+	int estimate = (pieces - _piecesPerCenter) / 2;
+
+	return estimate;
+}
+
 TextDialog::~TextDialog() {
+	delete _edgeSeries;
 }
 
 void TextDialog::addLine(const Common::String &line, bool underline) {
@@ -393,6 +430,81 @@ Dialogs *Dialogs::init(MADSEngine *vm) {
 Dialogs::Dialogs(MADSEngine *vm)
 	: _vm(vm) {
 	_pendingDialog = DIALOG_NONE;
+}
+
+/*------------------------------------------------------------------------*/
+
+FullScreenDialog::FullScreenDialog(MADSEngine *vm) : _vm(vm) {
+	switch (_vm->getGameID()) {
+	case GType_RexNebular:
+		_screenId = 990;
+		break;
+	case GType_Phantom:
+		_screenId = 920;
+		break;
+	case GType_Dragonsphere:
+		_screenId = 922;
+		break;
+	default:
+		error("FullScreenDialog:Unknown game");
+	}
+	_palFlag = true;
+}
+
+FullScreenDialog::~FullScreenDialog() {
+	_vm->_screen.resetClipBounds();
+	_vm->_game->_scene.restrictScene();
+}
+
+void FullScreenDialog::display() {
+	Game &game = *_vm->_game;
+	Scene &scene = game._scene;
+
+	int nextSceneId = scene._nextSceneId;
+	int currentSceneId = scene._currentSceneId;
+	int priorSceneId = scene._priorSceneId;
+
+	if (_screenId > 0) {
+		SceneInfo *sceneInfo = SceneInfo::init(_vm);
+		sceneInfo->load(_screenId, 0, "", 0, scene._depthSurface, scene._backgroundSurface);
+		delete sceneInfo;
+	}
+
+	scene._priorSceneId = priorSceneId;
+	scene._currentSceneId = currentSceneId;
+	scene._nextSceneId = nextSceneId;
+
+	_vm->_events->initVars();
+	game._kernelMode = KERNEL_ROOM_INIT;
+
+	byte pal[768];
+	if (_vm->_screenFade) {
+		Common::fill(&pal[0], &pal[PALETTE_SIZE], 0);
+		_vm->_palette->setFullPalette(pal);
+	} else {
+		_vm->_palette->getFullPalette(pal);
+		_vm->_palette->fadeOut(pal, nullptr, 0, PALETTE_COUNT, 0, 1, 1, 16);
+	}
+
+	// Set Fx state and palette entries
+	game._fx = _vm->_screenFade == SCREEN_FADE_SMOOTH ? kTransitionFadeIn : kNullPaletteCopy;
+	game._trigger = 0;
+
+	// Clear the screen and draw the upper and lower horizontal lines
+	_vm->_screen.empty();
+	_vm->_palette->setLowRange();
+	_vm->_screen.hLine(0, 20, MADS_SCREEN_WIDTH, 2);
+	_vm->_screen.hLine(0, 179, MADS_SCREEN_WIDTH, 2);
+	_vm->_screen.resetClipBounds();
+	_vm->_screen.copyRectToScreen(Common::Rect(0, 0, MADS_SCREEN_WIDTH, MADS_SCREEN_HEIGHT));
+
+	// Restrict the screen to the area between the two lines
+	_vm->_screen.setClipBounds(Common::Rect(0, DIALOG_TOP, MADS_SCREEN_WIDTH,
+		DIALOG_TOP + MADS_SCENE_HEIGHT));
+	_vm->_game->_scene.restrictScene();
+
+	if (_screenId > 0)
+		scene._spriteSlots.fullRefresh();
 }
 
 } // End of namespace MADS

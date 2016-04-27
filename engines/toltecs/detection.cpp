@@ -86,6 +86,20 @@ static const ToltecsGameDescription gameDescriptions[] = {
 	},
 
 	{
+		// 3 Skulls of the Toltecs PIRATE CD-RIP version (no audio)
+		// == DO NOT RE-ADD ==
+		{
+			"toltecs",
+			0,
+			AD_ENTRY1s("WESTERN", "56d0da91ec3db8ac869594357584e851", 104804435),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_PIRATED,
+			GUIO1(GUIO_NONE)
+		},
+	},
+
+	{
 		// 3 Skulls of the Toltecs Russian version
 		{
 			"toltecs",
@@ -248,7 +262,7 @@ SaveStateList ToltecsMetaEngine::listSaves(const char *target) const {
 	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
 	Toltecs::ToltecsEngine::SaveHeader header;
 	Common::String pattern = target;
-	pattern += ".???";
+	pattern += ".###";
 
 	Common::StringArray filenames;
 	filenames = saveFileMan->listSavefiles(pattern.c_str());
@@ -285,7 +299,7 @@ void ToltecsMetaEngine::removeSaveState(const char *target, int slot) const {
 
 	Common::StringArray filenames;
 	Common::String pattern = target;
-	pattern += ".???";
+	pattern += ".###";
 	filenames = saveFileMan->listSavefiles(pattern.c_str());
 	Common::sort(filenames.begin(), filenames.end());	// Sort (hopefully ensuring we are sorted numerically..)
 

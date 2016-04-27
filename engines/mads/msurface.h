@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -51,10 +51,9 @@ struct SpriteInfo {
  * MADS graphics surface
  */
 class MSurface : public Graphics::Surface {
-private:
-	bool _freeFlag;
 protected:
 	static MADSEngine *_vm;
+	bool _freeFlag;
 public:
 	/**
 	 * Sets the engine refrence used all surfaces
@@ -65,6 +64,11 @@ public:
 	 * Helper method for calculating new dimensions when scaling a sprite
 	 */
 	static int scaleValue(int value, int scale, int err);
+
+	/**
+	* Base method for descendents to load their contents
+	*/
+	virtual void load(const Common::String &resName) {}
 public:
 	/**
 	 * Basic constructor
@@ -216,16 +220,26 @@ public:
 	 * Create a new surface which is a flipped horizontal copy of the current one
 	 */
 	MSurface *flipHorizontal() const;
+
+	/**
+	 * Copy an area from one surface to another, translating it using a palette
+	 * map as it's done
+	 */
+	void copyRectTranslate(MSurface &srcSurface, const byte *paletteMap,
+		const Common::Point &destPos, const Common::Rect &srcRect);
 };
 
 class DepthSurface : public MSurface {
-private:
-	MADSEngine *_vm;
 public:
+	/**
+	 * Depth style
+	 */
+	int _depthStyle;
+
 	/**
 	 * Constructor
 	 */
-	DepthSurface(MADSEngine *vm) : _vm(vm) {}
+	DepthSurface() : _depthStyle(0) {}
 
 	/**
 	 * Returns the depth at a given position

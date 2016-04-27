@@ -114,6 +114,24 @@ static const MohawkGameDescription gameDescriptions[] = {
 	},
 
 	// Myst
+	// Italian Windows ?
+	// From goodoldgeorg in bug #6895
+	{
+		{
+			"myst",
+			"",
+			AD_ENTRY1("MYST.DAT", "a5795ce1751fc42525e4f9a1859181d5"),
+			Common::IT_ITA,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GType_MYST,
+		0,
+		0,
+	},
+
+	// Myst
 	// Japanese Windows 3.11
 	// From clone2727
 	{
@@ -330,6 +348,23 @@ static const MohawkGameDescription gameDescriptions[] = {
 	},
 
 	// Riven: The Sequel to Myst
+	// Version 1.1 (5CD) - Russian, Fargus
+	{
+		{
+			"riven",
+			"",
+			AD_ENTRY1("a_Data.MHK", "59bd2e3ccbae2f1faa1b23a18dc316eb"),
+			Common::RU_RUS,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GType_RIVEN,
+		0,
+		0,
+	},
+
+	// Riven: The Sequel to Myst
 	// Version 1.? (DVD, From "Myst 10th Anniversary Edition")
 	// From Clone2727
 	{
@@ -392,6 +427,23 @@ static const MohawkGameDescription gameDescriptions[] = {
 			"",
 			AD_ENTRY1("a_Data.MHK", "733a710cf5f848b441ec72d988ab8a3d"),
 			Common::PL_POL,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GType_RIVEN,
+		GF_DVD,
+		0,
+	},
+
+	// Riven: The Sequel to Myst
+	// Version 1.1 (DVD), Russan, Fargus
+	{
+		{
+			"riven",
+			"DVD",
+			AD_ENTRY1("a_Data.MHK", "b5f40e6e6b843bf3abea291faa0911f4"),
+			Common::RU_RUS,
 			Common::kPlatformWindows,
 			ADGF_UNSTABLE,
 			GUIO1(GUIO_NOASPECT)
@@ -1377,6 +1429,22 @@ static const MohawkGameDescription gameDescriptions[] = {
 		GType_LIVINGBOOKSV1,
 		GF_LB_10,
 		"GRANDMA.EXE"
+	},
+
+	// Just Grandma and Me 1.0, Macintosh
+	{
+		{
+			"grandma",
+			"v1.0",
+			AD_ENTRY1("BookOutline", "9162483da06179e76f4a082412245efa"),
+			Common::EN_ANY,
+			Common::kPlatformMacintosh,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GType_LIVINGBOOKSV1,
+		GF_LB_10,
+		0
 	},
 
 	// Just Grandma and Me 1.1 Mac

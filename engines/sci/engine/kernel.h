@@ -145,7 +145,7 @@ public:
 	 */
 	Kernel(ResourceManager *resMan, SegManager *segMan);
 	~Kernel();
-	
+
 	void init();
 
 	uint getSelectorNamesSize() const;
@@ -161,7 +161,7 @@ public:
 	 * @return The appropriate selector ID, or -1 on error
 	 */
 	int findSelector(const char *selectorName) const;
-	
+
 	bool selectorNamesAvailable();
 
 	// Script dissection/dumping functions
@@ -172,6 +172,12 @@ public:
 	SelectorCache _selectorCache; /**< Shortcut list for important selectors. */
 	typedef Common::Array<KernelFunction> KernelFunctionArray;
 	KernelFunctionArray _kernelFuncs; /**< Table of kernel functions. */
+
+#ifdef ENABLE_SCI32
+	// id of kString function, for quick usage in kArray
+	// kArray calls kString in case parameters are strings
+	uint16 _kernelFunc_StringId;
+#endif
 
 	/**
 	 * Determines whether a list of registers matches a given signature.
@@ -186,7 +192,7 @@ public:
 	bool signatureMatch(const uint16 *sig, int argc, const reg_t *argv);
 
 	// Prints out debug information in case a signature check fails
-	void signatureDebug(const uint16 *sig, int argc, const reg_t *argv);
+	void signatureDebug(Common::String &signatureDetails, const uint16 *sig, int argc, const reg_t *argv);
 
 	/**
 	 * Determines the type of the object indicated by reg.
@@ -414,6 +420,27 @@ reg_t kIsHiRes(EngineState *s, int argc, reg_t *argv);
 reg_t kArray(EngineState *s, int argc, reg_t *argv);
 reg_t kListAt(EngineState *s, int argc, reg_t *argv);
 reg_t kString(EngineState *s, int argc, reg_t *argv);
+
+reg_t kStringNew(EngineState *s, int argc, reg_t *argv);
+reg_t kStringSize(EngineState *s, int argc, reg_t *argv);
+reg_t kStringAt(EngineState *s, int argc, reg_t *argv);
+reg_t kStringPutAt(EngineState *s, int argc, reg_t *argv);
+reg_t kStringFree(EngineState *s, int argc, reg_t *argv);
+reg_t kStringFill(EngineState *s, int argc, reg_t *argv);
+reg_t kStringCopy(EngineState *s, int argc, reg_t *argv);
+reg_t kStringCompare(EngineState *s, int argc, reg_t *argv);
+reg_t kStringDup(EngineState *s, int argc, reg_t *argv);
+reg_t kStringGetData(EngineState *s, int argc, reg_t *argv);
+reg_t kStringLen(EngineState *s, int argc, reg_t *argv);
+reg_t kStringPrintf(EngineState *s, int argc, reg_t *argv);
+reg_t kStringPrintfBuf(EngineState *s, int argc, reg_t *argv);
+reg_t kStringAtoi(EngineState *s, int argc, reg_t *argv);
+reg_t kStringTrim(EngineState *s, int argc, reg_t *argv);
+reg_t kStringUpper(EngineState *s, int argc, reg_t *argv);
+reg_t kStringLower(EngineState *s, int argc, reg_t *argv);
+reg_t kStringTrn(EngineState *s, int argc, reg_t *argv);
+reg_t kStringTrnExclude(EngineState *s, int argc, reg_t *argv);
+
 reg_t kMulDiv(EngineState *s, int argc, reg_t *argv);
 reg_t kCantBeHere32(EngineState *s, int argc, reg_t *argv);
 reg_t kRemapColors32(EngineState *s, int argc, reg_t *argv);
@@ -429,6 +456,7 @@ reg_t kAddPlane(EngineState *s, int argc, reg_t *argv);
 reg_t kDeletePlane(EngineState *s, int argc, reg_t *argv);
 reg_t kUpdatePlane(EngineState *s, int argc, reg_t *argv);
 reg_t kSetShowStyle(EngineState *s, int argc, reg_t *argv);
+reg_t kSetPalStyleRange(EngineState *s, int argc, reg_t *argv);
 reg_t kGetHighPlanePri(EngineState *s, int argc, reg_t *argv);
 reg_t kFrameOut(EngineState *s, int argc, reg_t *argv);
 
@@ -446,10 +474,19 @@ reg_t kMakeSaveCatName(EngineState *s, int argc, reg_t *argv);
 reg_t kMakeSaveFileName(EngineState *s, int argc, reg_t *argv);
 reg_t kSetScroll(EngineState *s, int argc, reg_t *argv);
 reg_t kPalCycle(EngineState *s, int argc, reg_t *argv);
-reg_t kPalVaryUnknown(EngineState *s, int argc, reg_t *argv);
-reg_t kPalVaryUnknown2(EngineState *s, int argc, reg_t *argv);
+reg_t kPaletteSetFade(EngineState *s, int argc, reg_t *argv);
+reg_t kPalVarySetVary(EngineState *s, int argc, reg_t *argv);
+reg_t kPalVarySetPercent(EngineState *s, int argc, reg_t *argv);
+reg_t kPalVaryGetPercent(EngineState *s, int argc, reg_t *argv);
+reg_t kPalVaryOff(EngineState *s, int argc, reg_t *argv);
+reg_t kPalVaryMergeTarget(EngineState *s, int argc, reg_t *argv);
+reg_t kPalVarySetTime(EngineState *s, int argc, reg_t *argv);
+reg_t kPalVarySetTarget(EngineState *s, int argc, reg_t *argv);
+reg_t kPalVarySetStart(EngineState *s, int argc, reg_t *argv);
+reg_t kPalVaryMergeStart(EngineState *s, int argc, reg_t *argv);
 
 // SCI2.1 Kernel Functions
+reg_t kMorphOn(EngineState *s, int argc, reg_t *argv);
 reg_t kText(EngineState *s, int argc, reg_t *argv);
 reg_t kSave(EngineState *s, int argc, reg_t *argv);
 reg_t kAutoSave(EngineState *s, int argc, reg_t *argv);

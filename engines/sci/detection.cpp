@@ -371,10 +371,20 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 	{
 		GAMEOPTION_EGA_UNDITHER,
 		{
-			_s("EGA undithering"),
-			_s("Enable undithering in EGA games"),
+			_s("Skip EGA dithering pass (full color backgrounds)"),
+			_s("Skip dithering pass in EGA games, graphics are shown with full colors"),
 			"disable_dithering",
 			false
+		}
+	},
+
+	{
+		GAMEOPTION_HIGH_RESOLUTION_GRAPHICS,
+		{
+			_s("Enable high resolution graphics"),
+			_s("Enable high resolution graphics/content"),
+			"enable_high_resolution_graphics",
+			true
 		}
 	},
 
@@ -563,31 +573,28 @@ const ADGameDescription *SciMetaEngine::fallbackDetect(const FileMap &allFiles, 
 
 
 	// If these files aren't found, it can't be SCI
-	if (!foundResMap && !foundRes000) {
+	if (!foundResMap && !foundRes000)
 		return 0;
-	}
 
 	ResourceManager resMan;
-	resMan.addAppropriateSources(fslist);
-	resMan.init(true);
+	resMan.addAppropriateSourcesForDetection(fslist);
+	resMan.initForDetection();
 	// TODO: Add error handling.
 
 #ifndef ENABLE_SCI32
 	// Is SCI32 compiled in? If not, and this is a SCI32 game,
 	// stop here
-	if (getSciVersion() >= SCI_VERSION_2) {
-		return (const ADGameDescription *)&s_fallbackDesc;
-	}
+	if (getSciVersionForDetection() >= SCI_VERSION_2)
+		return 0;
 #endif
 
 	ViewType gameViews = resMan.getViewType();
 
 	// Have we identified the game views? If not, stop here
-	// Can't be SCI (or unsupported SCI views). Pinball Creep by sierra also uses resource.map/resource.000 files
-	//  but doesnt share sci format at all, if we dont return 0 here we will detect this game as SCI
-	if (gameViews == kViewUnknown) {
+	// Can't be SCI (or unsupported SCI views). Pinball Creep by Sierra also uses resource.map/resource.000 files
+	// but doesn't share SCI format at all
+	if (gameViews == kViewUnknown)
 		return 0;
-	}
 
 	// Set the platform to Amiga if the game is using Amiga views
 	if (gameViews == kViewAmiga)
@@ -597,9 +604,8 @@ const ADGameDescription *SciMetaEngine::fallbackDetect(const FileMap &allFiles, 
 	Common::String sierraGameId = resMan.findSierraGameId();
 
 	// If we don't have a game id, the game is not SCI
-	if (sierraGameId.empty()) {
+	if (sierraGameId.empty())
 		return 0;
-	}
 
 	Common::String gameId = convertSierraGameId(sierraGameId, &s_fallbackDesc.flags, resMan);
 	strncpy(s_fallbackGameIdBuf, gameId.c_str(), sizeof(s_fallbackGameIdBuf) - 1);
@@ -718,18 +724,18 @@ SaveStateList SciMetaEngine::listSaves(const char *target) const {
 	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
 	Common::StringArray filenames;
 	Common::String pattern = target;
-	pattern += ".???";
+	pattern += ".###";
 
 	filenames = saveFileMan->listSavefiles(pattern);
 	sort(filenames.begin(), filenames.end());	// Sort (hopefully ensuring we are sorted numerically..)
 
 	SaveStateList saveList;
-	int slotNum = 0;
+	int slotNr = 0;
 	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
 		// Obtain the last 3 digits of the filename, since they correspond to the save slot
-		slotNum = atoi(file->c_str() + file->size() - 3);
+		slotNr = atoi(file->c_str() + file->size() - 3);
 
-		if (slotNum >= 0 && slotNum <= 99) {
+		if (slotNr >= 0 && slotNr <= 99) {
 			Common::InSaveFile *in = saveFileMan->openForLoading(*file);
 			if (in) {
 				SavegameMetadata meta;
@@ -738,7 +744,17 @@ SaveStateList SciMetaEngine::listSaves(const char *target) const {
 					delete in;
 					continue;
 				}
-				saveList.push_back(SaveStateDescriptor(slotNum, meta.name));
+				SaveStateDescriptor descriptor(slotNr, meta.name);
+
+				if (slotNr == 0) {
+					// ScummVM auto-save slot, not used by SCI
+					// SCI does not support auto-saving, but slot 0 is reserved for auto-saving in ScummVM.
+					descriptor.setWriteProtectedFlag(true);
+				} else {
+					descriptor.setWriteProtectedFlag(false);
+				}
+
+				saveList.push_back(descriptor);
 				delete in;
 			}
 		}
@@ -747,44 +763,60 @@ SaveStateList SciMetaEngine::listSaves(const char *target) const {
 	return saveList;
 }
 
-SaveStateDescriptor SciMetaEngine::querySaveMetaInfos(const char *target, int slot) const {
-	Common::String fileName = Common::String::format("%s.%03d", target, slot);
+SaveStateDescriptor SciMetaEngine::querySaveMetaInfos(const char *target, int slotNr) const {
+	Common::String fileName = Common::String::format("%s.%03d", target, slotNr);
 	Common::InSaveFile *in = g_system->getSavefileManager()->openForLoading(fileName);
+	SaveStateDescriptor descriptor(slotNr, "");
+
+	// Do not allow save slot 0 (used for auto-saving) to be deleted or
+	// overwritten. SCI does not support auto-saving, but slot 0 is reserved for auto-saving in ScummVM.
+	if (slotNr == 0) {
+		descriptor.setWriteProtectedFlag(true);
+		descriptor.setDeletableFlag(false);
+	} else {
+		descriptor.setWriteProtectedFlag(false);
+		descriptor.setDeletableFlag(true);
+	}
 
 	if (in) {
 		SavegameMetadata meta;
+	
 		if (!get_savegame_metadata(in, &meta)) {
 			// invalid
 			delete in;
 
-			SaveStateDescriptor desc(slot, "Invalid");
-			return desc;
+			descriptor.setDescription("*Invalid*");
+			return descriptor;
 		}
 
-		SaveStateDescriptor desc(slot, meta.name);
+		descriptor.setDescription(meta.name);
 
 		Graphics::Surface *const thumbnail = Graphics::loadThumbnail(*in);
-		desc.setThumbnail(thumbnail);
+		descriptor.setThumbnail(thumbnail);
 
 		int day = (meta.saveDate >> 24) & 0xFF;
 		int month = (meta.saveDate >> 16) & 0xFF;
 		int year = meta.saveDate & 0xFFFF;
 
-		desc.setSaveDate(year, month, day);
+		descriptor.setSaveDate(year, month, day);
 
 		int hour = (meta.saveTime >> 16) & 0xFF;
 		int minutes = (meta.saveTime >> 8) & 0xFF;
 
-		desc.setSaveTime(hour, minutes);
+		descriptor.setSaveTime(hour, minutes);
 
-		desc.setPlayTime(meta.playTime * 1000);
+		if (meta.version >= 34) {
+			descriptor.setPlayTime(meta.playTime * 1000 / 60);
+		} else {
+			descriptor.setPlayTime(meta.playTime * 1000);
+		}
 
 		delete in;
 
-		return desc;
+		return descriptor;
 	}
-
-	return SaveStateDescriptor();
+	// Return empty descriptor
+	return descriptor;
 }
 
 int SciMetaEngine::getMaximumSaveSlot() const { return 99; }
@@ -795,22 +827,9 @@ void SciMetaEngine::removeSaveState(const char *target, int slot) const {
 }
 
 Common::Error SciEngine::loadGameState(int slot) {
-	Common::String fileName = Common::String::format("%s.%03d", _targetName.c_str(), slot);
-	Common::SaveFileManager *saveFileMan = g_engine->getSaveFileManager();
-	Common::SeekableReadStream *in = saveFileMan->openForLoading(fileName);
-
-	if (in) {
-		// found a savegame file
-		gamestate_restore(_gamestate, in);
-		delete in;
-	}
-
-	if (_gamestate->r_acc != make_reg(0, 1)) {
-		return Common::kNoError;
-	} else {
-		warning("Restoring gamestate '%s' failed", fileName.c_str());
-		return Common::kUnknownError;
-	}
+	_gamestate->_delayedRestoreGameId = slot;
+	_gamestate->_delayedRestoreGame = true;
+	return Common::kNoError;
 }
 
 Common::Error SciEngine::saveGameState(int slot, const Common::String &desc) {
@@ -838,16 +857,12 @@ Common::Error SciEngine::saveGameState(int slot, const Common::String &desc) {
 	return Common::kNoError;
 }
 
-// Before enabling the load option in the ScummVM menu, the main game loop must
-// have run at least once. When the game loop runs, kGameIsRestarting is invoked,
-// thus the speed throttler is initialized. Hopefully fixes bug #3565505.
-
 bool SciEngine::canLoadGameStateCurrently() {
-	return !_gamestate->executionStackBase && (_gamestate->_throttleLastTime > 0 || _gamestate->_throttleTrigger);
+	return !_gamestate->executionStackBase;
 }
 
 bool SciEngine::canSaveGameStateCurrently() {
-	return !_gamestate->executionStackBase && (_gamestate->_throttleLastTime > 0 || _gamestate->_throttleTrigger);
+	return !_gamestate->executionStackBase;
 }
 
 } // End of namespace Sci

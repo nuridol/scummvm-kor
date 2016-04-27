@@ -90,7 +90,7 @@ namespace Graphics {
             file.close();
             //warning("Font: %d %d at %x", korwidth, korheight, korfont);
         } else {
-            warning("Couldn't load any font");
+            //warning("Couldn't load any font");
         }
     }
     

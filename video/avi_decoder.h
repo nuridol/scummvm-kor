@@ -32,7 +32,8 @@
 #include "audio/mixer.h"
 
 namespace Audio {
-class QueuingAudioStream;
+class AudioStream;
+class PacketizedAudioStream;
 }
 
 namespace Common {
@@ -179,11 +180,14 @@ protected:
 		int getCurFrame() const { return _curFrame; }
 		int getFrameCount() const { return _frameCount; }
 		const Graphics::Surface *decodeNextFrame() { return _lastFrame; }
-		const byte *getPalette() const { _dirtyPalette = false; return _palette; }
-		bool hasDirtyPalette() const { return _dirtyPalette; }
+
+		const byte *getPalette() const;
+		bool hasDirtyPalette() const;
 		void setCurFrame(int frame) { _curFrame = frame; }
 		void loadPaletteFromChunk(Common::SeekableReadStream *chunk);
 		void useInitialPalette();
+		bool canDither() const;
+		void setDither(const byte *palette);
 
 		bool isTruemotion1() const;
 		void forceDimensions(uint16 width, uint16 height);
@@ -212,16 +216,19 @@ protected:
 		AVIAudioTrack(const AVIStreamHeader &streamHeader, const PCMWaveFormat &waveFormat, Audio::Mixer::SoundType soundType);
 		~AVIAudioTrack();
 
+		virtual void createAudioStream();
 		virtual void queueSound(Common::SeekableReadStream *stream);
 		Audio::Mixer::SoundType getSoundType() const { return _soundType; }
 		void skipAudio(const Audio::Timestamp &time, const Audio::Timestamp &frameTime);
-		void resetStream();
+		virtual void resetStream();
+		uint32 getCurChunk() const { return _curChunk; }
+		void setCurChunk(uint32 chunk) { _curChunk = chunk; }
 
 		bool isRewindable() const { return true; }
 		bool rewind();
 
 	protected:
-		Audio::AudioStream *getAudioStream() const;
+		Audio::AudioStream *getAudioStream() const { return _audioStream; }
 
 		// Audio Codecs
 		enum {
@@ -236,8 +243,17 @@ protected:
 		AVIStreamHeader _audsHeader;
 		PCMWaveFormat _wvInfo;
 		Audio::Mixer::SoundType _soundType;
-		Audio::QueuingAudioStream *_audStream;
-		Audio::QueuingAudioStream *createAudioStream();
+		Audio::AudioStream *_audioStream;
+		Audio::PacketizedAudioStream *_packetStream;
+		uint32 _curChunk;
+	};
+
+	struct TrackStatus {
+		TrackStatus();
+
+		Track *track;
+		uint32 index;
+		uint32 chunkSearchOffset;
 	};
 
 	AVIHeader _header;
@@ -260,8 +276,11 @@ protected:
 	void handleStreamHeader(uint32 size);
 	uint16 getStreamType(uint32 tag) const { return tag & 0xFFFF; }
 	byte getStreamIndex(uint32 tag) const;
-	void forceVideoEnd();
 	void checkTruemotion1();
+
+	void handleNextPacket(TrackStatus& status);
+	bool shouldQueueAudio(TrackStatus& status);
+	Common::Array<TrackStatus> _videoTracks, _audioTracks;
 
 public:
 	virtual AVIAudioTrack *createAudioTrack(AVIStreamHeader sHeader, PCMWaveFormat wvInfo);

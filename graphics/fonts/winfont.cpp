@@ -211,8 +211,8 @@ uint16 WinFont::characterToIndex(uint32 character) const {
 
 int WinFont::getCharWidth(uint32 chr) const {
 #ifdef SCUMMVMKOR
-	if (chr > 0xff)
-		return getKorFontWidth();
+    if (chr > 0xff)
+        return getKorFontWidth();
 #endif
 	return _glyphs[characterToIndex(chr)].charWidth;
 }
@@ -331,10 +331,10 @@ bool WinFont::loadFromFNT(Common::SeekableReadStream &stream) {
 
 void WinFont::drawChar(Surface *dst, uint32 chr, int x, int y, uint32 color) const {
 #ifdef SCUMMVMKOR
-	if (chr > 0xff) {
-		drawKorChar(dst, chr, x, y, color);
-		return;
-	}
+    if (chr > 0xff) {
+        drawKorChar(dst, chr, x, y, color);
+        return;
+    }
 #endif
 	assert(dst);
 	assert(dst->format.bytesPerPixel == 1 || dst->format.bytesPerPixel == 2 || dst->format.bytesPerPixel == 4);

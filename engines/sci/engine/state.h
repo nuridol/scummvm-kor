@@ -57,6 +57,10 @@ enum AbortGameState {
 	kAbortQuitGame = 3
 };
 
+// slot 0 is the ScummVM auto-save slot, which is not used by us, but is still reserved
+#define SAVEGAMESLOT_FIRST 1
+#define SAVEGAMESLOT_LAST 99
+
 // We assume that scripts give us savegameId 0->99 for creating a new save slot
 //  and savegameId 100->199 for existing save slots. Refer to kfile.cpp
 enum {
@@ -131,6 +135,10 @@ public:
 	VirtualIndexFile *_virtualIndexFile;
 #endif
 
+	// see detection.cpp / SciEngine::loadGameState()
+	bool _delayedRestoreGame;  // boolean, that triggers delayed restore (triggered by ScummVM menu)
+	int _delayedRestoreGameId; // the saved game id, that it supposed to get restored (triggered by ScummVM menu)
+
 	uint _chosenQfGImportItem; // Remembers the item selected in QfG import rooms
 
 	bool _cursorWorkaroundActive; // Refer to GfxCursor::setPosition()
@@ -198,8 +206,6 @@ public:
 	VideoState _videoState;
 	uint16 _vmdPalStart, _vmdPalEnd;
 	bool _syncedAudioOptions;
-
-	uint16 _palCycleToColor;
 
 	/**
 	 * Resets the engine state.

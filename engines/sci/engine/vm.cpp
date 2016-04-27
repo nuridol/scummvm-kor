@@ -358,12 +358,15 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 		SciTrackOriginReply originReply;
 		SciWorkaroundSolution solution = trackOriginAndFindWorkaround(0, kernelCall.workarounds, &originReply);
 		switch (solution.type) {
-		case WORKAROUND_NONE:
-			kernel->signatureDebug(kernelCall.signature, argc, argv);
-			error("[VM] k%s[%x]: signature mismatch via method %s::%s (room %d, script %d, localCall 0x%x)",
+		case WORKAROUND_NONE: {
+			Common::String signatureDetailsStr;
+			kernel->signatureDebug(signatureDetailsStr, kernelCall.signature, argc, argv);
+			error("\n%s[VM] k%s[%x]: signature mismatch in method %s::%s (room %d, script %d, localCall 0x%x)",
+				signatureDetailsStr.c_str(),
 				kernelCall.name, kernelCallNr, originReply.objectName.c_str(), originReply.methodName.c_str(),
 				s->currentRoomNumber(), originReply.scriptNr, originReply.localCallOffset);
 			break;
+			}
 		case WORKAROUND_IGNORE: // don't do kernel call, leave acc alone
 			return;
 		case WORKAROUND_STILLCALL: // call kernel anyway
@@ -408,15 +411,18 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 			SciWorkaroundSolution solution = trackOriginAndFindWorkaround(0, kernelSubCall.workarounds, &originReply);
 			switch (solution.type) {
 			case WORKAROUND_NONE: {
-				kernel->signatureDebug(kernelSubCall.signature, argc, argv);
+				Common::String signatureDetailsStr;
+				kernel->signatureDebug(signatureDetailsStr, kernelSubCall.signature, argc, argv);
 				int callNameLen = strlen(kernelCall.name);
 				if (strncmp(kernelCall.name, kernelSubCall.name, callNameLen) == 0) {
 					const char *subCallName = kernelSubCall.name + callNameLen;
-					error("[VM] k%s(%s): signature mismatch via method %s::%s (room %d, script %d, localCall %x)",
+					error("\n%s[VM] k%s(%s): signature mismatch in method %s::%s (room %d, script %d, localCall %x)",
+						signatureDetailsStr.c_str(),
 						kernelCall.name, subCallName, originReply.objectName.c_str(), originReply.methodName.c_str(),
 						s->currentRoomNumber(), originReply.scriptNr, originReply.localCallOffset);
 				}
-				error("[VM] k%s: signature mismatch via method %s::%s (room %d, script %d, localCall %x)",
+				error("\n%s[VM] k%s: signature mismatch in method %s::%s (room %d, script %d, localCall %x)",
+					signatureDetailsStr.c_str(),
 					kernelSubCall.name, originReply.objectName.c_str(), originReply.methodName.c_str(),
 					s->currentRoomNumber(), originReply.scriptNr, originReply.localCallOffset);
 				break;
@@ -968,21 +974,24 @@ void run_vm(EngineState *s) {
 
 			break;
 
-		case 0x26: // (38)
-		case 0x27: // (39)
-			if (getSciVersion() == SCI_VERSION_3) {
-				if (extOpcode == 0x4c)
-					s->r_acc = obj->getInfoSelector();
-				else if (extOpcode == 0x4d)
-					PUSH32(obj->getInfoSelector());
-				else if (extOpcode == 0x4e)
-					s->r_acc = obj->getSuperClassSelector();	// TODO: is this correct?
-				// TODO: There are also opcodes in
-				// here to get the superclass, and possibly the species too.
-				else
-					error("Dummy opcode 0x%x called", opcode);	// should never happen
-			} else
+		case op_infoToa: // (38)
+			if (getSciVersion() < SCI_VERSION_3)
 				error("Dummy opcode 0x%x called", opcode);	// should never happen
+
+			if (!(extOpcode & 1))
+				s->r_acc = obj->getInfoSelector();
+			else
+				PUSH32(obj->getInfoSelector());
+			break;
+
+		case op_superToa: // (39)
+			if (getSciVersion() < SCI_VERSION_3)
+				error("Dummy opcode 0x%x called", opcode);	// should never happen
+
+			if (!(extOpcode & 1))
+				s->r_acc = obj->getSuperClassSelector();
+			else
+				PUSH32(obj->getSuperClassSelector());
 			break;
 
 		case op_class: // 0x28 (40)

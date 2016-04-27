@@ -185,7 +185,7 @@ reg_t kDoAudio(EngineState *s, int argc, reg_t *argv) {
 		volume = CLIP<int16>(volume, 0, AUDIO_VOLUME_MAX);
 		debugC(kDebugLevelSound, "kDoAudio: set volume to %d", volume);
 #ifdef ENABLE_SCI32
-		if (getSciVersion() >= SCI_VERSION_2_1) {
+		if (getSciVersion() >= SCI_VERSION_2_1_EARLY) {
 			int16 volumePrev = mixer->getVolumeForSoundType(Audio::Mixer::kSpeechSoundType) / 2;
 			volumePrev = CLIP<int16>(volumePrev, 0, AUDIO_VOLUME_MAX);
 			mixer->setVolumeForSoundType(Audio::Mixer::kSpeechSoundType, volume * 2);
@@ -206,8 +206,15 @@ reg_t kDoAudio(EngineState *s, int argc, reg_t *argv) {
 			// athrxx: It seems from disasm that the original KQ5 FM-Towns loads a default language (Japanese) audio map at the beginning
 			// right after loading the video and audio drivers. The -1 language argument in here simply means that the original will stick
 			// with Japanese. Instead of doing that we switch to the language selected in the launcher.
-			if (g_sci->getPlatform() == Common::kPlatformFMTowns && language == -1)
-				language = (g_sci->getLanguage() == Common::JA_JPN) ? K_LANG_JAPANESE : K_LANG_ENGLISH;
+			if (g_sci->getPlatform() == Common::kPlatformFMTowns && language == -1) {
+				// FM-Towns calls us to get the current language / also set the default language
+				// This doesn't just happen right at the start, but also when the user clicks on the Sierra logo in the game menu
+				// It uses the result of this call to either show "English Voices" or "Japanese Voices".
+
+				// Language should have been set by setLauncherLanguage() already (or could have been modified by the scripts).
+				// Get this language setting, so that the chosen language will get set for resource manager.
+				language = g_sci->getSciLanguage();
+			}
 
 			debugC(kDebugLevelSound, "kDoAudio: set language to %d", language);
 

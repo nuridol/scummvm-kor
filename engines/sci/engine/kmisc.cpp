@@ -218,7 +218,6 @@ enum {
 
 reg_t kGetTime(EngineState *s, int argc, reg_t *argv) {
 	TimeDate loc_time;
-	uint32 elapsedTime = g_engine->getTotalPlayTime();
 	int retval = 0; // Avoid spurious warning
 
 	g_system->getTimeAndDate(loc_time);
@@ -232,7 +231,7 @@ reg_t kGetTime(EngineState *s, int argc, reg_t *argv) {
 
 	switch (mode) {
 	case KGETTIME_TICKS :
-		retval = elapsedTime * 60 / 1000;
+		retval = g_sci->getTickCount();
 		debugC(kDebugLevelTime, "GetTime(elapsed) returns %d", retval);
 		break;
 	case KGETTIME_TIME_12HOUR :
@@ -269,7 +268,10 @@ reg_t kMemory(EngineState *s, int argc, reg_t *argv) {
 	switch (argv[0].toUint16()) {
 	case K_MEMORY_ALLOCATE_CRITICAL: {
 		int byteCount = argv[1].toUint16();
-		// WORKAROUND:
+		// Sierra themselves allocated at least 2 bytes more than requested.
+		// Probably as a safety margin. And they also made size even.
+		//
+		// This behavior is required by at least these:
 		//  - pq3 (multilingual) room 202
 		//     when plotting crimes, allocates the returned bytes from kStrLen
 		//     on "W" and "E" and wants to put a string in there, which doesn't
@@ -277,18 +279,22 @@ reg_t kMemory(EngineState *s, int argc, reg_t *argv) {
 		//  - lsl5 (multilingual) room 280
 		//     allocates memory according to a previous kStrLen for the name of
 		//     the airport ladies (bug #3093818), which isn't enough
-
-		// We always allocate 1 byte more, because of this
-		byteCount++;
+		byteCount += 2 + (byteCount & 1);
 
 		if (!s->_segMan->allocDynmem(byteCount, "kMemory() critical", &s->r_acc)) {
 			error("Critical heap allocation failed");
 		}
 		break;
 	}
-	case K_MEMORY_ALLOCATE_NONCRITICAL:
-		s->_segMan->allocDynmem(argv[1].toUint16(), "kMemory() non-critical", &s->r_acc);
+	case K_MEMORY_ALLOCATE_NONCRITICAL: {
+		int byteCount = argv[1].toUint16();
+
+		// See above
+		byteCount += 2 + (byteCount & 1);
+
+		s->_segMan->allocDynmem(byteCount, "kMemory() non-critical", &s->r_acc);
 		break;
+	}
 	case K_MEMORY_FREE :
 		if (!s->_segMan->freeDynmem(argv[1])) {
 			if (g_sci->getGameId() == GID_QFG1VGA) {
@@ -487,7 +493,7 @@ reg_t kMacPlatform(EngineState *s, int argc, reg_t *argv) {
 		// In SCI1, its usage is still unknown
 		// In SCI1.1, it's NOP
 		// In SCI32, it's used for remapping cursor ID's
-		if (getSciVersion() >= SCI_VERSION_2_1) // Set Mac cursor remap
+		if (getSciVersion() >= SCI_VERSION_2_1_EARLY) // Set Mac cursor remap
 			g_sci->_gfxCursor->setMacCursorRemapList(argc - 1, argv + 1);
 		else if (getSciVersion() != SCI_VERSION_1_1)
 			warning("Unknown SCI1 kMacPlatform(0) call");
@@ -538,6 +544,11 @@ reg_t kPlatform(EngineState *s, int argc, reg_t *argv) {
 		// return 0. However, the behavior changed for kPlatform with no
 		// parameters in SCI32.
 		return NULL_REG;
+	}
+
+	if (g_sci->forceHiresGraphics()) {
+		// force Windows platform, so that hires-graphics are enabled
+		isWindows = true;
 	}
 
 	uint16 operation = (argc == 0) ? 0 : argv[0].toUint16();

@@ -241,6 +241,15 @@ void QuickTimeAudioDecoder::QuickTimeAudioTrack::queueAudio(const Timestamp &len
 			// If we have any samples that we need to skip (ie. we seeked into
 			// the middle of a chunk), skip them here.
 			if (_skipSamples != Timestamp()) {
+				if (_skipSamples > chunkLength) {
+					// If the amount we need to skip is greater than the size
+					// of the chunk, just skip it altogether.
+					_curMediaPos = _curMediaPos + chunkLength;
+					_skipSamples = _skipSamples - chunkLength;
+					delete stream;
+					continue;
+				}
+
 				skipSamples(_skipSamples, stream);
 				_curMediaPos = _curMediaPos + _skipSamples;
 				chunkLength = chunkLength - _skipSamples;
@@ -414,8 +423,15 @@ void QuickTimeAudioDecoder::QuickTimeAudioTrack::skipSamples(const Timestamp &le
 }
 
 void QuickTimeAudioDecoder::QuickTimeAudioTrack::findEdit(const Timestamp &position) {
-	for (_curEdit = 0; _curEdit < _parentTrack->editCount - 1 && position > Timestamp(0, _parentTrack->editList[_curEdit].timeOffset, _decoder->_timeScale); _curEdit++)
-		;
+	// Go through the edits look for where we find out we need to be. As long
+	// as the position is >= to the edit's start time, it is considered to be in that
+	// edit. seek() already figured out if we reached the last edit, so we don't need
+	// to handle that case here.
+	for (_curEdit = 0; _curEdit < _parentTrack->editCount - 1; _curEdit++) {
+		Timestamp nextEditTime(0, _parentTrack->editList[_curEdit + 1].timeOffset, _decoder->_timeScale);
+		if (position < nextEditTime)
+			break;
+	}
 
 	enterNewEdit(position);
 }
