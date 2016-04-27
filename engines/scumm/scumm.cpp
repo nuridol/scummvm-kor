@@ -487,11 +487,8 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_debugMode = (gDebugLevel >= 0);
 	_dumpScripts = ConfMan.getBool("dump_scripts");
 	_bootParam = ConfMan.getInt("boot_param");
-#ifdef SCUMMVMKOR
-    if (_game.id==GID_MONKEY2 && _bootParam == 0)
-        _bootParam = 10001;
-#endif
-    // Boot params often need debugging switched on to work
+
+	// Boot params often need debugging switched on to work
 	if (_bootParam)
 		_debugMode = true;
 
