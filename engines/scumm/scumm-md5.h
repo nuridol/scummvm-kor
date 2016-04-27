@@ -281,10 +281,7 @@ static const MD5Table md5table[] = {
 	{ "600abd3e9f47e63e670188b7e4e86ac7", "spyozon", "", "", 47128, Common::EN_USA, Common::kPlatformUnknown },
 	{ "6027e9ca9c35746d95dee2068cec17e5", "zak", "V2", "V2", -1, Common::DE_DEU, Common::kPlatformAmiga },
 	{ "60ba818dc3bede86d40357e3913f8505", "ft", "", "Version B", 19697, Common::EN_ANY, Common::kPlatformUnknown },
-#ifdef SCUMMVMKOR
-    { "60c7b33000059b44465b2ce104a52285", "monkey", "CD", "DUMB 0.4.0", -1, Common::KO_KOR, Common::kPlatformDOS },
-#endif
-    { "613f64f78ea26c7353b2a5940eb61d6a", "zak", "V2", "V2", -1, Common::FR_FRA, Common::kPlatformAtariST },
+  { "613f64f78ea26c7353b2a5940eb61d6a", "zak", "V2", "V2", -1, Common::FR_FRA, Common::kPlatformAtariST },
 	{ "62050da376483d8edcbd98cd26b6cb57", "puttrace", "HE 99", "", -1, Common::RU_RUS, Common::kPlatformWindows },
 	{ "624cdb93654667c869d204a64af7e57f", "maniac", "V2", "V2", 1988, Common::EN_ANY, Common::kPlatformDOS },
 	{ "6269b8fbf51a353e5b501e4ad98cdc67", "arttime", "", "", -1, Common::EN_ANY, Common::kPlatformUnknown },
@@ -490,9 +487,6 @@ static const MD5Table md5table[] = {
 	{ "a86f9c49355579c30d4a55b477c0d869", "baseball2001", "", "", -1, Common::EN_ANY, Common::kPlatformUnknown },
 	{ "a8fcc3084ad5e3e569722755f205b1ef", "pajama3", "", "Mini Game", 13911, Common::DE_DEU, Common::kPlatformWindows },
 	{ "a9543ef0d79bcb47cd76ec197ad0a967", "puttmoon", "", "", -1, Common::EN_ANY, Common::kPlatform3DO },
-#ifdef SCUMMVMKOR
-    { "a95baf7746f1be4985ad42126993a744", "monkey2", "", "DUMB 0.1.0", -1, Common::KO_KOR, Common::kPlatformDOS },
-#endif
 	{ "a99c39ba65b6086be28aef576da69595", "spyozon", "", "Demo", -1, Common::FR_FRA, Common::kPlatformWindows },
 	{ "a9f2f04b1ecaab9495b59befffe9bf88", "pajama3", "", "Demo", -1, Common::EN_USA, Common::kPlatformUnknown },
 	{ "aa6a91b7f6f119d1b7b1f2a4c9e24d59", "puttmoon", "", "Demo", 6233, Common::EN_ANY, Common::kPlatformDOS },
@@ -701,5 +695,13 @@ static const MD5Table md5table[] = {
 	{ "fe60d6b5ff51b0553ac59963123b5777", "comi", "", "", 76791, Common::UNK_LANG, Common::kPlatformWindows },
 	{ "febf4a983ea5faea1c9dd6c710ebb09c", "puttcircus", "", "", -1, Common::DE_DEU, Common::kPlatformWindows },
 	{ "ff05c07990061d97647f059c48c1d05a", "zak", "V2", "V2", -1, Common::DE_DEU, Common::kPlatformAtariST },
+#ifdef SCUMMVMKOR
+	{ "a4b30b29a419d49a2ab33bd4414939d1", "tentacle", "V2", "CD", -1, Common::KO_KOR, Common::kPlatformDOS },
+	{ "cb8feea195746e042368e2b738766d8b", "indy3", "V2", "VGA", -1, Common::KO_KOR, Common::kPlatformDOS },
+	{ "f3f1a88e3d87697d7e31928ee653010b", "loom", "V2", "EGA", -1, Common::KO_KOR, Common::kPlatformDOS },
+	{ "32765851cd5ed099f8da36a4a6144c7e", "atlantis", "V2", "CD", -1, Common::KO_KOR, Common::kPlatformDOS },
+	{ "60c7b33000059b44465b2ce104a52285", "monkey", "CD", "DUMB 0.4.0", -1, Common::KO_KOR, Common::kPlatformDOS },
+	{ "a95baf7746f1be4985ad42126993a744", "monkey2", "", "DUMB 0.1.0", -1, Common::KO_KOR, Common::kPlatformDOS },
+#endif
 	{ 0, 0, 0, 0, 0, Common::UNK_LANG, Common::kPlatformUnknown }
 };

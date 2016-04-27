@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 
@@ -53,72 +54,74 @@ void ScummEngine::loadCJKFont() {
 	_newLineCharacter = 0;
 
 #ifdef SCUMMVMKOR
-        _useMultiFont = 0;	// Korean Multi-Font
-#endif
 
-#ifdef SCUMMVMKOR
-        // Special case for Korean
-        if (_language == Common::KO_KOR) {
-            int numChar = 2350;
-            _useCJKMode = true;
-            
-            if (_game.version < 7 || _game.id == GID_FT)
-                _useMultiFont = 1;
-            
-            if (_useMultiFont) {
-                warning("Loading Korean Multi Font System");
-                _numLoadedFont = 0;
-                _2byteFontPtr = NULL;
-                _2byteWidth = 0;
-                _2byteHeight = 0;
-                for(int i = 0; i < 20; i++) {
-                    char fontFile[256];
-                    sprintf(fontFile, "korean%02d.fnt", i);
-                    _2byteMultiFontPtr[i] = NULL;
-                    if (fp.open(fontFile)) {
-                        _numLoadedFont++;
-                        fp.readByte();
-                        _2byteMultiShadow[i] = fp.readByte();
-                        _2byteMultiWidth[i] = fp.readByte();
-                        _2byteMultiHeight[i] = fp.readByte();
-                        
-                        int fontSize = ((_2byteMultiWidth[i] + 7) / 8) * _2byteMultiHeight[i] * numChar;
-                        _2byteMultiFontPtr[i] = new byte[fontSize];
-                        warning("#%d, size %d, height =%d", i, fontSize, _2byteMultiHeight[i]);
-                        fp.read(_2byteMultiFontPtr[i], fontSize);
-                        fp.close();
-                        if (_2byteFontPtr == NULL) {	// for non-initialized Smushplayer drawChar
-                            _2byteFontPtr = _2byteMultiFontPtr[i];
-                            _2byteWidth = _2byteMultiWidth[i];
-                            _2byteHeight = _2byteMultiHeight[i];
-                            _2byteShadow = _2byteMultiShadow[i];
-                        }
+    _useMultiFont = 0;	// Korean Multi-Font
+    
+    // Special case for Korean
+    if (_language == Common::KO_KOR) {
+        int numChar = 2350;
+        _useCJKMode = true;
+        
+        if (_game.version < 7 || _game.id == GID_FT)
+            _useMultiFont = 1;
+        
+        if (_useMultiFont) {
+            debug("Loading Korean Multi Font System");
+            _numLoadedFont = 0;
+            _2byteFontPtr = NULL;
+            _2byteWidth = 0;
+            _2byteHeight = 0;
+            for(int i = 0; i < 20; i++) {
+                char fontFile[256];
+                sprintf(fontFile, "korean%02d.fnt", i);
+                _2byteMultiFontPtr[i] = NULL;
+                if (fp.open(fontFile)) {
+                    _numLoadedFont++;
+                    fp.readByte();
+                    _2byteMultiShadow[i] = fp.readByte();
+                    _2byteMultiWidth[i] = fp.readByte();
+                    _2byteMultiHeight[i] = fp.readByte();
+                    
+                    int fontSize = ((_2byteMultiWidth[i] + 7) / 8) * _2byteMultiHeight[i] * numChar;
+                    _2byteMultiFontPtr[i] = new byte[fontSize];
+                    warning("#%d, size %d, height =%d", i, fontSize, _2byteMultiHeight[i]);
+                    fp.read(_2byteMultiFontPtr[i], fontSize);
+                    fp.close();
+                    if (_2byteFontPtr == NULL) {	// for non-initialized Smushplayer drawChar
+                        _2byteFontPtr = _2byteMultiFontPtr[i];
+                        _2byteWidth = _2byteMultiWidth[i];
+                        _2byteHeight = _2byteMultiHeight[i];
+                        _2byteShadow = _2byteMultiShadow[i];
                     }
                 }
-                if(_numLoadedFont == 0) {
-                    warning("Cannot load any font for multi font");
-                    _useMultiFont = 0;
-                } else
-                    warning("%d fonts are loaded", _numLoadedFont);
             }
-            
-            if (!_useMultiFont) {
-                warning("Loading Korean Single Font System");
-                if (fp.open("korean.fnt")) {
-                    fp.seek(2, SEEK_CUR);
-                    _2byteWidth = fp.readByte();
-                    _2byteHeight = fp.readByte();
-                    _2byteFontPtr = new byte[((_2byteWidth + 7) / 8) * _2byteHeight * numChar];
-                    fp.read(_2byteFontPtr, ((_2byteWidth + 7) / 8) * _2byteHeight * numChar);
-                    fp.close();
-                } else {
-                    error("Couldn't load any font: %s", fp.getName());
-                }
+            if(_numLoadedFont == 0) {
+                warning("Cannot load any font for multi font");
+                _useMultiFont = 0;
+            } else
+                debug("%d fonts are loaded", _numLoadedFont);
+        }
+        
+        if (!_useMultiFont) {
+            debug("Loading Korean Single Font System");
+            if (fp.open("korean.fnt")) {
+                fp.seek(2, SEEK_CUR);
+                _2byteWidth = fp.readByte();
+                _2byteHeight = fp.readByte();
+                _2byteFontPtr = new byte[((_2byteWidth + 7) / 8) * _2byteHeight * numChar];
+                fp.read(_2byteFontPtr, ((_2byteWidth + 7) / 8) * _2byteHeight * numChar);
+                fp.close();
+            } else {
+                error("Couldn't load any font: %s", fp.getName());
             }
         }
-#else
+        
+        return;
+    }
+#endif
 
 	if (_game.version <= 5 && _game.platform == Common::kPlatformFMTowns && _language == Common::JA_JPN) { // FM-TOWNS v3 / v5 Kanji
+
 #if defined(DISABLE_TOWNS_DUAL_LAYER_MODE) || !defined(USE_RGB_COLOR)
 		GUIErrorMessage("FM-Towns Kanji font drawing requires dual graphics layer support which is disabled in this build");
 		error("FM-Towns Kanji font drawing requires dual graphics layer support which is disabled in this build");
@@ -222,7 +225,6 @@ void ScummEngine::loadCJKFont() {
 				error("SCUMM::Font: Could not load any font");
 		}
 	}
-#endif
 }
 
 byte *ScummEngine::get2byteCharPtr(int idx) {
@@ -323,7 +325,7 @@ CharsetRenderer::~CharsetRenderer() {
 
 CharsetRendererCommon::CharsetRendererCommon(ScummEngine *vm)
 	: CharsetRenderer(vm), _bytesPerPixel(0), _fontHeight(0), _numChars(0) {
-	_shadowMode = false;
+	_enableShadow = false;
 	_shadowColor = 0;
 }
 
@@ -349,35 +351,35 @@ void CharsetRendererCommon::setCurID(int32 id) {
 	_numChars = READ_LE_UINT16(_fontPtr + 2);
 
 #ifdef SCUMMVMKOR
-        if(_vm->_useMultiFont) {
-            if(id == 6) {
-                // Inventory: 한글이 넘쳐서 에러가 나기 때문에 0번 font를 사용
-                _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[0];
-                _vm->_2byteWidth = _vm->_2byteMultiWidth[0];
-                _vm->_2byteHeight = _vm->_2byteMultiHeight[0];
-                _vm->_2byteShadow = _vm->_2byteMultiShadow[0];
-            } else if(_vm->_2byteMultiFontPtr[id]) {
-                _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[id];
-                _vm->_2byteWidth = _vm->_2byteMultiWidth[id];
-                _vm->_2byteHeight = _vm->_2byteMultiHeight[id];
-                _vm->_2byteShadow = _vm->_2byteMultiShadow[id];
-            } else {
-                // Get nearest font set (by height)
-                debug(7, "Cannot find matching font set for charset #%d, use nearest font set", id);
-                int dstHeight = _fontHeight;
-                int nearest = 0;
-                for(int i = 0; i < _vm->_numLoadedFont; i++) {
-                    if(ABS(_vm->_2byteMultiHeight[i] - dstHeight) <= ABS(_vm->_2byteMultiHeight[nearest] - dstHeight)) {
-                        nearest = i;
-                    }
+    if(_vm->_useMultiFont) {
+        if(id == 6) {
+            // Inventory: 한글이 넘쳐서 에러가 나기 때문에 0번 font를 사용
+            _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[0];
+            _vm->_2byteWidth = _vm->_2byteMultiWidth[0];
+            _vm->_2byteHeight = _vm->_2byteMultiHeight[0];
+            _vm->_2byteShadow = _vm->_2byteMultiShadow[0];
+        } else if(_vm->_2byteMultiFontPtr[id]) {
+            _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[id];
+            _vm->_2byteWidth = _vm->_2byteMultiWidth[id];
+            _vm->_2byteHeight = _vm->_2byteMultiHeight[id];
+            _vm->_2byteShadow = _vm->_2byteMultiShadow[id];
+        } else {
+            // Get nearest font set (by height)
+            debug(7, "Cannot find matching font set for charset #%d, use nearest font set", id);
+            int dstHeight = _fontHeight;
+            int nearest = 0;
+            for(int i = 0; i < _vm->_numLoadedFont; i++) {
+                if(ABS(_vm->_2byteMultiHeight[i] - dstHeight) <= ABS(_vm->_2byteMultiHeight[nearest] - dstHeight)) {
+                    nearest = i;
                 }
-                debug(7, "Found #%d", nearest);
-                _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[nearest];
-                _vm->_2byteWidth = _vm->_2byteMultiWidth[nearest];
-                _vm->_2byteHeight = _vm->_2byteMultiHeight[nearest];
-                _vm->_2byteShadow = _vm->_2byteMultiShadow[nearest];
             }
+            debug(7, "Found #%d", nearest);
+            _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[nearest];
+            _vm->_2byteWidth = _vm->_2byteMultiWidth[nearest];
+            _vm->_2byteHeight = _vm->_2byteMultiHeight[nearest];
+            _vm->_2byteShadow = _vm->_2byteMultiShadow[nearest];
         }
+    }
 #endif
 }
 
@@ -402,35 +404,35 @@ void CharsetRendererV3::setCurID(int32 id) {
 	_fontPtr += _numChars;
 
 #ifdef SCUMMVMKOR
-        if(_vm->_useMultiFont) {
-            if(id == 6) {
-                // Inventory: 한글이 넘쳐서 에러가 나기 때문에 0번 font를 사용
-                _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[0];
-                _vm->_2byteWidth = _vm->_2byteMultiWidth[0];
-                _vm->_2byteHeight = _vm->_2byteMultiHeight[0];
-                _vm->_2byteShadow = _vm->_2byteMultiShadow[0];
-            } else if(_vm->_2byteMultiFontPtr[id]) {
-                _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[id];
-                _vm->_2byteWidth = _vm->_2byteMultiWidth[id];
-                _vm->_2byteHeight = _vm->_2byteMultiHeight[id];
-                _vm->_2byteShadow = _vm->_2byteMultiShadow[id];
-            } else {
-                // Get nearest font set (by height)
-                debug(7, "Cannot find matching font set for charset #%d, use nearest font set", id);
-                int dstHeight = _fontHeight;
-                int nearest = 0;
-                for(int i = 0; i < _vm->_numLoadedFont; i++) {
-                    if(ABS(_vm->_2byteMultiHeight[i] - dstHeight) <= ABS(_vm->_2byteMultiHeight[nearest] - dstHeight)) {
-                        nearest = i;
-                    }
+    if(_vm->_useMultiFont) {
+        if(id == 6) {
+            // Inventory: 한글이 넘쳐서 에러가 나기 때문에 0번 font를 사용
+            _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[0];
+            _vm->_2byteWidth = _vm->_2byteMultiWidth[0];
+            _vm->_2byteHeight = _vm->_2byteMultiHeight[0];
+            _vm->_2byteShadow = _vm->_2byteMultiShadow[0];
+        } else if(_vm->_2byteMultiFontPtr[id]) {
+            _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[id];
+            _vm->_2byteWidth = _vm->_2byteMultiWidth[id];
+            _vm->_2byteHeight = _vm->_2byteMultiHeight[id];
+            _vm->_2byteShadow = _vm->_2byteMultiShadow[id];
+        } else {
+            // Get nearest font set (by height)
+            debug(7, "Cannot find matching font set for charset #%d, use nearest font set", id);
+            int dstHeight = _fontHeight;
+            int nearest = 0;
+            for(int i = 0; i < _vm->_numLoadedFont; i++) {
+                if(ABS(_vm->_2byteMultiHeight[i] - dstHeight) <= ABS(_vm->_2byteMultiHeight[nearest] - dstHeight)) {
+                    nearest = i;
                 }
-                debug(7, "Found #%d", nearest);
-                _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[nearest];
-                _vm->_2byteWidth = _vm->_2byteMultiWidth[nearest];
-                _vm->_2byteHeight = _vm->_2byteMultiHeight[nearest];
-                _vm->_2byteShadow = _vm->_2byteMultiShadow[nearest];
             }
+            debug(7, "Found #%d", nearest);
+            _vm->_2byteFontPtr = _vm->_2byteMultiFontPtr[nearest];
+            _vm->_2byteWidth = _vm->_2byteMultiWidth[nearest];
+            _vm->_2byteHeight = _vm->_2byteMultiHeight[nearest];
+            _vm->_2byteShadow = _vm->_2byteMultiShadow[nearest];
         }
+    }
 #endif
 }
 
@@ -526,6 +528,10 @@ int CharsetRenderer::getStringWidth(int arg, const byte *text) {
 			} else if (chr & 0x80) {
 				pos++;
 				width += _vm->_2byteWidth;
+				// Original keeps glyph width and character dimensions separately
+				if (_vm->_language == Common::KO_KOR || _vm->_language == Common::ZH_TWN) {
+					width++;
+				}
 				continue;
 			}
 		}
@@ -539,13 +545,11 @@ int CharsetRenderer::getStringWidth(int arg, const byte *text) {
 
 void CharsetRenderer::addLinebreaks(int a, byte *str, int pos, int maxwidth) {
 	int lastspace = -1;
-
 #ifdef SCUMMVMKOR
-        int lastKoreanLineBreak = -1;
-        char tmpStrBuf[512];
-        int origPos = pos;
+    int lastKoreanLineBreak = -1;
+    char tmpStrBuf[512];
+    int origPos = pos;
 #endif
-
 	int curw = 1;
 	int chr;
 	int oldID = getCurID();
@@ -608,14 +612,12 @@ void CharsetRenderer::addLinebreaks(int a, byte *str, int pos, int maxwidth) {
 
 		if (chr == _vm->_newLineCharacter)
 			lastspace = pos - 1;
-
 #ifdef SCUMMVMKOR
         if (_vm->_useCJKMode && _vm->_language == Common::KO_KOR) {
             if (_center == false && chr == '(' && pos - 3 >= origPos && checkKSCode(str[pos -3], str[pos -2]))
                 lastKoreanLineBreak = pos - 1;
         }
 #endif
-
 		if (_vm->_useCJKMode) {
 			if (_vm->_game.platform == Common::kPlatformFMTowns) {
 				if (checkSJISCode(chr))
@@ -635,6 +637,12 @@ void CharsetRenderer::addLinebreaks(int a, byte *str, int pos, int maxwidth) {
                         lastKoreanLineBreak = pos - 2;
                 }
 #endif
+				// Original keeps glyph width and character dimensions separately
+				if (_vm->_language == Common::KO_KOR || _vm->_language == Common::ZH_TWN) {
+					curw++;
+				}
+			} else {
+				curw += getCharWidth(chr);
 			}
 		} else {
 			curw += getCharWidth(chr);
@@ -664,10 +672,10 @@ void CharsetRenderer::addLinebreaks(int a, byte *str, int pos, int maxwidth) {
                 lastKoreanLineBreak = -1;
             }
 #else
-            str[lastspace] = 0xD;
-            curw = 1;
-            pos = lastspace + 1;
-            lastspace = -1;
+			str[lastspace] = 0xD;
+			curw = 1;
+			pos = lastspace + 1;
+			lastspace = -1;
 #endif
 		}
 	}
@@ -687,85 +695,89 @@ int CharsetRendererV3::getCharWidth(uint16 chr) {
 	return spacing;
 }
 
-void CharsetRendererV3::enableShadow(bool enable) {
+void CharsetRendererPC::enableShadow(bool enable) {
 	_shadowColor = 0;
-	_shadowMode = enable;
+	_enableShadow = enable;
+
+	if (_vm->_game.version >= 7 && _vm->_language == Common::KO_KOR)
+		_shadowType = kHorizontalShadowType;
+	else
+		_shadowType = kNormalShadowType;
 }
 
-#ifdef SCUMMVMKOR
-void CharsetRendererCommon::drawBits1(const Graphics::Surface &s, byte *dst, const byte *src, int drawTop, int width, int height, uint8 bitDepth) {
-    int y, x;
-    byte bits = 0;
-    
-    // HACK: 한글 폰트에 그림자/테두리 정보가 없기 때문에
-    //       NUT Renderer에 있는 그림자 출력 방법을 사용한다
-    //       그리고 거기에 약간의 클리핑을 해준다
-    //       이걸로 FMT Kanji 버전에서도 OK
-    bool useOldShadow = false;
-    
-    int offsetX[14] = { -2, -2, -2, -1, 0, -1,  0,  1, -1, 1, -1, 0, 1, 0 };
-    int offsetY[14] = {  0,  1,  2,  2, 2, -1, -1, -1,  0, 0,  1, 1, 1, 0 };
-    int cTable[14] =  { _shadowColor, _shadowColor, _shadowColor,
-        _shadowColor, _shadowColor, _shadowColor, _shadowColor,
-        _shadowColor, _shadowColor, _shadowColor, _shadowColor,
-        _shadowColor, _shadowColor, _color };
-    int i = 0;
-    
-    if(_vm->_game.id == GID_DIG) {
-        _vm->_2byteShadow = 2;	// 그림자 패치
-    }
-    
-    switch(_vm->_2byteShadow) {
-        case 1:		// 그림자 없음
-            i = 13;
-            break;
-        case 2:		// 5시 그림자
-            i = 12;
-            break;
-        case 3:		// 테두리 및 7시 그림자 ("Monkey2", "Indy4")
-            i = 0;
-            break;
-        default:	// 테두리
-            i = 5;
-    }
-    
-    if (!_vm->_useCJKMode) {
-        i = 13;
-        useOldShadow = true;
-    }
-    
-    const byte *origSrc = src;
-    byte *origDst = dst;
-    
-    for (; i < 14; i++) {
-        src = origSrc;
-        dst = origDst;
-        
-        for (y = 0; y < height && y + drawTop + offsetY[i] < s.h; y++) {
-            for (x = 0; x < width && x + offsetY[i] < s.w; x++) {
-                if ((x % 8) == 0)
-                    bits = *src++;
-                if ((bits & revBitMask(x % 8)) && y + drawTop >= 0) {
-                    if (_shadowMode) {
-                        *(dst + 1) = _shadowColor;
-                        *(dst + s.pitch) = _shadowColor;
-//                            if (_shadowMode != kFMTOWNSShadowMode)
-                            *(dst + s.pitch + 1) = _shadowColor;
-                    }
-                    *(dst + (s.pitch * offsetY[i]) + offsetX[i]) = cTable[i];
-                }
-                dst++;
-            }
-            
-            dst += s.pitch - width;
-        }
-    }
-}
-#endif
-
-void CharsetRendererV3::drawBits1(Graphics::Surface &dest, int x, int y, const byte *src, int drawTop, int width, int height) {
+void CharsetRendererPC::drawBits1(Graphics::Surface &dest, int x, int y, const byte *src, int drawTop, int width, int height) {
 	byte *dst = (byte *)dest.getBasePtr(x, y);
-
+#ifdef SCUMMVMKOR
+    if (_vm->_useCJKMode && _vm->_language == Common::KO_KOR) {
+        int y, x;
+        byte bits = 0;
+        
+        // HACK: 한글 폰트에 그림자/테두리 정보가 없기 때문에
+        //       NUT Renderer에 있는 그림자 출력 방법을 사용한다
+        //       그리고 거기에 약간의 클리핑을 해준다
+        //       이걸로 FMT Kanji 버전에서도 OK
+        bool useOldShadow = false;
+        
+        int offsetX[14] = { -2, -2, -2, -1, 0, -1,  0,  1, -1, 1, -1, 0, 1, 0 };
+        int offsetY[14] = {  0,  1,  2,  2, 2, -1, -1, -1,  0, 0,  1, 1, 1, 0 };
+        int cTable[14] =  { _shadowColor, _shadowColor, _shadowColor,
+            _shadowColor, _shadowColor, _shadowColor, _shadowColor,
+            _shadowColor, _shadowColor, _shadowColor, _shadowColor,
+            _shadowColor, _shadowColor, _color };
+        int i = 0;
+        
+        if(_vm->_game.id == GID_DIG) {
+            _vm->_2byteShadow = 2;	// 그림자 패치
+        }
+        
+        switch(_vm->_2byteShadow) {
+            case 1:		// 그림자 없음
+                i = 13;
+                break;
+            case 2:		// 5시 그림자
+                i = 12;
+                break;
+            case 3:		// 테두리 및 7시 그림자 ("Monkey2", "Indy4")
+                i = 0;
+                break;
+            default:	// 테두리
+                i = 5;
+        }
+        
+        if (!_vm->_useCJKMode) {
+            i = 13;
+            useOldShadow = true;
+        }
+        
+        const byte *origSrc = src;
+        byte *origDst = dst;
+        
+        for (; i < 14; i++) {
+            src = origSrc;
+            dst = origDst;
+            
+            for (y = 0; y < height && y + drawTop + offsetY[i] < dest.h; y++) {
+                for (x = 0; x < width && x + offsetY[i] < dest.w; x++) {
+                    if ((x % 8) == 0)
+                        bits = *src++;
+                    if ((bits & revBitMask(x % 8)) && y + drawTop >= 0) {
+                        if (_enableShadow) {
+                            *(dst + 1) = _shadowColor;
+                            *(dst + dest.pitch) = _shadowColor;
+                            *(dst + dest.pitch + 1) = _shadowColor;
+                        }
+                        *(dst + (dest.pitch * offsetY[i]) + offsetX[i]) = cTable[i];
+                    }
+                    dst++;
+                }
+                
+                dst += dest.pitch - width;
+            }
+        }
+        return;
+    }
+#endif
+    
 	byte bits = 0;
 	uint8 col = _color;
 	int pitch = dest.pitch - width * dest.format.bytesPerPixel;
@@ -776,8 +788,12 @@ void CharsetRendererV3::drawBits1(Graphics::Surface &dest, int x, int y, const b
 			if ((x % 8) == 0)
 				bits = *src++;
 			if ((bits & revBitMask(x % 8)) && y + drawTop >= 0) {
-				if (_shadowMode)
-					dst[1] = dst2[0] = dst2[1] = _shadowColor;
+				if (_enableShadow) {
+					if (_shadowType == kNormalShadowType)
+						dst[1] = dst2[0] = dst2[1] = _shadowColor;
+					else if (_shadowType == kHorizontalShadowType)
+						dst[1] = _shadowColor;
+				}
 				dst[0] = col;
 			}
 			dst += dest.format.bytesPerPixel;
@@ -845,11 +861,7 @@ void CharsetRendererV3::printChar(int chr, bool ignoreCharsetMask) {
 	VirtScreen *vs;
 	const byte *charPtr;
 
-#ifdef SCUMMVMKOR
-    int is2byte = (chr > 0xff && _vm->_useCJKMode) ? 1 : 0;
-#else
-	int is2byte = (chr >= 256 && _vm->_useCJKMode) ? 1 : 0;
-#endif
+    int is2byte = (chr >= 256 && _vm->_useCJKMode) ? 1 : 0;
 
 	assertRange(0, _curId, _vm->_numCharsets - 1, "charset");
 
@@ -860,22 +872,25 @@ void CharsetRendererV3::printChar(int chr, bool ignoreCharsetMask) {
 		return;
 
 #ifdef SCUMMVMKOR
-    if (is2byte) {
-        charPtr = _vm->get2byteCharPtr(chr);
-        width = _vm->_2byteWidth;
-        height = _vm->_2byteHeight;
-    }
-    else {
-        charPtr = _fontPtr + chr * 8;
-        width = getDrawWidthIntern(chr);
-        height = getDrawHeightIntern(chr);
-        // or
-        // height = 8;
-    }
+    if (_vm->_language == Common::KO_KOR) {
+        if (is2byte) {
+            charPtr = _vm->get2byteCharPtr(chr);
+            width = _vm->_2byteWidth;
+            height = _vm->_2byteHeight;
+        }
+        else {
+            charPtr = _fontPtr + chr * 8;
+            width = getDrawWidthIntern(chr);
+            height = getDrawHeightIntern(chr);
+        }
+    } else {
 #else
 	charPtr = (_vm->_useCJKMode && chr > 127) ? _vm->get2byteCharPtr(chr) : _fontPtr + chr * 8;
 	width = getDrawWidthIntern(chr);
 	height = getDrawHeightIntern(chr);
+#endif
+#ifdef SCUMMVMKOR
+    }
 #endif
 	setDrawCharIntern(chr);
 
@@ -886,7 +901,7 @@ void CharsetRendererV3::printChar(int chr, bool ignoreCharsetMask) {
 	if (_left + origWidth > _right + 1)
 		return;
 
-	if (_shadowMode) {
+	if (_enableShadow) {
 		width++;
 		height++;
 	}
@@ -929,7 +944,7 @@ void CharsetRendererV3::printChar(int chr, bool ignoreCharsetMask) {
 
 	if (_str.right < _left) {
 		_str.right = _left;
-		if (_shadowMode)
+		if (_enableShadow)
 			_str.right++;
 	}
 
@@ -944,20 +959,25 @@ void CharsetRendererV3::drawChar(int chr, Graphics::Surface &s, int x, int y) {
     int height;
     int is2byte = (chr > 0xff && _vm->_useCJKMode) ? 1 : 0;
 
-    if (is2byte) {
-        charPtr = _vm->get2byteCharPtr(chr);
-        width = _vm->_2byteWidth;
-        height = _vm->_2byteHeight;
-    }
-    else {
-        charPtr = _fontPtr + chr * 8;
-        width = getDrawWidthIntern(chr);
-        height = getDrawHeightIntern(chr);
-    }
+    if (_vm->_language == Common::KO_KOR) {
+        if (is2byte) {
+            charPtr = _vm->get2byteCharPtr(chr);
+            width = _vm->_2byteWidth;
+            height = _vm->_2byteHeight;
+        }
+        else {
+            charPtr = _fontPtr + chr * 8;
+            width = getDrawWidthIntern(chr);
+            height = getDrawHeightIntern(chr);
+        }
+    } else {
 #else
 	const byte *charPtr = (_vm->_useCJKMode && chr > 127) ? _vm->get2byteCharPtr(chr) : _fontPtr + chr * 8;
 	int width = getDrawWidthIntern(chr);
 	int height = getDrawHeightIntern(chr);
+#endif
+#ifdef SCUMMVMKOR
+    }
 #endif
 	setDrawCharIntern(chr);
 	drawBits1(s, x, y, charPtr, y, width, height);
@@ -994,21 +1014,9 @@ void CharsetRenderer::saveLoadWithSerializer(Serializer *ser) {
 	}
 }
 
-#ifdef SCUMMVMKOR
-void CharsetRendererClassic::enableShadow(bool enable) {
-    _shadowColor = 0;
-    _shadowMode = enable;
-}
-#endif
-
 void CharsetRendererClassic::printChar(int chr, bool ignoreCharsetMask) {
 	VirtScreen *vs;
-
-#ifdef SCUMMVMKOR
-    bool is2byte = (chr >= 0xff && _vm->_useCJKMode);
-#else
-    bool is2byte = (chr >= 256 && _vm->_useCJKMode);
-#endif
+	bool is2byte = (chr >= 256 && _vm->_useCJKMode);
 
 	assertRange(1, _curId, _vm->_numCharsets - 1, "charset");
 
@@ -1022,6 +1030,7 @@ void CharsetRendererClassic::printChar(int chr, bool ignoreCharsetMask) {
 
 	_vm->_charsetColorMap[1] = _color;
 
+/// ????
 #ifdef SCUMMVMKOR
     if (is2byte) {
         enableShadow(true);
@@ -1042,8 +1051,8 @@ void CharsetRendererClassic::printChar(int chr, bool ignoreCharsetMask) {
             return;
     }
 #else
-    if (!prepareDraw(chr))
-        return;
+	if (!prepareDraw(chr))
+		return;
 #endif
 
 #ifdef SCUMMVMKOR
@@ -1051,14 +1060,14 @@ void CharsetRendererClassic::printChar(int chr, bool ignoreCharsetMask) {
         if(_width <= 8 || _height <= 8)
             enableShadow(false);
     }
-
+    
     _origWidth = _width;
     _origHeight = _height;
-    
-    if (_shadowMode) {
-        _width++;
-        _height++;
-    }
+
+//    if (_enableShadow) {
+//        _width++;
+//        _height++;
+//    }
 #endif
 
 	if (_firstChar) {
@@ -1123,11 +1132,15 @@ void CharsetRendererClassic::printChar(int chr, bool ignoreCharsetMask) {
 
 	printCharIntern(is2byte, _charPtr, _origWidth, _origHeight, _width, _height, vs, ignoreCharsetMask);
 
+	// Original keeps glyph width and character dimensions separately
+	if ((_vm->_language == Common::ZH_TWN || _vm->_language == Common::KO_KOR) && is2byte)
+		_origWidth++;
+
 	_left += _origWidth;
 
 	if (_str.right < _left) {
 		_str.right = _left;
-		if (_vm->_game.platform != Common::kPlatformFMTowns && _shadowMode)
+		if (_vm->_game.platform != Common::kPlatformFMTowns && _enableShadow)
 			_str.right++;
 	}
 
@@ -1190,15 +1203,11 @@ void CharsetRendererClassic::printCharIntern(bool is2byte, const byte *charPtr, 
 		if (!ignoreCharsetMask && vs->hasTwoBuffers) {
 			drawTop = _top - _vm->_screenTop;
 		}
-
-#ifdef SCUMMVMKOR
-        if (is2byte)
-            drawBits1(dstSurface, dstPtr, charPtr, drawTop, origWidth, origHeight, dstSurface.format.bytesPerPixel);
-        else
-            drawBitsN(is2byte, dstSurface, dstPtr, charPtr, *_fontPtr, drawTop, origWidth, origHeight);
-#else
-		drawBitsN(dstSurface, dstPtr, charPtr, *_fontPtr, drawTop, origWidth, origHeight);
-#endif
+        
+		if (is2byte && _vm->_game.platform != Common::kPlatformFMTowns)
+			drawBits1(dstSurface, _left, drawTop, charPtr, drawTop, origWidth, origHeight);
+		else
+			drawBitsN(dstSurface, dstPtr, charPtr, *_fontPtr, drawTop, origWidth, origHeight);
 
 		if (_blitAlso && vs->hasTwoBuffers) {
 			// FIXME: Revisiting this code, I think the _blitAlso mode is likely broken
@@ -1238,6 +1247,36 @@ void CharsetRendererClassic::printCharIntern(bool is2byte, const byte *charPtr, 
 }
 
 bool CharsetRendererClassic::prepareDraw(uint16 chr) {
+	bool is2byte = (chr >= 256 && _vm->_useCJKMode);
+	if (is2byte) {
+#ifdef SCUMMVMKOR
+        if (_vm->_language == Common::KO_KOR) {
+            // HACK: Drop shadow를 없애기 위한 임시 해결책
+            // Charset 번호에 따라야 한다
+            if(_width > 8 && _height > 8)
+                enableShadow(true);
+            else
+                enableShadow(false);
+        }
+#else
+        if (_vm->_language == Common::KO_KOR)
+			enableShadow(true);
+#endif
+
+		_charPtr = _vm->get2byteCharPtr(chr);
+		_width = _origWidth = _vm->_2byteWidth;
+		_height = _origHeight = _vm->_2byteHeight;
+		_offsX = _offsY = 0;
+
+//#ifndef SCUMMVMKOR
+		if (_enableShadow) {
+			_width++;
+			_height++;
+		}
+//#endif
+		return true;
+	}
+
 	uint32 charOffs = READ_LE_UINT32(_fontPtr + chr * 4 + 4);
 	assert(charOffs < 0x14000);
 	if (!charOffs)
@@ -1260,53 +1299,19 @@ bool CharsetRendererClassic::prepareDraw(uint16 chr) {
 }
 
 void CharsetRendererClassic::drawChar(int chr, Graphics::Surface &s, int x, int y) {
-#ifdef SCUMMVMKOR
-    bool is2byte = (chr > 0xff && _vm->_useCJKMode);
-#else
-    bool is2byte = (chr >= 256 && _vm->_useCJKMode);
-#endif
-    
-#ifdef SCUMMVMKOR
-    if (is2byte) {
-        enableShadow(true);
-        _charPtr = _vm->get2byteCharPtr(chr);
-        _width = _vm->_2byteWidth;
-        _height = _vm->_2byteHeight;
-        _offsX = _offsY = 0;
-        
-        // HACK: Drop shadow를 없애기 위한 임시 해결책
-        // Charset 번호에 따라야 한다
-        if(_width > 8 && _height > 8)
-            enableShadow(true);
-        else
-            enableShadow(false);
-    }
-    else {
-        if (!prepareDraw(chr))
-            return;
-    }
-#else
-    if (!prepareDraw(chr))
-        return;
-#endif
+	if (!prepareDraw(chr))
+		return;
 
 	byte *dst = (byte *)s.getBasePtr(x, y);
 
-#ifdef SCUMMVMKOR
-    if (is2byte)
-        drawBits1(s, dst, _charPtr, y, _width, _height, s.format.bytesPerPixel);
-    else
-        drawBitsN(is2byte, s, dst, _charPtr, *_fontPtr, y, _width, _height);
-#else
-	drawBitsN(s, dst, _charPtr, *_fontPtr, y, _width, _height);
-#endif
+	bool is2byte = (_vm->_useCJKMode && chr >= 256);
+	if (is2byte)
+		drawBits1(s, x, y, _charPtr, y, _width, _height);
+	else
+		drawBitsN(s, dst, _charPtr, *_fontPtr, y, _width, _height);
 }
 
-#ifdef SCUMMVMKOR
-void CharsetRendererClassic::drawBitsN(bool is2byte, const Graphics::Surface &s, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height) {
-#else
 void CharsetRendererClassic::drawBitsN(const Graphics::Surface &s, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height) {
-#endif
 	int y, x;
 	int color;
 	byte numbits, bits;
@@ -1328,76 +1333,6 @@ void CharsetRendererClassic::drawBitsN(const Graphics::Surface &s, byte *dst, co
 		else
 			amigaMap = _vm->_roomPalette;
 	}
-
-#ifdef SCUMMVMKOR
-    if (is2byte) {
-        // HACK: 한글 폰트에 그림자/테두리 정보가 없기 때문에
-        //       NUT Renderer에 있는 그림자 출력 방법을 사용한다
-        //       그리고 거기에 약간의 클리핑을 해준다
-        //       이걸로 FMT Kanji 버전에서도 OK
-        bool useOldShadow = false;
-        
-        int offsetX[14] = { -2, -2, -2, -1, 0, -1,  0,  1, -1, 1, -1, 0, 1, 0 };
-        int offsetY[14] = {  0,  1,  2,  2, 2, -1, -1, -1,  0, 0,  1, 1, 1, 0 };
-        int cTable[14] =  { _shadowColor, _shadowColor, _shadowColor,
-            _shadowColor, _shadowColor, _shadowColor, _shadowColor,
-            _shadowColor, _shadowColor, _shadowColor, _shadowColor,
-            _shadowColor, _shadowColor, _color };
-        int i = 0;
-        
-        if(_vm->_game.id == GID_DIG) {
-            _vm->_2byteShadow = 2;	// 그림자 패치
-        }
-        
-        switch(_vm->_2byteShadow) {
-            case 1:		// 그림자 없음
-                i = 13;
-                break;
-            case 2:		// 5시 그림자
-                i = 12;
-                break;
-            case 3:		// 테두리 및 7시 그림자 ("Monkey2", "Indy4")
-                i = 0;
-                break;
-            default:	// 테두리
-                i = 5;
-        }
-        
-        if (!_vm->_useCJKMode) {
-            i = 13;
-            useOldShadow = true;
-        }
-        
-        const byte *origSrc = src;
-        byte *origDst = dst;
-        
-        for (; i < 14; i++) {
-            src = origSrc;
-            dst = origDst;
-            
-            for (y = 0; y < height && y + drawTop + offsetY[i] < s.h; y++) {
-                for (x = 0; x < width && x + offsetY[i] < s.w; x++) {
-                    if ((x % 8) == 0)
-                        bits = *src++;
-                    if ((bits & revBitMask(x % 8)) && y + drawTop >= 0) {
-                        if (_shadowMode) {
-                            *(dst + 1) = _shadowColor;
-                            *(dst + s.pitch) = _shadowColor;
-//                                    if (_shadowMode != kFMTOWNSShadowMode)
-                                *(dst + s.pitch + 1) = _shadowColor;
-                        }
-                        *(dst + (s.pitch * offsetY[i]) + offsetX[i]) = cTable[i];
-                    }
-                    dst++;
-                }
-                
-                dst += s.pitch - width;
-            }
-        }
-        
-        return;
-    }
-#endif
 
 	for (y = 0; y < height && y + drawTop < s.h; y++) {
 		for (x = 0; x < width; x++) {
@@ -1446,7 +1381,7 @@ int CharsetRendererTownsV3::getFontHeight() {
 
 void CharsetRendererTownsV3::enableShadow(bool enable) {
 	_shadowColor = 8;
-	_shadowMode = enable;
+	_enableShadow = enable;
 
 #ifndef DISABLE_TOWNS_DUAL_LAYER_MODE
 	_shadowColor = 0x88;
@@ -1491,13 +1426,13 @@ void CharsetRendererTownsV3::drawBits1(Graphics::Surface &dest, int x, int y, co
 				bits = *src++;
 			if ((bits & revBitMask(x % 8)) && y + drawTop >= 0) {
 				if (dest.format.bytesPerPixel == 2) {
-					if (_shadowMode) {
+					if (_enableShadow) {
 						WRITE_UINT16(dst + 2, _vm->_16BitPalette[_shadowColor]);
 						WRITE_UINT16(dst + dest.pitch, _vm->_16BitPalette[_shadowColor]);
 					}
 					WRITE_UINT16(dst, _vm->_16BitPalette[_color]);
 				} else {
-					if (_shadowMode) {
+					if (_enableShadow) {
 #ifndef DISABLE_TOWNS_DUAL_LAYER_MODE
 						if (scale2x) {
 							dst[2] = dst[3] = dst2[2] = dst2[3] = _shadowColor;
@@ -1588,11 +1523,11 @@ void CharsetRendererPCE::drawBits1(Graphics::Surface &dest, int x, int y, const 
 				bits = *src++;
 			if ((bits & revBitMask(bitCount % 8)) && y + drawTop >= 0) {
 				if (dest.format.bytesPerPixel == 2) {
-					if (_shadowMode)
+					if (_enableShadow)
 						WRITE_UINT16(dst + dest.pitch + 2, _vm->_16BitPalette[_shadowColor]);
 					WRITE_UINT16(dst, _vm->_16BitPalette[_color]);
 				} else {
-					if (_shadowMode)
+					if (_enableShadow)
 						*(dst + dest.pitch + 1) = _shadowColor;
 					*dst = _color;
 				}
@@ -1691,7 +1626,8 @@ void CharsetRendererNut::printChar(int chr, bool ignoreCharsetMask) {
 	int width = _current->getCharWidth(chr);
 	int height = _current->getCharHeight(chr);
 
-	if (chr >= 256 && _vm->_useCJKMode)
+	bool is2byte = chr >= 256 && _vm->_useCJKMode;
+	if (is2byte)
 		width = _vm->_2byteWidth;
 
 	shadow.right = _left + width;
@@ -1723,8 +1659,8 @@ void CharsetRendererNut::printChar(int chr, bool ignoreCharsetMask) {
 		_str.left = _left;
 
 	// Original keeps glyph width and character dimensions separately
-	if (_vm->_language == Common::ZH_TWN && width == 16)
-		width = 17;
+	if ((_vm->_language == Common::ZH_TWN || _vm->_language == Common::KO_KOR) && is2byte)
+		width++;
 
 	_left += width;
 
@@ -1791,7 +1727,7 @@ void CharsetRendererNES::printChar(int chr, bool ignoreCharsetMask) {
 
 	if (_str.right < _left) {
 		_str.right = _left;
-		if (_shadowMode)
+		if (_enableShadow)
 			_str.right++;
 	}
 
@@ -1858,11 +1794,7 @@ int CharsetRendererTownsClassic::getFontHeight() {
 	return _vm->_useCJKMode ? htbl[_curId] : _fontHeight;
 }
 
-#ifdef SCUMMVMKOR
-void CharsetRendererTownsClassic::drawBitsN(bool is2byte, const Graphics::Surface&, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height) {
-#else
 void CharsetRendererTownsClassic::drawBitsN(const Graphics::Surface&, byte *dst, const byte *src, byte bpp, int drawTop, int width, int height) {
-#endif
 	if (_sjisCurChar) {
 		assert(_vm->_cjkFont);
 		_vm->_cjkFont->drawChar(_vm->_textSurface, _sjisCurChar, _left * _vm->_textSurfaceMultiplier, (_top - _vm->_screenTop) * _vm->_textSurfaceMultiplier, _vm->_townsCharsetColorMap[1], _shadowColor);
@@ -1890,76 +1822,6 @@ void CharsetRendererTownsClassic::drawBitsN(const Graphics::Surface&, byte *dst,
 		dst2 += _vm->_textSurface.pitch;
 		pitch <<= 1;
 	}
-
-#ifdef SCUMMVMKOR
-    if (is2byte) {
-        // HACK: 한글 폰트에 그림자/테두리 정보가 없기 때문에
-        //       NUT Renderer에 있는 그림자 출력 방법을 사용한다
-        //       그리고 거기에 약간의 클리핑을 해준다
-        //       이걸로 FMT Kanji 버전에서도 OK
-        bool useOldShadow = false;
-        
-        int offsetX[14] = { -2, -2, -2, -1, 0, -1,  0,  1, -1, 1, -1, 0, 1, 0 };
-        int offsetY[14] = {  0,  1,  2,  2, 2, -1, -1, -1,  0, 0,  1, 1, 1, 0 };
-        int cTable[14] =  { _shadowColor, _shadowColor, _shadowColor,
-            _shadowColor, _shadowColor, _shadowColor, _shadowColor,
-            _shadowColor, _shadowColor, _shadowColor, _shadowColor,
-            _shadowColor, _shadowColor, _color };
-        int i = 0;
-        
-        if(_vm->_game.id == GID_DIG) {
-            _vm->_2byteShadow = 2;	// 그림자 패치
-        }
-        
-        switch(_vm->_2byteShadow) {
-            case 1:		// 그림자 없음
-                i = 13;
-                break;
-            case 2:		// 5시 그림자
-                i = 12;
-                break;
-            case 3:		// 테두리 및 7시 그림자 ("Monkey2", "Indy4")
-                i = 0;
-                break;
-            default:	// 테두리
-                i = 5;
-        }
-        
-        if (!_vm->_useCJKMode) {
-            i = 13;
-            useOldShadow = true;
-        }
-        
-        const byte *origSrc = src;
-        byte *origDst = dst;
-        
-        for (; i < 14; i++) {
-            src = origSrc;
-            dst = origDst;
-            
-            for (y = 0; y < height && y + drawTop + offsetY[i] < _vm->_textSurface.h; y++) {
-                for (x = 0; x < width && x + offsetY[i] < _vm->_textSurface.w; x++) {
-                    if ((x % 8) == 0)
-                        bits = *src++;
-                    if ((bits & revBitMask(x % 8)) && y + drawTop >= 0) {
-                        if (_shadowMode) {
-                            *(dst + 1) = _shadowColor;
-                            *(dst + _vm->_textSurface.pitch) = _shadowColor;
-//                                        if (_shadowMode != kFMTOWNSShadowMode)
-//                                            *(dst + s.pitch + 1) = _shadowColor;
-                        }
-                        *(dst + (_vm->_textSurface.pitch * offsetY[i]) + offsetX[i]) = cTable[i];
-                    }
-                    dst++;
-                }
-                
-                dst += _vm->_textSurface.pitch - width;
-            }
-        }
-        
-        return;
-    }
-#endif
 
 	for (y = 0; y < height && y + drawTop < _vm->_textSurface.h; y++) {
 		for (x = 0; x < width; x++) {
@@ -2020,16 +1882,8 @@ bool CharsetRendererTownsClassic::prepareDraw(uint16 chr) {
 		_origWidth = _width = _vm->_2byteWidth;
 		_origHeight = _height = _vm->_2byteHeight;
 		_charPtr = _vm->get2byteCharPtr(chr);
-#ifdef SCUMMVMKOR
-        // HACK: Drop shadow를 없애기 위한 임시 해결책
-        // Charset 번호에 따라야 한다
-        if(_width > 8 && _height > 8)
-            enableShadow(true);
-        else
-            enableShadow(false);
-#endif
 		_offsX = _offsY = 0;
-		if (_shadowMode) {
+		if (_enableShadow) {
 			_width++;
 			_height++;
 		}
@@ -2041,7 +1895,7 @@ bool CharsetRendererTownsClassic::prepareDraw(uint16 chr) {
 }
 
 void CharsetRendererTownsClassic::setupShadowMode() {
-	_shadowMode = true;
+	_enableShadow = true;
 	_shadowColor = _vm->_townsCharsetColorMap[0];
 	assert(_vm->_cjkFont);
 
