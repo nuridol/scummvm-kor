@@ -47,7 +47,7 @@ ScummVM Team
 
     AGI:
        Stuart George
-       Matthew Hoops
+       Matthew Hoops                - (retired)
        Filippos Karapetis
        Martin Kiewitz
        Pawel Kolodziejski
@@ -104,6 +104,7 @@ ScummVM Team
     Drascula:
        Filippos Karapetis
        Pawel Kolodziejski
+       Thierry Crozat
 
     DreamWeb:
        Torbjorn Andersson
@@ -111,6 +112,10 @@ ScummVM Team
        Filippos Karapetis
        Vladimir Menshakov           - (retired)
        Willem Jan Palenstijn
+
+    Gnap:
+       Arnaud Boutonne
+       Benjamin Haisch
 
     Gob:
        Torbjorn Andersson
@@ -140,7 +145,7 @@ ScummVM Team
        Johannes Schickel
 
     Lastexpress:
-       Matthew Hoops
+       Matthew Hoops                - (retired)
        Jordi Vilalta Prat
        Julien Templier
 
@@ -158,7 +163,7 @@ ScummVM Team
 
     Mohawk:
        Bastien Bouclet
-       Matthew Hoops
+       Matthew Hoops                - (retired)
        Filippos Karapetis
        Alyssa Milburn
        Eugene Sandulenko
@@ -176,7 +181,7 @@ ScummVM Team
        peres
 
     Pegasus:
-       Matthew Hoops
+       Matthew Hoops                - (retired)
 
     Queen:
        David Eriksson               - (retired)
@@ -281,6 +286,7 @@ ScummVM Team
     Android:
        Andre Heider
        Angus Lees
+       Lubomyr Lisen
 
     Dreamcast:
        Marcus Comstedt
@@ -301,6 +307,9 @@ ScummVM Team
     Maemo:
        Frantisek Dufka              - (retired)
        Tarek Soliman
+
+    Nintendo 3DS:
+       Thomas Edvalson
 
     Nintendo 64:
        Fabio Battaglia
@@ -401,7 +410,8 @@ ScummVM Team
      Thierry Crozat               - Numerous contributions to documentation
      Joachim Eberhard             - Numerous contributions to documentation
                                     (retired)
-     Matthew Hoops                - Wiki editor
+     Matthew Hoops                - Numerous contributions to documentation
+                                    (retired)
 
   Retired Team Members
   --------------------
@@ -444,6 +454,7 @@ Other contributions
     Mac OS X:
        Max Horn                     - (retired)
        Oystein Eftevaag
+       Thierry Crozat
 
     Mandriva:
        Dominik Scherer              - (retired)
@@ -670,7 +681,7 @@ Special thanks to
 *****************
    Daniel Balsom     - For the original Reinherit (SAGA) code
    Sander Buskens    - For his work on the initial reversing of Monkey2
-   Canadacow         - For the original MT-32 emulator
+   Dean Beeler       - For the original MT-32 emulator
    Kevin Carnes      - For Scumm16, the basis of ScummVM's older gfx codecs
    Curt Coder        - For the original TrollVM (preAGI) code
    Patrick Combet    - For the original Gobliiins ADL player
@@ -682,12 +693,12 @@ Special thanks to
    DOSBox Team       - For their awesome OPL2 and OPL3 emulator
    Yusuke Kamiyamane - For contributing some GUI icons
    Till Kresslein    - For design of modern ScummVM GUI
-   Jezar             - For his freeverb filter implementation
+   Jezar Wakefield   - For his freeverb filter implementation
    Jim Leiterman     - Various info on his FM-TOWNS/Marty SCUMM ports
-   lloyd             - For deep tech details about C64 Zak & MM
+   Lloyd Rosen       - For deep tech details about C64 Zak & MM
    Sarien Team       - Original AGI engine code
    Jimmi Thogersen   - For ScummRev, and much obscure code/documentation
-   Tristan           - For additional work on the original MT-32 emulator
+   Tristan Matthews  - For additional work on the original MT-32 emulator
    James Woodcock    - Soundtrack enhancements
    Anton Yartsev     - For the original re-implementation of the Z-Vision
                        engine

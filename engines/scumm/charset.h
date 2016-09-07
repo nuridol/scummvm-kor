@@ -105,6 +105,7 @@ public:
 
 #ifdef SCUMMVMKOR
     virtual byte getColor() { return _color; }
+    bool isScummvmKorTarget();
 #endif
 
     void saveLoadWithSerializer(Serializer *ser);

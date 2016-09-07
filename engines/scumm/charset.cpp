@@ -46,6 +46,14 @@ The advantage will be cleaner coder (easier to debug, in particular), and a
 better separation of the various modules.
 */
 
+#ifdef SCUMMVMKOR
+bool CharsetRenderer::isScummvmKorTarget() {
+	if (_vm->_language == Common::KO_KOR && (_vm->_game.version < 7 || _vm->_game.id == GID_FT)) {
+		return true;
+	}
+	return false;
+}
+#endif
 
 void ScummEngine::loadCJKFont() {
 	Common::File fp;
@@ -58,7 +66,7 @@ void ScummEngine::loadCJKFont() {
     _useMultiFont = 0;	// Korean Multi-Font
     
     // Special case for Korean
-    if (_language == Common::KO_KOR) {
+    if (_language == Common::KO_KOR && (_game.version < 7 || _game.id == GID_FT)) {
         int numChar = 2350;
         _useCJKMode = true;
         
@@ -613,7 +621,7 @@ void CharsetRenderer::addLinebreaks(int a, byte *str, int pos, int maxwidth) {
 		if (chr == _vm->_newLineCharacter)
 			lastspace = pos - 1;
 #ifdef SCUMMVMKOR
-        if (_vm->_useCJKMode && _vm->_language == Common::KO_KOR) {
+        if (_vm->_useCJKMode && isScummvmKorTarget()) {
             if (_center == false && chr == '(' && pos - 3 >= origPos && checkKSCode(str[pos -3], str[pos -2]))
                 lastKoreanLineBreak = pos - 1;
         }
@@ -629,7 +637,7 @@ void CharsetRenderer::addLinebreaks(int a, byte *str, int pos, int maxwidth) {
 				pos++;
 				curw += _vm->_2byteWidth;
 #ifdef SCUMMVMKOR
-                if (_vm->_language == Common::KO_KOR && checkKSCode(chr, str[pos])) {
+                if (isScummvmKorTarget() && checkKSCode(chr, str[pos])) {
                     if (_center == false
                         && !(pos - 4 >= origPos && str[pos - 3] == '`' && str[pos - 4] == ' ')	// prevents hanging quotation mark at the end of line
                         && !(pos - 4 >= origPos && str[pos - 3] == '\'' && str[pos - 4] == ' ')	// prevents hanging single quotation mark at the end of line
@@ -648,15 +656,23 @@ void CharsetRenderer::addLinebreaks(int a, byte *str, int pos, int maxwidth) {
 			curw += getCharWidth(chr);
 		}
 #ifdef SCUMMVMKOR
-        if (lastspace == -1 && lastKoreanLineBreak == -1)
-            continue;
+		if (lastspace == -1) {
+			if (!isScummvmKorTarget() || lastKoreanLineBreak == -1) {
+				continue;
+			}
+		}
 #else
 		if (lastspace == -1)
 			continue;
 #endif
 		if (curw > maxwidth) {
 #ifdef SCUMMVMKOR
-            if (lastspace >= lastKoreanLineBreak) {
+			if (!isScummvmKorTarget()) {
+				str[lastspace] = 0xD;
+				curw = 1;
+				pos = lastspace + 1;
+				lastspace = -1;
+			} else if (lastspace >= lastKoreanLineBreak) {
                 str[lastspace] = 0xD;
                 curw = 1;
                 pos = lastspace + 1;
@@ -708,7 +724,7 @@ void CharsetRendererPC::enableShadow(bool enable) {
 void CharsetRendererPC::drawBits1(Graphics::Surface &dest, int x, int y, const byte *src, int drawTop, int width, int height) {
 	byte *dst = (byte *)dest.getBasePtr(x, y);
 #ifdef SCUMMVMKOR
-    if (_vm->_useCJKMode && _vm->_language == Common::KO_KOR) {
+    if (_vm->_useCJKMode && isScummvmKorTarget()) {
         int y, x;
         byte bits = 0;
         
@@ -726,9 +742,9 @@ void CharsetRendererPC::drawBits1(Graphics::Surface &dest, int x, int y, const b
             _shadowColor, _shadowColor, _color };
         int i = 0;
         
-        if(_vm->_game.id == GID_DIG) {
-            _vm->_2byteShadow = 2;	// 그림자 패치
-        }
+        // if(_vm->_game.id == GID_DIG) {
+        //     _vm->_2byteShadow = 2;	// 그림자 패치
+        // }
         
         switch(_vm->_2byteShadow) {
             case 1:		// 그림자 없음
@@ -744,10 +760,10 @@ void CharsetRendererPC::drawBits1(Graphics::Surface &dest, int x, int y, const b
                 i = 5;
         }
         
-        if (!_vm->_useCJKMode) {
-            i = 13;
-            useOldShadow = true;
-        }
+        // if (!_vm->_useCJKMode) {
+        //     i = 13;
+        //     useOldShadow = true;
+        // }
         
         const byte *origSrc = src;
         byte *origDst = dst;
@@ -872,7 +888,7 @@ void CharsetRendererV3::printChar(int chr, bool ignoreCharsetMask) {
 		return;
 
 #ifdef SCUMMVMKOR
-    if (_vm->_language == Common::KO_KOR) {
+    if (isScummvmKorTarget()) {
         if (is2byte) {
             charPtr = _vm->get2byteCharPtr(chr);
             width = _vm->_2byteWidth;
@@ -884,11 +900,10 @@ void CharsetRendererV3::printChar(int chr, bool ignoreCharsetMask) {
             height = getDrawHeightIntern(chr);
         }
     } else {
-#else
+#endif
 	charPtr = (_vm->_useCJKMode && chr > 127) ? _vm->get2byteCharPtr(chr) : _fontPtr + chr * 8;
 	width = getDrawWidthIntern(chr);
 	height = getDrawHeightIntern(chr);
-#endif
 #ifdef SCUMMVMKOR
     }
 #endif
@@ -959,7 +974,7 @@ void CharsetRendererV3::drawChar(int chr, Graphics::Surface &s, int x, int y) {
     int height;
     int is2byte = (chr > 0xff && _vm->_useCJKMode) ? 1 : 0;
 
-    if (_vm->_language == Common::KO_KOR) {
+    if (isScummvmKorTarget()) {
         if (is2byte) {
             charPtr = _vm->get2byteCharPtr(chr);
             width = _vm->_2byteWidth;
@@ -971,13 +986,14 @@ void CharsetRendererV3::drawChar(int chr, Graphics::Surface &s, int x, int y) {
             height = getDrawHeightIntern(chr);
         }
     } else {
+        charPtr = (_vm->_useCJKMode && chr > 127) ? _vm->get2byteCharPtr(chr) : _fontPtr + chr * 8;
+        width = getDrawWidthIntern(chr);
+        height = getDrawHeightIntern(chr);
+    }
 #else
 	const byte *charPtr = (_vm->_useCJKMode && chr > 127) ? _vm->get2byteCharPtr(chr) : _fontPtr + chr * 8;
 	int width = getDrawWidthIntern(chr);
 	int height = getDrawHeightIntern(chr);
-#endif
-#ifdef SCUMMVMKOR
-    }
 #endif
 	setDrawCharIntern(chr);
 	drawBits1(s, x, y, charPtr, y, width, height);
@@ -1032,7 +1048,7 @@ void CharsetRendererClassic::printChar(int chr, bool ignoreCharsetMask) {
 
 /// ????
 #ifdef SCUMMVMKOR
-    if (is2byte) {
+    if (isScummvmKorTarget() && is2byte) {
         enableShadow(true);
         _charPtr = _vm->get2byteCharPtr(chr);
         _width = _vm->_2byteWidth;
@@ -1056,10 +1072,11 @@ void CharsetRendererClassic::printChar(int chr, bool ignoreCharsetMask) {
 #endif
 
 #ifdef SCUMMVMKOR
-    if (_vm->_useCJKMode) {	// KOR indy4 selection text hack: prevents underline deletion
-        if(_width <= 8 || _height <= 8)
-            enableShadow(false);
-    }
+	if (isScummvmKorTarget()) {
+    	if (_vm->_useCJKMode) {	// KOR indy4 selection text hack: prevents underline deletion
+	        if(_width <= 8 || _height <= 8)
+	            enableShadow(false);
+	    }
     
     _origWidth = _width;
     _origHeight = _height;
@@ -1068,6 +1085,7 @@ void CharsetRendererClassic::printChar(int chr, bool ignoreCharsetMask) {
 //        _width++;
 //        _height++;
 //    }
+	}
 #endif
 
 	if (_firstChar) {
@@ -1105,15 +1123,19 @@ void CharsetRendererClassic::printChar(int chr, bool ignoreCharsetMask) {
 	int drawTop = _top - vs->topline;
 
 #ifdef SCUMMVMKOR
-    // shadow clipping error hack
-    // The reason is maybe due to the korean shadow drawing?
-    int markLeft = _left, markTop = drawTop;
-    if (markLeft > 0) markLeft--;
-    if (markTop > 0) markTop--;
-    
-    _vm->markRectAsDirty(vs->number, markLeft, _left + _width, markTop, drawTop + _height);
-#else
+	if (isScummvmKorTarget()) {
+	    // shadow clipping error hack
+	    // The reason is maybe due to the korean shadow drawing?
+	    int markLeft = _left, markTop = drawTop;
+	    if (markLeft > 0) markLeft--;
+	    if (markTop > 0) markTop--;
+	    
+	    _vm->markRectAsDirty(vs->number, markLeft, _left + _width, markTop, drawTop + _height);
+	} else {
+#endif
 	_vm->markRectAsDirty(vs->number, _left, _left + _width, drawTop, drawTop + _height);
+#ifdef SCUMMVMKOR
+	}
 #endif
 
 	// This check for kPlatformFMTowns and kMainVirtScreen is at least required for the chat with
@@ -1250,7 +1272,7 @@ bool CharsetRendererClassic::prepareDraw(uint16 chr) {
 	bool is2byte = (chr >= 256 && _vm->_useCJKMode);
 	if (is2byte) {
 #ifdef SCUMMVMKOR
-        if (_vm->_language == Common::KO_KOR) {
+        if (isScummvmKorTarget()) {
             // HACK: Drop shadow를 없애기 위한 임시 해결책
             // Charset 번호에 따라야 한다
             if(_width > 8 && _height > 8)
@@ -1258,10 +1280,9 @@ bool CharsetRendererClassic::prepareDraw(uint16 chr) {
             else
                 enableShadow(false);
         }
-#else
+#endif
         if (_vm->_language == Common::KO_KOR)
 			enableShadow(true);
-#endif
 
 		_charPtr = _vm->get2byteCharPtr(chr);
 		_width = _origWidth = _vm->_2byteWidth;
