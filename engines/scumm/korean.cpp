@@ -300,16 +300,17 @@ namespace Scumm {
         strcat(fname, ".dat");
         
         if(!fp.open(fname)) {
-            warning("WARNING: Cannot load Korean V2 subtitle!, %s\n", fname);
-            return;
-//            strcpy(fname, "");
-//            strcat(fname, _gameID);
-//            strcat(fname, ".dat");
-//                
-//            if(!fp.open(fname)) {
-//                warning("WARNING: Cannot load Korean V2 subtitle!, %s\n", fname);
-//                return;
-//            }
+            // warning("WARNING: Cannot load Korean V1 subtitle!, %s\n", fname);
+
+            // retry without sub
+            strcpy(fname, "");
+            strcat(fname, _gameID);
+            strcat(fname, ".dat");
+                
+            if(!fp.open(fname)) {
+                warning("WARNING: Cannot load Korean V1 subtitle!, %s\n", fname);
+                return;
+            }
         }
         
         int k;
