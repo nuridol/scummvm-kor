@@ -82,6 +82,10 @@
 
 #include "audio/mixer.h"
 
+#ifdef SCUMMVMKOR
+#include "scumm/korean.h"
+#endif
+
 using Common::File;
 
 namespace Scumm {
@@ -321,6 +325,10 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_costumeRenderer = NULL;
 	_2byteFontPtr = 0;
 	_V1TalkingActor = 0;
+#ifdef SCUMMVMKOR
+	for(int i = 0; i < 20; i++)
+		_2byteMultiFontPtr[i] = NULL;
+#endif
 	_NESStartStrip = 0;
 
 	_skipDrawObject = 0;
@@ -599,8 +607,16 @@ ScummEngine::~ScummEngine() {
 	}
 
 	delete[] _sortedActors;
-
+#ifdef SCUMMVMKOR
+	if (_koreanMode) unloadKoreanFiles();
+	if (_2byteFontPtr && !_useMultiFont)
+		delete _2byteFontPtr;
+	for (int i = 0; i < 20; i++)
+		if (_2byteMultiFontPtr[i])
+			delete _2byteMultiFontPtr[i];
+#else
 	delete[] _2byteFontPtr;
+#endif
 	delete _charset;
 	delete _messageDialog;
 	delete _pauseDialog;
@@ -1243,6 +1259,41 @@ Common::Error ScummEngine::init() {
 	// Load CJK font, if present
 	// Load it earlier so _useCJKMode variable could be set
 	loadCJKFont();
+
+#ifdef SCUMMVMKOR
+	// 개선의 여지가 약간 있지만, 일단은 그대로 남겨둠
+	_koreanMode = 0;
+	_koreanOnly = 0;
+	_highRes = 0;
+	
+	if(_language == Common::KO_KOR) {
+		_koreanMode = ConfMan.getBool("v1_korean_mode");
+		_koreanOnly = ConfMan.getBool("v1_korean_only") && _koreanMode;
+		if((_game.version == 8 || _game.heversion > 72) && _koreanMode)
+			_highRes = true;
+		if((_game.id == GID_DIG || _game.id == GID_CMI) && _koreanMode) {
+			debug("You can not use V1 mode in this game");
+			_koreanMode = 0;
+			_koreanOnly = 0;
+			_highRes = 0;
+		}
+		if(_koreanMode) {
+			debug("Korean V1 translation mode.");
+			loadKoreanFiles(/*getGameName()*/_game.gameid);
+			//_useCJKMode = 0;	// V1과 V2를 동시에 사용하지 않는다
+			_useCJKMode = 1;	// V1과 V2를 동시에 사용한다
+		} else {
+			if(_useCJKMode) {
+				debug("Korean V2 mode for DUMB edition or COMI Korean version");
+			}
+		}
+	}
+	debug("_game.id = %d", _game.id);
+	debug("_game.gameid = %s", _game.gameid);
+	debug("_game.version = %d, _game.heversion = %d", _game.version, _game.heversion);
+	debug("_koreanMode = %d, _koreanOnly = %d, _useCJKMode = %d", _koreanMode, _koreanOnly, _useCJKMode);
+	debug("_highRes = %d", _highRes);
+#endif
 
 	// Initialize backend
 	if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG) {
@@ -2204,6 +2255,21 @@ void ScummEngine::scummLoop(int delta) {
 	_talkDelay -= delta;
 	if (_talkDelay < 0)
 		_talkDelay = 0;
+
+#ifdef SCUMMVMKOR
+	for(int numb = 0; numb < MAX_KOR; numb++) {
+		if (_strKSet1[numb].delay != -1) { // kor
+			_strKSet1[numb].delay -= delta;
+			if (_strKSet1[numb].delay < 0)
+				_strKSet1[numb].delay = 0;
+		}
+		if (_strKDesc[numb].delay != -1) { // kor
+			_strKDesc[numb].delay -= 5;
+			if (_strKDesc[numb].delay < 0)
+				_strKDesc[numb].delay = 0;
+		}
+	}
+#endif
 
 	// Record the current ego actor before any scripts (including input scripts)
 	// get a chance to run.

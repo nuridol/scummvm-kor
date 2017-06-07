@@ -1652,6 +1652,8 @@ if test "$_release_build" = yes; then
 	append_var DEFINES "-DRELEASE_BUILD"
 fi
 
+#scummvmkor
+	append_var DEFINES "-DSCUMMVMKOR"
 
 #
 # Determine extension used for executables

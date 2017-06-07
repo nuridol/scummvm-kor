@@ -11,6 +11,7 @@ MODULE_OBJS := \
 	fonts/newfont.o \
 	fonts/ttf.o \
 	fonts/winfont.o \
+	korfont.o \
 	maccursor.o \
 	macgui/macmenu.o \
 	macgui/macwindow.o \

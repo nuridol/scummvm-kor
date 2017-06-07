@@ -39,6 +39,10 @@
 #include "scumm/usage_bits.h"
 #include "scumm/util.h"
 
+#ifdef SCUMMVMKOR
+#include "scumm/korean.h"
+#endif
+
 namespace Scumm {
 
 byte Actor::kInvalidBox = 0;
@@ -2747,6 +2751,9 @@ void ScummEngine_v7::actorTalk(const byte *msg) {
 	_charsetBufPos = 0;
 	_talkDelay = 0;
 	_haveMsg = 1;
+#ifdef SCUMMVMKOR
+	INIT_KOR_DELAYS;
+#endif
 	if (_game.id == GID_FT)
 		VAR(VAR_HAVE_MSG) = 0xFF;
 	_haveActorSpeechMsg = (_game.id == GID_FT) ? true : (!_sound->isSoundRunning(kTalkSoundID));
@@ -2824,6 +2831,9 @@ void ScummEngine::actorTalk(const byte *msg) {
 	_charsetBufPos = 0;
 	_talkDelay = 0;
 	_haveMsg = 0xFF;
+#ifdef SCUMMVMKOR
+	INIT_KOR_DELAYS;
+#endif
 	VAR(VAR_HAVE_MSG) = 0xFF;
 	if (VAR_CHARCOUNT != 0xFF)
 		VAR(VAR_CHARCOUNT) = 0;
@@ -2862,6 +2872,9 @@ void ScummEngine::stopTalk() {
 	_haveMsg = 0;
 	_talkDelay = 0;
 
+#ifdef SCUMMVMKOR
+	INIT_KOR_DELAYS;
+#endif
 	act = getTalkingActor();
 	if (act && act < 0x80) {
 		Actor *a = derefActor(act, "stopTalk");

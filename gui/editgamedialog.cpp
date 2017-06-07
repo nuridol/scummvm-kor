@@ -169,6 +169,14 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 		_platformPopUp->appendEntry(p->description, p->id);
 	}
 
+#ifdef SCUMMVMKOR
+	// Korean Mode popup
+	if (g_system->getOverlayWidth() > 320)
+		_koreanModeCheckbox = new CheckboxWidget(tab, "GameOptions_Game.V1modeCheckbox", _("Use V1 Korean Mode"), 0, 0);
+	else
+		_koreanModeCheckbox = new CheckboxWidget(tab, "GameOptions_Game.V1modeCheckbox", _c("Use V1 Korean Mode", "lowres"), 0, 0);
+#endif
+
 	//
 	// 2) The engine tab (shown only if there are custom engine options)
 	//
@@ -349,7 +357,11 @@ void EditGameDialog::open() {
 	if (ConfMan.hasKey("language", _domain)) {
 		_langPopUp->setSelectedTag(lang);
 	} else {
+#ifdef SCUMMVMKOR
+		_langPopUp->setSelectedTag(Common::parseLanguage("kr"));
+#else
 		_langPopUp->setSelectedTag((uint32)Common::UNK_LANG);
+#endif
 	}
 
 	if (_langPopUp->numEntries() <= 3) { // If only one language is avaliable
@@ -379,6 +391,10 @@ void EditGameDialog::open() {
 			sel = i + 2;
 	}
 	_platformPopUp->setSelected(sel);
+#ifdef SCUMMVMKOR
+	if (ConfMan.hasKey("v1_korean_mode", _domain))
+		_koreanModeCheckbox->setState(ConfMan.getBool("v1_korean_mode", _domain));
+#endif
 }
 
 
@@ -413,6 +429,11 @@ void EditGameDialog::close() {
 			ConfMan.removeKey("platform", _domain);
 		else
 			ConfMan.set("platform", Common::getPlatformCode(platform), _domain);
+
+#ifdef SCUMMVMKOR
+		ConfMan.setBool("v1_korean_mode", _koreanModeCheckbox->getState(), _domain);
+		ConfMan.setBool("v1_korean_only", _koreanModeCheckbox->getState(), _domain);
+#endif
 
 		// Set the state of engine-specific checkboxes
 		for (uint i = 0; i < _engineOptions.size(); i++) {
