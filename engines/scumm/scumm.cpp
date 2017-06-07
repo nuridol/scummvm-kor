@@ -30,7 +30,6 @@
 #include "engines/util.h"
 
 #include "gui/message.h"
-#include "gui/gui-manager.h"
 
 #include "graphics/cursorman.h"
 
@@ -67,6 +66,7 @@
 #include "scumm/players/player_v5m.h"
 #include "scumm/resource.h"
 #include "scumm/he/resource_he.h"
+#include "scumm/he/moonbase/moonbase.h"
 #include "scumm/scumm_v0.h"
 #include "scumm/scumm_v8.h"
 #include "scumm/sound.h"
@@ -81,10 +81,6 @@
 #include "backends/audiocd/audiocd.h"
 
 #include "audio/mixer.h"
-
-#ifdef SCUMMVMKOR
-#include "scumm/korean.h"
-#endif
 
 using Common::File;
 
@@ -324,11 +320,7 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_costumeLoader = NULL;
 	_costumeRenderer = NULL;
 	_2byteFontPtr = 0;
-#ifdef SCUMMVMKOR
-          for(int i = 0; i < 20; i++)
-              _2byteMultiFontPtr[i] = NULL;
-#endif
-    _V1TalkingActor = 0;
+	_V1TalkingActor = 0;
 	_NESStartStrip = 0;
 
 	_skipDrawObject = 0;
@@ -487,7 +479,6 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_debugMode = (gDebugLevel >= 0);
 	_dumpScripts = ConfMan.getBool("dump_scripts");
 	_bootParam = ConfMan.getInt("boot_param");
-
 	// Boot params often need debugging switched on to work
 	if (_bootParam)
 		_debugMode = true;
@@ -609,17 +600,8 @@ ScummEngine::~ScummEngine() {
 
 	delete[] _sortedActors;
 
-#ifdef SCUMMVMKOR
-    if (_koreanMode) unloadKoreanFiles();
-    if (_2byteFontPtr && !_useMultiFont)
-        delete _2byteFontPtr;
-    for (int i = 0; i < 20; i++)
-        if (_2byteMultiFontPtr[i])
-            delete _2byteMultiFontPtr[i];
-#else
 	delete[] _2byteFontPtr;
-#endif
-    delete _charset;
+	delete _charset;
 	delete _messageDialog;
 	delete _pauseDialog;
 	delete _versionDialog;
@@ -751,8 +733,37 @@ ScummEngine_v0::ScummEngine_v0(OSystem *syst, const DetectorResult &dr)
 	VAR_IS_SOUND_RUNNING = 0xFF;
 	VAR_ACTIVE_VERB = 0xFF;
 
+	DelayReset();
+
 	if (strcmp(dr.fp.pattern, "maniacdemo.d64") == 0 )
-		_game.features |= GF_DEMO; 
+		_game.features |= GF_DEMO;
+}
+
+void ScummEngine_v0::DelayReset() {
+	_V0Delay._screenScroll = false;
+	_V0Delay._objectRedrawCount = 0;
+	_V0Delay._objectStripRedrawCount = 0;
+	_V0Delay._actorRedrawCount = 0;
+	_V0Delay._actorLimbRedrawDrawCount = 0;
+}
+
+int ScummEngine_v0::DelayCalculateDelta() {
+	float Time = 0;
+
+	// These values are made up, based on trial/error with visual inspection against WinVice
+	// If anyone feels inclined, the routines in the original engine could be profiled
+	// and these values changed accordindly.
+	Time += _V0Delay._objectRedrawCount * 7;
+	Time += _V0Delay._objectStripRedrawCount * 0.6;
+	Time += _V0Delay._actorRedrawCount * 2.0;
+	Time += _V0Delay._actorLimbRedrawDrawCount * 0.3;
+
+	if (_V0Delay._screenScroll)
+		Time += 3.6f;
+
+	DelayReset();
+
+	return floor(Time + 0.5);
 }
 
 ScummEngine_v6::ScummEngine_v6(OSystem *syst, const DetectorResult &dr)
@@ -823,6 +834,8 @@ ScummEngine_v70he::ScummEngine_v70he(OSystem *syst, const DetectorResult &dr)
 	_heSndChannel = 0;
 	_heSndFlags = 0;
 	_heSndSoundFreq = 0;
+	_heSndPan = 0;
+	_heSndVol = 0;
 
 	_numStoredFlObjects = 0;
 	_storedFlObjects = (ObjectData *)calloc(100, sizeof(ObjectData));
@@ -893,7 +906,7 @@ ScummEngine_v90he::ScummEngine_v90he(OSystem *syst, const DetectorResult &dr)
 	memset(_videoParams.filename, 0, sizeof(_videoParams.filename));
 	_videoParams.status = 0;
 	_videoParams.flags = 0;
-	_videoParams.unk2 = 0;
+	_videoParams.number = 0;
 	_videoParams.wizResNum = 0;
 
 	VAR_NUM_SPRITE_GROUPS = 0xFF;
@@ -914,6 +927,25 @@ ScummEngine_v90he::~ScummEngine_v90he() {
 	if (_game.heversion >= 99) {
 		free(_hePalettes);
 	}
+}
+
+ScummEngine_v100he::ScummEngine_v100he(OSystem *syst, const DetectorResult &dr) : ScummEngine_v99he(syst, dr) {
+	/* Moonbase stuff */
+	_moonbase = 0;
+
+	if (_game.id == GID_MOONBASE)
+		_moonbase = new Moonbase(this);
+
+	VAR_U32_USER_VAR_A = 0xFF;
+	VAR_U32_USER_VAR_B = 0xFF;
+	VAR_U32_USER_VAR_C = 0xFF;
+	VAR_U32_USER_VAR_D = 0xFF;
+	VAR_U32_USER_VAR_E = 0xFF;
+	VAR_U32_USER_VAR_F = 0xFF;
+}
+
+ScummEngine_v100he::~ScummEngine_v100he() {
+	delete _moonbase;
 }
 
 ScummEngine_vCUPhe::ScummEngine_vCUPhe(OSystem *syst, const DetectorResult &dr) : Engine(syst){
@@ -1212,41 +1244,6 @@ Common::Error ScummEngine::init() {
 	// Load it earlier so _useCJKMode variable could be set
 	loadCJKFont();
 
-#ifdef SCUMMVMKOR
-    // 개선의 여지가 약간 있지만, 일단은 그대로 남겨둠
-    _koreanMode = 0;
-    _koreanOnly = 0;
-    _highRes = 0;
-    
-    if(_language == Common::KO_KOR) {
-        _koreanMode = ConfMan.getBool("v1_korean_mode");
-        _koreanOnly = ConfMan.getBool("v1_korean_only") && _koreanMode;
-        if((_game.version == 8 || _game.heversion > 72) && _koreanMode)
-            _highRes = true;
-        if((_game.id == GID_DIG || _game.id == GID_CMI) && _koreanMode) {
-            debug("You can not use V1 mode in this game");
-            _koreanMode = 0;
-            _koreanOnly = 0;
-            _highRes = 0;
-        }
-        if(_koreanMode) {
-            debug("Korean V1 translation mode.");
-            loadKoreanFiles(/*getGameName()*/_game.gameid);
-            //_useCJKMode = 0;	// V1과 V2를 동시에 사용하지 않는다
-            _useCJKMode = 1;	// V1과 V2를 동시에 사용한다
-        } else {
-            if(_useCJKMode) {
-                debug("Korean V2 mode for DUMB edition or COMI Korean version");
-            }
-        }
-    }
-    debug("_game.id = %d", _game.id);
-    debug("_game.gameid = %s", _game.gameid);
-    debug("_game.version = %d, _game.heversion = %d", _game.version, _game.heversion);
-    debug("_koreanMode = %d, _koreanOnly = %d, _useCJKMode = %d", _koreanMode, _koreanOnly, _useCJKMode);
-    debug("_highRes = %d", _highRes);
-#endif
-
 	// Initialize backend
 	if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG) {
 		initGraphics(kHercWidth, kHercHeight, true);
@@ -1328,10 +1325,7 @@ void ScummEngine::setupScumm() {
 	// On some systems it's not safe to run CD audio games from the CD.
 	if (_game.features & GF_AUDIOTRACKS && !Common::File::exists("CDDA.SOU")) {
 		checkCD();
-
-		int cd_num = ConfMan.getInt("cdrom");
-		if (cd_num >= 0)
-			_system->getAudioCDManager()->openCD(cd_num);
+		_system->getAudioCDManager()->open();
 	}
 
 	// Create the sound manager
@@ -2114,13 +2108,24 @@ Common::Error ScummEngine::go() {
 		if (delta < 1)	// Ensure we don't get into an endless loop
 			delta = 1;  // by not decreasing sleepers.
 
-		// WORKAROUND: walking speed in the original v0/v1 interpreter
+		// WORKAROUND: Unfortunately the MOS 6502 wasn't always fast enough for MM
+		//  a number of situations can lead to the engine running at less than 60 ticks per second, without this drop
+		//	- A single kid is able to escape via the Dungeon Door (after pushing the brick)
+		//	- During the intro, calls to 'SetState08' are made for the lights on the mansion, with a 'breakHere'
+		//	  in between each, the reduction in ticks then occurs while affected stripes are being redrawn.
+		//	  The music buildup is then out of sync with the text "A Lucasfilm Games Production".
+		//	  Each call to 'breakHere' has been replaced with calls to 'Delay' in the V1/V2 versions of the game
+		if (_game.version == 0) {
+			delta += ((ScummEngine_v0 *)this)->DelayCalculateDelta();
+		}
+
+		// WORKAROUND: walking speed in the original v1 interpreter
 		// is sometimes slower (e.g. during scrolling) than in ScummVM.
 		// This is important for the door-closing action in the dungeon,
 		// otherwise (delta < 6) a single kid is able to escape.
-		if ((_game.version == 0 && isScriptRunning(132)) ||
-			(_game.version == 1 && isScriptRunning(137)))
-			delta = 6;
+		if (_game.version == 1 && isScriptRunning(137)) {
+				delta = 6;
+		}
 
 		// Wait...
 		waitForTimer(delta * 1000 / 60 - diff);
@@ -2199,21 +2204,6 @@ void ScummEngine::scummLoop(int delta) {
 	_talkDelay -= delta;
 	if (_talkDelay < 0)
 		_talkDelay = 0;
-
-#ifdef SCUMMVMKOR
-    for(int numb = 0; numb < MAX_KOR; numb++) {
-        if (_strKSet1[numb].delay != -1) { // kor
-            _strKSet1[numb].delay -= delta;
-            if (_strKSet1[numb].delay < 0)
-                _strKSet1[numb].delay = 0;
-        }
-        if (_strKDesc[numb].delay != -1) { // kor
-            _strKDesc[numb].delay -= 5;
-            if (_strKDesc[numb].delay < 0)
-                _strKDesc[numb].delay = 0;
-        }
-    }
-#endif
 
 	// Record the current ego actor before any scripts (including input scripts)
 	// get a chance to run.
@@ -2502,6 +2492,8 @@ void ScummEngine_v8::scummLoop_handleSaveLoad() {
 
 void ScummEngine::scummLoop_handleDrawing() {
 	if (camera._cur != camera._last || _bgNeedsRedraw || _fullRedraw) {
+		_V0Delay._screenScroll = true;
+
 		redrawBGAreas();
 	}
 
@@ -2597,6 +2589,30 @@ void ScummEngine_v60he::setHETimer(int timer) {
 	_heTimers[timer] = _system->getMillis();
 }
 
+void ScummEngine_v60he::pauseHETimers(bool pause) {
+	// The HE timers rely on system time which of course doesn't pause when
+	// the engine does. By adding the elapsed time we compensate for this.
+	// Fixes bug #6352
+	if (pause) {
+		// Pauses can be layered, we only need the start of the first
+		if (!_pauseStartTime)
+			_pauseStartTime = _system->getMillis();
+	} else {
+		int elapsedTime = _system->getMillis() - _pauseStartTime;
+		for (int i = 0; i < ARRAYSIZE(_heTimers); i++) {
+			if (_heTimers[i] != 0)
+				_heTimers[i] += elapsedTime;
+		}
+		_pauseStartTime = 0;
+	}
+}
+
+void ScummEngine_v60he::pauseEngineIntern(bool pause) {
+	pauseHETimers(pause);
+
+	ScummEngine::pauseEngineIntern(pause);
+}
+
 void ScummEngine::pauseGame() {
 	pauseDialog();
 }
@@ -2679,8 +2695,12 @@ bool ScummEngine::startManiac() {
 			Common::String path = dom.getVal("path");
 
 			if (path.hasPrefix(currentPath)) {
-				path.erase(0, currentPath.size() + 1);
-				if (path.equalsIgnoreCase("maniac")) {
+				path.erase(0, currentPath.size());
+				// Do a case-insensitive non-path-mode match of the remainder.
+				// While strictly speaking it's too broad, this matchString
+				// ignores the presence or absence of trailing path separators
+				// in either currentPath or path.
+				if (path.matchString("*maniac*", true, false)) {
 					maniacTarget = iter->_key;
 					break;
 				}

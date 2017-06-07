@@ -53,10 +53,6 @@ int BdfFont::getMaxCharWidth() const {
 }
 
 int BdfFont::getCharWidth(uint32 chr) const {
-#ifdef SCUMMVMKOR
-    if (chr > 0xff)
-        return getKorFontWidth();
-#endif
 	// In case all font have the same advance value, we use the maximum.
 	if (!_data.advances)
 		return _data.maxAdvance;
@@ -101,12 +97,6 @@ int BdfFont::mapToIndex(uint32 ch) const {
 }
 
 void BdfFont::drawChar(Surface *dst, uint32 chr, const int tx, const int ty, const uint32 color) const {
-#ifdef SCUMMVMKOR
-    if (chr > 0xff) {
-        drawKorChar(dst, chr, tx, ty, color);
-        return;
-    }
-#endif
 	assert(dst != 0);
 
 	// TODO: Where is the relation between the max advance being smaller or

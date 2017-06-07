@@ -35,7 +35,6 @@
 #include "graphics/surface.h"
 #include "graphics/thumbnail.h"
 #include "gui/saveload.h"
-#include "gui/about.h"
 #include "gui/message.h"
 #include "toon/resource.h"
 #include "toon/toon.h"
@@ -709,7 +708,7 @@ bool ToonEngine::showOptions() {
 	entries[2].activeFrame = entries[2].animation->_numFrames - 1;
 
 	if (!_showConversationText) {
-		entries[4].activeFrame = 4;		
+		entries[4].activeFrame = 4;
 	} else if (_useAlternativeFont) {
 		entries[4].activeFrame = 8;
 	} else {
@@ -798,19 +797,19 @@ bool ToonEngine::showOptions() {
 			// handle sliders
 			if (clickingOn == OPTIONMENUHOTSPOT_VOLUMEMUSICSLIDER) {
 				entries[clickingOnSprite].activeFrame = ratioX * (entries[clickingOnSprite].animation->_numFrames) / 256;
-				int vol = entries[clickingOnSprite].activeFrame * 256 / entries[clickingOnSprite].animation->_numFrames; 
+				int vol = entries[clickingOnSprite].activeFrame * 256 / entries[clickingOnSprite].animation->_numFrames;
 				_audioManager->_mixer->setVolumeForSoundType(Audio::Mixer::kMusicSoundType, vol);
 			}
 
 			if (clickingOn == OPTIONMENUHOTSPOT_VOLUMEVOICESLIDER) {
 				entries[clickingOnSprite].activeFrame = ratioX * (entries[clickingOnSprite].animation->_numFrames) / 256;
-				int vol = entries[clickingOnSprite].activeFrame * 256 / entries[clickingOnSprite].animation->_numFrames; 
+				int vol = entries[clickingOnSprite].activeFrame * 256 / entries[clickingOnSprite].animation->_numFrames;
 				_audioManager->_mixer->setVolumeForSoundType(Audio::Mixer::kSpeechSoundType, vol);
 			}
 
 			if (clickingOn == OPTIONMENUHOTSPOT_VOLUMESFXSLIDER) {
 				entries[clickingOnSprite].activeFrame = ratioX * (entries[clickingOnSprite].animation->_numFrames) / 256;
-				int vol = entries[clickingOnSprite].activeFrame * 256 / entries[clickingOnSprite].animation->_numFrames; 
+				int vol = entries[clickingOnSprite].activeFrame * 256 / entries[clickingOnSprite].animation->_numFrames;
 				_audioManager->_mixer->setVolumeForSoundType(Audio::Mixer::kSFXSoundType, vol);
 			}
 
@@ -936,9 +935,11 @@ bool ToonEngine::showOptions() {
 	_gameState->_inMenu = false;
 	_firstFrame = true;
 	_gameState->_currentScrollValue = oldScrollValue;
-	
+
 	restorePalette();
 	dirtyAllScreen();
+
+	delete optionPicture;
 
 	return exitGame;
 }
@@ -1297,6 +1298,7 @@ ToonEngine::ToonEngine(OSystem *syst, const ADGameDescription *gameDescription)
 		_scriptState[i].running = false;
 	}
 	_currentScriptRegion = 0;
+	_currentFont = nullptr;
 }
 
 ToonEngine::~ToonEngine() {

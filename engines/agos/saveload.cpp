@@ -25,7 +25,6 @@
 #include "common/textconsole.h"
 #include "common/translation.h"
 
-#include "gui/about.h"
 #include "gui/message.h"
 
 #include "agos/agos.h"
@@ -495,7 +494,7 @@ void AGOSEngine_Elvira2::userGame(bool load) {
 
 			i = userGameGetKey(&b, 128);
 			if (b) {
-				if (i <= 223) {
+				if (i <= 23) {
 					if (!confirmOverWrite(window)) {
 						listSaveGames();
 						continue;
@@ -1318,7 +1317,7 @@ bool AGOSEngine_Elvira2::loadGame(const Common::String &filename, bool restartMo
 
 			if (getGameType() == GType_WW && getPlatform() == Common::kPlatformDOS && derefItem(item->parent) == NULL)
 				item->parent = 0;
-						
+
 			parent_item = derefItem(parent);
 			setItemParent(item, parent_item);
 

@@ -96,7 +96,7 @@ void scene11_setupMusic() {
 void scene11_initScene(Scene *sc) {
 	g_vars->scene11_swingie = sc->getStaticANIObject1ById(ANI_SWINGER, -1);
 	g_vars->scene11_boots = sc->getStaticANIObject1ById(ANI_BOOTS_11, -1);
-	g_vars->scene11_mgm.clear();
+	g_vars->scene11_aniHandler.detachAllObjects();
 	g_vars->scene11_dudeOnSwing = sc->getStaticANIObject1ById(ANI_MAN11, -1);
 	g_vars->scene11_dudeOnSwing->_callback2 = scene11_dudeSwingCallback;
 	g_vars->scene11_dudeOnSwing = sc->getStaticANIObject1ById(ANI_KACHELI, -1);
@@ -139,7 +139,7 @@ void scene11_initScene(Scene *sc) {
 
 		getSc2MctlCompoundBySceneId(sc->_sceneId)->replaceNodeX(303, 353);
 	} else if (swingie == g_fp->getObjectEnumState(sO_Swingie, sO_IsStandingInBoots)
-			   || swingie == g_fp->getObjectEnumState(sO_Swingie, sO_IsStandingInCorner)) {
+				|| swingie == g_fp->getObjectEnumState(sO_Swingie, sO_IsStandingInCorner)) {
 		g_vars->scene11_swingIsSwinging = false;
 		g_vars->scene11_swingieStands = true;
 
@@ -251,7 +251,7 @@ void sceneHandler11_manToSwing() {
 	g_vars->scene11_dudeOnSwing->startAnim(MV_MAN11_SWING_0, 0, -1);
 	g_vars->scene11_dudeOnSwing->_movement->setDynamicPhaseIndex(45);
 
-	g_vars->scene11_mgm.addItem(g_fp->_aniMan->_id);
+	g_vars->scene11_aniHandler.attachObject(g_fp->_aniMan->_id);
 
 	g_fp->_currentScene->_x = 1400 - g_fp->_sceneRect.right;
 
@@ -315,8 +315,8 @@ void sceneHandler11_jumpFromSwing() {
 	g_vars->scene11_dudeOnSwing->_priority = 20;
 	g_vars->scene11_dudeOnSwing->_flags |= 4;
 
-    MessageQueue *mq = new MessageQueue(g_fp->_globalMessageQueueList->compact());
-    ExCommand *ex = new ExCommand(g_fp->_aniMan->_id, 34, 256, 0, 0, 0, 1, 0, 0, 0);
+	MessageQueue *mq = new MessageQueue(g_fp->_globalMessageQueueList->compact());
+	ExCommand *ex = new ExCommand(g_fp->_aniMan->_id, 34, 256, 0, 0, 0, 1, 0, 0, 0);
 	ex->_field_14 = 256;
 	ex->_messageNum = 0;
 	ex->_excFlags |= 3;
@@ -385,7 +385,7 @@ void sceneHandler11_emptySwing() {
 }
 
 void sceneHandler11_jumpHitAndWin() {
-	MGMInfo mgminfo;
+	MakeQueueStruct mkQueue;
 
 	sceneHandler11_emptySwing();
 
@@ -393,27 +393,27 @@ void sceneHandler11_jumpHitAndWin() {
 						  MV_MAN11_JUMPHIT, 0);
 	g_fp->_aniMan->_priority = 10;
 
-	mgminfo.field_1C = 10;
-	mgminfo.ani = g_fp->_aniMan;
-	mgminfo.staticsId2 = ST_MAN_1PIX;
-	mgminfo.x1 = 1400;
-	mgminfo.y1 = 0;
-	mgminfo.field_10 = 1;
-	mgminfo.flags = 66;
-	mgminfo.movementId = MV_MAN11_JUMPHIT;
+	mkQueue.field_1C = 10;
+	mkQueue.ani = g_fp->_aniMan;
+	mkQueue.staticsId2 = ST_MAN_1PIX;
+	mkQueue.x1 = 1400;
+	mkQueue.y1 = 0;
+	mkQueue.field_10 = 1;
+	mkQueue.flags = 66;
+	mkQueue.movementId = MV_MAN11_JUMPHIT;
 
-	MessageQueue *mq = g_vars->scene11_mgm.genMovement(&mgminfo);
+	MessageQueue *mq = g_vars->scene11_aniHandler.makeRunQueue(&mkQueue);
 
 	if (mq) {
 		g_vars->scene11_crySound = SND_11_024;
 		ExCommand *ex = new ExCommand(ANI_MAN, 2, 36, 0, 0, 0, 1, 0, 0, 0);
-		ex->_keyCode = -1;
+		ex->_param = -1;
 		ex->_excFlags = 2;
 
 		mq->addExCommandToEnd(ex);
 
 		ex = new ExCommand(SC_11, 17, 61, 0, 0, 0, 1, 0, 0, 0);
-		ex->_keyCode = TrubaRight;
+		ex->_param = TrubaRight;
 		ex->_excFlags = 3;
 
 		mq->addExCommandToEnd(ex);
@@ -430,7 +430,7 @@ void sceneHandler11_jumpHitAndWin() {
 }
 
 void sceneHandler11_jumpOver(double angle) {
-	MGMInfo mgminfo;
+	MakeQueueStruct mkQueue;
 
 	sceneHandler11_emptySwing();
 
@@ -438,16 +438,16 @@ void sceneHandler11_jumpOver(double angle) {
 						  MV_MAN11_JUMPOVER, 0);
 	g_fp->_aniMan->_priority = 0;
 
-	mgminfo.staticsId2 = ST_MAN_1PIX;
-	mgminfo.ani = g_fp->_aniMan;
-	mgminfo.x1 = 1163;
-	mgminfo.y1 = 837 - (int)(angle * 153.0);
-	mgminfo.field_1C = 0;
-	mgminfo.field_10 = 1;
-	mgminfo.flags = 78;
-	mgminfo.movementId = MV_MAN11_JUMPOVER;
+	mkQueue.staticsId2 = ST_MAN_1PIX;
+	mkQueue.ani = g_fp->_aniMan;
+	mkQueue.x1 = 1163;
+	mkQueue.y1 = 837 - (int)(angle * 153.0);
+	mkQueue.field_1C = 0;
+	mkQueue.field_10 = 1;
+	mkQueue.flags = 78;
+	mkQueue.movementId = MV_MAN11_JUMPOVER;
 
-	MessageQueue *mq = g_vars->scene11_mgm.genMovement(&mgminfo);
+	MessageQueue *mq = g_vars->scene11_aniHandler.makeRunQueue(&mkQueue);
 
 	if (mq) {
 		g_vars->scene11_crySound = SND_11_022;
@@ -463,7 +463,7 @@ void sceneHandler11_jumpOver(double angle) {
 }
 
 void sceneHandler11_jumpHit(double angle) {
-	MGMInfo mgminfo;
+	MakeQueueStruct mkQueue;
 
 	sceneHandler11_emptySwing();
 
@@ -478,16 +478,16 @@ void sceneHandler11_jumpHit(double angle) {
 						  MV_MAN11_JUMPOVER, 0);
 	g_fp->_aniMan->_priority = 0;
 
-	mgminfo.staticsId2 = ST_MAN_1PIX;
-	mgminfo.ani = g_fp->_aniMan;
-	mgminfo.x1 = 1017 - (int)(angle * -214.0);
-	mgminfo.y1 = 700;
-	mgminfo.field_1C = 0;
-	mgminfo.field_10 = 1;
-	mgminfo.flags = 78;
-	mgminfo.movementId = MV_MAN11_JUMPHIT;
+	mkQueue.staticsId2 = ST_MAN_1PIX;
+	mkQueue.ani = g_fp->_aniMan;
+	mkQueue.x1 = 1017 - (int)(angle * -214.0);
+	mkQueue.y1 = 700;
+	mkQueue.field_1C = 0;
+	mkQueue.field_10 = 1;
+	mkQueue.flags = 78;
+	mkQueue.movementId = MV_MAN11_JUMPHIT;
 
-	MessageQueue *mq = g_vars->scene11_mgm.genMovement(&mgminfo);
+	MessageQueue *mq = g_vars->scene11_aniHandler.makeRunQueue(&mkQueue);
 
 	if (mq) {
 		g_vars->scene11_crySound = SND_11_022;
@@ -551,7 +551,7 @@ void sceneHandler11_swingieSit() {
 }
 
 void sceneHandler11_swingieJumpDown() {
-    MessageQueue *mq = new MessageQueue(g_fp->_currentScene->getMessageQueueById(QU_SWR_JUMPDOWN), 0, 0);
+	MessageQueue *mq = new MessageQueue(g_fp->_currentScene->getMessageQueueById(QU_SWR_JUMPDOWN), 0, 0);
 
 	mq->setFlags(mq->getFlags() | 1);
 
@@ -590,7 +590,7 @@ int sceneHandler11(ExCommand *cmd) {
 
 	case MSG_SC11_SITSWINGER:
 		if (g_fp->getObjectState(sO_Swingie) == g_fp->getObjectEnumState(sO_Swingie, sO_IsStandingInBoots)
-			    || g_fp->getObjectState(sO_Swingie) == g_fp->getObjectEnumState(sO_Swingie, sO_IsStandingInCorner)) {
+				|| g_fp->getObjectState(sO_Swingie) == g_fp->getObjectEnumState(sO_Swingie, sO_IsStandingInCorner)) {
 			g_fp->setObjectState(sO_Swingie, g_fp->getObjectEnumState(sO_Swingie, sO_IsSitting));
 		}
 		break;
@@ -750,7 +750,7 @@ int sceneHandler11(ExCommand *cmd) {
 	case 29:
 		if (g_vars->scene11_swingIsSwinging) {
 			if (g_fp->_currentScene->getStaticANIObjectAtPos(g_fp->_sceneRect.left + cmd->_x, g_fp->_sceneRect.top + cmd->_y) == g_vars->scene11_swingie
-				&& cmd->_keyCode == ANI_INV_BOOT)
+				&& cmd->_param == ANI_INV_BOOT)
 				sceneHandler11_putBoot();
 		} else {
 			if (g_vars->scene11_arcadeIsOn) {
@@ -763,11 +763,11 @@ int sceneHandler11(ExCommand *cmd) {
 		if (!g_vars->scene11_arcadeIsOn) {
 			StaticANIObject *ani = g_fp->_currentScene->getStaticANIObjectAtPos(cmd->_sceneClickX, cmd->_sceneClickY);
 
-			if (!ani || !canInteractAny(g_fp->_aniMan, ani, cmd->_keyCode)) {
+			if (!ani || !canInteractAny(g_fp->_aniMan, ani, cmd->_param)) {
 				int picId = g_fp->_currentScene->getPictureObjectIdAtPos(cmd->_sceneClickX, cmd->_sceneClickY);
 				PictureObject *pic = g_fp->_currentScene->getPictureObjectById(picId, 0);
 
-				if (!pic || !canInteractAny(g_fp->_aniMan, pic, cmd->_keyCode)) {
+				if (!pic || !canInteractAny(g_fp->_aniMan, pic, cmd->_param)) {
 					if ((g_fp->_sceneRect.right - cmd->_sceneClickX < 47 && g_fp->_sceneRect.right < g_fp->_sceneWidth - 1)
 						|| (cmd->_sceneClickX - g_fp->_sceneRect.left < 47 && g_fp->_sceneRect.left > 0)) {
 						g_fp->processArcade(cmd);

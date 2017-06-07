@@ -34,6 +34,9 @@
 #include "sci/graphics/coordadjuster.h"
 #include "sci/graphics/cursor.h"
 #include "sci/graphics/maciconbar.h"
+#ifdef ENABLE_SCI32
+#include "sci/graphics/frameout.h"
+#endif
 
 namespace Sci {
 
@@ -58,10 +61,7 @@ reg_t kGetEvent(EngineState *s, int argc, reg_t *argv) {
 	if (g_debug_simulated_key && (mask & SCI_EVENT_KEYBOARD)) {
 		// In case we use a simulated event we query the current mouse position
 		mousePos = g_sci->_gfxCursor->getPosition();
-#ifdef ENABLE_SCI32
-		if (getSciVersion() >= SCI_VERSION_2_1_EARLY)
-			g_sci->_gfxCoordAdjuster->fromDisplayToScript(mousePos.y, mousePos.x);
-#endif
+
 		// Limit the mouse cursor position, if necessary
 		g_sci->_gfxCursor->refreshPosition();
 
@@ -73,7 +73,7 @@ reg_t kGetEvent(EngineState *s, int argc, reg_t *argv) {
 		g_debug_simulated_key = 0;
 		return make_reg(0, 1);
 	}
-	
+
 	curEvent = g_sci->getEventManager()->getSciEvent(mask);
 
 	if (s->_delayedRestoreGame) {
@@ -83,13 +83,17 @@ reg_t kGetEvent(EngineState *s, int argc, reg_t *argv) {
 	}
 
 	// For a real event we use its associated mouse position
-	mousePos = curEvent.mousePos;
 #ifdef ENABLE_SCI32
-	if (getSciVersion() >= SCI_VERSION_2_1_EARLY)
-		g_sci->_gfxCoordAdjuster->fromDisplayToScript(mousePos.y, mousePos.x);
+	if (getSciVersion() >= SCI_VERSION_2)
+		mousePos = curEvent.mousePosSci;
+	else {
 #endif
-	// Limit the mouse cursor position, if necessary
-	g_sci->_gfxCursor->refreshPosition();
+		mousePos = curEvent.mousePos;
+		// Limit the mouse cursor position, if necessary
+		g_sci->_gfxCursor->refreshPosition();
+#ifdef ENABLE_SCI32
+	}
+#endif
 
 	if (g_sci->getVocabulary())
 		g_sci->getVocabulary()->parser_event = NULL_REG; // Invalidate parser event
@@ -101,7 +105,25 @@ reg_t kGetEvent(EngineState *s, int argc, reg_t *argv) {
 		// question. Check GfxCursor::setPosition(), for a more detailed
 		// explanation and a list of cursor position workarounds.
 		if (s->_cursorWorkaroundRect.contains(mousePos.x, mousePos.y)) {
-			s->_cursorWorkaroundActive = false;
+			// For OpenPandora and possibly other platforms, that support analog-stick control + touch screen
+			// control at the same time: in case the cursor is currently at the coordinate set by the scripts,
+			// we will count down instead of immediately disabling the workaround.
+			// On OpenPandora the cursor position is set, but it's overwritten shortly afterwards by the
+			// touch screen. In this case we would sometimes disable the workaround, simply because the touch
+			// screen hasn't yet overwritten the position and thus the workaround would not work anymore.
+			// On OpenPandora it would sometimes work and sometimes not without this.
+			if (s->_cursorWorkaroundPoint == mousePos) {
+				// Cursor is still at the same spot as set by the scripts
+				if (s->_cursorWorkaroundPosCount > 0) {
+					s->_cursorWorkaroundPosCount--;
+				} else {
+					// Was for quite a bit of time at that spot, so disable workaround now
+					s->_cursorWorkaroundActive = false;
+				}
+			} else {
+				// Cursor has moved, but is within the rect -> disable workaround immediately
+				s->_cursorWorkaroundActive = false;
+			}
 		} else {
 			mousePos.x = s->_cursorWorkaroundPoint.x;
 			mousePos.y = s->_cursorWorkaroundPoint.y;
@@ -239,11 +261,12 @@ reg_t kMapKeyToDir(EngineState *s, int argc, reg_t *argv) {
 	if (readSelectorValue(segMan, obj, SELECTOR(type)) == SCI_EVENT_KEYBOARD) { // Keyboard
 		uint16 message = readSelectorValue(segMan, obj, SELECTOR(message));
 		uint16 eventType = SCI_EVENT_DIRECTION;
-		// Check if the game is using cursor views. These games allowed control
-		// of the mouse cursor via the keyboard controls (the so called
-		// "PseudoMouse" functionality in script 933).
-		if (g_sci->_features->detectSetCursorType() == SCI_VERSION_1_1)
+		// It seems with SCI1 Sierra started to add the SCI_EVENT_DIRECTION bit instead of setting it directly.
+		// It was done inside the keyboard driver and is required for the PseudoMouse functionality and class
+		// to work (script 933).
+		if (g_sci->_features->detectPseudoMouseAbility() == kPseudoMouseAbilityTrue) {
 			eventType |= SCI_EVENT_KEYBOARD;
+		}
 
 		for (int i = 0; i < 9; i++) {
 			if (keyToDirMap[i].key == message) {
@@ -261,14 +284,13 @@ reg_t kMapKeyToDir(EngineState *s, int argc, reg_t *argv) {
 
 reg_t kGlobalToLocal(EngineState *s, int argc, reg_t *argv) {
 	reg_t obj = argv[0];
-	reg_t planeObject = argc > 1 ? argv[1] : NULL_REG; // SCI32
 	SegManager *segMan = s->_segMan;
 
 	if (obj.getSegment()) {
 		int16 x = readSelectorValue(segMan, obj, SELECTOR(x));
 		int16 y = readSelectorValue(segMan, obj, SELECTOR(y));
 
-		g_sci->_gfxCoordAdjuster->kernelGlobalToLocal(x, y, planeObject);
+		g_sci->_gfxCoordAdjuster->kernelGlobalToLocal(x, y);
 
 		writeSelectorValue(segMan, obj, SELECTOR(x), x);
 		writeSelectorValue(segMan, obj, SELECTOR(y), y);
@@ -280,14 +302,13 @@ reg_t kGlobalToLocal(EngineState *s, int argc, reg_t *argv) {
 
 reg_t kLocalToGlobal(EngineState *s, int argc, reg_t *argv) {
 	reg_t obj = argv[0];
-	reg_t planeObject = argc > 1 ? argv[1] : NULL_REG; // SCI32
 	SegManager *segMan = s->_segMan;
 
 	if (obj.getSegment()) {
 		int16 x = readSelectorValue(segMan, obj, SELECTOR(x));
 		int16 y = readSelectorValue(segMan, obj, SELECTOR(y));
 
-		g_sci->_gfxCoordAdjuster->kernelLocalToGlobal(x, y, planeObject);
+		g_sci->_gfxCoordAdjuster->kernelLocalToGlobal(x, y);
 
 		writeSelectorValue(segMan, obj, SELECTOR(x), x);
 		writeSelectorValue(segMan, obj, SELECTOR(y), y);
@@ -301,5 +322,53 @@ reg_t kJoystick(EngineState *s, int argc, reg_t *argv) {
 	debug(5, "Unimplemented syscall 'Joystick()'");
 	return NULL_REG;
 }
+
+#ifdef ENABLE_SCI32
+reg_t kGlobalToLocal32(EngineState *s, int argc, reg_t *argv) {
+	const reg_t result = argv[0];
+	const reg_t planeObj = argv[1];
+
+	bool visible = true;
+	Plane *plane = g_sci->_gfxFrameout->getVisiblePlanes().findByObject(planeObj);
+	if (plane == nullptr) {
+		plane = g_sci->_gfxFrameout->getPlanes().findByObject(planeObj);
+		visible = false;
+	}
+	if (plane == nullptr) {
+		error("kGlobalToLocal: Plane %04x:%04x not found", PRINT_REG(planeObj));
+	}
+
+	const int16 x = readSelectorValue(s->_segMan, result, SELECTOR(x)) - plane->_gameRect.left;
+	const int16 y = readSelectorValue(s->_segMan, result, SELECTOR(y)) - plane->_gameRect.top;
+
+	writeSelectorValue(s->_segMan, result, SELECTOR(x), x);
+	writeSelectorValue(s->_segMan, result, SELECTOR(y), y);
+
+	return make_reg(0, visible);
+}
+
+reg_t kLocalToGlobal32(EngineState *s, int argc, reg_t *argv) {
+	const reg_t result = argv[0];
+	const reg_t planeObj = argv[1];
+
+	bool visible = true;
+	Plane *plane = g_sci->_gfxFrameout->getVisiblePlanes().findByObject(planeObj);
+	if (plane == nullptr) {
+		plane = g_sci->_gfxFrameout->getPlanes().findByObject(planeObj);
+		visible = false;
+	}
+	if (plane == nullptr) {
+		error("kLocalToGlobal: Plane %04x:%04x not found", PRINT_REG(planeObj));
+	}
+
+	const int16 x = readSelectorValue(s->_segMan, result, SELECTOR(x)) + plane->_gameRect.left;
+	const int16 y = readSelectorValue(s->_segMan, result, SELECTOR(y)) + plane->_gameRect.top;
+
+	writeSelectorValue(s->_segMan, result, SELECTOR(x), x);
+	writeSelectorValue(s->_segMan, result, SELECTOR(y), y);
+
+	return make_reg(0, visible);
+}
+#endif
 
 } // End of namespace Sci

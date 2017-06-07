@@ -43,6 +43,7 @@ SegManager::SegManager(ResourceManager *resMan, ScriptPatcher *scriptPatcher)
 #ifdef ENABLE_SCI32
 	_arraysSegId = 0;
 	_stringSegId = 0;
+	_bitmapSegId = 0;
 #endif
 
 	createClassTable();
@@ -72,6 +73,7 @@ void SegManager::resetSegMan() {
 #ifdef ENABLE_SCI32
 	_arraysSegId = 0;
 	_stringSegId = 0;
+	_bitmapSegId = 0;
 #endif
 
 	// Reinitialize class table
@@ -247,9 +249,9 @@ Object *SegManager::getObject(reg_t pos) const {
 
 	if (mobj != NULL) {
 		if (mobj->getType() == SEG_TYPE_CLONES) {
-			CloneTable *ct = (CloneTable *)mobj;
-			if (ct->isValidEntry(pos.getOffset()))
-				obj = &(ct->_table[pos.getOffset()]);
+			CloneTable &ct = *(CloneTable *)mobj;
+			if (ct.isValidEntry(pos.getOffset()))
+				obj = &(ct[pos.getOffset()]);
 			else
 				warning("getObject(): Trying to get an invalid object");
 		} else if (mobj->getType() == SEG_TYPE_SCRIPT) {
@@ -313,7 +315,7 @@ reg_t SegManager::findObjectByName(const Common::String &name, int index) {
 		} else if (mobj->getType() == SEG_TYPE_CLONES) {
 			// It's clone table, scan all objects in it
 			const CloneTable *ct = (const CloneTable *)mobj;
-			for (uint idx = 0; idx < ct->_table.size(); ++idx) {
+			for (uint idx = 0; idx < ct->size(); ++idx) {
 				if (!ct->isValidEntry(idx))
 					continue;
 
@@ -404,7 +406,7 @@ reg_t SegManager::allocateHunkEntry(const char *hunk_type, int size) {
 	offset = table->allocEntry();
 
 	reg_t addr = make_reg(_hunksSegId, offset);
-	Hunk *h = &(table->_table[offset]);
+	Hunk *h = &table->at(offset);
 
 	if (!h)
 		return NULL_REG;
@@ -424,7 +426,7 @@ byte *SegManager::getHunkPointer(reg_t addr) {
 		return NULL;
 	}
 
-	return (byte *)ht->_table[addr.getOffset()].mem;
+	return (byte *)ht->at(addr.getOffset()).mem;
 }
 
 Clone *SegManager::allocateClone(reg_t *addr) {
@@ -439,7 +441,7 @@ Clone *SegManager::allocateClone(reg_t *addr) {
 	offset = table->allocEntry();
 
 	*addr = make_reg(_clonesSegId, offset);
-	return &(table->_table[offset]);
+	return &table->at(offset);
 }
 
 List *SegManager::allocateList(reg_t *addr) {
@@ -453,7 +455,7 @@ List *SegManager::allocateList(reg_t *addr) {
 	offset = table->allocEntry();
 
 	*addr = make_reg(_listsSegId, offset);
-	return &(table->_table[offset]);
+	return &table->at(offset);
 }
 
 Node *SegManager::allocateNode(reg_t *addr) {
@@ -467,7 +469,7 @@ Node *SegManager::allocateNode(reg_t *addr) {
 	offset = table->allocEntry();
 
 	*addr = make_reg(_nodesSegId, offset);
-	return &(table->_table[offset]);
+	return &table->at(offset);
 }
 
 reg_t SegManager::newNode(reg_t value, reg_t key) {
@@ -486,14 +488,14 @@ List *SegManager::lookupList(reg_t addr) {
 		return NULL;
 	}
 
-	ListTable *lt = (ListTable *)_heap[addr.getSegment()];
+	ListTable &lt = *(ListTable *)_heap[addr.getSegment()];
 
-	if (!lt->isValidEntry(addr.getOffset())) {
+	if (!lt.isValidEntry(addr.getOffset())) {
 		error("Attempt to use non-list %04x:%04x as list", PRINT_REG(addr));
 		return NULL;
 	}
 
-	return &(lt->_table[addr.getOffset()]);
+	return &(lt[addr.getOffset()]);
 }
 
 Node *SegManager::lookupNode(reg_t addr, bool stopOnDiscarded) {
@@ -507,9 +509,9 @@ Node *SegManager::lookupNode(reg_t addr, bool stopOnDiscarded) {
 		return NULL;
 	}
 
-	NodeTable *nt = (NodeTable *)_heap[addr.getSegment()];
+	NodeTable &nt = *(NodeTable *)_heap[addr.getSegment()];
 
-	if (!nt->isValidEntry(addr.getOffset())) {
+	if (!nt.isValidEntry(addr.getOffset())) {
 		if (!stopOnDiscarded)
 			return NULL;
 
@@ -517,7 +519,7 @@ Node *SegManager::lookupNode(reg_t addr, bool stopOnDiscarded) {
 		return NULL;
 	}
 
-	return &(nt->_table[addr.getOffset()]);
+	return &(nt[addr.getOffset()]);
 }
 
 SegmentRef SegManager::dereference(reg_t pointer) {
@@ -873,32 +875,32 @@ SciArray<reg_t> *SegManager::allocateArray(reg_t *addr) {
 	offset = table->allocEntry();
 
 	*addr = make_reg(_arraysSegId, offset);
-	return &(table->_table[offset]);
+	return &table->at(offset);
 }
 
 SciArray<reg_t> *SegManager::lookupArray(reg_t addr) {
 	if (_heap[addr.getSegment()]->getType() != SEG_TYPE_ARRAY)
 		error("Attempt to use non-array %04x:%04x as array", PRINT_REG(addr));
 
-	ArrayTable *arrayTable = (ArrayTable *)_heap[addr.getSegment()];
+	ArrayTable &arrayTable = *(ArrayTable *)_heap[addr.getSegment()];
 
-	if (!arrayTable->isValidEntry(addr.getOffset()))
+	if (!arrayTable.isValidEntry(addr.getOffset()))
 		error("Attempt to use non-array %04x:%04x as array", PRINT_REG(addr));
 
-	return &(arrayTable->_table[addr.getOffset()]);
+	return &(arrayTable[addr.getOffset()]);
 }
 
 void SegManager::freeArray(reg_t addr) {
 	if (_heap[addr.getSegment()]->getType() != SEG_TYPE_ARRAY)
 		error("Attempt to use non-array %04x:%04x as array", PRINT_REG(addr));
 
-	ArrayTable *arrayTable = (ArrayTable *)_heap[addr.getSegment()];
+	ArrayTable &arrayTable = *(ArrayTable *)_heap[addr.getSegment()];
 
-	if (!arrayTable->isValidEntry(addr.getOffset()))
+	if (!arrayTable.isValidEntry(addr.getOffset()))
 		error("Attempt to use non-array %04x:%04x as array", PRINT_REG(addr));
 
-	arrayTable->_table[addr.getOffset()].destroy();
-	arrayTable->freeEntry(addr.getOffset());
+	arrayTable[addr.getOffset()].destroy();
+	arrayTable.freeEntry(addr.getOffset());
 }
 
 SciString *SegManager::allocateString(reg_t *addr) {
@@ -913,33 +915,82 @@ SciString *SegManager::allocateString(reg_t *addr) {
 	offset = table->allocEntry();
 
 	*addr = make_reg(_stringSegId, offset);
-	return &(table->_table[offset]);
+	return &table->at(offset);
 }
 
 SciString *SegManager::lookupString(reg_t addr) {
 	if (_heap[addr.getSegment()]->getType() != SEG_TYPE_STRING)
 		error("lookupString: Attempt to use non-string %04x:%04x as string", PRINT_REG(addr));
 
-	StringTable *stringTable = (StringTable *)_heap[addr.getSegment()];
+	StringTable &stringTable = *(StringTable *)_heap[addr.getSegment()];
 
-	if (!stringTable->isValidEntry(addr.getOffset()))
+	if (!stringTable.isValidEntry(addr.getOffset()))
 		error("lookupString: Attempt to use non-string %04x:%04x as string", PRINT_REG(addr));
 
-	return &(stringTable->_table[addr.getOffset()]);
+	return &(stringTable[addr.getOffset()]);
 }
 
 void SegManager::freeString(reg_t addr) {
 	if (_heap[addr.getSegment()]->getType() != SEG_TYPE_STRING)
 		error("freeString: Attempt to use non-string %04x:%04x as string", PRINT_REG(addr));
 
-	StringTable *stringTable = (StringTable *)_heap[addr.getSegment()];
+	StringTable &stringTable = *(StringTable *)_heap[addr.getSegment()];
 
-	if (!stringTable->isValidEntry(addr.getOffset()))
+	if (!stringTable.isValidEntry(addr.getOffset()))
 		error("freeString: Attempt to use non-string %04x:%04x as string", PRINT_REG(addr));
 
-	stringTable->_table[addr.getOffset()].destroy();
-	stringTable->freeEntry(addr.getOffset());
+	stringTable[addr.getOffset()].destroy();
+	stringTable.freeEntry(addr.getOffset());
 }
+
+#pragma mark -
+#pragma mark Bitmaps
+
+SciBitmap *SegManager::allocateBitmap(reg_t *addr, const int16 width, const int16 height, const uint8 skipColor, const int16 displaceX, const int16 displaceY, const int16 scaledWidth, const int16 scaledHeight, const uint32 paletteSize, const bool remap, const bool gc) {
+	BitmapTable *table;
+	int offset;
+
+	if (!_bitmapSegId) {
+		table = (BitmapTable *)allocSegment(new BitmapTable(), &(_bitmapSegId));
+	} else {
+		table = (BitmapTable *)_heap[_bitmapSegId];
+	}
+
+	offset = table->allocEntry();
+
+	*addr = make_reg(_bitmapSegId, offset);
+	SciBitmap &bitmap = table->at(offset);
+
+	bitmap.create(width, height, skipColor, displaceX, displaceY, scaledWidth, scaledHeight, paletteSize, remap, gc);
+
+	return &bitmap;
+}
+
+SciBitmap *SegManager::lookupBitmap(const reg_t addr) {
+	if (_heap[addr.getSegment()]->getType() != SEG_TYPE_BITMAP)
+		error("Attempt to use non-bitmap %04x:%04x as bitmap", PRINT_REG(addr));
+
+	BitmapTable &bitmapTable = *(BitmapTable *)_heap[addr.getSegment()];
+
+	if (!bitmapTable.isValidEntry(addr.getOffset()))
+		error("Attempt to use invalid entry %04x:%04x as bitmap", PRINT_REG(addr));
+
+	return &(bitmapTable.at(addr.getOffset()));
+}
+
+void SegManager::freeBitmap(const reg_t addr) {
+	if (_heap[addr.getSegment()]->getType() != SEG_TYPE_BITMAP)
+		error("Attempt to free non-bitmap %04x:%04x as bitmap", PRINT_REG(addr));
+
+	BitmapTable &bitmapTable = *(BitmapTable *)_heap[addr.getSegment()];
+
+	if (!bitmapTable.isValidEntry(addr.getOffset()))
+		error("Attempt to free invalid entry %04x:%04x as bitmap", PRINT_REG(addr));
+
+	bitmapTable.freeEntry(addr.getOffset());
+}
+
+#pragma mark -
 
 #endif
 

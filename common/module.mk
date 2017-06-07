@@ -16,6 +16,7 @@ MODULE_OBJS := \
 	iff_container.o \
 	ini-file.o \
 	installshield_cab.o \
+	json.o \
 	language.o \
 	localization.o \
 	macresman.o \
@@ -54,6 +55,11 @@ MODULE_OBJS += \
 ifdef ENABLE_EVENTRECORDER
 MODULE_OBJS += \
 	recorderfile.o
+endif
+
+ifdef USE_UPDATES
+MODULE_OBJS += \
+	updates.o
 endif
 
 # Include common rules

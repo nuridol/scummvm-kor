@@ -662,7 +662,7 @@ void cmdWordToString(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 	uint16 stringNr = parameter[0];
 	uint16 wordNr = parameter[1];
 
-	strcpy(state->strings[stringNr], state->_vm->_words->getEgoWord(wordNr));
+	Common::strlcpy(state->strings[stringNr], state->_vm->_words->getEgoWord(wordNr), MAX_STRINGLEN);
 }
 
 void cmdOpenDialogue(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
@@ -894,6 +894,8 @@ void cmdSetSimple(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 		// it's called with parameter 16.
 		// Original interpreter doesn't seem to play any sound.
 		// TODO: Figure out what's going on. It can't be automatic saving of course.
+		// Also getting called in KQ1, when planting beans - parameter 12.
+		// And when killing the witch - parameter 40.
 		if ((getVersion() < 0x2425) || (getVersion() == 0x2440)) {
 			// was not available before 2.2425, but also not available in 2.440
 			warning("set.simple called, although not available for current AGI version");
@@ -2012,7 +2014,7 @@ void cmdGetString(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 
 	// copy string to destination
 	// TODO: not sure if set all the time or only when ENTER is pressed
-	strcpy(&state->_vm->_game.strings[stringDestNr][0], (char *)textMgr->_inputString);
+	Common::strlcpy(&state->_vm->_game.strings[stringDestNr][0], (char *)textMgr->_inputString, MAX_STRINGLEN);
 
 	textMgr->charPos_Pop();
 
@@ -2100,7 +2102,7 @@ void cmdSetString(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 	// CM: to avoid crash in Groza (str = 150)
 	if (stringNr > MAX_STRINGS)
 		return;
-	strcpy(state->strings[stringNr], state->_curLogic->texts[textNr]);
+	Common::strlcpy(state->strings[stringNr], state->_curLogic->texts[textNr], MAX_STRINGLEN);
 }
 
 void cmdDisplay(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
@@ -2225,7 +2227,7 @@ void cmdMousePosn(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 	int16 mouseX = vm->_mouse.pos.x;
 	int16 mouseY = vm->_mouse.pos.y;
 
-	state->_vm->adjustPosToGameScreen(mouseX, mouseY);
+	vm->_gfx->translateDisplayPosToGameScreen(mouseX, mouseY);
 
 	vm->setVar(destVarNr1, mouseX);
 	vm->setVar(destVarNr2, mouseY);

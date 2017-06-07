@@ -30,8 +30,6 @@
 #include "common/savefile.h"
 #include "common/system.h"
 
-#include "audio/mixer.h"
-
 #include "graphics/transparent_surface.h"
 
 #include "engines/engine.h"
@@ -41,9 +39,25 @@
 
 struct ADGameDescription;
 
+namespace Audio {
+class SoundHandle;
+}
+
 namespace Fullpipe {
 
 enum FullpipeGameFeatures {
+};
+
+enum {
+	kDebugPathfinding	= 1 << 0,
+	kDebugDrawing		= 1 << 1,
+	kDebugLoading		= 1 << 2,
+	kDebugAnimation		= 1 << 3,
+	kDebugMemory		= 1 << 4,
+	kDebugEvents		= 1 << 5,
+	kDebugBehavior		= 1 << 6,
+	kDebugInventory		= 1 << 7,
+	kDebugSceneLogic	= 1 << 8
 };
 
 class BehaviorManager;
@@ -62,7 +76,7 @@ class GlobalMessageQueueList;
 struct MessageHandler;
 class MessageQueue;
 struct MovTable;
-class MGM;
+class AniHandler;
 class NGIArchive;
 class PictureObject;
 struct PreloadItem;
@@ -198,7 +212,7 @@ public:
 	MovTable *_movTable;
 
 	Floaters *_floaters;
-	MGM *_mgm;
+	AniHandler *_aniHandler;
 
 	Common::Array<Common::Point *> _arcadeKeys;
 
@@ -312,7 +326,7 @@ public:
 	void lift_openLift();
 
 	GameVar *_musicGameVar;
-	Audio::SoundHandle _sceneTrackHandle;
+	Audio::SoundHandle *_sceneTrackHandle;
 
 public:
 

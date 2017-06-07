@@ -123,6 +123,14 @@ struct TransparentSurface : public Graphics::Surface {
 	                  uint color = TS_ARGB(255, 255, 255, 255),
 	                  int width = -1, int height = -1,
 	                  TSpriteBlendMode blend = BLEND_NORMAL);
+	Common::Rect blitClip(Graphics::Surface &target, Common::Rect clippingArea,
+						int posX = 0, int posY = 0,
+						int flipping = FLIP_NONE,
+						Common::Rect *pPartRect = nullptr,
+						uint color = TS_ARGB(255, 255, 255, 255),
+						int width = -1, int height = -1,
+						TSpriteBlendMode blend = BLEND_NORMAL);
+
 	void applyColorKey(uint8 r, uint8 g, uint8 b, bool overwriteAlpha = false);
 
 	/**
@@ -143,6 +151,16 @@ struct TransparentSurface : public Graphics::Surface {
 	 *
 	 */
 	TransparentSurface *rotoscale(const TransformStruct &transform) const;
+
+	TransparentSurface *convertTo(const PixelFormat &dstFormat, const byte *palette = 0) const;
+
+	float getRatio() {
+		if (!w)
+			return 0;
+
+		return h / (float)w;
+	}
+
 	AlphaType getAlphaMode() const;
 	void setAlphaMode(AlphaType);
 private:

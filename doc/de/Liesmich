@@ -401,6 +401,7 @@ Andere Spiele:
      I Have No Mouth, and I Must Scream          [ihnm]
      Lands of Lore: The Throne of Chaos          [lol]
      Mortville Manor                             [morteville]
+     Myst / Myst: Masterpiece Edition            [myst]
      Nippon Safes Inc.                           [nippon]
      Rex Nebular and the Cosmic Gender Bender    [nebular]
      Ringworld: Revenge of the Patriarch         [ringworld]
@@ -410,6 +411,7 @@ Andere Spiele:
      TeenAgent                                   [teenagent]
      The 7th Guest                               [t7g]
      The Journeyman Project: Pegasus Prime       [pegasus]
+     The Labyrinth of Time                       [lab]
      The Legend of Kyrandia                      [kyra1]
      The Legend of Kyrandia: The Hand of Fate    [kyra2]
      The Legend of Kyrandia: Malcolm's Revenge   [kyra3]
@@ -418,6 +420,7 @@ Andere Spiele:
      Toonstruck                                  [toon]
      Touché: Die Abenteuer des fünften
          Musketiers                              [touche]
+     U.F.O.s / Gnap: Der Schurke aus dem All     [gnap]
      Voyeur                                      [voyeur]
      Zork: Der Großinquisitor                    [zgi]
      Zork Nemesis: Das verbotene Land            [znemesis]
@@ -878,7 +881,7 @@ einem PC arbeiten, lesen Sie hierfür:
   http://wiki.scummvm.org/index.php/HOWTO-Mac_Games
 
 Obwohl hier in erster Linie über SCUMM-Spiele gesprochen wird, findet das
-Dienstprogramm „HFVExplorer“ Erwähnung, welches Sie benötigen, um die Dateien zu
+Dienstprogramm „HFSExplorer“ Erwähnung, welches Sie benötigen, um die Dateien zu
 extrahieren. Beachten Sie, dass Sie die Sprachausgabedaten aus „Inherit the
 Earth Voices“ im selben Verzeichnis ablegen müssen wie die Spieldaten, die sich
 an folgendem Ort befinden:
@@ -1280,7 +1283,7 @@ kompliziert werden, auf die CD- oder Diskettendaten zuzugreifen. Der Grund
 hierfür ist, dass der Mac ein spezielles Datenträgerformat nutzt, welches sich
 HFS nennt, und das andere Systeme normalerweise nicht unterstützen. Es gibt
 jedoch zahlreiche kostenlose Tools, die es ermöglichen, einen solchen
-HFS-Datenträger zu lesen. Z. B. „HFVExplorer“ für Windows und „hfsutils“ für
+HFS-Datenträger zu lesen. Z. B. „HFSExplorer“ für Windows und „hfsutils“ für
 Linux und andere Betriebssysteme, die Unix ähnlich sind.
 
 Die meisten neueren Spiele für den Macintosh wurden nur mit einer einzigen

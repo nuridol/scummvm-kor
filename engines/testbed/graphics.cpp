@@ -47,6 +47,7 @@ GFXTestSuite::GFXTestSuite() {
 
 	// Init Mouse Palette (White-black-yellow)
 	GFXtests::initMousePalette();
+	GFXtests::initMouseCursor();
 
 	// Add tests here
 
@@ -101,6 +102,29 @@ void GFXtests::initMousePalette() {
 	palette[8] = 0;
 
 	CursorMan.replaceCursorPalette(palette, 0, 3);
+}
+
+static const byte MOUSECURSOR_SCI[] = {
+	1,1,0,0,0,0,0,0,0,0,0,
+	1,2,1,0,0,0,0,0,0,0,0,
+	1,2,2,1,0,0,0,0,0,0,0,
+	1,2,2,2,1,0,0,0,0,0,0,
+	1,2,2,2,2,1,0,0,0,0,0,
+	1,2,2,2,2,2,1,0,0,0,0,
+	1,2,2,2,2,2,2,1,0,0,0,
+	1,2,2,2,2,2,2,2,1,0,0,
+	1,2,2,2,2,2,2,2,2,1,0,
+	1,2,2,2,2,2,2,2,2,2,1,
+	1,2,2,2,2,2,1,0,0,0,0,
+	1,2,1,0,1,2,2,1,0,0,0,
+	1,1,0,0,1,2,2,1,0,0,0,
+	0,0,0,0,0,1,2,2,1,0,0,
+	0,0,0,0,0,1,2,2,1,0,0,
+	0,0,0,0,0,0,1,2,2,1,0
+};
+
+void GFXtests::initMouseCursor() {
+	CursorMan.replaceCursor(MOUSECURSOR_SCI, 11, 16, 0, 0, 0);
 }
 
 Common::Rect GFXtests::computeSize(const Common::Rect &cursorRect, int scalingFactor, int cursorTargetScale) {
@@ -626,9 +650,12 @@ TestExitStatus GFXtests::mouseMovements() {
 	g_system->updateScreen();
 	g_system->delayMillis(1000);
 
+	Common::Event event;
+
 	for (int i = 0; i <= 100; i++) {
 		g_system->delayMillis(20);
 		g_system->warpMouse(i, i);
+		g_system->getEventManager()->pollEvent(event);
 		g_system->updateScreen();
 	}
 
