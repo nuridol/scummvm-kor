@@ -84,12 +84,18 @@ uint Kernel::getKernelNamesSize() const {
 }
 
 const Common::String &Kernel::getKernelName(uint number) const {
-	// FIXME: The following check is a temporary workaround for an issue
-	// leading to crashes when using the debugger's backtrace command.
-	if (number >= _kernelNames.size())
-		return _invalid;
+	assert(number < _kernelFuncs.size());
 	return _kernelNames[number];
 }
+
+Common::String Kernel::getKernelName(uint number, uint subFunction) const {
+	assert(number < _kernelFuncs.size());
+	const KernelFunction &kernelCall = _kernelFuncs[number];
+
+	assert(subFunction < kernelCall.subFunctionCount);
+	return kernelCall.subFunctions[subFunction].name;
+}
+
 
 int Kernel::findKernelFuncPos(Common::String kernelFuncName) {
 	for (uint32 i = 0; i < _kernelNames.size(); i++)
@@ -165,8 +171,11 @@ void Kernel::loadSelectorNames() {
 // (io) -> optionally integer AND an object
 // (i) -> optional integer
 // . -> any type
-// i* -> optional multiple integers
-// .* -> any parameters afterwards (or none)
+// i* -> at least one integer, more integers may follow after that
+// (i*) -> optional multiple integers
+// .* -> at least one parameter of any type and more parameters of any type may follow
+// (.*) -> any parameters afterwards (or none)
+// * -> means "more of the last parameter may follow (or none at all)", must be at the end of a signature. Is not valid anywhere else.
 static uint16 *parseKernelSignature(const char *kernelName, const char *writtenSig) {
 	const char *curPos;
 	char curChar;
@@ -402,6 +411,7 @@ uint16 Kernel::findRegType(reg_t reg) {
 #ifdef ENABLE_SCI32
 	case SEG_TYPE_ARRAY:
 	case SEG_TYPE_STRING:
+	case SEG_TYPE_BITMAP:
 #endif
 		result |= SIG_TYPE_REFERENCE;
 		break;
@@ -853,7 +863,7 @@ void Kernel::loadKernelNames(GameFeatures *features) {
 				_kernelNames[0x26] = "Portrait";
 			else if (g_sci->getPlatform() == Common::kPlatformMacintosh)
 				_kernelNames[0x84] = "ShowMovie";
-		} else if (g_sci->getGameId() == GID_QFG4 && g_sci->isDemo()) {
+		} else if (g_sci->getGameId() == GID_QFG4DEMO) {
 			_kernelNames[0x7b] = "RemapColors"; // QFG4 Demo has this SCI2 function instead of StrSplit
 		}
 
@@ -879,8 +889,8 @@ void Kernel::loadKernelNames(GameFeatures *features) {
 			// how kDoSound is called from Sound::play().
 			// Known games that use this:
 			// GK2 demo
-			// KQ7 1.4
-			// PQ4 SWAT demo
+			// KQ7 1.4/1.51
+			// PQ:SWAT demo
 			// LSL6
 			// PQ4CD
 			// QFG4CD
@@ -891,7 +901,7 @@ void Kernel::loadKernelNames(GameFeatures *features) {
 
 			_kernelNames = Common::StringArray(sci2_default_knames, kKernelEntriesGk2Demo);
 			// OnMe is IsOnMe here, but they should be compatible
-			_kernelNames[0x23] = "Robot"; // Graph in SCI2
+			_kernelNames[0x23] = g_sci->getGameId() == GID_LSL6HIRES ? "Empty" : "Robot"; // Graph in SCI2
 			_kernelNames[0x2e] = "Priority"; // DisposeTextBitmap in SCI2
 		} else {
 			// Normal SCI2.1 kernel table

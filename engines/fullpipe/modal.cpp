@@ -69,7 +69,7 @@ bool ModalIntro::handleMessage(ExCommand *message) {
 	if (message->_messageNum != 36)
 		return false;
 
-	if (message->_keyCode != 13 && message->_keyCode != 27 && message->_keyCode != 32)
+	if (message->_param != 13 && message->_param != 27 && message->_param != 32)
 		return false;
 
 	if (_stillRunning) {
@@ -233,8 +233,6 @@ void ModalIntro::finish() {
 }
 
 void ModalVideoPlayer::play(const char *filename) {
-	// TODO: Videos are encoded using Intel Indeo 5 (IV50), which isn't supported yet
-
 	Video::AVIDecoder *aviDecoder = new Video::AVIDecoder();
 
 	if (!aviDecoder->loadFile(filename))
@@ -309,7 +307,7 @@ bool ModalMap::init(int counterdiff) {
 		_rect2.right = _rect2.left + 800;
 		_rect2.bottom = _rect2.top + 600;
 
-		g_fp->_sceneRect =_rect2;
+		g_fp->_sceneRect = _rect2;
 
 		_mapScene->updateScrolling2();
 
@@ -344,19 +342,19 @@ bool ModalMap::handleMessage(ExCommand *cmd) {
 	case 29:
 		_flag = 1;
 		_mouseX = g_fp->_mouseScreenPos.x;
-		_mouseY = g_fp->_mouseScreenPos.x;
+		_mouseY = g_fp->_mouseScreenPos.y;
 
-		_field_3C = _rect2.top;
 		_field_38 = _rect2.left;
+		_field_3C = _rect2.top;
 
-		break;
+		return false;
 
 	case 30:
 		_flag = 0;
-		break;
+		return false;
 
 	case 36:
-		if (cmd->_keyCode != 9 && cmd->_keyCode != 27 )
+		if (cmd->_param != 9 && cmd->_param != 27)
 			return false;
 
 		break;
@@ -431,20 +429,20 @@ PictureObject *ModalMap::getScenePicture() {
 
 	switch (g_fp->_currentScene->_sceneId) {
 	case SC_1:
-        picId = PIC_MAP_S01;
-        break;
+		picId = PIC_MAP_S01;
+		break;
 	case SC_2:
-        picId = PIC_MAP_S02;
-        break;
+		picId = PIC_MAP_S02;
+		break;
 	case SC_3:
-        picId = PIC_MAP_S03;
-        break;
+		picId = PIC_MAP_S03;
+		break;
 	case SC_4:
-        picId = PIC_MAP_S04;
-        break;
+		picId = PIC_MAP_S04;
+		break;
 	case SC_5:
-        picId = PIC_MAP_S05;
-        break;
+		picId = PIC_MAP_S05;
+		break;
 	case SC_6:
 		picId = PIC_MAP_S06;
 		break;
@@ -489,7 +487,7 @@ PictureObject *ModalMap::getScenePicture() {
 		picId = PIC_MAP_S20;
 		break;
 	case SC_21:
-        picId = PIC_MAP_S21;
+		picId = PIC_MAP_S21;
 		break;
 	case SC_22:
 		picId = PIC_MAP_S22;
@@ -618,7 +616,7 @@ void ModalFinal::unloadScenes() {
 }
 
 bool ModalFinal::handleMessage(ExCommand *cmd) {
-	if (cmd->_messageKind == 17 && cmd->_messageNum == 36 && cmd->_keyCode == 27) {
+	if (cmd->_messageKind == 17 && cmd->_messageNum == 36 && cmd->_param == 27) {
 		g_fp->_modalObject = new ModalMainMenu();
 		g_fp->_modalObject->_parentObj = this;
 
@@ -691,7 +689,7 @@ ModalCredits::~ModalCredits() {
 }
 
 bool ModalCredits::handleMessage(ExCommand *cmd) {
-	if (cmd->_messageKind == 17 && cmd->_messageNum == 36 && cmd->_keyCode == 27) {
+	if (cmd->_messageKind == 17 && cmd->_messageNum == 36 && cmd->_param == 27) {
 		_fadeIn = false;
 
 		return true;
@@ -892,10 +890,10 @@ bool ModalMainMenu::handleMessage(ExCommand *message) {
 	if (message->_messageNum != 36)
 		return false;
 
-	if (message->_keyCode == 27)
+	if (message->_param == 27)
 		_hoverAreaId = PIC_MNU_CONTINUE_L;
 	else
-		enableDebugMenu(message->_keyCode);
+		enableDebugMenu(message->_param);
 
 	return false;
 }
@@ -1023,7 +1021,7 @@ bool ModalMainMenu::init(int counterdiff) {
 }
 
 void ModalMainMenu::updateVolume() {
-	if (g_fp->_soundEnabled ) {
+	if (g_fp->_soundEnabled) {
 		for (int s = 0; s < g_fp->_currSoundListCount; s++)
 			for (int i = 0; i < g_fp->_currSoundList1[s]->getCount(); i++) {
 				updateSoundVolume(g_fp->_currSoundList1[s]->getSoundByIndex(i));
@@ -1058,7 +1056,7 @@ void ModalMainMenu::updateSoundVolume(Sound *snd) {
 				dx = ani->_oy - _screct.bottom;
 			}
 
-		    par = 0;
+			par = 0;
 
 			if (dx > 800) {
 				snd->setPanAndVolume(-3500, 0);
@@ -1199,7 +1197,7 @@ bool ModalMainMenu::isSaveAllowed() {
 }
 
 void ModalMainMenu::enableDebugMenu(char c) {
-	const char deb[] = "DEBUGER";
+	const char deb[] = "debuger";
 
 	if (c == deb[_debugKeyCount]) {
 		_debugKeyCount++;
@@ -1397,7 +1395,7 @@ bool ModalQuery::handleMessage(ExCommand *cmd) {
 
 			if (_cancelBtn->isPointInside(g_fp->_mouseScreenPos.x, g_fp->_mouseScreenPos.y))
 				_queryResult = 0;
-		} else if (cmd->_messageNum == 36 && cmd->_keyCode == 27) {
+		} else if (cmd->_messageNum == 36 && cmd->_param == 27) {
 			_queryResult = 0;
 
 			return false;
@@ -1603,7 +1601,7 @@ void ModalSaveGame::setup(Scene *sc, int mode) {
 		} else {
 			w = 0;
 
-			for (int j = 0; j < 16; j++) {
+			for (uint j = 0; j < _arrayL.size(); j++) {
 				_arrayL[j]->getDimensions(&point);
 				w += point.x + 2;
 			}
@@ -1624,7 +1622,7 @@ char *ModalSaveGame::getSaveName() {
 	if (_queryRes < 0)
 		return 0;
 
-	return _files[_queryRes]->filename;
+	return _files[_queryRes - 1]->filename;
 }
 
 bool ModalSaveGame::getFileInfo(int slot, FileInfo *fileinfo) {
@@ -1642,7 +1640,9 @@ bool ModalSaveGame::getFileInfo(int slot, FileInfo *fileinfo) {
 	SaveStateDescriptor desc(slot, header.saveName);
 	char res[17];
 
-	snprintf(res, 17, "%s  %s", desc.getSaveDate().c_str(), desc.getSaveTime().c_str());
+	Fullpipe::parseSavegameHeader(header, desc);
+
+	snprintf(res, 17, "%s %s", desc.getSaveDate().c_str(), desc.getSaveTime().c_str());
 
 	for (int i = 0; i < 16; i++) {
 		switch(res[i]) {
@@ -1738,7 +1738,7 @@ bool ModalSaveGame::handleMessage(ExCommand *cmd) {
 	if (cmd->_messageNum == 29)
 		processMouse(cmd->_x, cmd->_y);
 	else if (cmd->_messageNum == 36)
-		processKey(cmd->_keyCode);
+		processKey(cmd->_param);
 
 	return false;
 }

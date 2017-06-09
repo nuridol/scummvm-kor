@@ -298,13 +298,13 @@ void sceneHandler08_standUp() {
 }
 
 void sceneHandler08_jumpLogic(ExCommand *cmd) {
-  if (g_fp->_currentScene->getPictureObjectIdAtPos(cmd->_sceneClickX, cmd->_sceneClickY) == PIC_SC8_LADDERD) {
-    sceneHandler08_jumpOff(cmd);
+	if (g_fp->_currentScene->getPictureObjectIdAtPos(cmd->_sceneClickX, cmd->_sceneClickY) == PIC_SC8_LADDERD) {
+		sceneHandler08_jumpOff(cmd);
 
-    cmd->_messageKind = 0;
-  } else {
-    sceneHandler08_standUp();
-  }
+		cmd->_messageKind = 0;
+	} else {
+		sceneHandler08_standUp();
+	}
 }
 
 void sceneHandler08_badLuck() {
@@ -318,7 +318,7 @@ void sceneHandler08_badLuck() {
 
 	ExCommand *ex = new ExCommand(g_fp->_aniMan->_id, 1, MV_MAN8_BADLUCK, 0, 0, 0, 1, 0, 0, 0);
 	ex->_excFlags |= 2;
-	ex->_keyCode = g_fp->_aniMan->_okeyCode;
+	ex->_param = g_fp->_aniMan->_odelay;
 	mq->addExCommandToEnd(ex);
 
 	mq->setFlags(mq->getFlags() | 1);
@@ -371,9 +371,9 @@ void sceneHandler08_calcFlight() {
 		&& g_fp->_aniMan->_statics && g_fp->_aniMan->_statics->_staticsId == ST_MAN8_HANDSUP) {
 		sceneHandler08_badLuck();
 	} else if (g_fp->_aniMan->_oy > 236 || g_vars->scene08_stairsVisible
-			   || !g_fp->_aniMan->_statics || g_fp->_aniMan->_statics->_staticsId != ST_MAN8_HANDSUP) {
+				|| !g_fp->_aniMan->_statics || g_fp->_aniMan->_statics->_staticsId != ST_MAN8_HANDSUP) {
 		if (g_fp->_aniMan->_movement || g_fp->_aniMan->_oy < 660
-			 || (g_vars->scene08_vmyats->_movement && g_vars->scene08_vmyats->_movement->_currDynamicPhaseIndex > 0)
+			|| (g_vars->scene08_vmyats->_movement && g_vars->scene08_vmyats->_movement->_currDynamicPhaseIndex > 0)
 			|| abs(g_vars->scene08_manOffsetY) > 2) {
 			if (g_vars->scene08_manOffsetY >= 0 && !g_fp->_aniMan->_movement) {
 				if (g_fp->_aniMan->_statics->_staticsId == ST_MAN8_HANDSUP)
@@ -408,7 +408,7 @@ void sceneHandler08_checkEndArcade() {
 			ExCommand *ex = new ExCommand(SC_8, 17, 0, 0, 0, 0, 1, 0, 0, 0);
 			ex->_messageNum = 61;
 			ex->_excFlags |= 2;
-			ex->_keyCode = TrubaUp;
+			ex->_param = TrubaUp;
 
 			ex->postMessage();
 		}

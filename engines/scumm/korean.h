@@ -39,56 +39,56 @@ namespace Scumm {
 #ifndef ABS
 #define ABS(x) ((x) >= 0 ? (x) : -(x))
 #endif
-    
+	
 #ifndef MIN
 #define	MIN(a,b) (((a) < (b)) ? (a) : (b))
 #endif
-    
+	
 #ifndef MAX
 #define	MAX(a,b) (((a) > (b)) ? (a) : (b))
 #endif
-    
+	
 #define MAX_KOR 32
-    
+	
 #define INIT_KOR_DELAYS for(int numb=0;numb<MAX_KOR;numb++) if(_strKSet1[numb].delay!=-1) _strKSet1[numb].delay = 0
-    
-    struct StringKor {
-        uint16 xpos, ypos;
-        uint8 color;
-        char buffer[1024];
-        int16 delay;
-        bool remainflag;
-        bool remainend;
-        bool remainstart;
-    };
-    
-    struct StringKorSmush {
-        long xpos, ypos, xright;
-        uint8 color;
-        char buffer[1024];
-        uint8 remain;
-    };
-    
-    extern bool _koreanMode;
-    extern bool _koreanOnly;
-    extern bool _highRes;
-    
-    extern StringKor _strKSet1[MAX_KOR];
-    extern StringKor _strKDesc[MAX_KOR];
-    extern StringKorSmush _strKSmush[MAX_KOR];
-    
-    extern K_Color *_kPalette;
-    extern void putEmergencyFont(K_Surface *screen, int xpos, int ypos, int scrw, int scrh, uint16 color, const char *buffer);
-    
-    extern void loadKoreanFiles(const char *id);
-    extern void unloadKoreanFiles();
-    
-    extern char *convertToKorean(const char *buf, bool descFlag);
-    extern char *convertToKoreanValid(const char *buf, bool descFlag);
-    extern void addKString(char *buf, uint16 xpos, uint16 ypos, short delay, uint8 col);
-    extern void addKDesc(char *buf, uint16 xpos, uint16 ypos, short delay, uint8 col);
-    extern void addKSmush(char *buf, long xpos, long ypos, uint8 col);
-    
+	
+	struct StringKor {
+		uint16 xpos, ypos;
+		uint8 color;
+		char buffer[1024];
+		int16 delay;
+		bool remainflag;
+		bool remainend;
+		bool remainstart;
+	};
+	
+	struct StringKorSmush {
+		long xpos, ypos, xright;
+		uint8 color;
+		char buffer[1024];
+		uint8 remain;
+	};
+	
+	extern bool _koreanMode;
+	extern bool _koreanOnly;
+	extern bool _highRes;
+	
+	extern StringKor _strKSet1[MAX_KOR];
+	extern StringKor _strKDesc[MAX_KOR];
+	extern StringKorSmush _strKSmush[MAX_KOR];
+	
+	extern K_Color *_kPalette;
+	extern void putEmergencyFont(K_Surface *screen, int xpos, int ypos, int scrw, int scrh, uint16 color, const char *buffer);
+	
+	extern void loadKoreanFiles(const char *id);
+	extern void unloadKoreanFiles();
+	
+	extern char *convertToKorean(const char *buf, bool descFlag);
+	extern char *convertToKoreanValid(const char *buf, bool descFlag);
+	extern void addKString(char *buf, uint16 xpos, uint16 ypos, short delay, uint8 col);
+	extern void addKDesc(char *buf, uint16 xpos, uint16 ypos, short delay, uint8 col);
+	extern void addKSmush(char *buf, long xpos, long ypos, uint8 col);
+	
 } // End of namespace Scumm
 
 #endif

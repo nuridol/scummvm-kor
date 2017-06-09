@@ -1,6 +1,158 @@
 For a more comprehensive changelog of the latest experimental code, see:
         https://github.com/scummvm/scummvm/commits/
 
+1.9.0 (2016-10-17)
+ New Games:
+   - Added support for Myst.
+   - Added support for Myst: Masterpiece Edition.
+   - Added support for U.F.O.s.
+   - Added support for Hi-Res Adventure #0: Mission Asteroid.
+   - Added support for Hi-Res Adventure #1: Mystery House.
+   - Added support for Hi-Res Adventure #2: The Wizard and the Princess.
+
+ General:
+   - Fixed audio corruption in the MS ADPCM decoder.
+   - Fixed audio pitch in the CMS/GameBlaster emulation.
+   - Switched SDL backend to SDL2 by default. SDL1 is still a fallback.
+
+ AGI:
+   - Added support for Hercules rendering. Both green and amber modes are
+     supported.
+   - Added support for the Hercules high resolution font. The font is also
+     usable outside of Hercules rendering.
+   - Added optional "pause, when entering commands" feature, that was only
+     available in the original interpreter for Hercules rendering.
+
+ Beneath a Steel Sky:
+   - Fixed a bug that could possibly make the game unfinishable due to a
+     wrong animation for Officer Blunt that makes further interaction with
+     this character impossible.
+
+ Gob:
+   - Fixed graphical issues in Gobliiins (EGA version).
+
+ Kyra:
+   - Updated Italian EOB1 translation.
+   - Fixed a bug that caused a crash in Lands of Lore.
+
+ SCI:
+   - Fixed a missing dialog line in QfG3 which awards the player with 3 additional
+     points. This is a bug in the original game interpreter. Due to this bug,
+     it was not possible to get all points in the original game.
+   - Fixed a bug in Space Quest 1 that caused issues with the spider droid.
+   - Fixed a bug in Laura Bow: The Colonel's Bequest that could cause a lock-up when
+     interacting with the armor in room 37 (main house, downstairs). This bug is also
+     present in the original game.
+   - Fixed auto-saving in the fan-made Cascade Quest.
+   - Fixed a game bug in the Conquests of Longbow scripts that could cause crashes in Sherwood Forest.
+   - Added support for the ImagiNation Network (INN) demo.
+
+ SCUMM:
+   - Fixed missing translations in the in-game quit and restart dialogs in Pajama Sam 1.
+   - Fixed visual glitches in DOTT that occured after loading a savegame with the stereo
+     in Green Tentacle's room turned on.
+   - Improved timing and pathfinding in Maniac Mansion (C64 and Apple II versions)
+   - Added support for the Dutch demo of Let's Explore the Airport with Buzzy.
+
+ Sherlock:
+   - Fixed a bug that could cause a crash in The Case of the Serrated Scalpel.
+   - Fixed an issue with item hotspots in The Case of the Serrated Scalpel.
+   - Fixed a bug that caused game lockups in the inventory of The Case of the Rose Tattoo.
+
+ Amiga port:
+   - Added support for AmiUpdate autoupdates.
+
+ Linux port:
+   - Added basic support for the snap packaging system.
+
+ Windows port:
+   - Fixed taskbar support on Windows 10 onwards.
+   - Fixed keymapping for non-QWERTY keyboards.
+   - Added support for WinSparkle updater.
+
+
+1.8.1 (2016-05-25)
+ New ports:
+   - Added Nintendo 3DS port.
+   - Added Android SDL port.
+
+ General:
+   - Removed TESTING flag from several supported games.
+   - Added Chinese Pinyin translation.
+   - Fixed cursor stuttering in the launcher that occured on some systems.
+
+ BBVS:
+   - Fixed game restart.
+
+ CinE:
+   - Fixed sound effect loading.
+
+ Drascula:
+   - Fixed text alignment to be faithful to the original.
+   - Fixed character walking off screen.
+   - Fixed loading savegames in the Pendulum scene.
+   - Fixed wrong background for inventory items during chapter 6 in the
+     Spanish version.
+   - Fixed animations speed (they were running two times slower than in the
+     original engine).
+   - Fixed noise at start and/or end of speech. This was most noticeable
+     with the Spanish speech.
+   - Fixed delay when interacting with the verb menu and the inventory.
+   - Fixed possibility to pick up the axe in the castle multiple times.
+
+ Gob:
+   - Fixed lock up for some games during sound initialization.
+
+ KYRA:
+   - Fixed potential crash when using swamp snake potion on the rat in Hand
+     of Fate. (NOTE: This fix was included in version 1.8.0, but it was not
+     added to the NEWS file).
+   - Fixed missing voice reactions when hitting enemies in CD version of
+     Lands of Lore.
+
+ Lab:
+   - Fixed lock-up during ending sequence.
+   - Improved internal game controls.
+   - Fixed lock-up during some in-game animations.
+
+ SAGA:
+   - Fixed user interface colors in the French and German versions of I Have No
+     Mouth and I Must Scream.
+
+ SCI:
+   - Make cursor workarounds work properly on OpenPandora (and other devices, that
+     support touch screen and analog sticks/mouse at the same time)
+   - Script patch to fix broken ending battle in multilingual King's Quest 5
+     (French, German + Spanish versions are all broken)
+   - Fixed invalid memory access, when loading broken King's Quest 5 credit music track
+   - Fixed lowres/hires issues in King's Quest 6 when saving, changing the lowres/hires
+     setting and restoring the saved game afterwards.
+
+ SCUMM:
+   - Fixed detection of Maniac Mansion from Day of the Tentacle in the Windows
+     version of ScummVM.
+   - Fixed a sound effect not stopping in Loom EGA with AdLib.
+
+ Broken Sword 2.5:
+   - Added option to use English speech instead of German one when no speech is
+     available for the selected language.
+   - Fixed resource releasing on game exit.
+   - Fixed game restart after language change in-game.
+   - Fixed flickering in main Menu.
+   - Fixed long save time on Windows.
+
+ Windows port:
+   - Fixed bug in MIDI device listing affecting cases where MIDI devices were
+     not usable.
+
+ Mac OS X port:
+   - Dock menu for ScummVM now lists recently played games when ScummVM is
+     not running and allows starting those games.
+   - Enabled Sparkle application updater.
+
+ GCW0 port:
+   - Improved support for built-in ScummVM documentation.
+
 1.8.0 (2016-03-04)
  New Games:
    - Added support for Rex Nebular and the Cosmic Gender Bender.

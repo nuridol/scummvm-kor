@@ -266,18 +266,19 @@ public:
   { return ::readSaveGame(buffer, _size, filename); }
 };
 
-class OutVMSave : public Common::OutSaveFile {
+class OutVMSave : public Common::WriteStream {
 private:
   char *buffer;
-  int pos, size, committed;
+  int _pos, size, committed;
   char filename[16];
   bool iofailed;
 
 public:
   uint32 write(const void *buf, uint32 cnt);
+  virtual int32 pos() const { return _pos; }
 
   OutVMSave(const char *_filename)
-    : pos(0), committed(-1), iofailed(false)
+    : _pos(0), committed(-1), iofailed(false)
   {
     strncpy(filename, _filename, 16);
     buffer = new char[size = MAX_SAVE_SIZE];
@@ -291,12 +292,34 @@ public:
 };
 
 class VMSaveManager : public Common::SaveFileManager {
-public:
+private:
+	static int nameCompare(const unsigned char *entry, const char *match) {
+		return !scumm_strnicmp(reinterpret_cast<const char *>(entry), match, 12);
+	}
 
-  virtual Common::OutSaveFile *openForSaving(const Common::String &filename, bool compress = true) {
-	OutVMSave *s = new OutVMSave(filename.c_str());
-	return compress ? Common::wrapCompressedWriteStream(s) : s;
-  }
+public:
+	virtual void updateSavefilesList(Common::StringArray &lockedFiles) {
+		// TODO: implement this (locks files, preventing them from being listed, saved or loaded)
+	}
+
+	VMSaveManager() {
+		vmsfs_name_compare_function = nameCompare;
+	}
+
+	virtual Common::InSaveFile *openRawFile(const Common::String &filename) {
+		InVMSave *s = new InVMSave();
+		if (s->readSaveGame(filename.c_str())) {
+			return s;
+		} else {
+			delete s;
+			return NULL;
+		}
+	}
+
+	virtual Common::OutSaveFile *openForSaving(const Common::String &filename, bool compress = true) {
+		OutVMSave *s = new OutVMSave(filename.c_str());
+		return new Common::OutSaveFile(compress ? Common::wrapCompressedWriteStream(s) : s);
+	}
 
   virtual Common::InSaveFile *openForLoading(const Common::String &filename) {
 	InVMSave *s = new InVMSave();
@@ -320,14 +343,14 @@ void OutVMSave::finalize()
   extern const char *gGameName;
   extern Icon icon;
 
-  if (committed >= pos)
+  if (committed >= _pos)
     return;
 
   char *data = buffer;
-  int len = pos;
+  int len = _pos;
 
   vmsaveResult r = writeSaveGame(gGameName, data, len, filename, icon);
-  committed = pos;
+  committed = _pos;
   if (r != VMSAVE_OK)
     iofailed = true;
   displaySaveResult(r);
@@ -386,13 +409,13 @@ bool InVMSave::seek(int32 offs, int whence)
 uint32 OutVMSave::write(const void *buf, uint32 cnt)
 {
   int nbyt = cnt;
-  if (pos + nbyt > size) {
-    cnt = (size - pos);
+  if (_pos + nbyt > size) {
+    cnt = (size - _pos);
     nbyt = cnt;
   }
   if (nbyt)
-    memcpy(buffer + pos, buf, nbyt);
-  pos += nbyt;
+    memcpy(buffer + _pos, buf, nbyt);
+  _pos += nbyt;
   return cnt;
 }
 

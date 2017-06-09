@@ -462,6 +462,139 @@ Common::Rect TransparentSurface::blit(Graphics::Surface &target, int posX, int p
 	return retSize;
 }
 
+Common::Rect TransparentSurface::blitClip(Graphics::Surface &target, Common::Rect clippingArea, int posX, int posY, int flipping, Common::Rect *pPartRect, uint color, int width, int height, TSpriteBlendMode blendMode) {
+	Common::Rect retSize;
+	retSize.top = 0;
+	retSize.left = 0;
+	retSize.setWidth(0);
+	retSize.setHeight(0);
+	// Check if we need to draw anything at all
+	int ca = (color >> kAModShift) & 0xff;
+
+	if (ca == 0) {
+		return retSize;
+	}
+
+	// Create an encapsulating surface for the data
+	TransparentSurface srcImage(*this, false);
+	// TODO: Is the data really in the screen format?
+	if (format.bytesPerPixel != 4) {
+		warning("TransparentSurface can only blit 32bpp images, but got %d", format.bytesPerPixel * 8);
+		return retSize;
+	}
+
+	if (pPartRect) {
+
+		int xOffset = pPartRect->left;
+		int yOffset = pPartRect->top;
+
+		if (flipping & FLIP_V) {
+			yOffset = srcImage.h - pPartRect->bottom;
+		}
+
+		if (flipping & FLIP_H) {
+			xOffset = srcImage.w - pPartRect->right;
+		}
+
+		srcImage.pixels = getBasePtr(xOffset, yOffset);
+		srcImage.w = pPartRect->width();
+		srcImage.h = pPartRect->height();
+
+		debug(6, "Blit(%d, %d, %d, [%d, %d, %d, %d], %08x, %d, %d)", posX, posY, flipping,
+			pPartRect->left, pPartRect->top, pPartRect->width(), pPartRect->height(), color, width, height);
+	} else {
+
+		debug(6, "Blit(%d, %d, %d, [%d, %d, %d, %d], %08x, %d, %d)", posX, posY, flipping, 0, 0,
+			srcImage.w, srcImage.h, color, width, height);
+	}
+
+	if (width == -1) {
+		width = srcImage.w;
+	}
+	if (height == -1) {
+		height = srcImage.h;
+	}
+
+#ifdef SCALING_TESTING
+	// Hardcode scaling to 66% to test scaling
+	width = width * 2 / 3;
+	height = height * 2 / 3;
+#endif
+
+	Graphics::Surface *img = nullptr;
+	Graphics::Surface *imgScaled = nullptr;
+	byte *savedPixels = nullptr;
+	if ((width != srcImage.w) || (height != srcImage.h)) {
+		// Scale the image
+		img = imgScaled = srcImage.scale(width, height);
+		savedPixels = (byte *)img->getPixels();
+	} else {
+		img = &srcImage;
+	}
+
+	// Handle off-screen clipping
+	if (posY < clippingArea.top) {
+		img->h = MAX(0, (int)img->h - (clippingArea.top - posY));
+		img->setPixels((byte *)img->getBasePtr(0, clippingArea.top - posY));
+		posY = clippingArea.top;
+	}
+
+	if (posX < clippingArea.left) {
+		img->w = MAX(0, (int)img->w - (clippingArea.left - posX));
+		img->setPixels((byte *)img->getBasePtr(clippingArea.left - posX, 0));
+		posX = clippingArea.left;
+	}
+
+	img->w = CLIP((int)img->w, 0, (int)MAX((int)clippingArea.right - posX, 0));
+	img->h = CLIP((int)img->h, 0, (int)MAX((int)clippingArea.bottom - posY, 0));
+
+	if ((img->w > 0) && (img->h > 0)) {
+		int xp = 0, yp = 0;
+
+		int inStep = 4;
+		int inoStep = img->pitch;
+		if (flipping & FLIP_H) {
+			inStep = -inStep;
+			xp = img->w - 1;
+		}
+
+		if (flipping & FLIP_V) {
+			inoStep = -inoStep;
+			yp = img->h - 1;
+		}
+
+		byte *ino = (byte *)img->getBasePtr(xp, yp);
+		byte *outo = (byte *)target.getBasePtr(posX, posY);
+
+		if (color == 0xFFFFFFFF && blendMode == BLEND_NORMAL && _alphaMode == ALPHA_OPAQUE) {
+			doBlitOpaqueFast(ino, outo, img->w, img->h, target.pitch, inStep, inoStep);
+		} else if (color == 0xFFFFFFFF && blendMode == BLEND_NORMAL && _alphaMode == ALPHA_BINARY) {
+			doBlitBinaryFast(ino, outo, img->w, img->h, target.pitch, inStep, inoStep);
+		} else {
+			if (blendMode == BLEND_ADDITIVE) {
+				doBlitAdditiveBlend(ino, outo, img->w, img->h, target.pitch, inStep, inoStep, color);
+			} else if (blendMode == BLEND_SUBTRACTIVE) {
+				doBlitSubtractiveBlend(ino, outo, img->w, img->h, target.pitch, inStep, inoStep, color);
+			} else {
+				assert(blendMode == BLEND_NORMAL);
+				doBlitAlphaBlend(ino, outo, img->w, img->h, target.pitch, inStep, inoStep, color);
+			}
+		}
+
+	}
+
+	retSize.setWidth(img->w);
+	retSize.setHeight(img->h);
+
+	if (imgScaled) {
+		imgScaled->setPixels(savedPixels);
+		imgScaled->free();
+		delete imgScaled;
+	}
+
+	return retSize;
+}
+
 /**
  * Writes a color key to the alpha channel of the surface
  * @param rKey  the red component of the color key
@@ -844,6 +977,84 @@ TransparentSurface *TransparentSurface::scale(uint16 newWidth, uint16 newHeight)
 
 	return target;
 
+}
+
+TransparentSurface *TransparentSurface::convertTo(const PixelFormat &dstFormat, const byte *palette) const {
+	assert(pixels);
+
+	TransparentSurface *surface = new TransparentSurface();
+
+	// If the target format is the same, just copy
+	if (format == dstFormat) {
+		surface->copyFrom(*this);
+		return surface;
+	}
+
+	if (format.bytesPerPixel == 0 || format.bytesPerPixel > 4)
+		error("Surface::convertTo(): Can only convert from 1Bpp, 2Bpp, 3Bpp, and 4Bpp");
+
+	if (dstFormat.bytesPerPixel != 2 && dstFormat.bytesPerPixel != 4)
+		error("Surface::convertTo(): Can only convert to 2Bpp and 4Bpp");
+
+	surface->create(w, h, dstFormat);
+
+	if (format.bytesPerPixel == 1) {
+		// Converting from paletted to high color
+		assert(palette);
+
+		for (int y = 0; y < h; y++) {
+			const byte *srcRow = (const byte *)getBasePtr(0, y);
+			byte *dstRow = (byte *)surface->getBasePtr(0, y);
+
+			for (int x = 0; x < w; x++) {
+				byte index = *srcRow++;
+				byte r = palette[index * 3];
+				byte g = palette[index * 3 + 1];
+				byte b = palette[index * 3 + 2];
+
+				uint32 color = dstFormat.RGBToColor(r, g, b);
+
+				if (dstFormat.bytesPerPixel == 2)
+					*((uint16 *)dstRow) = color;
+				else
+					*((uint32 *)dstRow) = color;
+
+				dstRow += dstFormat.bytesPerPixel;
+			}
+		}
+	} else {
+		// Converting from high color to high color
+		for (int y = 0; y < h; y++) {
+			const byte *srcRow = (const byte *)getBasePtr(0, y);
+			byte *dstRow = (byte *)surface->getBasePtr(0, y);
+
+			for (int x = 0; x < w; x++) {
+				uint32 srcColor;
+				if (format.bytesPerPixel == 2)
+					srcColor = READ_UINT16(srcRow);
+				else if (format.bytesPerPixel == 3)
+					srcColor = READ_UINT24(srcRow);
+				else
+					srcColor = READ_UINT32(srcRow);
+
+				srcRow += format.bytesPerPixel;
+
+				// Convert that color to the new format
+				byte r, g, b, a;
+				format.colorToARGB(srcColor, a, r, g, b);
+				uint32 color = dstFormat.ARGBToColor(a, r, g, b);
+
+				if (dstFormat.bytesPerPixel == 2)
+					*((uint16 *)dstRow) = color;
+				else
+					*((uint32 *)dstRow) = color;
+
+				dstRow += dstFormat.bytesPerPixel;
+			}
+		}
+	}
+
+	return surface;
 }
 
 } // End of namespace Graphics

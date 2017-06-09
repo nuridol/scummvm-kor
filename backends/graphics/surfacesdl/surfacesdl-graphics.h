@@ -145,6 +145,7 @@ public:
 
 #ifdef USE_OSD
 	virtual void displayMessageOnOSD(const char *msg);
+	virtual void displayActivityIconOnOSD(const Graphics::Surface *icon);
 #endif
 
 	// Override from Common::EventObserver
@@ -161,18 +162,28 @@ public:
 protected:
 #ifdef USE_OSD
 	/** Surface containing the OSD message */
-	SDL_Surface *_osdSurface;
-	/** Transparency level of the OSD */
-	uint8 _osdAlpha;
+	SDL_Surface *_osdMessageSurface;
+	/** Transparency level of the OSD message */
+	uint8 _osdMessageAlpha;
 	/** When to start the fade out */
-	uint32 _osdFadeStartTime;
+	uint32 _osdMessageFadeStartTime;
 	/** Enum with OSD options */
 	enum {
 		kOSDFadeOutDelay = 2 * 1000,	/** < Delay before the OSD is faded out (in milliseconds) */
 		kOSDFadeOutDuration = 500,		/** < Duration of the OSD fade out (in milliseconds) */
-		kOSDColorKey = 1,				/** < Transparent color key */
 		kOSDInitialAlpha = 80			/** < Initial alpha level, in percent */
 	};
+	/** Screen rectangle where the OSD message is drawn */
+	SDL_Rect getOSDMessageRect() const;
+	/** Clear the currently displayed OSD message if any */
+	void removeOSDMessage();
+	/** Surface containing the OSD background activity icon */
+	SDL_Surface *_osdIconSurface;
+	/** Screen rectangle where the OSD background activity icon is drawn */
+	SDL_Rect getOSDIconRect() const;
+
+	void updateOSD();
+	void drawOSD();
 #endif
 
 	/** Hardware screen */

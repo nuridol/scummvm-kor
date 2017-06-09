@@ -70,9 +70,6 @@ static const uint16 s_halfWidthSJISMap[256] = {
 
 EngineState::EngineState(SegManager *segMan)
 : _segMan(segMan),
-#ifdef ENABLE_SCI32
-	_virtualIndexFile(0),
-#endif
 	_dirseeker() {
 
 	reset(false);
@@ -80,9 +77,6 @@ EngineState::EngineState(SegManager *segMan)
 
 EngineState::~EngineState() {
 	delete _msgState;
-#ifdef ENABLE_SCI32
-	delete _virtualIndexFile;
-#endif
 }
 
 void EngineState::reset(bool isRestoring) {
@@ -95,6 +89,7 @@ void EngineState::reset(bool isRestoring) {
 	// reset delayed restore game functionality
 	_delayedRestoreGame = false;
 	_delayedRestoreGameId = 0;
+	_delayedRestoreFromLauncher = false;
 
 	executionStackBase = 0;
 	_executionStackPosChanged = false;
@@ -126,9 +121,6 @@ void EngineState::reset(bool isRestoring) {
 
 	_videoState.reset();
 	_syncedAudioOptions = false;
-
-	_vmdPalStart = 0;
-	_vmdPalEnd = 256;
 }
 
 void EngineState::speedThrottler(uint32 neededSleep) {
@@ -210,12 +202,12 @@ Common::String SciEngine::getSciLanguageString(const Common::String &str, kLangu
 	const byte *textPtr = (const byte *)str.c_str();
 	byte curChar = 0;
 	byte curChar2 = 0;
-	
+
 	while (1) {
 		curChar = *textPtr;
 		if (!curChar)
 			break;
-		
+
 		if ((curChar == '%') || (curChar == '#')) {
 			curChar2 = *(textPtr + 1);
 			foundLanguage = charToLanguage(curChar2);
@@ -244,7 +236,7 @@ Common::String SciEngine::getSciLanguageString(const Common::String &str, kLangu
 
 			while (1) {
 				curChar = *textPtr;
-				
+
 				switch (curChar) {
 				case 0: // Terminator NUL
 					return fullWidth;
@@ -265,7 +257,7 @@ Common::String SciEngine::getSciLanguageString(const Common::String &str, kLangu
 						continue;
 					}
 				}
-				
+
 				textPtr++;
 
 				mappedChar = s_halfWidthSJISMap[curChar];

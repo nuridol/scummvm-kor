@@ -88,6 +88,7 @@ const SciWorkaroundEntry arithmeticWorkarounds[] = {
 	{ GID_QFG2,           200,  200,  0,              "astro", "messages",                        NULL,     0, { WORKAROUND_FAKE,   0 } }, // op_lsi: when getting asked for your name by the astrologer - bug #5152
 	{ GID_QFG3,           780,  999,  0,                   "", "export 6",                        NULL,     0, { WORKAROUND_FAKE,   0 } }, // op_add: trying to talk to yourself at the top of the giant tree - bug #6692
 	{ GID_QFG4,           710,64941,  0,          "RandCycle", "doit",                            NULL,     0, { WORKAROUND_FAKE,   1 } }, // op_gt: when the tentacle appears in the third room of the caves
+	{ GID_TORIN,        51400,64928,  0,              "Blink", "init",                            NULL,     0, { WORKAROUND_FAKE,   1 } }, // op_div: when Lycentia knocks Torin out after he removes her collar
 	SCI_WORKAROUNDENTRY_TERMINATOR
 };
 
@@ -298,6 +299,7 @@ const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
 	{ GID_KQ6,            -1,   907,  0,             "tomato", "doVerb",                          NULL,     2, { WORKAROUND_FAKE,   0 } }, // when looking at the rotten tomato in the inventory - bug #5331
 	{ GID_KQ6,            -1,   928,  0,                 NULL, "startText",                       NULL,     0, { WORKAROUND_FAKE,   0 } }, // gets caused by Text+Audio support (see script patcher)
 	{ GID_KQ7,            -1, 64996,  0,               "User", "handleEvent",                     NULL,     1, { WORKAROUND_FAKE,   0 } }, // called when pushing a keyboard key
+	{ GID_KQ7,          2450,  2450,  0,           "exBridge", "handleEvent",                     NULL,     0, { WORKAROUND_FAKE,   0 } }, // called when walking up to the throne in the cave in chapter 2
 	{ GID_LAURABOW,       37,     0,  0,                "CB1", "doit",                            NULL,     1, { WORKAROUND_FAKE,   0 } }, // when going up the stairs - bug #5084
 	{ GID_LAURABOW,       -1,   967,  0,             "myIcon", "cycle",                           NULL,     1, { WORKAROUND_FAKE,   0 } }, // having any portrait conversation coming up - initial bug #4971
 	{ GID_LAURABOW2,      -1,    24,  0,              "gcWin", "open",                            NULL,     5, { WORKAROUND_FAKE, 0xf } }, // is used as priority for game menu
@@ -328,7 +330,7 @@ const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
 	{ GID_PEPPER,         -1,   894,  0,            "Package", "doVerb",                          NULL,     3, { WORKAROUND_FAKE,   0 } }, // using the hand on the book in the inventory - bug #5154
 	{ GID_PEPPER,        150,   928,  0,           "Narrator", "startText",                       NULL,     0, { WORKAROUND_FAKE,   0 } }, // happens during the non-interactive demo of Pepper
 	{ GID_PQ4,            -1,    25,  0,         "iconToggle", "select",                          NULL,     1, { WORKAROUND_FAKE,   0 } }, // when toggling the icon bar to auto-hide or not
-	{ GID_PQSWAT,         -1, 64950,  0,               "View", "handleEvent",                     NULL,     0, { WORKAROUND_FAKE,   0 } }, // Using the menu in the beginning
+	{ GID_PQSWAT,         -1, 64950,  0,                 NULL, "handleEvent",                     NULL,     0, { WORKAROUND_FAKE,   0 } }, // Using any menus in-game
 	{ GID_QFG1,           -1,   210,  0,          "Encounter", "init",           sig_uninitread_qfg1_1,     0, { WORKAROUND_FAKE,   0 } }, // qfg1/hq1: going to the brigands hideout
 	{ GID_QFG1VGA,        16,    16,  0,        "lassoFailed", "changeState",                     NULL,    -1, { WORKAROUND_FAKE,   0 } }, // qfg1vga: casting the "fetch" spell in the screen with the flowers, temps 0 and 1 - bug #5309
 	{ GID_QFG1VGA,        -1,   210,  0,          "Encounter", "init",        sig_uninitread_qfg1vga_1,     0, { WORKAROUND_FAKE,   0 } }, // qfg1vga: going to the brigands hideout - bug #5515
@@ -378,6 +380,8 @@ const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
 	{ GID_SQ6,            -1, 64950, -1,            "Feature", "handleEvent",                     NULL,     0, { WORKAROUND_FAKE,   0 } }, // called when pressing "Start game" in the main menu, when entering the Orion's Belt bar (room 300), and perhaps other places
 	{ GID_SQ6,            -1, 64964,  0,              "DPath", "init",                            NULL,     1, { WORKAROUND_FAKE,   0 } }, // during the game
 	{ GID_TORIN,          -1, 64017,  0,             "oFlags", "clear",                           NULL,     0, { WORKAROUND_FAKE,   0 } }, // entering Torin's home in the French version
+	{ GID_TORIN,       10000, 64029,  0,          "oMessager", "nextMsg",                         NULL,     3, { WORKAROUND_FAKE,   0 } }, // start of chapter one
+	{ GID_TORIN,       20100, 64964,  0,              "DPath", "init",                            NULL,     1, { WORKAROUND_FAKE,   0 } }, // going down the cliff at the first screen of chapter 2 (washing area)
 	SCI_WORKAROUNDENTRY_TERMINATOR
 };
 
@@ -406,6 +410,7 @@ const SciWorkaroundEntry kCelWide_workarounds[] = {
 	{ GID_PQ2,            -1,   255,  0,              "DIcon", "setSize",                   NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // when showing picture within windows, called with 2nd/3rd parameters as objects
 	{ GID_SQ1,             1,   255,  0,              "DIcon", "setSize",                   NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // DEMO: Called with 2nd/3rd parameters as objects when clicking on the menu - bug #5012
 	{ GID_FANMADE,        -1,   979,  0,              "DIcon", "setSize",                   NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // In The Gem Scenario and perhaps other fanmade games, this is called with 2nd/3rd parameters as objects - bug #5144
+	{ GID_LSL6HIRES,      -1,    94,  0,    "ll6ControlPanel",    "init",                   NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // when opening the "controls" panel from the main menu, the third argument is missing
 	SCI_WORKAROUNDENTRY_TERMINATOR
 };
 
@@ -489,7 +494,7 @@ const SciWorkaroundEntry kDisplay_workarounds[] = {
 	{ GID_PQ2,            23,    23,  0,         "rm23Script", "elements",     sig_kDisplay_pq2_1,     0, { WORKAROUND_IGNORE,    0 } }, // when looking at the 2nd page of pate's file - 0x75 as id - bug #5223
 	{ GID_QFG1,           11,    11,  0,             "battle", "init",                       NULL,     0, { WORKAROUND_IGNORE,    0 } }, // DEMO: When entering battle, 0x75 as id
 	{ GID_SQ4,           397,     0,  0,                   "", "export 12",                  NULL,     0, { WORKAROUND_IGNORE,    0 } }, // FLOPPY: when going into the computer store - bug #5227
-	{ GID_SQ4,           391,   391,  0,          "doCatalog", "mode",         sig_kDisplay_sq4_1,     0, { WORKAROUND_IGNORE,    0 } }, // CD: clicking on catalog in roboter sale - a parameter is an object
+	{ GID_SQ4,           391,   391,  0,          "doCatalog", "changeState",  sig_kDisplay_sq4_1,     0, { WORKAROUND_IGNORE,    0 } }, // CD: clicking on catalog in roboter sale - a parameter is an object
 	{ GID_SQ4,           391,   391,  0,         "choosePlug", "changeState",                NULL,     0, { WORKAROUND_IGNORE,    0 } }, // CD: ordering connector in roboter sale - a parameter is an object
 	SCI_WORKAROUNDENTRY_TERMINATOR
 };
@@ -508,6 +513,15 @@ const SciWorkaroundEntry kDisposeScript_workarounds[] = {
 	{ GID_SQ4,           150,   151,  0,        "fightScript", "dispose",                   NULL,     0, { WORKAROUND_IGNORE,    0 } }, // during fight with Vohaul, parameter 0 is an object
 	{ GID_SQ4,           150,   152,  0,       "driveCloseUp", "dispose",                   NULL,     0, { WORKAROUND_IGNORE,    0 } }, // when choosing "beam download", parameter 0 is an object
 	{ GID_SQ4,           150,   152,  0,                   "", "dispose",                   NULL,     0, { WORKAROUND_IGNORE,    0 } }, // when choosing "beam download"... in Russian version - bug #5573
+	SCI_WORKAROUNDENTRY_TERMINATOR
+};
+
+//    gameID,           room,script,lvl,          object-name, method-name, local-call-signature, index,                workaround
+const SciWorkaroundEntry kDoSoundPlay_workarounds[] = {
+	{ GID_LSL6HIRES,    -1,  64989,   0,          NULL,          "play",                    NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // always passes an extra null argument
+	{ GID_QFG4,         -1,  64989,   0,          NULL,          "play",                    NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // always passes an extra null argument
+	{ GID_PQ4,          -1,  64989,   0,          NULL,          "play",                    NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // always passes an extra null argument
+	{ GID_GK1,          -1,  64989,   0,          NULL,          "play",                    NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // Mac version always passes an extra null argument
 	SCI_WORKAROUNDENTRY_TERMINATOR
 };
 
@@ -630,7 +644,7 @@ const SciWorkaroundEntry kGraphUpdateBox_workarounds[] = {
 
 //    gameID,           room,script,lvl,          object-name, method-name,    local-call-signature, index,                workaround
 const SciWorkaroundEntry kIsObject_workarounds[] = {
-	{ GID_GK1,           50,   999,  0,                "List", "eachElementDo",                NULL,     0, { WORKAROUND_FAKE, 0 } }, // GK1 demo, when asking Grace for messages it gets called with an invalid parameter (type "error") - bug #4950
+	{ GID_GK1DEMO,       50,   999,  0,                "List", "eachElementDo",                NULL,     0, { WORKAROUND_FAKE, 0 } }, // GK1 demo, when asking Grace for messages it gets called with an invalid parameter (type "error") - bug #4950
 	{ GID_ISLANDBRAIN,   -1,   999,  0,                "List", "eachElementDo",                NULL,     0, { WORKAROUND_FAKE, 0 } }, // when going to the game options, choosing "Info" and selecting anything from the list, gets called with an invalid parameter (type "error") - bug #4989
 	{ GID_QFG3,          -1,   999,  0,                "List", "eachElementDo",                NULL,     0, { WORKAROUND_FAKE, 0 } }, // when asking for something, gets called with type error parameter
 	SCI_WORKAROUNDENTRY_TERMINATOR
@@ -656,6 +670,20 @@ const SciWorkaroundEntry kNewWindow_workarounds[] = {
 };
 
 //    gameID,           room,script,lvl,          object-name, method-name, local-call-signature, index,                workaround
+const SciWorkaroundEntry kPalVarySetPercent_workarounds[] = {
+	{ GID_GK1,           370,   370,  0,        "graceComeOut", "changeState",              NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // there's an extra parameter in GK1, when changing chapters. This extra parameter seems to be a bug or just unimplemented functionality, as there's no visible change from the original in the chapter change room
+	SCI_WORKAROUNDENTRY_TERMINATOR
+};
+
+//    gameID,           room,script,lvl,          object-name, method-name, local-call-signature, index,                workaround
+const SciWorkaroundEntry kRandom_workarounds[] = {
+	{ GID_TORIN,        51400,64928,  0,               "Blink", "init",                     NULL,     0, { WORKAROUND_STILLCALL,  0 } }, // when Lycentia knocks Torin out after he removes her collar
+	{ GID_TORIN,        51400,64928,  0,               "Blink", "cycleDone",                NULL,     0, { WORKAROUND_STILLCALL,  0 } }, // when Lycentia knocks Torin out after he removes her collar
+	SCI_WORKAROUNDENTRY_TERMINATOR
+};
+
+
+//    gameID,           room,script,lvl,          object-name, method-name, local-call-signature, index,                workaround
 const SciWorkaroundEntry kReadNumber_workarounds[] = {
 	{ GID_CNICK_LAURABOW,100,   101,  0,          "dominoes.opt", "doit",                   NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // When dominoes.opt is present, the game scripts call kReadNumber with an extra integer parameter - bug #6425
 	{ GID_HOYLE3,        100,   101,  0,          "dominoes.opt", "doit",                   NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // When dominoes.opt is present, the game scripts call kReadNumber with an extra integer parameter - bug #6425
@@ -664,13 +692,14 @@ const SciWorkaroundEntry kReadNumber_workarounds[] = {
 
 //    gameID,           room,script,lvl,          object-name, method-name,  local-call-signature, index,                workaround
 const SciWorkaroundEntry kPaletteUnsetFlag_workarounds[] = {
-	{ GID_QFG4,          100,   100,  0,            "doMovie", "changeState",                NULL,     0, { WORKAROUND_IGNORE,    0 } }, // after the Sierra logo, no flags are passed, thus the call is meaningless - bug #4947
+	{ GID_QFG4DEMO,      100,   100,  0,            "doMovie", "changeState",                NULL,     0, { WORKAROUND_IGNORE,    0 } }, // after the Sierra logo, no flags are passed, thus the call is meaningless - bug #4947
 	SCI_WORKAROUNDENTRY_TERMINATOR
 };
 
 //    gameID,           room,script,lvl,          object-name, method-name, local-call-signature, index,                workaround
 const SciWorkaroundEntry kSetCursor_workarounds[] = {
 	{ GID_KQ5,            -1,   768,  0,           "KQCursor", "init",                      NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // CD: gets called with 4 additional "900d" parameters
+	{ GID_MOTHERGOOSEHIRES,0,     0, -1,                 "MG", "setCursor",                 NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // At the start of the game, an object is passed as the cel number
 	SCI_WORKAROUNDENTRY_TERMINATOR
 };
 
@@ -737,6 +766,17 @@ const SciWorkaroundEntry kUnLoad_workarounds[] = {
 	SCI_WORKAROUNDENTRY_TERMINATOR
 };
 
+//    gameID,           room,script,lvl,          object-name, method-name,  local-call-signature, index,                workaround
+const SciWorkaroundEntry kStringPutAt_workarounds[] = {
+	{ GID_PHANTASMAGORIA,902, 64918, 0,                 "Str", "callKernel",                 NULL,     0, { WORKAROUND_IGNORE, 0 } }, // When starting a new game from after chapter 1, the game tries to save ego's object in a string
+};
+
+//    gameID,           room,script,lvl,          object-name, method-name,  local-call-signature, index,                workaround
+const SciWorkaroundEntry kScrollWindowAdd_workarounds[] = {
+	{ GID_PHANTASMAGORIA, 45, 64907,  0,   "ScrollableWindow", "addString",                  NULL,     0, { WORKAROUND_STILLCALL, 0 } }, // ScrollWindow interface passes the last two parameters twice
+};
+
+
 SciWorkaroundSolution trackOriginAndFindWorkaround(int index, const SciWorkaroundEntry *workaroundList, SciTrackOriginReply *trackOrigin) {
 	// HACK for SCI3: Temporarily ignore this
 	if (getSciVersion() == SCI_VERSION_3) {
@@ -758,7 +798,7 @@ SciWorkaroundSolution trackOriginAndFindWorkaround(int index, const SciWorkaroun
 		Common::List<ExecStack>::const_iterator callIterator = state->_executionStack.end();
 		while (callIterator != state->_executionStack.begin()) {
 			callIterator--;
-			ExecStack loopCall = *callIterator;
+			const ExecStack &loopCall = *callIterator;
 			if ((loopCall.debugSelector != -1) || (loopCall.debugExportId != -1)) {
 				lastCall->debugSelector = loopCall.debugSelector;
 				lastCall->debugExportId = loopCall.debugExportId;

@@ -239,8 +239,9 @@ ExecStack *execute_method(EngineState *s, uint16 script, uint16 pubfunct, StackP
 	// Check if a breakpoint is set on this method
 	g_sci->checkExportBreakpoint(script, pubfunct);
 
+	assert(argp[0].toUint16() == argc); // The first argument is argc
 	ExecStack xstack(calling_obj, calling_obj, sp, argc, argp,
-						seg, make_reg32(seg, exportAddr), -1, pubfunct, -1,
+						seg, make_reg32(seg, exportAddr), -1, -1, -1, pubfunct, -1,
 						s->_executionStack.size() - 1, EXEC_STACK_TYPE_CALL);
 	s->_executionStack.push_back(xstack);
 	return &(s->_executionStack.back());
@@ -257,6 +258,10 @@ static void _exec_varselectors(EngineState *s) {
 			// varselector access?
 			if (xs.argc) { // write?
 				*var = xs.variables_argp[1];
+
+#ifdef ENABLE_SCI32
+				updateInfoFlagViewVisible(s->_segMan->getObject(xs.addr.varp.obj), xs.addr.varp.varindex);
+#endif
 
 			} else // No, read
 				s->r_acc = *var;
@@ -308,8 +313,9 @@ ExecStack *send_selector(EngineState *s, reg_t send_obj, reg_t work_obj, StackPt
 		if (activeBreakpointTypes || DebugMan.isDebugChannelEnabled(kDebugLevelScripts))
 			debugSelectorCall(send_obj, selector, argc, argp, varp, funcp, s->_segMan, selectorType);
 
+		assert(argp[0].toUint16() == argc); // The first argument is argc
 		ExecStack xstack(work_obj, send_obj, curSP, argc, argp,
-							0xFFFF, curFP, selector, -1, -1,
+							0xFFFF, curFP, selector, -1, -1, -1, -1,
 							origin, stackType);
 
 		if (selectorType == kSelectorVariable)
@@ -331,12 +337,12 @@ ExecStack *send_selector(EngineState *s, reg_t send_obj, reg_t work_obj, StackPt
 	return s->_executionStack.empty() ? NULL : &(s->_executionStack.back());
 }
 
-static void addKernelCallToExecStack(EngineState *s, int kernelCallNr, int argc, reg_t *argv) {
+static void addKernelCallToExecStack(EngineState *s, int kernelCallNr, int kernelSubCallNr, int argc, reg_t *argv) {
 	// Add stack frame to indicate we're executing a callk.
 	// This is useful in debugger backtraces if this
 	// kernel function calls a script itself.
 	ExecStack xstack(NULL_REG, NULL_REG, NULL, argc, argv - 1, 0xFFFF, make_reg32(0, 0),
-						kernelCallNr, -1, -1, s->_executionStack.size() - 1, EXEC_STACK_TYPE_KERNEL);
+						-1, kernelCallNr, kernelSubCallNr, -1, -1, s->_executionStack.size() - 1, EXEC_STACK_TYPE_KERNEL);
 	s->_executionStack.push_back(xstack);
 }
 
@@ -382,7 +388,8 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 
 	// Call kernel function
 	if (!kernelCall.subFunctionCount) {
-		addKernelCallToExecStack(s, kernelCallNr, argc, argv);
+		argv[-1] = make_reg(0, argc); // The first argument is argc
+		addKernelCallToExecStack(s, kernelCallNr, -1, argc, argv);
 		s->r_acc = kernelCall.function(s, argc, argv);
 
 		if (kernelCall.debugLogging)
@@ -398,6 +405,21 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 			error("[VM] k%s[%x]: no subfunction ID parameter given", kernelCall.name, kernelCallNr);
 		if (argv[0].isPointer())
 			error("[VM] k%s[%x]: given subfunction ID is actually a pointer", kernelCall.name, kernelCallNr);
+
+#ifdef ENABLE_SCI32
+		// The Windows version of kShowMovie has subops, but the subop number
+		// is put in the second parameter in SCI2.1+, even though every other
+		// kcall with subops puts the subop in the first parameter. To allow use
+		// of the normal subops system, we swap the arguments so the subop
+		// number is in the usual place.
+		if (getSciVersion() > SCI_VERSION_2 &&
+			g_sci->getPlatform() == Common::kPlatformWindows &&
+			strcmp(kernelCall.name, "ShowMovie") == 0) {
+			assert(argc > 1);
+			SWAP(argv[0], argv[1]);
+		}
+#endif
+
 		const uint16 subId = argv[0].toUint16();
 		// Skip over subfunction-id
 		argc--;
@@ -440,7 +462,8 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 		}
 		if (!kernelSubCall.function)
 			error("[VM] k%s: subfunction ID %d requested, but not available", kernelCall.name, subId);
-		addKernelCallToExecStack(s, kernelCallNr, argc, argv);
+		argv[-1] = make_reg(0, argc); // The first argument is argc
+		addKernelCallToExecStack(s, kernelCallNr, subId, argc, argv);
 		s->r_acc = kernelSubCall.function(s, argc, argv);
 
 		if (kernelSubCall.debugLogging)
@@ -830,14 +853,15 @@ void run_vm(EngineState *s) {
 			int argc = (opparams[1] >> 1) // Given as offset, but we need count
 			           + 1 + s->r_rest;
 			StackPtr call_base = s->xs->sp - argc;
-			s->xs->sp[1].incOffset(s->r_rest);
 
 			uint32 localCallOffset = s->xs->addr.pc.getOffset() + opparams[0];
 
+			int final_argc = (call_base->requireUint16()) + s->r_rest;
+			call_base[0] = make_reg(0, final_argc); // The first argument is argc
 			ExecStack xstack(s->xs->objp, s->xs->objp, s->xs->sp,
-							(call_base->requireUint16()) + s->r_rest, call_base,
+							final_argc, call_base,
 							s->xs->local_segment, make_reg32(s->xs->addr.pc.getSegment(), localCallOffset),
-							NULL_SELECTOR, -1, localCallOffset, s->_executionStack.size() - 1,
+							NULL_SELECTOR, -1, -1, -1, localCallOffset, s->_executionStack.size() - 1,
 							EXEC_STACK_TYPE_CALL);
 
 			s->_executionStack.push_back(xstack);
@@ -1095,6 +1119,9 @@ void run_vm(EngineState *s) {
 		case op_aTop: // 0x32 (50)
 			// Accumulator To Property
 			validate_property(s, obj, opparams[0]) = s->r_acc;
+#ifdef ENABLE_SCI32
+			updateInfoFlagViewVisible(obj, opparams[0]>>1);
+#endif
 			break;
 
 		case op_pTos: // 0x33 (51)
@@ -1105,6 +1132,9 @@ void run_vm(EngineState *s) {
 		case op_sTop: // 0x34 (52)
 			// Stack To Property
 			validate_property(s, obj, opparams[0]) = POP32();
+#ifdef ENABLE_SCI32
+			updateInfoFlagViewVisible(obj, opparams[0]>>1);
+#endif
 			break;
 
 		case op_ipToa: // 0x35 (53)
@@ -1119,7 +1149,9 @@ void run_vm(EngineState *s) {
 				opProperty += 1;
 			else
 				opProperty -= 1;
-
+#ifdef ENABLE_SCI32
+			updateInfoFlagViewVisible(obj, opparams[0]>>1);
+#endif
 			if (opcode == op_ipToa || opcode == op_dpToa)
 				s->r_acc = opProperty;
 			else

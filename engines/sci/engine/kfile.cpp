@@ -29,6 +29,7 @@
 #include "common/savefile.h"
 #include "common/system.h"
 #include "common/translation.h"
+#include "common/memstream.h"
 
 #include "gui/saveload.h"
 
@@ -39,6 +40,9 @@
 #include "sci/engine/savegame.h"
 #include "sci/sound/audio.h"
 #include "sci/console.h"
+#ifdef ENABLE_SCI32
+#include "sci/resource.h"
+#endif
 
 namespace Sci {
 
@@ -195,26 +199,25 @@ reg_t kValidPath(EngineState *s, int argc, reg_t *argv) {
 #ifdef ENABLE_SCI32
 
 reg_t kCD(EngineState *s, int argc, reg_t *argv) {
-	// TODO: Stub
-	switch (argv[0].toUint16()) {
-	case 0:
-		if (argc == 1) {
-			// Check if a disc is in the drive
-			return TRUE_REG;
-		} else {
-			// Check if the specified disc is in the drive
-			// and return the current disc number. We just
-			// return the requested disc number.
-			return argv[1];
-		}
-	case 1:
-		// Return the current CD number
-		return make_reg(0, 1);
-	default:
-		warning("CD(%d)", argv[0].toUint16());
+	if (!s)
+		return make_reg(0, getSciVersion());
+	error("not supposed to call this");
+}
+
+reg_t kCheckCD(EngineState *s, int argc, reg_t *argv) {
+	const int16 cdNo = argc > 0 ? argv[0].toSint16() : 0;
+
+	if (cdNo) {
+		g_sci->getResMan()->findDisc(cdNo);
 	}
 
-	return NULL_REG;
+	return make_reg(0, g_sci->getResMan()->getCurrentDiscNo());
+}
+
+reg_t kGetSavedCD(EngineState *s, int argc, reg_t *argv) {
+	// TODO: This is wrong, CD number needs to be available prior to
+	// the save game being loaded
+	return make_reg(0, g_sci->getResMan()->getCurrentDiscNo());
 }
 
 #endif
@@ -250,6 +253,28 @@ reg_t kFileIOOpen(EngineState *s, int argc, reg_t *argv) {
 		return SIGNAL_REG;
 	}
 
+	// Torin's autosave system checks for the presence of autosave.cat
+	// by opening it. Since we don't use .cat files, we instead check
+	// for autosave.000 or autosave.001.
+	//
+	// The same logic is being followed for torinsg.cat - this shows
+	// the "Open..." button when continuing a game.
+	//
+	// This has the added benefit of not detecting an SSCI autosave.cat
+	// accompanying SSCI autosave files that we wouldn't be able to load.
+	if (g_sci->getGameId() == GID_TORIN && (name == "autosave.cat" || name == "torinsg.cat")) {
+		Common::SaveFileManager *saveFileMan = g_sci->getSaveFileManager();
+		const Common::String pattern = (name == "autosave.cat") ? g_sci->wrapFilename("autosave.###") : g_sci->getSavegamePattern();
+		bool exists = !saveFileMan->listSavefiles(pattern).empty();
+		if (exists) {
+			// Dummy handle. Torin only checks if this is SIGNAL_REG,
+			// and calls kFileIOClose on it.
+			return make_reg(0, VIRTUALFILE_HANDLE_SCI32SAVE);
+		} else {
+			return SIGNAL_REG;
+		}
+	}
+
 	if (name.empty()) {
 		// Happens many times during KQ1 (e.g. when typing something)
 		debugC(kDebugLevelFile, "Attempted to open a file with an empty filename");
@@ -263,19 +288,6 @@ reg_t kFileIOOpen(EngineState *s, int argc, reg_t *argv) {
 	}
 
 #ifdef ENABLE_SCI32
-	if (name == PHANTASMAGORIA_SAVEGAME_INDEX) {
-		if (s->_virtualIndexFile) {
-			return make_reg(0, VIRTUALFILE_HANDLE_SCI32SAVE);
-		} else {
-			Common::String englishName = g_sci->getSciLanguageString(name, K_LANG_ENGLISH);
-			Common::String wrappedName = g_sci->wrapFilename(englishName);
-			if (!g_sci->getSaveFileManager()->listSavefiles(wrappedName).empty()) {
-				s->_virtualIndexFile = new VirtualIndexFile(wrappedName);
-				return make_reg(0, VIRTUALFILE_HANDLE_SCI32SAVE);
-			}
-		}
-	}
-
 	// Shivers is trying to store savegame descriptions and current spots in
 	// separate .SG files, which are hardcoded in the scripts.
 	// Essentially, there is a normal save file, created by the executable
@@ -313,18 +325,18 @@ reg_t kFileIOOpen(EngineState *s, int argc, reg_t *argv) {
 			listSavegames(saves);
 			int savegameNr = findSavegame(saves, slotNumber - SAVEGAMEID_OFFICIALRANGE_START);
 
-			if (!s->_virtualIndexFile) {
-				// Make the virtual file buffer big enough to avoid having it grow dynamically.
-				// 50 bytes should be more than enough.
-				s->_virtualIndexFile = new VirtualIndexFile(50);
-			}
+			int size = strlen(saves[savegameNr].name) + 2;
+			char *buf = (char *)malloc(size);
+			strcpy(buf, saves[savegameNr].name);
+			buf[size - 1] = 0; // Spot description (empty)
 
-			s->_virtualIndexFile->seek(0, SEEK_SET);
-			s->_virtualIndexFile->write(saves[savegameNr].name, strlen(saves[savegameNr].name));
-			s->_virtualIndexFile->write("\0", 1);
-			s->_virtualIndexFile->write("\0", 1);	// Spot description (empty)
-			s->_virtualIndexFile->seek(0, SEEK_SET);
-			return make_reg(0, VIRTUALFILE_HANDLE_SCI32SAVE);
+			uint handle = findFreeFileHandle(s);
+
+			s->_fileHandles[handle]._in = new Common::MemoryReadStream((byte *)buf, size, DisposeAfterUse::YES);
+			s->_fileHandles[handle]._out = nullptr;
+			s->_fileHandles[handle]._name = "";
+
+			return make_reg(0, handle);
 		}
 	}
 #endif
@@ -348,13 +360,6 @@ reg_t kFileIOClose(EngineState *s, int argc, reg_t *argv) {
 		return s->r_acc;
 
 	uint16 handle = argv[0].toUint16();
-
-#ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE) {
-		s->_virtualIndexFile->close();
-		return SIGNAL_REG;
-	}
-#endif
 
 	if (handle >= VIRTUALFILE_HANDLE_START) {
 		// it's a virtual handle? ignore it
@@ -381,17 +386,9 @@ reg_t kFileIOReadRaw(EngineState *s, int argc, reg_t *argv) {
 	char *buf = new char[size];
 	debugC(kDebugLevelFile, "kFileIO(readRaw): %d, %d", handle, size);
 
-#ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE) {
-		bytesRead = s->_virtualIndexFile->read(buf, size);
-	} else {
-#endif
-		FileHandle *f = getFileFromHandle(s, handle);
-		if (f)
-			bytesRead = f->_in->read(buf, size);
-#ifdef ENABLE_SCI32
-	}
-#endif
+	FileHandle *f = getFileFromHandle(s, handle);
+	if (f)
+		bytesRead = f->_in->read(buf, size);
 
 	// TODO: What happens if less bytes are read than what has
 	// been requested? (i.e. if bytesRead is non-zero, but still
@@ -411,20 +408,11 @@ reg_t kFileIOWriteRaw(EngineState *s, int argc, reg_t *argv) {
 	s->_segMan->memcpy((byte *)buf, argv[1], size);
 	debugC(kDebugLevelFile, "kFileIO(writeRaw): %d, %d", handle, size);
 
-#ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE) {
-		s->_virtualIndexFile->write(buf, size);
+	FileHandle *f = getFileFromHandle(s, handle);
+	if (f) {
+		f->_out->write(buf, size);
 		success = true;
-	} else {
-#endif
-		FileHandle *f = getFileFromHandle(s, handle);
-		if (f) {
-			f->_out->write(buf, size);
-			success = true;
-		}
-#ifdef ENABLE_SCI32
 	}
-#endif
 
 	delete[] buf;
 	if (success)
@@ -463,13 +451,6 @@ reg_t kFileIOUnlink(EngineState *s, int argc, reg_t *argv) {
 			const Common::String wrappedName = g_sci->wrapFilename(name);
 			result = saveFileMan->removeSavefile(wrappedName);
 		}
-
-#ifdef ENABLE_SCI32
-		if (name == PHANTASMAGORIA_SAVEGAME_INDEX) {
-			delete s->_virtualIndexFile;
-			s->_virtualIndexFile = 0;
-		}
-#endif
 	} else {
 		const Common::String wrappedName = g_sci->wrapFilename(name);
 		result = saveFileMan->removeSavefile(wrappedName);
@@ -488,12 +469,7 @@ reg_t kFileIOReadString(EngineState *s, int argc, reg_t *argv) {
 	debugC(kDebugLevelFile, "kFileIO(readString): %d, %d", handle, maxsize);
 	uint32 bytesRead;
 
-#ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE)
-		bytesRead = s->_virtualIndexFile->readLine(buf, maxsize);
-	else
-#endif
-		bytesRead = fgets_wrapper(s, buf, maxsize, handle);
+	bytesRead = fgets_wrapper(s, buf, maxsize, handle);
 
 	s->_segMan->memcpy(argv[0], (const byte*)buf, maxsize);
 	delete[] buf;
@@ -520,13 +496,6 @@ reg_t kFileIOWriteString(EngineState *s, int argc, reg_t *argv) {
 		return NULL_REG;
 	}
 
-#ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE) {
-		s->_virtualIndexFile->write(str.c_str(), str.size());
-		return NULL_REG;
-	}
-#endif
-
 	FileHandle *f = getFileFromHandle(s, handle);
 
 	if (f) {
@@ -546,11 +515,6 @@ reg_t kFileIOSeek(EngineState *s, int argc, reg_t *argv) {
 	uint16 offset = ABS<int16>(argv[1].toSint16());	// can be negative
 	uint16 whence = argv[2].toUint16();
 	debugC(kDebugLevelFile, "kFileIO(seek): %d, %d, %d", handle, offset, whence);
-
-#ifdef ENABLE_SCI32
-	if (handle == VIRTUALFILE_HANDLE_SCI32SAVE)
-		return make_reg(0, s->_virtualIndexFile->seek(offset, whence));
-#endif
 
 	FileHandle *f = getFileFromHandle(s, handle);
 
@@ -591,14 +555,6 @@ reg_t kFileIOFindNext(EngineState *s, int argc, reg_t *argv) {
 reg_t kFileIOExists(EngineState *s, int argc, reg_t *argv) {
 	Common::String name = s->_segMan->getString(argv[0]);
 
-#ifdef ENABLE_SCI32
-	// Cache the file existence result for the Phantasmagoria
-	// save index file, as the game scripts keep checking for
-	// its existence.
-	if (name == PHANTASMAGORIA_SAVEGAME_INDEX && s->_virtualIndexFile)
-		return TRUE_REG;
-#endif
-
 	bool exists = false;
 
 	if (g_sci->getGameId() == GID_PEPPER) {
@@ -610,6 +566,9 @@ reg_t kFileIOExists(EngineState *s, int argc, reg_t *argv) {
 		if (name == "CDAUDIO")
 			return NULL_REG;
 	}
+
+	// TODO: It may apparently be worth caching the existence of
+	// phantsg.dir, and possibly even keeping it open persistently
 
 	// Check for regular file
 	exists = Common::File::exists(name);
@@ -672,6 +631,15 @@ reg_t kFileIOExists(EngineState *s, int argc, reg_t *argv) {
 reg_t kFileIORename(EngineState *s, int argc, reg_t *argv) {
 	Common::String oldName = s->_segMan->getString(argv[0]);
 	Common::String newName = s->_segMan->getString(argv[1]);
+
+	// We don't fully implement all cases that could occur here, and
+	// assume the file to be renamed is a wrapped filename.
+	// Known usage: In Phant1 and KQ7 while deleting savegames.
+	// The scripts rewrite the dir file as a temporary file, and then
+	// rename it to the actual dir file.
+
+	oldName = g_sci->wrapFilename(oldName);
+	newName = g_sci->wrapFilename(newName);
 
 	// SCI1.1 returns 0 on success and a DOS error code on fail. SCI32
 	// returns -1 on fail. We just return -1 for all versions.
@@ -753,7 +721,7 @@ reg_t kSave(EngineState *s, int argc, reg_t *argv) {
 #endif
 
 reg_t kSaveGame(EngineState *s, int argc, reg_t *argv) {
-	Common::String game_id;
+	Common::String game_id = !argv[0].isNull() ? s->_segMan->getString(argv[0]) : "";
 	int16 virtualId = argv[1].toSint16();
 	int16 savegameId = -1;
 	Common::String game_description;
@@ -767,6 +735,13 @@ reg_t kSaveGame(EngineState *s, int argc, reg_t *argv) {
 		warning("kSaveGame - won't save from within kernel function");
 		return NULL_REG;
 	}
+
+	// Torin has two sets of saves: autosave.### and torinsg.###, both with
+	// their own slots and .cat file.
+	// The autosave system uses autosave.000 and autosave.001.
+	// It also checks the presence of autosave.cat to determine if it should
+	// show the chapter selection menu on startup. (See kFileIOOpen.)
+	bool torinAutosave = g_sci->getGameId() == GID_TORIN && game_id == "Autosave";
 
 	if (argv[0].isNull()) {
 		// Direct call, from a patched Game::save
@@ -787,9 +762,15 @@ reg_t kSaveGame(EngineState *s, int argc, reg_t *argv) {
 		if (savegameId < 0)
 			return NULL_REG;
 
+	} else if (torinAutosave) {
+		if (argv[2].isNull())
+			error("kSaveGame: called with description being NULL");
+		game_description = s->_segMan->getString(argv[2]);
+		savegameId = virtualId;
+
+		debug(3, "kSaveGame(%s,%d,%s,%s) [Torin autosave]", game_id.c_str(), virtualId, game_description.c_str(), version.c_str());
 	} else {
 		// Real call from script
-		game_id = s->_segMan->getString(argv[0]);
 		if (argv[2].isNull())
 			error("kSaveGame: called with description being NULL");
 		game_description = s->_segMan->getString(argv[2]);
@@ -806,25 +787,47 @@ reg_t kSaveGame(EngineState *s, int argc, reg_t *argv) {
 				return NULL_REG;
 		} else if (virtualId < SAVEGAMEID_OFFICIALRANGE_START) {
 			// virtualId is low, we assume that scripts expect us to create new slot
-			if (g_sci->getGameId() == GID_JONES) {
+			switch (g_sci->getGameId()) {
+			case GID_JONES:
 				// Jones has one save slot only
 				savegameId = 0;
-			} else if (virtualId == s->_lastSaveVirtualId) {
-				// if last virtual id is the same as this one, we assume that caller wants to overwrite last save
-				savegameId = s->_lastSaveNewId;
-			} else {
-				uint savegameNr;
-				// savegameId is in lower range, scripts expect us to create a new slot
-				for (savegameId = SAVEGAMESLOT_FIRST; savegameId <= SAVEGAMESLOT_LAST; savegameId++) {
-					for (savegameNr = 0; savegameNr < saves.size(); savegameNr++) {
-						if (savegameId == saves[savegameNr].id)
+				break;
+			case GID_FANMADE: {
+				// Fanmade game, try to identify the game
+				const char *gameName = g_sci->getGameObjectName();
+
+				if (strcmp(gameName, "CascadeQuest") == 0) {
+					// Cascade Quest calls us directly to auto-save and uses slot 99,
+					//  put that save into slot 0 (ScummVM auto-save slot) see bug #7007
+					if (virtualId == (SAVEGAMEID_OFFICIALRANGE_START - 1)) {
+						savegameId = 0;
+					}
+				}
+				break;
+			}
+			default:
+				break;
+			}
+
+			if (savegameId < 0) {
+				// savegameId not set yet
+				if (virtualId == s->_lastSaveVirtualId) {
+					// if last virtual id is the same as this one, we assume that caller wants to overwrite last save
+					savegameId = s->_lastSaveNewId;
+				} else {
+					uint savegameNr;
+					// savegameId is in lower range, scripts expect us to create a new slot
+					for (savegameId = SAVEGAMESLOT_FIRST; savegameId <= SAVEGAMESLOT_LAST; savegameId++) {
+						for (savegameNr = 0; savegameNr < saves.size(); savegameNr++) {
+							if (savegameId == saves[savegameNr].id)
+								break;
+						}
+						if (savegameNr == saves.size()) // Slot not found, seems to be good to go
 							break;
 					}
-					if (savegameNr == saves.size()) // Slot not found, seems to be good to go
-						break;
+					if (savegameId > SAVEGAMESLOT_LAST)
+						error("kSavegame: no more savegame slots available");
 				}
-				if (savegameId > SAVEGAMESLOT_LAST)
-					error("kSavegame: no more savegame slots available");
 			}
 		} else {
 			error("kSaveGame: invalid savegameId used");
@@ -840,6 +843,10 @@ reg_t kSaveGame(EngineState *s, int argc, reg_t *argv) {
 	Common::String filename = g_sci->getSavegameName(savegameId);
 	Common::SaveFileManager *saveFileMan = g_sci->getSaveFileManager();
 	Common::OutSaveFile *out;
+
+	if (torinAutosave) {
+		filename = g_sci->wrapFilename(Common::String::format("autosave.%03d", savegameId));
+	}
 
 	out = saveFileMan->openForSaving(filename);
 	if (!out) {
@@ -869,6 +876,10 @@ reg_t kRestoreGame(EngineState *s, int argc, reg_t *argv) {
 
 	debug(3, "kRestoreGame(%s,%d)", game_id.c_str(), savegameId);
 
+
+	// See comment in kSaveGame
+	bool torinAutosave = g_sci->getGameId() == GID_TORIN && game_id == "Autosave";
+
 	if (argv[0].isNull()) {
 		// Direct call, either from launcher or from a patched Game::restore
 		if (savegameId == -1) {
@@ -884,7 +895,7 @@ reg_t kRestoreGame(EngineState *s, int argc, reg_t *argv) {
 			pausedMusic = true;
 		}
 		// don't adjust ID of the saved game, it's already correct
-	} else {
+	} else if (!torinAutosave) {
 		if (g_sci->getGameId() == GID_JONES) {
 			// Jones has one save slot only
 			savegameId = 0;
@@ -901,14 +912,19 @@ reg_t kRestoreGame(EngineState *s, int argc, reg_t *argv) {
 	s->r_acc = NULL_REG; // signals success
 
 	Common::Array<SavegameDesc> saves;
-	listSavegames(saves);
-	if (findSavegame(saves, savegameId) == -1) {
+	if (!torinAutosave)
+		listSavegames(saves);
+	if (!torinAutosave && findSavegame(saves, savegameId) == -1) {
 		s->r_acc = TRUE_REG;
 		warning("Savegame ID %d not found", savegameId);
 	} else {
 		Common::SaveFileManager *saveFileMan = g_sci->getSaveFileManager();
 		Common::String filename = g_sci->getSavegameName(savegameId);
 		Common::SeekableReadStream *in;
+
+		if (torinAutosave) {
+			filename = g_sci->wrapFilename(Common::String::format("autosave.%03d", savegameId));
+		}
 
 		in = saveFileMan->openForLoading(filename);
 		if (in) {

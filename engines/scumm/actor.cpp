@@ -103,7 +103,7 @@ static const byte v0ActorTalk[25] = {
 	0x06, // Sandy (Cut-Scene)
 };
 
-static const byte v0WalkboxSlantedModifier[0x16] = { 
+static const byte v0WalkboxSlantedModifier[0x16] = {
 	0x00,0x01,0x02,0x03,0x03,0x04,0x05,0x06,
 	0x06,0x07,0x08,0x09,0x09,0x0A,0x0B,
 	0x0C,0x0C,0x0D,0x0E,0x0F,0x10,0x10
@@ -241,7 +241,7 @@ void Actor_v0::initActor(int mode) {
 	_costCommand = 0xFF;
 	_miscflags = 0;
 	_speaking = 0;
-	
+
 	_walkCountModulo = 0;
 	_newWalkBoxEntered = false;
 	_walkDirX = 0;
@@ -263,11 +263,123 @@ void Actor_v0::initActor(int mode) {
 		_limb_flipped[i] = false;
 	}
 
+	walkBoxQueueReset();
+
 	if (_vm->_game.features & GF_DEMO) {
 		_sound[0] = v0ActorDemoTalk[_number];
 	} else {
 		_sound[0] = v0ActorTalk[_number];
 	}
+}
+
+void Actor_v0::walkBoxQueueReset() {
+	_walkboxHistory.clear();
+	_walkboxQueueIndex = 0;
+
+	for (uint i = 0; i < ARRAYSIZE(_walkboxQueue); ++i) {
+		_walkboxQueue[i] = kInvalidBox;
+	}
+}
+
+bool Actor_v0::walkBoxQueueAdd(int box) {
+
+	if (_walkboxQueueIndex == ARRAYSIZE(_walkboxQueue))
+		return false;
+
+	_walkboxQueue[_walkboxQueueIndex++] = box;
+	_walkboxHistory.push_back(box);
+	return true;
+}
+
+void Actor_v0::walkboxQueueReverse() {
+	int j = ARRAYSIZE(_walkboxQueue) - 1;
+
+	while (_walkboxQueue[j] == kInvalidBox && j >= 1)
+		--j;
+
+	if (j <= 1)
+		return;
+
+	for (int i = 1; i < j && j >= 1 ; ++i, --j) {
+
+		byte tmp = _walkboxQueue[i];
+
+		_walkboxQueue[i] = _walkboxQueue[j];
+		_walkboxQueue[j] = tmp;
+	}
+}
+
+bool Actor_v0::walkBoxQueueFind(int box) {
+
+	for (uint i = 0; i < _walkboxHistory.size(); ++i) {
+		if (box == _walkboxHistory[i])
+			return true;
+	}
+
+	return false;
+}
+
+bool Actor_v0::walkBoxQueuePrepare() {
+	walkBoxQueueReset();
+	int BoxFound = _walkbox;
+
+	if (BoxFound == _walkdata.destbox) {
+
+		_newWalkBoxEntered = true;
+		return true;
+	}
+
+	// Build a series of walkboxes from our current position, to the target
+	do {
+		// Add the current box to the queue
+		if (!walkBoxQueueAdd(BoxFound))
+			return false;
+
+		// Loop until we find a walkbox which hasn't been tested
+		while (_walkboxQueueIndex > 0) {
+
+			// Check if the dest box is a direct neighbour
+			if ((BoxFound = _vm->getNextBox(BoxFound, _walkdata.destbox)) == kInvalidBox) {
+
+				// Its not, start hunting through this boxes immediate connections
+				byte* boxm = _vm->getBoxConnectionBase(_walkboxQueue[_walkboxQueueIndex - 1]);
+
+				// Attempt to find one, which we havn't already used
+				for (; *boxm != kInvalidBox; ++boxm) {
+					if (walkBoxQueueFind(*boxm) != true)
+						break;
+				}
+
+				BoxFound = *boxm;
+			}
+
+			// Found one?
+			if (BoxFound != kInvalidBox) {
+
+				// Did we find a connection to the final walkbox
+				if (BoxFound == _walkdata.destbox) {
+
+					_newWalkBoxEntered = true;
+
+					walkBoxQueueAdd(BoxFound);
+
+					walkboxQueueReverse();
+					return true;
+				}
+
+				// Nope, check the next box
+				break;
+			}
+
+			// Drop this box, its useless to us
+			_walkboxQueue[--_walkboxQueueIndex] = kInvalidBox;
+
+			BoxFound = _walkboxQueue[_walkboxQueueIndex - 1];
+		}
+
+	} while (_walkboxQueueIndex > 0);
+
+	return false;
 }
 
 void Actor::setBox(int box) {
@@ -508,7 +620,7 @@ bool Actor_v0::calcWalkDistances() {
 	if (!_walkXCountInc && !_walkYCountInc)
 		return true;
 
-	if (_walkXCountInc <= _walkYCountInc) 
+	if (_walkXCountInc <= _walkYCountInc)
 		_walkYCountGreaterThanXCount = 1;
 
 	// 2FCC
@@ -544,7 +656,7 @@ byte Actor_v0::actorWalkX() {
 		setActorFromTmp();
 
 		return 3;
-	} 
+	}
 	// 2EBF
 	if (_tmp_Dest.x == _CurrentWalkTo.x)
 		return 1;
@@ -571,7 +683,7 @@ byte Actor_v0::actorWalkY() {
 		// 2EF8
 		setActorFromTmp();
 		return 4;
-	} 
+	}
 	// 2EFE
 	if (_walkYCountInc != 0) {
 		if (_walkYCountInc == 0xFF) {
@@ -582,7 +694,7 @@ byte Actor_v0::actorWalkY() {
 	// 2F0D
 	if (_CurrentWalkTo.y == _tmp_Dest.y)
 		return 1;
-	
+
 	return 0;
 }
 
@@ -638,17 +750,18 @@ void Actor::startWalkActor(int destX, int destY, int dir) {
 	_walkdata.dest.y = abr.y;
 	_walkdata.destbox = abr.box;
 	_walkdata.destdir = dir;
-	
+	_walkdata.point3.x = 32000;
+	_walkdata.curbox = _walkbox;
+
 	if (_vm->_game.version == 0) {
-		((Actor_v0*)this)->_newWalkBoxEntered = true;
+		((Actor_v0 *)this)->walkBoxQueuePrepare();
+
 	} else if (_vm->_game.version <= 2) {
 		_moving = (_moving & ~(MF_LAST_LEG | MF_IN_LEG)) | MF_NEW_LEG;
  	} else {
  		_moving = (_moving & MF_IN_LEG) | MF_NEW_LEG;
  	}
 
-	_walkdata.point3.x = 32000;
-	_walkdata.curbox = _walkbox;
 }
 
 void Actor::startWalkAnim(int cmd, int angle) {
@@ -795,8 +908,8 @@ L2A33:;
 		}
 
 		directionUpdate();
-		
-		if (_moving & 0x80) 
+
+		if (_moving & 0x80)
 			return;
 
 		animateActor(newDirToOldDir(_facing));
@@ -804,7 +917,7 @@ L2A33:;
 	} else {
 		// 2A0A
 		if ((_moving & 0x7F) != 1) {
-			
+
 			if (_NewWalkTo == _pos)
 				return;
 		}
@@ -865,13 +978,7 @@ L2C36:;
 			stopActorMoving();
 			return;
 		}
-		// 2C98: Yes, an exact copy of what just occured.. the original does this, so im doing it...
-		//       Just to keep me sane when going over it :)
-		if (A == 0xFF) {
-			setActorFromTmp();
-			stopActorMoving();
-			return;
-		}
+
 		return;
 	}
 
@@ -922,7 +1029,7 @@ L2CA3:;
 				_moving &= 0xF0;
 				_moving |= A;
 			} else {
-				if (A == 4) 
+				if (A == 4)
 					stopActorMoving();
 			}
 
@@ -958,7 +1065,7 @@ L2CA3:;
 				} else {
 					_targetFacing = getAngleFromPos(V12_X_MULTIPLIER*-1, V12_Y_MULTIPLIER*0, false);
 				}
-				
+
 				directionUpdate();
 				animateActor(newDirToOldDir(_facing));
 				goto L2CA3;
@@ -1330,13 +1437,13 @@ void Actor::turnToDirection(int newdir) {
 
 	if (_vm->_game.version <= 6) {
 		_targetFacing = newdir;
-		
+
 		if (_vm->_game.version == 0) {
 			setDirection(newdir);
 			return;
 		}
 		_moving = MF_TURN;
-		
+
 	} else {
 		_moving &= ~MF_TURN;
 		if (newdir != _facing) {
@@ -1402,13 +1509,13 @@ void Actor::putActor(int dstX, int dstY, int newRoom) {
 			showActor();
 	}
 
-	// V0 always sets the actor to face the camera upon entering a room
 	if (_vm->_game.version == 0) {
-		_walkdata.dest = _pos;
 
-		((Actor_v0*)this)->_newWalkBoxEntered = true;
-		((Actor_v0*)this)->_CurrentWalkTo = _pos;
+		((Actor_v0 *)this)->_newWalkBoxEntered = false;
+		((Actor_v0 *)this)->_CurrentWalkTo = _pos;
+		((Actor_v0 *)this)->_NewWalkTo = _pos;
 
+		// V0 always sets the actor to face the camera upon entering a room
 		setDirection(oldDirToNewDir(2));
 	}
 }
@@ -1534,7 +1641,7 @@ AdjustBoxResult Actor_v0::adjustPosInBorderWalkbox(AdjustBoxResult box) {
 
 	int16 A;
 	boxMask &= 0x7C;
-	if (boxMask == 0x0C) 
+	if (boxMask == 0x0C)
 		A = 2;
 	else {
 		if (boxMask != 0x08)
@@ -1553,7 +1660,7 @@ AdjustBoxResult Actor_v0::adjustPosInBorderWalkbox(AdjustBoxResult box) {
 		if (A < box.x)
 			return box;
 
-		if (A < 0xA0 || A == 0xA0)
+		if (A <= 0xA0)
 			A = 0;
 
 		Result.x = A;
@@ -1984,9 +2091,10 @@ void ScummEngine::processActors() {
 		if (_game.version == 0) {
 			// 0x057B
 			Actor_v0 *a0 = (Actor_v0*) a;
-			if (a0->_speaking & 1)
+			if (a0->_speaking & 1) {
 				a0->_speaking ^= 0xFE;
-
+				++_V0Delay._actorRedrawCount;
+			}
 			// 0x22B5
 			if (a0->_miscflags & kActorMiscFlagHide)
 				continue;
@@ -2010,7 +2118,7 @@ void ScummEngine::processActors() {
 		// comment further up in this method for some details.
 		if (a->_costume) {
 
-			// Unfortunately in V0, the 'animateCostume' call happens right after the call to 'walkActor' (which is before drawing the actor)... 
+			// Unfortunately in V0, the 'animateCostume' call happens right after the call to 'walkActor' (which is before drawing the actor)...
 			// doing it the other way with V0, causes animation glitches (when beginnning to walk, as the costume hasnt been updated).
 			// Updating the costume directly after 'walkActor' and again, after drawing... causes frame skipping
 			if (_game.version == 0) {
@@ -2408,8 +2516,13 @@ void Actor_v0::limbFrameCheck(int limb) {
 void Actor_v0::animateCostume() {
 	speakCheck();
 
-	if (_vm->_costumeLoader->increaseAnims(this))
+	byte count = _vm->_costumeLoader->increaseAnims(this);
+
+	if (count) {
+		_vm->_V0Delay._actorLimbRedrawDrawCount += count;
+
 		_needRedraw = true;
+	}
 }
 
 void Actor_v0::speakCheck() {
@@ -2483,6 +2596,13 @@ void ScummEngine::setActorRedrawFlags() {
 			_actors[j]->_needRedraw = true;
 		}
 	} else {
+		if (_game.heversion >= 72) {
+			for (j = 1; j < _numActors; j++) {
+				if (_actors[j]->_costume && _actors[j]->_heXmapNum)
+					_actors[j]->_needRedraw = true;
+			}
+		}
+
 		for (i = 0; i < _gdi->_numStrips; i++) {
 			int strip = _screenStartStrip + i;
 			if (testGfxAnyUsageBits(strip)) {
@@ -2630,12 +2750,10 @@ void ScummEngine_v7::actorTalk(const byte *msg) {
 
 	_charsetBufPos = 0;
 	_talkDelay = 0;
-
+	_haveMsg = 1;
 #ifdef SCUMMVMKOR
-    INIT_KOR_DELAYS;
+	INIT_KOR_DELAYS;
 #endif
-
-    _haveMsg = 1;
 	if (_game.id == GID_FT)
 		VAR(VAR_HAVE_MSG) = 0xFF;
 	_haveActorSpeechMsg = (_game.id == GID_FT) ? true : (!_sound->isSoundRunning(kTalkSoundID));
@@ -2712,12 +2830,10 @@ void ScummEngine::actorTalk(const byte *msg) {
 	}
 	_charsetBufPos = 0;
 	_talkDelay = 0;
-
-#ifdef SCUMMVMKOR
-    INIT_KOR_DELAYS;
-#endif
-
 	_haveMsg = 0xFF;
+#ifdef SCUMMVMKOR
+	INIT_KOR_DELAYS;
+#endif
 	VAR(VAR_HAVE_MSG) = 0xFF;
 	if (VAR_CHARCOUNT != 0xFF)
 		VAR(VAR_CHARCOUNT) = 0;
@@ -2757,10 +2873,9 @@ void ScummEngine::stopTalk() {
 	_talkDelay = 0;
 
 #ifdef SCUMMVMKOR
-    INIT_KOR_DELAYS;
+	INIT_KOR_DELAYS;
 #endif
-
-    act = getTalkingActor();
+	act = getTalkingActor();
 	if (act && act < 0x80) {
 		Actor *a = derefActor(act, "stopTalk");
 		if ((_game.version >= 7 && !_string[0].no_talk_anim) ||
@@ -3265,7 +3380,7 @@ void Actor_v0::animateActor(int anim) {
 
 	} else {
 
-		if (anim > 4 && anim <= 7)
+		if (anim >= 4 && anim <= 7)
 			_facing = normalizeAngle(oldDirToNewDir(dir));
 	}
 }
@@ -3322,13 +3437,13 @@ void Actor_v0::setActorFromTmp() {
 }
 
 void Actor_v0::actorSetWalkTo() {
-	
+
 	if (_newWalkBoxEntered == false)
 		return;
 
 	_newWalkBoxEntered = false;
 
-	int nextBox = ((ScummEngine_v0*)_vm)->walkboxFindTarget(this, _walkdata.destbox, _walkdata.dest);
+	int nextBox = ((ScummEngine_v0 *)_vm)->walkboxFindTarget(this, _walkdata.destbox, _walkdata.dest);
 	if (nextBox != kInvalidBox) {
 		_walkdata.curbox = nextBox;
 	}
@@ -3361,10 +3476,38 @@ void Actor_v0::saveLoadWithSerializer(Serializer *ser) {
 		MKLINE(Actor_v0, _walkYCount, sleByte, VER(97)),
 		MKLINE(Actor_v0, _walkYCountInc, sleByte, VER(97)),
 		MKLINE(Actor_v0, _walkMaxXYCountInc, sleByte, VER(97)),
+
+		MKARRAY(Actor_v0, _walkboxQueue[0], sleByte, 16, VER(98)),
+		MKLINE(Actor_v0, _walkboxQueueIndex, sleByte, VER(98)),
 		MKEND()
 	};
 
 	ser->saveLoadEntries(this, actorEntries);
+
+	// When loading, we need to ensure the limbs are restarted
+	if (ser->isLoading()) {
+
+		// valid costume command?
+		if (_costCommand != 0xFF) {
+
+			// Do we have a walkbox queue?
+			if (_walkboxQueueIndex < 1) {
+				_costCommand = 0xFF;
+
+				// Standing Still
+				setDirection(_facing);
+				speakCheck();
+
+			} else {
+				// Force limb direction update
+				_facing = 0;
+				directionUpdate();
+
+				// Begin walking
+				animateActor(newDirToOldDir(_facing));
+			}
+		}
+	}
 }
 
 void Actor::saveLoadWithSerializer(Serializer *ser) {
@@ -3507,6 +3650,8 @@ void Actor::saveLoadWithSerializer(Serializer *ser) {
 			_walkdata.point3.x >>= V12_X_SHIFT;
 			_walkdata.point3.y >>= V12_Y_SHIFT;
 		}
+
+		setDirection(_facing);
 	}
 }
 

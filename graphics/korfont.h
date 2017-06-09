@@ -24,14 +24,14 @@
 #include "graphics/surface.h"
 
 namespace Graphics {
-    
-    int getKorFontWidth();
-    int getKorFontHeight();
-    bool checkKorCode(byte hi, byte lo);
-    void loadKoreanGUIFont();
-    void unloadKoreanGUIFont();
-    void drawKorChar(Surface *dst, uint32 chr, int tx, int ty, uint32 color);
-    
+	
+	int getKorFontWidth();
+	int getKorFontHeight();
+	bool checkKorCode(byte hi, byte lo);
+	void loadKoreanGUIFont();
+	void unloadKoreanGUIFont();
+	void drawKorChar(Surface *dst, uint32 chr, int tx, int ty, uint32 color);
+	
 } // End of namespace Graphics
 
 #endif

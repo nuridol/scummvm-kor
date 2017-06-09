@@ -131,17 +131,15 @@ public:
 	int16 _lastSaveVirtualId; // last virtual id fed to kSaveGame, if no kGetSaveFiles was called inbetween
 	int16 _lastSaveNewId;    // last newly created filename-id by kSaveGame
 
-#ifdef ENABLE_SCI32
-	VirtualIndexFile *_virtualIndexFile;
-#endif
-
 	// see detection.cpp / SciEngine::loadGameState()
 	bool _delayedRestoreGame;  // boolean, that triggers delayed restore (triggered by ScummVM menu)
 	int _delayedRestoreGameId; // the saved game id, that it supposed to get restored (triggered by ScummVM menu)
+	bool _delayedRestoreFromLauncher; // is set, when the the delayed restore game was triggered from launcher
 
 	uint _chosenQfGImportItem; // Remembers the item selected in QfG import rooms
 
 	bool _cursorWorkaroundActive; // Refer to GfxCursor::setPosition()
+	int16 _cursorWorkaroundPosCount; // When the cursor is reported to be at the previously set coordinate, we won't disable the workaround unless it happened for this many times
 	Common::Point _cursorWorkaroundPoint;
 	Common::Rect _cursorWorkaroundRect;
 
@@ -203,8 +201,8 @@ public:
 	uint16 _memorySegmentSize;
 	byte _memorySegment[kMemorySegmentMax];
 
+	// TODO: Excise video code from the state manager
 	VideoState _videoState;
-	uint16 _vmdPalStart, _vmdPalEnd;
 	bool _syncedAudioOptions;
 
 	/**

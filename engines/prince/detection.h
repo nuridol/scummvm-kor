@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -72,9 +72,9 @@ static const PrinceGameDescription gameDescriptions[] = {
 	{
 		{
 			"prince",
-			"The Prince and the Coward",
-			AD_ENTRY1s("databank.ptc", "5fa03833177331214ec1354761b1d2ee", 3565031),
-			Common::EN_ANY,
+			"Galador",
+			AD_ENTRY1s("talktxt.dat", "02bb2372f19aca3c65896ed81b2cefb3", 125702),
+			Common::RU_RUS,
 			Common::kPlatformWindows,
 			ADGF_TESTING,
 			GUIO1(GUIO_NONE)
@@ -85,10 +85,30 @@ static const PrinceGameDescription gameDescriptions[] = {
 		{
 			"prince",
 			"The Prince and the Coward",
-			AD_ENTRY1s("databank.ptc", "48ec9806bda9d152acbea8ce31c93c49", 3435298),
+			{
+				{"databank.ptc", 0, "5fa03833177331214ec1354761b1d2ee", 3565031},
+				{"prince_translation.dat", 0, 0, -1},
+				AD_LISTEND
+			},
 			Common::EN_ANY,
 			Common::kPlatformWindows,
-			ADGF_TESTING,
+			ADGF_TESTING | GF_TRANSLATED,
+			GUIO1(GUIO_NONE)
+		},
+		kPrinceDataDE
+	},
+	{
+		{
+			"prince",
+			"The Prince and the Coward",
+			{
+				{"databank.ptc", 0, "48ec9806bda9d152acbea8ce31c93c49", 3435298},
+				{"prince_translation.dat", 0, 0, -1},
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformWindows,
+			ADGF_TESTING | GF_TRANSLATED,
 			GUIO1(GUIO_NONE)
 		},
 		kPrinceDataPL
@@ -104,7 +124,7 @@ const static char *directoryGlobs[] = {
 class PrinceMetaEngine : public AdvancedMetaEngine {
 public:
 	PrinceMetaEngine() : AdvancedMetaEngine(Prince::gameDescriptions, sizeof(Prince::PrinceGameDescription), princeGames) {
-		_singleid = "prince";
+		_singleId = "prince";
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
 	}

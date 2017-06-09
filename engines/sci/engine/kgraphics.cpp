@@ -45,6 +45,7 @@
 #include "sci/graphics/paint16.h"
 #include "sci/graphics/picture.h"
 #include "sci/graphics/ports.h"
+#include "sci/graphics/remap.h"
 #include "sci/graphics/screen.h"
 #include "sci/graphics/text16.h"
 #include "sci/graphics/view.h"
@@ -355,16 +356,11 @@ reg_t kTextSize(EngineState *s, int argc, reg_t *argv) {
 	}
 
 	textWidth = dest[3].toUint16(); textHeight = dest[2].toUint16();
-	
+
 	uint16 languageSplitter = 0;
 	Common::String splitText = g_sci->strSplitLanguage(text.c_str(), &languageSplitter, sep);
 
-#ifdef ENABLE_SCI32
-	if (g_sci->_gfxText32)
-		g_sci->_gfxText32->kernelTextSize(splitText.c_str(), font_nr, maxwidth, &textWidth, &textHeight);
-	else
-#endif
-		g_sci->_gfxText16->kernelTextSize(splitText.c_str(), languageSplitter, font_nr, maxwidth, &textWidth, &textHeight);
+	g_sci->_gfxText16->kernelTextSize(splitText.c_str(), languageSplitter, font_nr, maxwidth, &textWidth, &textHeight);
 
 	// One of the game texts in LB2 German contains loads of spaces in
 	// its end. We trim the text here, otherwise the graphics code will
@@ -445,8 +441,15 @@ reg_t kCantBeHere(EngineState *s, int argc, reg_t *argv) {
 	reg_t curObject = argv[0];
 	reg_t listReference = (argc > 1) ? argv[1] : NULL_REG;
 
-	reg_t canBeHere = g_sci->_gfxCompare->kernelCanBeHere(curObject, listReference);
-	return canBeHere;
+#ifdef ENABLE_SCI32
+	if (getSciVersion() >= SCI_VERSION_2) {
+		return g_sci->_gfxCompare->kernelCantBeHere32(curObject, listReference);
+	} else {
+#endif
+		return g_sci->_gfxCompare->kernelCanBeHere(curObject, listReference);
+#ifdef ENABLE_SCI32
+	}
+#endif
 }
 
 reg_t kIsItSkip(EngineState *s, int argc, reg_t *argv) {
@@ -492,7 +495,7 @@ reg_t kNumLoops(EngineState *s, int argc, reg_t *argv) {
 
 	loopCount = g_sci->_gfxCache->kernelViewGetLoopCount(viewId);
 
-	debugC(kDebugLevelGraphics, "NumLoops(view.%d) = %d", viewId, loopCount);
+	debugC(9, kDebugLevelGraphics, "NumLoops(view.%d) = %d", viewId, loopCount);
 
 	return make_reg(0, loopCount);
 }
@@ -505,7 +508,7 @@ reg_t kNumCels(EngineState *s, int argc, reg_t *argv) {
 
 	celCount = g_sci->_gfxCache->kernelViewGetCelCount(viewId, loopNo);
 
-	debugC(kDebugLevelGraphics, "NumCels(view.%d, %d) = %d", viewId, loopNo, celCount);
+	debugC(9, kDebugLevelGraphics, "NumCels(view.%d, %d) = %d", viewId, loopNo, celCount);
 
 	return make_reg(0, celCount);
 }
@@ -577,7 +580,6 @@ reg_t kBaseSetter(EngineState *s, int argc, reg_t *argv) {
 
 reg_t kSetNowSeen(EngineState *s, int argc, reg_t *argv) {
 	g_sci->_gfxCompare->kernelSetNowSeen(argv[0]);
-
 	return s->r_acc;
 }
 
@@ -830,7 +832,7 @@ void _k_GenericDrawControl(EngineState *s, reg_t controlObject, bool hilite) {
 
 	uint16 languageSplitter = 0;
 	Common::String splitText;
-	
+
 	switch (type) {
 	case SCI_CONTROLS_TYPE_BUTTON:
 	case SCI_CONTROLS_TYPE_TEXTEDIT:
@@ -1189,7 +1191,7 @@ reg_t kDisplay(EngineState *s, int argc, reg_t *argv) {
 		argc--; argc--; argv++; argv++;
 		text = g_sci->getKernel()->lookupText(textp, index);
 	}
-	
+
 	uint16 languageSplitter = 0;
 	Common::String splitText = g_sci->strSplitLanguage(text.c_str(), &languageSplitter);
 
@@ -1253,16 +1255,16 @@ reg_t kRemapColors(EngineState *s, int argc, reg_t *argv) {
 	switch (operation) {
 	case 0: { // remap by percent
 		uint16 percent = argv[1].toUint16();
-		g_sci->_gfxPalette16->resetRemapping();
-		g_sci->_gfxPalette16->setRemappingPercent(254, percent);
+		g_sci->_gfxRemap16->resetRemapping();
+		g_sci->_gfxRemap16->setRemappingPercent(254, percent);
 		}
 		break;
 	case 1:	{ // remap by range
 		uint16 from = argv[1].toUint16();
 		uint16 to = argv[2].toUint16();
 		uint16 base = argv[3].toUint16();
-		g_sci->_gfxPalette16->resetRemapping();
-		g_sci->_gfxPalette16->setRemappingRange(254, from, to, base);
+		g_sci->_gfxRemap16->resetRemapping();
+		g_sci->_gfxRemap16->setRemappingRange(254, from, to, base);
 		}
 		break;
 	case 2:	// turn remapping off (unused)

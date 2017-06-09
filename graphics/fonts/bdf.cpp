@@ -54,8 +54,8 @@ int BdfFont::getMaxCharWidth() const {
 
 int BdfFont::getCharWidth(uint32 chr) const {
 #ifdef SCUMMVMKOR
-    if (chr > 0xff)
-        return getKorFontWidth();
+	if (chr > 0xff)
+		return getKorFontWidth();
 #endif
 	// In case all font have the same advance value, we use the maximum.
 	if (!_data.advances)
@@ -102,10 +102,10 @@ int BdfFont::mapToIndex(uint32 ch) const {
 
 void BdfFont::drawChar(Surface *dst, uint32 chr, const int tx, const int ty, const uint32 color) const {
 #ifdef SCUMMVMKOR
-    if (chr > 0xff) {
-        drawKorChar(dst, chr, tx, ty, color);
-        return;
-    }
+	if (chr > 0xff) {
+		drawKorChar(dst, chr, tx, ty, color);
+		return;
+	}
 #endif
 	assert(dst != 0);
 
@@ -233,7 +233,7 @@ byte *loadCharacter(Common::SeekableReadStream &stream, int &encoding, int &adva
 		} else if (line.hasPrefix("BBX ")) {
 			int width, height, xOffset, yOffset;
 			if (sscanf(line.c_str(), "BBX %d %d %d %d",
-			           &width, &height, &xOffset, &yOffset) != 4) {
+					   &width, &height, &xOffset, &yOffset) != 4) {
 				warning("BdfFont::loadCharacter: Invalid BBX");
 				delete[] bitmap;
 				return 0;
@@ -314,7 +314,7 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 		if (line.hasPrefix("FONTBOUNDINGBOX ")) {
 			int width, height, xOffset, yOffset;
 			if (sscanf(line.c_str(), "FONTBOUNDINGBOX %d %d %d %d",
-			           &width, &height, &xOffset, &yOffset) != 4) {
+					   &width, &height, &xOffset, &yOffset) != 4) {
 				warning("BdfFont::loadFont: Invalid FONTBOUNDINGBOX");
 				freeBitmaps(bitmaps, font.numCharacters);
 				delete[] bitmaps;
@@ -424,9 +424,9 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 
 		const BdfBoundingBox &bbox = font.boxes[i];
 		if (bbox.width != font.defaultBox.width
-		    || bbox.height != font.defaultBox.height
-		    || bbox.xOffset != font.defaultBox.xOffset
-		    || bbox.yOffset != font.defaultBox.yOffset)
+			|| bbox.height != font.defaultBox.height
+			|| bbox.xOffset != font.defaultBox.xOffset
+			|| bbox.yOffset != font.defaultBox.yOffset)
 			hasFixedBBox = false;
 	}
 
@@ -452,7 +452,7 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 
 	// Adapt for the fact that we never use encoding 0.
 	if (font.defaultCharacter < firstCharacter
-	    || font.defaultCharacter > lastCharacter)
+		|| font.defaultCharacter > lastCharacter)
 		font.defaultCharacter = -1;
 
 	font.firstCharacter = firstCharacter;

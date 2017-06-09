@@ -111,15 +111,15 @@ void sceneHandler13_testClose() {
 
 void sceneHandler13_testOpen() {
 	switch (g_vars->scene13_handleR->_statics->_staticsId) {
-    case ST_HDLR_DOWN:
+	case ST_HDLR_DOWN:
 		chainQueue(QU_SC13_OPENFAIL, 1);
 		break;
 
-    case ST_HDLR_DOWN_GUM:
+	case ST_HDLR_DOWN_GUM:
 		chainQueue(QU_SC13_OPENSUCCESS, 1);
 		break;
 
-    case ST_HDLR_GUM:
+	case ST_HDLR_GUM:
 		g_vars->scene13_handleR->changeStatics2(ST_HDLR_DOWN_GUM);
 
 		chainQueue(QU_SC13_OPENSUCCESS, 1);
@@ -178,14 +178,14 @@ void sceneHandler13_openFast() {
 }
 
 void sceneHandler13_uneatGum() {
-	BehaviorEntryInfo *beh = g_fp->_behaviorManager->getBehaviorEntryInfoByMessageQueueDataId(g_vars->scene13_guard, ST_STR_RIGHT, QU_STR_CHEW);
+	BehaviorMove *beh = g_fp->_behaviorManager->getBehaviorMoveByMessageQueueDataId(g_vars->scene13_guard, ST_STR_RIGHT, QU_STR_CHEW);
 
 	if (beh) {
 		beh->_percent = 0;
 		beh->_delay = 36;
 	}
 
-	beh = g_fp->_behaviorManager->getBehaviorEntryInfoByMessageQueueDataId(g_vars->scene13_guard, ST_STR_RIGHT, QU_STR_PLUU);
+	beh = g_fp->_behaviorManager->getBehaviorMoveByMessageQueueDataId(g_vars->scene13_guard, ST_STR_RIGHT, QU_STR_PLUU);
 	if (beh) {
 		beh->_percent = 0;
 		beh->_delay = 36;
@@ -193,7 +193,7 @@ void sceneHandler13_uneatGum() {
 }
 
 void sceneHandler13_eatGum() {
-	BehaviorEntryInfo *beh = g_fp->_behaviorManager->getBehaviorEntryInfoByMessageQueueDataId(g_vars->scene13_guard, ST_STR_RIGHT, QU_STR_CHEW);
+	BehaviorMove *beh = g_fp->_behaviorManager->getBehaviorMoveByMessageQueueDataId(g_vars->scene13_guard, ST_STR_RIGHT, QU_STR_CHEW);
 
 	if (beh) {
 		beh->_percent = 10922;
@@ -216,7 +216,7 @@ void sceneHandler13_showGum() {
 	chainQueue(QU_SC13_SHOWGUM, 0);
 }
 
-void sceneHandler13_setBehFlag(BehaviorEntryInfo *beh, bool flag) {
+void sceneHandler13_setBehFlag(BehaviorMove *beh, bool flag) {
 	if (!flag) {
 		beh->_percent = 327;
 		beh->_flags |= 1;
@@ -229,11 +229,11 @@ void sceneHandler13_setBehFlag(BehaviorEntryInfo *beh, bool flag) {
 }
 
 void sceneHandler13_walkForward(bool flag) {
-	BehaviorEntryInfo *beh = g_fp->_behaviorManager->getBehaviorEntryInfoByMessageQueueDataId(g_vars->scene13_guard, ST_STR_RIGHT, QU_STR_RTOL);
+	BehaviorMove *beh = g_fp->_behaviorManager->getBehaviorMoveByMessageQueueDataId(g_vars->scene13_guard, ST_STR_RIGHT, QU_STR_RTOL);
 
 	sceneHandler13_setBehFlag(beh, flag);
 
-	beh = g_fp->_behaviorManager->getBehaviorEntryInfoByMessageQueueDataId(g_vars->scene13_guard, ST_STR_LEFT, QU_STR_TURNR);
+	beh = g_fp->_behaviorManager->getBehaviorMoveByMessageQueueDataId(g_vars->scene13_guard, ST_STR_LEFT, QU_STR_TURNR);
 
 	sceneHandler13_setBehFlag(beh, flag);
 
@@ -241,11 +241,11 @@ void sceneHandler13_walkForward(bool flag) {
 }
 
 void sceneHandler13_walkBackward(bool flag) {
-	BehaviorEntryInfo *beh = g_fp->_behaviorManager->getBehaviorEntryInfoByMessageQueueDataId(g_vars->scene13_guard, ST_STR_RIGHT|0x4000, QU_STR_LTOR);
+	BehaviorMove *beh = g_fp->_behaviorManager->getBehaviorMoveByMessageQueueDataId(g_vars->scene13_guard, ST_STR_RIGHT|0x4000, QU_STR_LTOR);
 
 	sceneHandler13_setBehFlag(beh, flag);
 
-	beh = g_fp->_behaviorManager->getBehaviorEntryInfoByMessageQueueDataId(g_vars->scene13_guard, ST_STR_LEFT|0x4000, QU_STR_TURNR_L);
+	beh = g_fp->_behaviorManager->getBehaviorMoveByMessageQueueDataId(g_vars->scene13_guard, ST_STR_LEFT|0x4000, QU_STR_TURNR_L);
 
 	sceneHandler13_setBehFlag(beh, flag);
 
@@ -259,14 +259,14 @@ int sceneHandler13(ExCommand *cmd) {
 	switch(cmd->_messageNum) {
 	case MSG_SC13_OPENBRIDGE:
 		sceneHandler13_openBridge();
-        break;
+		break;
 
 	case MSG_SC13_TESTCLOSE:
 		sceneHandler13_testClose();
 		break;
 
 	case MSG_SC13_TESTOPEN:
-        sceneHandler13_testOpen();
+		sceneHandler13_testOpen();
 		break;
 
 	case MSG_SC13_CLOSEBRIDGE:
@@ -313,11 +313,11 @@ int sceneHandler13(ExCommand *cmd) {
 		{
 			StaticANIObject *ani = g_fp->_currentScene->getStaticANIObjectAtPos(cmd->_sceneClickX, cmd->_sceneClickY);
 
-			if (!ani || !canInteractAny(g_fp->_aniMan, ani, cmd->_keyCode)) {
+			if (!ani || !canInteractAny(g_fp->_aniMan, ani, cmd->_param)) {
 				int picId = g_fp->_currentScene->getPictureObjectIdAtPos(cmd->_sceneClickX, cmd->_sceneClickY);
 				PictureObject *pic = g_fp->_currentScene->getPictureObjectById(picId, 0);
 
-				if (!pic || !canInteractAny(g_fp->_aniMan, pic, cmd->_keyCode)) {
+				if (!pic || !canInteractAny(g_fp->_aniMan, pic, cmd->_param)) {
 					if ((g_fp->_sceneRect.right - cmd->_sceneClickX < 47
 						 && g_fp->_sceneRect.right < g_fp->_sceneWidth - 1)
 						|| (cmd->_sceneClickX - g_fp->_sceneRect.left < 47 && g_fp->_sceneRect.left > 0)) {

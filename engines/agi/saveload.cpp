@@ -118,7 +118,7 @@ int AgiEngine::saveGame(const Common::String &fileName, const Common::String &de
 
 	out->writeByte(2); // was _game.state, 2 = STATE_RUNNING
 
-	strcpy(gameIDstring, _game.id);
+	Common::strlcpy(gameIDstring, _game.id, 8);
 	out->write(gameIDstring, 8);
 	debugC(5, kDebugLevelMain | kDebugLevelSavegame, "Writing game id (%s, %s)", gameIDstring, _game.id);
 
@@ -689,9 +689,6 @@ int AgiEngine::loadGame(const Common::String &fileName, bool checkId) {
 			}
 		}
 	}
-	for (i = vtEntries; i < SCREENOBJECTS_MAX; i++) {
-		memset(&_game.screenObjTable[i], 0, sizeof(ScreenObjEntry));
-	}
 
 	// Fix some pointers in screenObjTable
 
@@ -832,7 +829,7 @@ SavedGameSlotIdArray AgiEngine::getSavegameSlotIds() {
 	filenames = _saveFileMan->listSavefiles(_targetName + ".###");
 
 	Common::StringArray::iterator it;
-	Common::StringArray::iterator end = filenames.end();;
+	Common::StringArray::iterator end = filenames.end();
 
 	// convert to lower-case, just to be sure
 	for (it = filenames.begin(); it != end; it++) {

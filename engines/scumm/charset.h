@@ -38,15 +38,15 @@ struct VirtScreen;
 
 #ifdef SCUMMVMKOR
 static inline bool checkKSCode(byte hi, byte lo) {
-    //hi : xx
-    //lo : yy
-    if ((0xA1 > lo) || (0xFE < lo)) {
-        return false;
-    }
-    if ((hi >= 0xB0) && (hi <= 0xC8)) {
-        return true;
-    }
-    return false;
+	//hi : xx
+	//lo : yy
+	if ((0xA1 > lo) || (0xFE < lo)) {
+		return false;
+	}
+	if ((hi >= 0xB0) && (hi <= 0xC8)) {
+		return true;
+	}
+	return false;
 }
 #endif
 
@@ -104,11 +104,11 @@ public:
 	virtual void setColor(byte color) { _color = color; translateColor(); }
 
 #ifdef SCUMMVMKOR
-    virtual byte getColor() { return _color; }
-    bool isScummvmKorTarget();
+	virtual byte getColor() { return _color; }
+	bool isScummvmKorTarget();
 #endif
 
-    void saveLoadWithSerializer(Serializer *ser);
+	void saveLoadWithSerializer(Serializer *ser);
 };
 
 class CharsetRendererCommon : public CharsetRenderer {

@@ -314,7 +314,23 @@ public:
 		 *
 		 * This feature has no associated state.
 		 */
-		kFeatureDisplayLogFile
+		kFeatureDisplayLogFile,
+
+		/**
+		 * The presence of this feature indicates whether the hasTextInClipboard()
+		 * and getTextFromClipboard() calls are supported.
+		 *
+		 * This feature has no associated state.
+		 */
+		kFeatureClipboardSupport,
+
+		/**
+		 * The presence of this feature indicates whether the openUrl()
+		 * call is supported.
+		 *
+		 * This feature has no associated state.
+		 */
+		kFeatureOpenUrl
 	};
 
 	/**
@@ -1086,11 +1102,30 @@ public:
 	virtual void displayMessageOnOSD(const char *msg) = 0;
 
 	/**
+	 * Display an icon indicating background activity
+	 *
+	 * The icon is displayed in an 'on screen display'. It is visible above
+	 * the regular screen content or near it.
+	 *
+	 * The caller keeps ownership of the icon. It is acceptable to free
+	 * the surface just after the call.
+	 *
+	 * There is no preferred pixel format for the icon. The backend should
+	 * convert its copy of the icon to an appropriate format.
+	 *
+	 * The caller must call this method again with a null pointer
+	 * as a parameter to indicate the icon should no longer be displayed.
+	 *
+	 * @param icon the icon to display on screen
+	 */
+	virtual void displayActivityIconOnOSD(const Graphics::Surface *icon) = 0;
+
+	/**
 	 * Return the SaveFileManager, used to store and load savestates
 	 * and other modifiable persistent game data. For more information,
 	 * refer to the SaveFileManager documentation.
 	 */
-	Common::SaveFileManager *getSavefileManager();
+	virtual Common::SaveFileManager *getSavefileManager();
 
 #if defined(USE_TASKBAR)
 	/**
@@ -1198,6 +1233,42 @@ public:
 	 * might for example require leaving fullscreen mode.
 	 */
 	virtual bool displayLogFile() { return false; }
+
+	/**
+	 * Returns whether there is text available in the clipboard.
+	 *
+	 * The kFeatureClipboardSupport feature flag can be used to
+	 * test whether this call has been implemented by the active
+	 * backend.
+	 *
+	 * @return true if there is text in the clipboard, false otherwise
+	 */
+	virtual bool hasTextInClipboard() { return false; }
+
+	/**
+	 * Returns clipboard contents as a String.
+	 *
+	 * The kFeatureClipboardSupport feature flag can be used to
+	 * test whether this call has been implemented by the active
+	 * backend.
+	 *
+	 * @return clipboard contents ("" if hasTextInClipboard() == false)
+	 */
+	virtual Common::String getTextFromClipboard() { return ""; }
+
+	/**
+	 * Open the given Url in the default browser (if available on the target
+	 * system).
+	 *
+	 * @return true on success, false otherwise.
+	 *
+	 * @note It is up to the backend to ensure that the system is in a state
+	 * that allows the user to actually see the web page. This might for
+	 * example require leaving fullscreen mode.
+	 *
+	 * @parem url the URL to open
+	 */
+	virtual bool openUrl(const Common::String &url) {return false; }
 
 	/**
 	 * Returns the locale of the system.

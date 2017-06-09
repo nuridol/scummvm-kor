@@ -66,6 +66,13 @@
 #endif
 
 #include "backends/keymapper/keymapper.h"
+#ifdef USE_LIBCURL
+#include "backends/cloud/cloudmanager.h"
+#include "backends/networking/curl/connectionmanager.h"
+#endif
+#ifdef USE_SDL_NET
+#include "backends/networking/sdl_net/localwebserver.h"
+#endif
 
 #if defined(_WIN32_WCE)
 #include "backends/platform/wince/CELauncherDialog.h"
@@ -75,6 +82,9 @@
 #include "gui/launcher.h"
 #endif
 
+#ifdef USE_UPDATES
+#include "gui/updates-dialog.h"
+#endif
 
 static bool launcherDialog() {
 
@@ -148,8 +158,11 @@ static Common::Error runGame(const EnginePlugin *plugin, OSystem &system, const 
 #endif
 
 	// Verify that the game path refers to an actual directory
-	if (!(dir.exists() && dir.isDirectory()))
+        if (!dir.exists()) {
+		err = Common::kPathDoesNotExist;
+        } else if (!dir.isDirectory()) {
 		err = Common::kPathNotDirectory;
+        }
 
 	// Create the game engine
 	if (err.getCode() == Common::kNoError) {
@@ -382,7 +395,12 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 	if (settings.contains("debugflags")) {
 		specialDebug = settings["debugflags"];
 		settings.erase("debugflags");
-	}
+	} else if (ConfMan.hasKey("debugflags"))
+		specialDebug = ConfMan.get("debugflags");
+
+	if (settings.contains("debug-channels-only"))
+		gDebugChannelsOnly = true;
+
 
 	PluginManager::instance().init();
  	PluginManager::instance().loadAllPlugins(); // load plugins for cached plugin manager
@@ -413,8 +431,8 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 	system.initBackend();
 
 #ifdef SCUMMVMKOR
-    // KOR: 한글 폰트를 로드한다
-    Graphics::loadKoreanGUIFont();
+	// KOR: 한글 폰트를 로드한다
+	Graphics::loadKoreanGUIFont();
 #endif
 
 	// If we received an invalid graphics mode parameter via command line
@@ -462,6 +480,18 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 
 	// Now as the event manager is created, setup the keymapper
 	setupKeymapper(system);
+
+#ifdef USE_UPDATES
+	if (!ConfMan.hasKey("updates_check")) {
+		GUI::UpdatesDialog dlg;
+		dlg.runModal();
+	}
+#endif
+
+#ifdef USE_LIBCURL
+	CloudMan.init();
+	CloudMan.syncSaves();
+#endif
 
 	// Unless a game was specified, show the launcher dialog
 	if (0 == ConfMan.getActiveDomain())
@@ -571,10 +601,18 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 			launcherDialog();
 		}
 	}
+#ifdef USE_SDL_NET
+	Networking::LocalWebserver::destroy();
+#endif
+#ifdef USE_LIBCURL
+	Networking::ConnectionManager::destroy();
+	//I think it's important to destroy it after ConnectionManager
+	Cloud::CloudManager::destroy();
+#endif
 
 #ifdef SCUMMVMKOR
-    // KOR: 한글 폰트를 언로드한다
-    Graphics::unloadKoreanGUIFont();
+	// KOR: 한글 폰트를 언로드한다
+	Graphics::unloadKoreanGUIFont();
 #endif
 
 	PluginManager::instance().unloadAllPlugins();
