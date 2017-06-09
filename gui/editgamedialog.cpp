@@ -152,7 +152,9 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	_langPopUp->appendEntry("", (uint32)Common::UNK_LANG);
 	const Common::LanguageDescription *l = Common::g_languages;
 	for (; l->code; ++l) {
+#ifndef SCUMMVMKOR
 		if (checkGameGUIOptionLanguage(l->id, _guioptionsString))
+#endif
 			_langPopUp->appendEntry(l->description, l->id);
 	}
 
