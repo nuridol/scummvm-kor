@@ -7,7 +7,7 @@ ScummVM-kor
 + 각 OS별 컴파일 방법은 http://wiki.scummvm.org/index.php/Compiling_ScummVM 를 참조하기 바랍니다.
 
 # iOS용 프로젝트 작성
-- iOS 9 SDK를 사용한 Xcode 8.3에서 빌드 확인했습니다. 프로젝트 파일을 작성해서 빌드하기 바랍니다.
+- iOS 10 SDK를 사용한 Xcode 8.3.3에서 빌드 확인했습니다. 프로젝트 파일을 작성해서 빌드하기 바랍니다.
 - 실기기에서 테스트하기 위해서는 iOS 개발자 프로그램 가입이 필요합니다.(유료 계정이 아니더라도 가능합니다.) Bundle Identifier를 프로파일에 맞게 수정하기 바랍니다.
 - 다음 내용을 prepare_workspace.sh로 저장하고 실행합니다.
 
@@ -26,11 +26,13 @@ git clone "$GIT_REPO_URL"
 # Create the workspace 
 mkdir build 
 cd build 
-curl -L "$LIBS_ZIP_URL" -O 
-unzip ScummVM-iOS-libraries.zip 
-rm ScummVM-iOS-libraries.zip 
+if [ ! -f ScummVM-iOS-libraries.zip ]; then 
+  curl -L "$LIBS_ZIP_URL" -O 
+  unzip ScummVM-iOS-libraries.zip 
+#  rm ScummVM-iOS-libraries.zip 
+fi 
 
-../scummvm-kor/devtools/create_project/xcode/build/Release/create_project ../scummvm-kor --xcode --enable-fluidsynth --disable-jpeg --disable-bink --disable-16bit --disable-mt32emu --disable-nasm --disable-opengl --disable-theora --disable-taskbar 
+../scummvm-kor/devtools/create_project/xcode/build/Release/create_project ../scummvm-kor --xcode --enable-fluidsynth --disable-jpeg --disable-bink --disable-16bit --disable-mt32emu --disable-nasm --disable-opengl --disable-theora --disable-taskbar --disable-cloud --disable-libcurl --disable-sdlnet 
 open scummvm.xcodeproj
 ```
 
