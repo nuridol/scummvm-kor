@@ -64,8 +64,12 @@ void OSystem_Win32::init() {
 }
 
 void OSystem_Win32::initBackend() {
+#ifdef SCUMMVMKOR
+	ConfMan.registerDefault("console", false);
+#else
 	// Console window is enabled by default on Windows
 	ConfMan.registerDefault("console", true);
+#endif
 
 	// Enable or disable the window console window
 	if (ConfMan.getBool("console")) {
