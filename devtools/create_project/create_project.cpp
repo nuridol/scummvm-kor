@@ -386,6 +386,9 @@ int main(int argc, char *argv[]) {
 #endif
 	}
 
+ 	// Define scummvm-kor
+ 	setup.defines.push_back("SCUMMVMKOR");
+
 	bool updatesEnabled = false, curlEnabled = false, sdlnetEnabled = false;
 	for (FeatureList::const_iterator i = setup.features.begin(); i != setup.features.end(); ++i) {
 		if (i->enable) {

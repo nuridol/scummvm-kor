@@ -27,6 +27,10 @@
 #include "common/ustr.h"
 #include "common/rect.h"
 
+#ifdef SCUMMVMKOR
+#include "graphics/korfont.h"
+#endif
+
 namespace Common {
 template<class T> class Array;
 }
