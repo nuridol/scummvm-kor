@@ -50,6 +50,7 @@ MODULE_OBJS := \
 	graphics/cursor.o \
 	graphics/font.o \
 	graphics/fontsjis.o \
+	graphics/fontkorean.o \
 	graphics/maciconbar.o \
 	graphics/menu.o \
 	graphics/paint16.o \
