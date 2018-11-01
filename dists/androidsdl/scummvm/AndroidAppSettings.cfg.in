@@ -6,7 +6,7 @@ AppSettingVersion=19
 LibSdlVersion=1.2
 
 # Specify application name (e.x. My Application)
-AppName="ScummVM"
+AppName="ScummVM-kor"
 
 # Specify reversed site name of application (e.x. com.mysite.myapp)
 AppFullName=org.scummvm.scummvm

@@ -15,6 +15,21 @@ Download this:
 	SDK Platform (API 25) or higher
 	Extras/Android Support Repository
 
+Scummvm-kor build information:
+
+	NDK/SDK: android-ndk-r15c, sdk-tools-linux-4333796
+	Installed packages:
+  Path                        | Version | Description                    | Location                    
+  -------                     | ------- | -------                        | -------                     
+  build-tools;25.0.3          | 25.0.3  | Android SDK Build-Tools 25.0.3 | build-tools/25.0.3/         
+  build-tools;26.0.0          | 26.0.0  | Android SDK Build-Tools 26     | build-tools/26.0.0/         
+  extras;android;m2repository | 47.0.0  | Android Support Repository     | extras/android/m2repository/
+  platform-tools              | 28.0.1  | Android SDK Platform-Tools     | platform-tools/             
+  platforms;android-21        | 2       | Android SDK Platform 21        | platforms/android-21/       
+  platforms;android-25        | 3       | Android SDK Platform 25        | platforms/android-25/       
+  platforms;android-26        | 2       | Android SDK Platform 26        | platforms/android-26/       
+  tools                       | 26.1.1  | Android SDK Tools 26.1.1       | tools/   
+
 3) Install JDK. You can do it from apt-get tool or download from official site (in this case you must set envirnoment 
 value to JDK, see guides "How install JDK and set envirnoment values to JDK).
 
@@ -28,22 +43,24 @@ this values manually. Warning: values will be setted for one command-line sessio
 Script:
 	#!/bin/sh
 
-	export ANDROID_HOME=~/Android/android-sdk
-	export ANDROID_NDK_HOME=~/Android/Sdk/ndk-bundle
+	export ANDROID_HOME=~/android/android-sdk
+	export ANDROID_NDK_HOME=~/android/android-ndk-r15c
 	export PATH=$ANDROID_NDK_HOME:$ANDROID_HOME/tools:$PATH
-	export PATH=$ANDROID_HOME/build-tools/25.0.2:$PATH
+	export PATH=$ANDROID_HOME/build-tools/25.0.3:$PATH
+	export PATH=$ANDROID_HOME/tools/bin:$PATH
 
 5) Install packages, which needs for build:
 
-Commands:
+Commands:(Ubuntu 18.04)
 	sudo apt-get install ant //If you install manually - set envirnoment value to Ant
 	sudo apt-get install make
 	sudo apt-get install git-core
+	sudo apt-get install build-essential software-properties-common ant autoconf automake bison byobu bzip2 cmake curl flex g++ gcc git gzip htop intltool libfaad-dev libflac-dev libfluidsynth-dev libfreetype6-dev libjpeg62-dev libmad0-dev libmpeg2-4-dev libogg-dev libpng-dev libsdl2-dev libtheora-dev libtool libtool-bin libvorbis-dev m4 make man nasm openjdk-8-jdk patch pax pkg-config python tar unzip vim wget yasm zlib1g-dev zip
 
 6) Create and put keystore (You can use debug version) in ~/.android/debug.keystore
 
 8) Now you can build project
-	cd scummvm/dists/androidsdl
+	cd scummvm-kor/dists/androidsdl
 	./build.sh
 
 Your apk will be stored in this folder
