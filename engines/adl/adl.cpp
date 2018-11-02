@@ -39,14 +39,13 @@
 #include "adl/display.h"
 #include "adl/detection.h"
 #include "adl/graphics.h"
-#include "adl/speaker.h"
+#include "adl/sound.h"
 
 namespace Adl {
 
 AdlEngine::~AdlEngine() {
 	delete _display;
 	delete _graphics;
-	delete _speaker;
 	delete _console;
 	delete _dumpFile;
 }
@@ -56,10 +55,15 @@ AdlEngine::AdlEngine(OSystem *syst, const AdlGameDescription *gd) :
 		_dumpFile(nullptr),
 		_display(nullptr),
 		_graphics(nullptr),
+		_textMode(false),
+		_linesPrinted(0),
 		_isRestarting(false),
 		_isRestoring(false),
-		_skipOneCommand(false),
+		_isQuitting(false),
+		_abortScript(false),
 		_gameDescription(gd),
+		_console(nullptr),
+		_messageIds(),
 		_saveVerb(0),
 		_saveNoun(0),
 		_restoreVerb(0),
@@ -135,12 +139,14 @@ Common::String AdlEngine::getItemDescription(const Item &item) const {
 }
 
 void AdlEngine::delay(uint32 ms) const {
-	uint32 start = g_system->getMillis();
+	uint32 now = g_system->getMillis();
+	const uint32 end = now + ms;
 
-	while (!shouldQuit() && g_system->getMillis() - start < ms) {
+	while (!shouldQuit() && now < end) {
 		Common::Event event;
 		pollEvent(event);
-		g_system->delayMillis(16);
+		g_system->delayMillis(end - now < 16 ? end - now : 16);
+		now = g_system->getMillis();
 	}
 }
 
@@ -245,6 +251,18 @@ void AdlEngine::loadWords(Common::ReadStream &stream, WordMap &map, Common::Stri
 		if (synonyms == 0xff)
 			break;
 
+		// WORKAROUND: Missing verb list terminator in hires3
+		if (_gameDescription->gameType == GAME_TYPE_HIRES3 && index == 72 && synonyms == 0)
+			return;
+
+		// WORKAROUND: Missing noun list terminator in hires3
+		if (_gameDescription->gameType == GAME_TYPE_HIRES3 && index == 113)
+			return;
+
+		// WORKAROUND: Missing noun list terminator in hires5 region 15
+		if (_gameDescription->gameType == GAME_TYPE_HIRES5 && _state.region == 15 && index == 81)
+			return;
+
 		for (uint i = 0; i < synonyms; ++i) {
 			if (stream.read((char *)buf, IDI_WORD_SIZE) < IDI_WORD_SIZE)
 				error("Error reading word list");
@@ -293,6 +311,30 @@ void AdlEngine::readCommands(Common::ReadStream &stream, Commands &commands) {
 
 		commands.push_back(command);
 	}
+}
+
+void AdlEngine::removeCommand(Commands &commands, uint idx) {
+	Commands::iterator cmds;
+	uint i = 0;
+	for (cmds = commands.begin(); cmds != commands.end(); ++cmds) {
+		if (i++ == idx) {
+			commands.erase(cmds);
+			return;
+		}
+	}
+
+	error("Command %d not found", idx);
+}
+
+Command &AdlEngine::getCommand(Commands &commands, uint idx) {
+	Commands::iterator cmds;
+	uint i = 0;
+	for (cmds = commands.begin(); cmds != commands.end(); ++cmds) {
+		if (i++ == idx)
+			return *cmds;
+	}
+
+	error("Command %d not found", idx);
 }
 
 void AdlEngine::checkInput(byte verb, byte noun) {
@@ -398,6 +440,11 @@ void AdlEngine::initState() {
 	initGameState();
 }
 
+void AdlEngine::switchRoom(byte roomNr) {
+	getCurRoom().curPicture = getCurRoom().picture;
+	_state.room = roomNr;
+}
+
 byte AdlEngine::roomArg(byte room) const {
 	return room;
 }
@@ -411,20 +458,62 @@ void AdlEngine::loadDroppedItemOffsets(Common::ReadStream &stream, byte count) {
 	}
 }
 
-void AdlEngine::clearScreen() const {
-	_display->setMode(DISPLAY_MODE_MIXED);
-	_display->clear(0x00);
-}
-
 void AdlEngine::drawPic(byte pic, Common::Point pos) const {
 	if (_roomData.pictures.contains(pic))
 		_graphics->drawPic(*_roomData.pictures[pic]->createReadStream(), pos);
-	else
+	else if (_pictures.contains(pic))
 		_graphics->drawPic(*_pictures[pic]->createReadStream(), pos);
+	else
+		error("Picture %d not found", pic);
 }
 
 void AdlEngine::bell(uint count) const {
-	_speaker->bell(count);
+	Tones tones;
+
+	for (uint i = 0; i < count - 1; ++i) {
+		tones.push_back(Tone(940.0, 100.0));
+		tones.push_back(Tone(0.0, 12.0));
+	}
+
+	tones.push_back(Tone(940.0, 100.0));
+
+	playTones(tones, false);
+}
+
+bool AdlEngine::playTones(const Tones &tones, bool isMusic, bool allowSkip) const {
+	Audio::SoundHandle handle;
+	Audio::AudioStream *stream = new Sound(tones);
+
+	g_system->getMixer()->playStream((isMusic ? Audio::Mixer::kMusicSoundType : Audio::Mixer::kSFXSoundType), &handle, stream);
+
+	while (!g_engine->shouldQuit() && g_system->getMixer()->isSoundHandleActive(handle)) {
+		Common::Event event;
+		pollEvent(event);
+
+		if (allowSkip && event.type == Common::EVENT_KEYDOWN) {
+			// FIXME: Preserve this event
+			g_system->getMixer()->stopHandle(handle);
+			return true;
+		}
+
+		g_system->delayMillis(16);
+	}
+
+	return false;
+}
+
+const Region &AdlEngine::getRegion(uint i) const {
+	if (i < 1 || i > _state.regions.size())
+		error("Region %i out of range [1, %i]", i, _state.regions.size());
+
+	return _state.regions[i - 1];
+}
+
+Region &AdlEngine::getRegion(uint i) {
+	if (i < 1 || i > _state.regions.size())
+		error("Region %i out of range [1, %i]", i, _state.regions.size());
+
+	return _state.regions[i - 1];
 }
 
 const Room &AdlEngine::getRoom(uint i) const {
@@ -439,6 +528,14 @@ Room &AdlEngine::getRoom(uint i) {
 		error("Room %i out of range [1, %i]", i, _state.rooms.size());
 
 	return _state.rooms[i - 1];
+}
+
+const Region &AdlEngine::getCurRegion() const {
+	return getRegion(_state.region);
+}
+
+Region &AdlEngine::getCurRegion() {
+	return getRegion(_state.region);
 }
 
 const Room &AdlEngine::getCurRoom() const {
@@ -487,25 +584,24 @@ void AdlEngine::takeItem(byte noun) {
 	Common::List<Item>::iterator item;
 
 	for (item = _state.items.begin(); item != _state.items.end(); ++item) {
-		if (item->noun != noun || item->room != _state.room)
-			continue;
-
-		if (item->state == IDI_ITEM_DOESNT_MOVE) {
-			printMessage(_messageIds.itemDoesntMove);
-			return;
-		}
-
-		if (item->state == IDI_ITEM_DROPPED) {
-			item->room = IDI_ANY;
-			return;
-		}
-
-		Common::Array<byte>::const_iterator pic;
-		for (pic = item->roomPictures.begin(); pic != item->roomPictures.end(); ++pic) {
-			if (*pic == getCurRoom().curPicture) {
-				item->room = IDI_ANY;
-				item->state = IDI_ITEM_DROPPED;
+		if (item->noun == noun && item->room == _state.room && item->region == _state.region) {
+			if (item->state == IDI_ITEM_DOESNT_MOVE) {
+				printMessage(_messageIds.itemDoesntMove);
 				return;
+			}
+
+			if (item->state == IDI_ITEM_DROPPED) {
+				item->room = IDI_ANY;
+				return;
+			}
+
+			Common::Array<byte>::const_iterator pic;
+			for (pic = item->roomPictures.begin(); pic != item->roomPictures.end(); ++pic) {
+				if (*pic == getCurRoom().curPicture) {
+					item->room = IDI_ANY;
+					item->state = IDI_ITEM_DROPPED;
+					return;
+				}
 			}
 		}
 	}
@@ -517,22 +613,77 @@ void AdlEngine::dropItem(byte noun) {
 	Common::List<Item>::iterator item;
 
 	for (item = _state.items.begin(); item != _state.items.end(); ++item) {
-		if (item->noun != noun || item->room != IDI_ANY)
-			continue;
-
-		item->room = _state.room;
-		item->state = IDI_ITEM_DROPPED;
-		return;
+		if (item->noun == noun && item->room == IDI_ANY) {
+			item->room = _state.room;
+			item->region = _state.region;
+			item->state = IDI_ITEM_DROPPED;
+			return;
+		}
 	}
 
 	printMessage(_messageIds.dontUnderstand);
 }
 
+void AdlEngine::gameLoop() {
+	uint verb = 0, noun = 0;
+	_isRestarting = false;
+
+	// When restoring from the launcher, we don't read
+	// input on the first iteration. This is needed to
+	// ensure that restoring from the launcher and
+	// restoring in-game brings us to the same game state.
+	// (Also see comment below.)
+	if (!_isRestoring) {
+		showRoom();
+
+		if (_isRestarting)
+			return;
+
+		_canSaveNow = _canRestoreNow = true;
+		getInput(verb, noun);
+		_canSaveNow = _canRestoreNow = false;
+
+		if (shouldQuit())
+			return;
+
+		_linesPrinted = 0;
+
+		// If we just restored from the GMM, we skip this command
+		// set, as no command has been input by the user
+		if (!_isRestoring)
+			checkInput(verb, noun);
+	}
+
+	if (_isRestoring) {
+		// We restored from the GMM or launcher. As restoring
+		// with "RESTORE GAME" does not end command processing,
+		// we don't break it off here either. This essentially
+		// means that restoring a game will always run through
+		// the global commands and increase the move counter
+		// before the first user input.
+		_display->printAsciiString("\r");
+		_isRestoring = false;
+		verb = _restoreVerb;
+		noun = _restoreNoun;
+	}
+
+	// Restarting does end command processing
+	if (_isRestarting)
+		return;
+
+	doAllCommands(_globalCommands, verb, noun);
+
+	if (_isRestarting)
+		return;
+
+	advanceClock();
+	_state.moves++;
+}
+
 Common::Error AdlEngine::run() {
-	initGraphics(DISPLAY_WIDTH * 2, DISPLAY_HEIGHT * 2, true);
+	initGraphics(DISPLAY_WIDTH * 2, DISPLAY_HEIGHT * 2);
 
 	_console = new Console(this);
-	_speaker = new Speaker();
 	_display = new Display();
 
 	setupOpcodeTables();
@@ -553,59 +704,8 @@ Common::Error AdlEngine::run() {
 
 	_display->setMode(DISPLAY_MODE_MIXED);
 
-	while (1) {
-		uint verb = 0, noun = 0;
-		_isRestarting = false;
-
-		// When restoring from the launcher, we don't read
-		// input on the first iteration. This is needed to
-		// ensure that restoring from the launcher and
-		// restoring in-game brings us to the same game state.
-		// (Also see comment below.)
-		if (!_isRestoring) {
-			showRoom();
-
-			if (_isRestarting)
-				continue;
-
-			_canSaveNow = _canRestoreNow = true;
-			getInput(verb, noun);
-			_canSaveNow = _canRestoreNow = false;
-
-			if (shouldQuit())
-				break;
-
-			// If we just restored from the GMM, we skip this command
-			// set, as no command has been input by the user
-			if (!_isRestoring)
-				checkInput(verb, noun);
-		}
-
-		if (_isRestoring) {
-			// We restored from the GMM or launcher. As restoring
-			// with "RESTORE GAME" does not end command processing,
-			// we don't break it off here either. This essentially
-			// means that restoring a game will always run through
-			// the global commands and increase the move counter
-			// before the first user input.
-			_display->printAsciiString("\r");
-			_isRestoring = false;
-			verb = _restoreVerb;
-			noun = _restoreNoun;
-		}
-
-		// Restarting does end command processing
-		if (_isRestarting)
-			continue;
-
-		doAllCommands(_globalCommands, verb, noun);
-
-		if (_isRestarting)
-			continue;
-
-		advanceClock();
-		_state.moves++;
-	}
+	while (!(_isQuitting || shouldQuit()))
+		gameLoop();
 
 	return Common::kNoError;
 }
@@ -619,6 +719,49 @@ bool AdlEngine::hasFeature(EngineFeature f) const {
 	default:
 		return false;
 	}
+}
+
+void AdlEngine::loadState(Common::ReadStream &stream) {
+	_state.room = stream.readByte();
+	_state.moves = stream.readByte();
+	_state.isDark = stream.readByte();
+	_state.time.hours = stream.readByte();
+	_state.time.minutes = stream.readByte();
+
+	uint32 size = stream.readUint32BE();
+	if (size != _state.rooms.size())
+		error("Room count mismatch (expected %i; found %i)", _state.rooms.size(), size);
+
+	for (uint i = 0; i < size; ++i) {
+		_state.rooms[i].picture = stream.readByte();
+		_state.rooms[i].curPicture = stream.readByte();
+		_state.rooms[i].isFirstTime = stream.readByte();
+	}
+
+	// NOTE: _state.curPicture is part of the save state in the original engine. We
+	// reconstruct it instead. This is believed to be safe for at least hires 0-2, but
+	// this may need to be re-evaluated for later games.
+	_state.curPicture = getCurRoom().curPicture;
+
+	size = stream.readUint32BE();
+	if (size != _state.items.size())
+		error("Item count mismatch (expected %i; found %i)", _state.items.size(), size);
+
+	Common::List<Item>::iterator item;
+	for (item = _state.items.begin(); item != _state.items.end(); ++item) {
+		item->room = stream.readByte();
+		item->picture = stream.readByte();
+		item->position.x = stream.readByte();
+		item->position.y = stream.readByte();
+		item->state = stream.readByte();
+	}
+
+	size = stream.readUint32BE();
+	if (size != _state.vars.size())
+		error("Variable count mismatch (expected %i; found %i)", _state.vars.size(), size);
+
+	for (uint i = 0; i < size; ++i)
+		_state.vars[i] = stream.readByte();
 }
 
 Common::Error AdlEngine::loadGameState(int slot) {
@@ -653,47 +796,7 @@ Common::Error AdlEngine::loadGameState(int slot) {
 	Graphics::skipThumbnail(*inFile);
 
 	initState();
-
-	_state.room = inFile->readByte();
-	_state.moves = inFile->readByte();
-	_state.isDark = inFile->readByte();
-	_state.time.hours = inFile->readByte();
-	_state.time.minutes = inFile->readByte();
-
-	uint32 size = inFile->readUint32BE();
-	if (size != _state.rooms.size())
-		error("Room count mismatch (expected %i; found %i)", _state.rooms.size(), size);
-
-	for (uint i = 0; i < size; ++i) {
-		_state.rooms[i].picture = inFile->readByte();
-		_state.rooms[i].curPicture = inFile->readByte();
-		_state.rooms[i].isFirstTime = inFile->readByte();
-	}
-
-	// NOTE: _state.curPicture is part of the save state in the original engine. We
-	// reconstruct it instead. This is believed to be safe for at least hires 0-2, but
-	// this may need to be re-evaluated for later games.
-	_state.curPicture = getCurRoom().curPicture;
-
-	size = inFile->readUint32BE();
-	if (size != _state.items.size())
-		error("Item count mismatch (expected %i; found %i)", _state.items.size(), size);
-
-	Common::List<Item>::iterator item;
-	for (item = _state.items.begin(); item != _state.items.end(); ++item) {
-		item->room = inFile->readByte();
-		item->picture = inFile->readByte();
-		item->position.x = inFile->readByte();
-		item->position.y = inFile->readByte();
-		item->state = inFile->readByte();
-	}
-
-	size = inFile->readUint32BE();
-	if (size != _state.vars.size())
-		error("Variable count mismatch (expected %i; found %i)", _state.vars.size(), size);
-
-	for (uint i = 0; i < size; ++i)
-		_state.vars[i] = inFile->readByte();
+	loadState(*inFile);
 
 	if (inFile->err() || inFile->eos())
 		error("Failed to load game '%s'", fileName.c_str());
@@ -708,6 +811,35 @@ Common::Error AdlEngine::loadGameState(int slot) {
 
 bool AdlEngine::canLoadGameStateCurrently() {
 	return _canRestoreNow;
+}
+
+void AdlEngine::saveState(Common::WriteStream &stream) {
+	stream.writeByte(_state.room);
+	stream.writeByte(_state.moves);
+	stream.writeByte(_state.isDark);
+	stream.writeByte(_state.time.hours);
+	stream.writeByte(_state.time.minutes);
+
+	stream.writeUint32BE(_state.rooms.size());
+	for (uint i = 0; i < _state.rooms.size(); ++i) {
+		stream.writeByte(_state.rooms[i].picture);
+		stream.writeByte(_state.rooms[i].curPicture);
+		stream.writeByte(_state.rooms[i].isFirstTime);
+	}
+
+	stream.writeUint32BE(_state.items.size());
+	Common::List<Item>::const_iterator item;
+	for (item = _state.items.begin(); item != _state.items.end(); ++item) {
+		stream.writeByte(item->room);
+		stream.writeByte(item->picture);
+		stream.writeByte(item->position.x);
+		stream.writeByte(item->position.y);
+		stream.writeByte(item->state);
+	}
+
+	stream.writeUint32BE(_state.vars.size());
+	for (uint i = 0; i < _state.vars.size(); ++i)
+		stream.writeByte(_state.vars[i]);
 }
 
 Common::Error AdlEngine::saveGameState(int slot, const Common::String &desc) {
@@ -747,34 +879,7 @@ Common::Error AdlEngine::saveGameState(int slot, const Common::String &desc) {
 	outFile->writeUint32BE(playTime);
 
 	_display->saveThumbnail(*outFile);
-
-	outFile->writeByte(_state.room);
-	outFile->writeByte(_state.moves);
-	outFile->writeByte(_state.isDark);
-	outFile->writeByte(_state.time.hours);
-	outFile->writeByte(_state.time.minutes);
-
-	outFile->writeUint32BE(_state.rooms.size());
-	for (uint i = 0; i < _state.rooms.size(); ++i) {
-		outFile->writeByte(_state.rooms[i].picture);
-		outFile->writeByte(_state.rooms[i].curPicture);
-		outFile->writeByte(_state.rooms[i].isFirstTime);
-	}
-
-	outFile->writeUint32BE(_state.items.size());
-	Common::List<Item>::const_iterator item;
-	for (item = _state.items.begin(); item != _state.items.end(); ++item) {
-		outFile->writeByte(item->room);
-		outFile->writeByte(item->picture);
-		outFile->writeByte(item->position.x);
-		outFile->writeByte(item->position.y);
-		outFile->writeByte(item->state);
-	}
-
-	outFile->writeUint32BE(_state.vars.size());
-	for (uint i = 0; i < _state.vars.size(); ++i)
-		outFile->writeByte(_state.vars[i]);
-
+	saveState(*outFile);
 	outFile->finalize();
 
 	if (outFile->err()) {
@@ -796,6 +901,12 @@ bool AdlEngine::canSaveGameStateCurrently() {
 	// Here we check whether or not the game currently accepts the command
 	// "SAVE GAME". This prevents saving via the GMM in situations where
 	// it wouldn't otherwise be possible to do so.
+	for (cmd = _roomData.commands.begin(); cmd != _roomData.commands.end(); ++cmd) {
+		ScriptEnv env(*cmd, _state.room, _saveVerb, _saveNoun);
+		if (matchCommand(env))
+			return env.op() == IDO_ACT_SAVE;
+	}
+
 	for (cmd = _roomCommands.begin(); cmd != _roomCommands.end(); ++cmd) {
 		ScriptEnv env(*cmd, _state.room, _saveVerb, _saveNoun);
 		if (matchCommand(env))
@@ -819,11 +930,7 @@ byte AdlEngine::convertKey(uint16 ascii) const {
 	return 0;
 }
 
-Common::String AdlEngine::getLine() const {
-	// Original engine uses a global here, which isn't reset between
-	// calls and may not match actual mode
-	bool textMode = false;
-
+Common::String AdlEngine::getLine() {
 	while (1) {
 		Common::String line = inputString(APPLECHAR('?'));
 
@@ -831,8 +938,8 @@ Common::String AdlEngine::getLine() const {
 			return "";
 
 		if ((byte)line[0] == ('\r' | 0x80)) {
-			textMode = !textMode;
-			_display->setMode(textMode ? DISPLAY_MODE_TEXT : DISPLAY_MODE_MIXED);
+			_textMode = !_textMode;
+			_display->setMode(_textMode ? DISPLAY_MODE_TEXT : DISPLAY_MODE_MIXED);
 			continue;
 		}
 
@@ -983,7 +1090,7 @@ int AdlEngine::o1_isItemPicEQ(ScriptEnv &e) {
 int AdlEngine::o1_varAdd(ScriptEnv &e) {
 	OP_DEBUG_2("\tVARS[%d] += %d", e.arg(2), e.arg(1));
 
-	setVar(e.arg(2), getVar(e.arg(2) + e.arg(1)));
+	setVar(e.arg(2), getVar(e.arg(2)) + e.arg(1));
 	return 2;
 }
 
@@ -1008,7 +1115,7 @@ int AdlEngine::o1_listInv(ScriptEnv &e) {
 
 	for (item = _state.items.begin(); item != _state.items.end(); ++item)
 		if (item->room == IDI_ANY)
-			printMessage(item->description);
+			printString(getItemDescription(*item));
 
 	return 0;
 }
@@ -1023,8 +1130,7 @@ int AdlEngine::o1_moveItem(ScriptEnv &e) {
 int AdlEngine::o1_setRoom(ScriptEnv &e) {
 	OP_DEBUG_1("\tROOM = %d", e.arg(1));
 
-	getCurRoom().curPicture = getCurRoom().picture;
-	_state.room = e.arg(1);
+	switchRoom(e.arg(1));
 	return 1;
 }
 
@@ -1101,7 +1207,13 @@ int AdlEngine::o1_quit(ScriptEnv &e) {
 	OP_DEBUG_0("\tQUIT_GAME()");
 
 	printMessage(_messageIds.thanksForPlaying);
-	quitGame();
+	// Wait for a key here to ensure that the user gets a chance
+	// to read the thank-you message
+	_display->printAsciiString("PRESS ANY KEY TO QUIT");
+	inputKey();
+
+	// We use _isRestarting to abort the current game loop iteration
+	_isQuitting = _isRestarting = true;
 	return -1;
 }
 
@@ -1141,8 +1253,7 @@ int AdlEngine::o1_goDirection(ScriptEnv &e) {
 		return -1;
 	}
 
-	getCurRoom().curPicture = getCurRoom().picture;
-	_state.room = room;
+	switchRoom(room);
 	return -1;
 }
 
@@ -1172,8 +1283,8 @@ bool AdlEngine::matchCommand(ScriptEnv &env) const {
 		return false;
 
 	if (DebugMan.isDebugChannelEnabled(kDebugChannelScript)) {
-		op_debug("IF\n\tROOM == %s", roomStr(env.getCommand().room).c_str());
-		op_debug("\t&& SAID(%s, %s)", verbStr(env.getCommand().verb).c_str(), nounStr(env.getCommand().noun).c_str());
+		(void)op_debug("IF\n\tROOM == %s", roomStr(env.getCommand().room).c_str());
+		(void)op_debug("\t&& SAID(%s, %s)", verbStr(env.getCommand().verb).c_str(), nounStr(env.getCommand().noun).c_str());
 	}
 
 	for (uint i = 0; i < env.getCondCount(); ++i) {
@@ -1186,7 +1297,7 @@ bool AdlEngine::matchCommand(ScriptEnv &env) const {
 
 		if (numArgs < 0) {
 			if (DebugMan.isDebugChannelEnabled(kDebugChannelScript))
-				op_debug("FAIL\n");
+				(void)op_debug("FAIL\n");
 			return false;
 		}
 
@@ -1198,7 +1309,7 @@ bool AdlEngine::matchCommand(ScriptEnv &env) const {
 
 void AdlEngine::doActions(ScriptEnv &env) {
 	if (DebugMan.isDebugChannelEnabled(kDebugChannelScript))
-		op_debug("THEN");
+		(void)op_debug("THEN");
 
 	for (uint i = 0; i < env.getActCount(); ++i) {
 		byte op = env.op();
@@ -1210,7 +1321,7 @@ void AdlEngine::doActions(ScriptEnv &env) {
 
 		if (numArgs < 0) {
 			if (DebugMan.isDebugChannelEnabled(kDebugChannelScript))
-				op_debug("ABORT\n");
+				(void)op_debug("ABORT\n");
 			return;
 		}
 
@@ -1218,27 +1329,25 @@ void AdlEngine::doActions(ScriptEnv &env) {
 	}
 
 	if (DebugMan.isDebugChannelEnabled(kDebugChannelScript))
-		op_debug("END\n");
+		(void)op_debug("END\n");
 }
 
 bool AdlEngine::doOneCommand(const Commands &commands, byte verb, byte noun) {
 	Commands::const_iterator cmd;
 
 	for (cmd = commands.begin(); cmd != commands.end(); ++cmd) {
-
-		if (_skipOneCommand) {
-			_skipOneCommand = false;
-			continue;
-		}
-
 		ScriptEnv env(*cmd, _state.room, verb, noun);
 		if (matchCommand(env)) {
 			doActions(env);
 			return true;
 		}
+
+		if (_abortScript) {
+			_abortScript = false;
+			return false;
+		}
 	}
 
-	_skipOneCommand = false;
 	return false;
 }
 
@@ -1246,11 +1355,6 @@ void AdlEngine::doAllCommands(const Commands &commands, byte verb, byte noun) {
 	Commands::const_iterator cmd;
 
 	for (cmd = commands.begin(); cmd != commands.end(); ++cmd) {
-		if (_skipOneCommand) {
-			_skipOneCommand = false;
-			continue;
-		}
-
 		ScriptEnv env(*cmd, _state.room, verb, noun);
 		if (matchCommand(env)) {
 			doActions(env);
@@ -1258,9 +1362,12 @@ void AdlEngine::doAllCommands(const Commands &commands, byte verb, byte noun) {
 			if (_isRestarting)
 				return;
 		}
-	}
 
-	_skipOneCommand = false;
+		if (_abortScript) {
+			_abortScript = false;
+			return;
+		}
+	}
 }
 
 Common::String AdlEngine::toAscii(const Common::String &str) {
@@ -1311,14 +1418,14 @@ Common::String AdlEngine::verbStr(uint i) const {
 	if (i == IDI_ANY)
 		return "*";
 	else
-		return Common::String::format("%d/%s", i, _priVerbs[i - 1].c_str());
+		return Common::String::format("%d/%s", i, (i - 1 < _priVerbs.size() ? _priVerbs[i - 1].c_str() : "<INVALID>"));
 }
 
 Common::String AdlEngine::nounStr(uint i) const {
 	if (i == IDI_ANY)
 		return "*";
 	else
-		return Common::String::format("%d/%s", i, _priNouns[i - 1].c_str());
+		return Common::String::format("%d/%s", i, (i - 1 < _priNouns.size() ? _priNouns[i - 1].c_str() : "<INVALID>"));
 }
 
 Common::String AdlEngine::msgStr(uint i) const {

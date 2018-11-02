@@ -62,7 +62,6 @@ enum UIViewTapDescription {
 };
 
 enum GraphicsModes {
-	kGraphicsModeLinear = 0,
 	kGraphicsModeNone = 1,
 
 	kGraphicsMode2xSaI,
@@ -80,7 +79,7 @@ struct VideoContext {
 	VideoContext() : asprectRatioCorrection(), screenWidth(), screenHeight(), overlayVisible(false),
 	                 overlayWidth(), overlayHeight(), mouseX(), mouseY(),
 	                 mouseHotspotX(), mouseHotspotY(), mouseWidth(), mouseHeight(),
-	                 mouseIsVisible(), graphicsMode(kGraphicsModeNone), shakeOffsetY() {
+	                 mouseIsVisible(), graphicsMode(kGraphicsModeNone), filtering(false), shakeOffsetY() {
 	}
 
 	// Game screen state
@@ -102,6 +101,7 @@ struct VideoContext {
 
 	// Misc state
 	GraphicsModes graphicsMode;
+	bool filtering;
 	int shakeOffsetY;
 };
 
@@ -122,6 +122,7 @@ void iOS7_updateScreen();
 bool iOS7_fetchEvent(InternalEvent *event);
 bool iOS7_isBigDevice();
 
+void iOS7_buildSharedOSystemInstance();
 void iOS7_main(int argc, char **argv);
 const char *iOS7_getDocumentsDir();
 bool iOS7_touchpadModeEnabled();

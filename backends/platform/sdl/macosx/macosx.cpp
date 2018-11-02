@@ -28,7 +28,6 @@
 #ifdef MACOSX
 
 #include "backends/audiocd/macosx/macosx-audiocd.h"
-#include "backends/mixer/doublebuffersdl/doublebuffersdl-mixer.h"
 #include "backends/platform/sdl/macosx/appmenu_osx.h"
 #include "backends/platform/sdl/macosx/macosx.h"
 #include "backends/updates/macosx/macosx-updates.h"
@@ -62,14 +61,6 @@ void OSystem_MacOSX::init() {
 }
 
 void OSystem_MacOSX::initBackend() {
-	// Create the mixer manager
-	if (_mixer == 0) {
-		_mixerManager = new DoubleBufferSDLMixerManager();
-
-		// Setup and start mixer
-		_mixerManager->init();
-	}
-
 #ifdef USE_TRANSLATION
 	// We need to initialize the translataion manager here for the following
 	// call to replaceApplicationMenuItems() work correctly
@@ -137,7 +128,7 @@ bool OSystem_MacOSX::openUrl(const Common::String &url) {
 	CFURLRef urlRef = CFURLCreateWithBytes (NULL, (UInt8*)url.c_str(), url.size(), kCFStringEncodingASCII, NULL);
 	OSStatus err = LSOpenCFURLRef(urlRef, NULL);
 	CFRelease(urlRef);
-	return err != noErr;
+	return err == noErr;
 }
 
 Common::String OSystem_MacOSX::getSystemLanguage() const {
@@ -185,6 +176,15 @@ Common::String OSystem_MacOSX::getSystemLanguage() const {
 #else // USE_DETECTLANG
 	return OSystem_POSIX::getSystemLanguage();
 #endif // USE_DETECTLANG
+}
+
+Common::String OSystem_MacOSX::getScreenshotsPath() {
+	Common::String path = ConfMan.get("screenshotpath");
+	if (path.empty())
+		path = getDesktopPathMacOSX();
+	if (!path.empty() && !path.hasSuffix("/"))
+		path += "/";
+	return path;
 }
 
 AudioCDManager *OSystem_MacOSX::createAudioCDManager() {

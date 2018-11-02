@@ -24,10 +24,12 @@
 #define TITANIC_PET_STARFIELD_H
 
 #include "titanic/pet_control/pet_section.h"
-#include "titanic/pet_control/pet_text.h"
+#include "titanic/gfx/text_control.h"
 #include "titanic/pet_control/pet_gfx_element.h"
 
 namespace Titanic {
+
+enum MarkerState { MS_BLANK = 0, MS_FLICKERING = 1, MS_HIGHLIGHTED = 2};
 
 class CPetStarfield : public CPetSection {
 private:
@@ -35,11 +37,11 @@ private:
 	CPetGfxElement _imgPhoto;
 	CPetGfxElement _imgStarCtrl;
 	CPetGfxElement _btnSetDest;
-	int _btnOffsets[3];
+	MarkerState _markerStates[3];
 	CPetGfxElement _leds[6];
 	Rect _rect1;
-	int _field18C;
-	CPetText _text;
+	int _flickerCtr;
+	CTextControl _text;
 	bool _photoOn;
 	bool _hasReference;
 private:
@@ -51,14 +53,17 @@ private:
 	/**
 	 * Draw a button
 	 */
-	void drawButton(int offset, int index, CScreenManager *screenManager);
+	void drawButton(MarkerState state, int index, CScreenManager *screenManager);
 
 	/**
-	 * Mouse down handling for Nav elements
+	 * Handles clicking on any of the three locked star LED markers
 	 */
-	bool elementsMouseDown(CMouseButtonDownMsg *msg);
+	bool markersMouseDown(CMouseButtonDownMsg *msg);
 
-	bool elementMouseButton(int index, CMouseButtonDownMsg *msg, const Rect &rect);
+	/**
+	 * Handles clicking on a specific locked star LED marker
+	 */
+	bool markerMouseDown(int index, CMouseButtonDownMsg *msg, const Rect &rect);
 public:
 	CPetStarfield();
 
@@ -105,9 +110,9 @@ public:
 	virtual void save(SimpleFile *file, int indent);
 
 	/**
-	 * Sets the offsets for each of the buttons
+	 * Sets the display for the marker buttons
 	 */
-	void setButtons(int val1, int val2);
+	void setButtons(int matchIndex, bool isMarkerClose);
 
 	/**
 	 * Sets whether the player has the galactic reference material

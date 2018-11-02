@@ -21,6 +21,7 @@
  */
 
 #include "titanic/game/sgt/washstand.h"
+#include "titanic/translation.h"
 
 namespace Titanic {
 
@@ -41,28 +42,28 @@ void CWashstand::load(SimpleFile *file) {
 }
 
 bool CWashstand::TurnOn(CTurnOn *msg) {
-	if (_statics->_v10 == "Closed" && _statics->_v2 == "NotOnWashstand") {
+	if (_statics->_washstand == "Closed" && _statics->_bedfoot != "NotOnWashstand") {
 		setVisible(true);
-		_statics->_v10 = "Open";
-		_fieldE0 = false;
+		_statics->_washstand = "Open";
+		_isClosed = false;
 		_startFrame = 0;
 		_endFrame = 14;
-		playMovie(0, 14, MOVIE_GAMESTATE);
-		playSound("b#14.wav");
+		playMovie(0, 14, MOVIE_WAIT_FOR_FINISH);
+		playSound(TRANSLATE("b#14.wav", "b#99.wav"));
 	}
 
 	return true;
 }
 
 bool CWashstand::TurnOff(CTurnOff *msg) {
-	if (_statics->_v10 == "Open" && _statics->_v11 == "Closed"
-			&& _statics->_v12 == "Closed" && _statics->_v2 == "Open") {
-		_statics->_v10 = "Closed";
-		_fieldE0 = true;
+	if (_statics->_washstand == "Open" && _statics->_basin == "Closed"
+			&& _statics->_toilet == "Closed" && _statics->_bedfoot != "Open") {
+		_statics->_washstand = "Closed";
+		_isClosed = true;
 		_startFrame = 14;
 		_endFrame = 28;
-		playMovie(14, 28, MOVIE_GAMESTATE | MOVIE_NOTIFY_OBJECT);
-		playSound("b#14.wav");
+		playMovie(14, 28, MOVIE_WAIT_FOR_FINISH | MOVIE_NOTIFY_OBJECT);
+		playSound(TRANSLATE("b#14.wav", "b#99.wav"));
 	}
 
 	return true;

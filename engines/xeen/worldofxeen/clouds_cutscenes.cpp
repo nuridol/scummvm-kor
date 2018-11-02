@@ -119,8 +119,7 @@ bool CloudsCutscenes::showCloudsIntro() {
 		screen.vertMerge(yScroll);
 		if (yCtr < 160) {
 			xeen.draw(screen, 0);
-		}
-		else if (yCtr < 100) {
+		} else if (yCtr < 100) {
 			xeen.draw(screen, 0);
 			if (++xeenCtr < 14)
 				xeen1.draw(screen, xeenCtr);
@@ -391,7 +390,8 @@ bool CloudsCutscenes::showCloudsEnding() {
 	prec.clear();
 
 	// Show swirling vortex
-	SpriteResource vort[21], cast[6], darkLord[4];
+	// TODO? SpriteResource vort[21];
+	SpriteResource cast[16], darkLord[4];
 	for (int idx = 1; idx < 7; ++idx)
 		cast[idx - 1].load(Common::String::format("cast%02u.end", idx));
 	for (int idx = 1; idx < 4; ++idx)

@@ -43,6 +43,7 @@
 #include "backends/audiocd/sdl/sdl-audiocd.h"
 #endif
 
+#include "backends/events/default/default-events.h"
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/mutex/sdl/sdl-mutex.h"
 #include "backends/timer/sdl/sdl-timer.h"
@@ -179,6 +180,10 @@ bool OSystem_SDL::hasFeature(Feature f) {
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 	if (f == kFeatureClipboardSupport) return true;
 #endif
+#ifdef JOY_ANALOG
+	if (f == kFeatureJoystickDeadzone) return true;
+#endif
+	if (f == kFeatureKbdMouseSpeed) return true;
 	return ModularBackend::hasFeature(f);
 }
 
@@ -202,6 +207,16 @@ void OSystem_SDL::initBackend() {
 	// manager didn't provide one yet.
 	if (_eventSource == 0)
 		_eventSource = new SdlEventSource();
+
+	if (_eventManager == nullptr) {
+		DefaultEventManager *eventManager = new DefaultEventManager(_eventSource);
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+		// SDL 2 generates its own keyboard repeat events.
+		eventManager->setGenerateKeyRepeatEvents(false);
+#endif
+		_eventManager = eventManager;
+	}
+
 
 #ifdef USE_OPENGL
 #if SDL_VERSION_ATLEAST(2, 0, 0)
@@ -274,6 +289,16 @@ void OSystem_SDL::initBackend() {
 
 	_inited = true;
 
+	if (!ConfMan.hasKey("kbdmouse_speed")) {
+		ConfMan.registerDefault("kbdmouse_speed", 3);
+		ConfMan.setInt("kbdmouse_speed", 3);
+	}
+#ifdef JOY_ANALOG
+	if (!ConfMan.hasKey("joystick_deadzone")) {
+		ConfMan.registerDefault("joystick_deadzone", 3);
+		ConfMan.setInt("joystick_deadzone", 3);
+	}
+#endif
 	ModularBackend::initBackend();
 
 	// We have to initialize the graphics manager before the event manager
@@ -283,20 +308,28 @@ void OSystem_SDL::initBackend() {
 	dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->activateManager();
 }
 
-#if defined(USE_TASKBAR)
 void OSystem_SDL::engineInit() {
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->unlockWindowSize();
+#endif
+#ifdef USE_TASKBAR
 	// Add the started engine to the list of recent tasks
 	_taskbarManager->addRecent(ConfMan.getActiveDomainName(), ConfMan.get("description"));
 
 	// Set the overlay icon the current running engine
 	_taskbarManager->setOverlayIcon(ConfMan.getActiveDomainName(), ConfMan.get("description"));
+#endif
 }
 
 void OSystem_SDL::engineDone() {
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->unlockWindowSize();
+#endif
+#ifdef USE_TASKBAR
 	// Remove overlay icon
 	_taskbarManager->setOverlayIcon("", "");
-}
 #endif
+}
 
 void OSystem_SDL::initSDL() {
 	// Check if SDL has not been initialized
@@ -418,7 +451,7 @@ Common::String OSystem_SDL::getSystemLanguage() const {
 	char langName[9];
 	char ctryName[9];
 
-	const LCID languageIdentifier = GetThreadLocale();
+	const LCID languageIdentifier = GetUserDefaultUILanguage();
 
 	if (GetLocaleInfo(languageIdentifier, LOCALE_SISO639LANGNAME, langName, sizeof(langName)) != 0 &&
 		GetLocaleInfo(languageIdentifier, LOCALE_SISO3166CTRYNAME, ctryName, sizeof(ctryName)) != 0) {
@@ -555,6 +588,14 @@ Common::SaveFileManager *OSystem_SDL::getSavefileManager() {
 #else
     return _savefileManager;
 #endif
+}
+
+//Not specified in base class
+Common::String OSystem_SDL::getScreenshotsPath() {
+	Common::String path = ConfMan.get("screenshotpath");
+	if (!path.empty() && !path.hasSuffix("/"))
+		path += "/";
+	return path;
 }
 
 #ifdef USE_OPENGL

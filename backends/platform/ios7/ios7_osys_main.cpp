@@ -52,8 +52,7 @@
 
 
 const OSystem::GraphicsMode OSystem_iOS7::s_supportedGraphicsModes[] = {
-	{ "none", "No filtering", kGraphicsModeNone },
-	{ "linear", "Linear filtering", kGraphicsModeLinear },
+	{ "none", "Normal", kGraphicsModeNone },
 
 #ifdef ENABLE_IOS7_SCALERS
 #ifdef USE_SCALERS
@@ -171,6 +170,7 @@ void OSystem_iOS7::initBackend() {
 bool OSystem_iOS7::hasFeature(Feature f) {
 	switch (f) {
 	case kFeatureCursorPalette:
+	case kFeatureFilteringMode:
 		return true;
 
 	default:
@@ -187,6 +187,9 @@ void OSystem_iOS7::setFeatureState(Feature f, bool enable) {
 			_mouseCursorPaletteEnabled = enable;
 		}
 		break;
+	case kFeatureFilteringMode:
+		_videoContext->filtering = enable;
+		break;
 	case kFeatureAspectRatioCorrection:
 		_videoContext->asprectRatioCorrection = enable;
 		break;
@@ -200,6 +203,8 @@ bool OSystem_iOS7::getFeatureState(Feature f) {
 	switch (f) {
 	case kFeatureCursorPalette:
 		return _mouseCursorPaletteEnabled;
+	case kFeatureFilteringMode:
+		return _videoContext->filtering;
 	case kFeatureAspectRatioCorrection:
 		return _videoContext->asprectRatioCorrection;
 
@@ -358,6 +363,10 @@ void OSystem_iOS7::logMessage(LogMessageType::Type type, const char *message) {
 bool iOS7_touchpadModeEnabled() {
 	OSystem_iOS7 *sys = (OSystem_iOS7 *) g_system;
 	return sys && sys->touchpadModeEnabled();
+}
+
+void iOS7_buildSharedOSystemInstance() {
+	OSystem_iOS7::sharedInstance();
 }
 
 void iOS7_main(int argc, char **argv) {

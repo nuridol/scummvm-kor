@@ -36,17 +36,23 @@ private:
 	 */
 	int populateItem(CGameObject *item, bool isLoading);
 
-	int subMode(CGameObject *item, bool isLoading);
+	/**
+	 * For items which can have multiple different states, such as the
+	 * beer glass or Maitre D arms, returns the correct item index to use
+	 * for getting the inventory item glyph and description
+	 */
+	int getItemIndex(CGameObject *item, bool isLoading);
 
 	/**
-	 * Start any movie for the background
+	 * Start a repeated animation for the item
 	 */
-	void startBackgroundMovie();
+	void startRepeatedMovie();
 
 	/**
-	 * Start any movie for the foreground item
+	 * Start a singular (non-repeating) animation for the item,
+	 * such as an item's transformation into a piece of Titania 
 	 */
-	void startForegroundMovie();
+	void startSingularMovie();
 
 	/**
 	 * Stop any previously started foreground or background movie
@@ -59,14 +65,14 @@ private:
 	void reposition(const Point &pt);
 public:
 	CGameObject *_item;
-	int _field34;
-	CGameObject *_background;
-	CGameObject *_image;
+	bool _active;
+	CGameObject *_repeated;
+	CGameObject *_singular;
 public:
-	CPetInventoryGlyph() : _item(nullptr), _field34(1),
-		_background(nullptr), _image(nullptr) {}
-	CPetInventoryGlyph(CCarry *item, int val) : _item(item),
-		_field34(val), _background(nullptr), _image(nullptr) {}
+	CPetInventoryGlyph() : _item(nullptr), _active(true),
+		_repeated(nullptr), _singular(nullptr) {}
+	CPetInventoryGlyph(CCarry *item, bool active) : _item(item),
+		_active(active), _repeated(nullptr), _singular(nullptr) {}
 
 	/**
 	 * Called when the PET area is entered
@@ -106,12 +112,12 @@ public:
 	/**
 	 * Returns the tooltip text for when the glyph is selected
 	 */
-	virtual void getTooltip(CPetText *text);
+	virtual void getTooltip(CTextControl *text);
 
 	/**
 	 * Return whether the glyph is currently valid
 	 */
-	virtual bool isValid() const { return _item && _background; }
+	virtual bool isValid() const { return _item && _repeated; }
 
 	/**
 	 * Returns the object associated with the glyph

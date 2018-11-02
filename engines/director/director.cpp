@@ -24,21 +24,31 @@
 #include "common/debug-channels.h"
 #include "common/error.h"
 
+#include "common/macresman.h"
+#include "graphics/fonts/macfont.h"
+
 #include "graphics/macgui/macwindowmanager.h"
 
 #include "director/director.h"
-#include "director/resource.h"
+#include "director/archive.h"
 #include "director/sound.h"
 #include "director/lingo/lingo.h"
 
 namespace Director {
 
+DirectorEngine *g_director;
+
 DirectorEngine::DirectorEngine(OSystem *syst, const DirectorGameDescription *gameDesc) : Engine(syst), _gameDescription(gameDesc),
 		_rnd("director") {
 	DebugMan.addDebugChannel(kDebugLingoExec, "lingoexec", "Lingo Execution");
 	DebugMan.addDebugChannel(kDebugLingoCompile, "lingocompile", "Lingo Compilation");
+	DebugMan.addDebugChannel(kDebugLingoParse, "lingoparse", "Lingo code parsing");
 	DebugMan.addDebugChannel(kDebugLoading, "loading", "Loading");
 	DebugMan.addDebugChannel(kDebugImages, "images", "Image drawing");
+	DebugMan.addDebugChannel(kDebugText, "text", "Text rendering");
+	DebugMan.addDebugChannel(kDebugEvents, "events", "Event processing");
+
+	g_director = this;
 
 	if (!_mixer->isReady())
 		error("Sound initialization failed");
@@ -46,7 +56,10 @@ DirectorEngine::DirectorEngine(OSystem *syst, const DirectorGameDescription *gam
 	// Setup mixer
 	syncSoundSettings();
 
-	_sharedCasts = nullptr;
+	// Load Patterns
+	loadPatterns();
+
+	_sharedScore = nullptr;
 
 	_currentScore = nullptr;
 	_soundManager = nullptr;
@@ -54,7 +67,7 @@ DirectorEngine::DirectorEngine(OSystem *syst, const DirectorGameDescription *gam
 	_currentPaletteLength = 0;
 	_lingo = nullptr;
 
-	_sharedCasts = nullptr;
+	_sharedScore = nullptr;
 	_sharedSound = nullptr;
 	_sharedBMP = nullptr;
 	_sharedSTXT = nullptr;
@@ -65,16 +78,24 @@ DirectorEngine::DirectorEngine(OSystem *syst, const DirectorGameDescription *gam
 
 	_movies = nullptr;
 
+	_nextMovie.frameI = -1;
+
 	_wm = nullptr;
 
 	const Common::FSNode gameDataDir(ConfMan.get("path"));
 	SearchMan.addSubDirectoryMatching(gameDataDir, "data");
 	SearchMan.addSubDirectoryMatching(gameDataDir, "install");
+	SearchMan.addSubDirectoryMatching(gameDataDir, "main");		// Meet Mediaband
 
 	_colorDepth = 8;	// 256-color
 	_key = 0;
 	_keyCode = 0;
 	_machineType = 9; // Macintosh IIci
+	_playbackPaused = false;
+	_skipFrameAdvance = false;
+
+	_draggingSprite = false;
+	_draggingSpriteId = 0;
 }
 
 DirectorEngine::~DirectorEngine() {
@@ -82,6 +103,7 @@ DirectorEngine::~DirectorEngine() {
 	delete _sharedBMP;
 	delete _sharedSTXT;
 	delete _sharedDIB;
+	delete _sharedScore;
 
 	delete _currentScore;
 
@@ -108,30 +130,94 @@ Common::Error DirectorEngine::run() {
 		_mainArchive = nullptr;
 		_currentScore = nullptr;
 
+		if (debugChannelSet(-1, kDebugText)) {
+			testFontScaling();
+			testFonts();
+		}
+
 		_lingo->runTests();
 
 		return Common::kNoError;
 	}
 
-	//FIXME
+	// FIXME
 	//_mainArchive = new RIFFArchive();
 	//_mainArchive->openFile("bookshelf_example.mmm");
 
-	scanMovies(ConfMan.get("path"));
+	_currentScore = new Score(this);
+
+	if (getVersion() < 4) {
+		if (getPlatform() == Common::kPlatformWindows) {
+			_sharedCastFile = "SHARDCST.MMM";
+		} else {
+			_sharedCastFile = "Shared Cast";
+		}
+	} else if (getVersion() == 5) {
+		if (getPlatform() == Common::kPlatformWindows) {
+			_sharedCastFile = "SHARED.Cxt";
+		}
+	} else {
+		_sharedCastFile = "Shared.dir";
+	}
 
 	loadSharedCastsFrom(_sharedCastFile);
-	loadMainArchive();
 
-	_currentScore = new Score(this, _mainArchive);
+	loadInitialMovie(getEXEName());
+
+	_currentScore->setArchive(_mainArchive);
 	debug(0, "Score name %s", _currentScore->getMacName().c_str());
 
-	_currentScore->loadArchive();
-	_currentScore->startLoop();
+	bool loop = true;
+
+	while (loop) {
+		loop = false;
+
+		_currentScore->loadArchive();
+
+		// If we came in a loop, then skip as requested
+		if (!_nextMovie.frameS.empty()) {
+			_currentScore->setStartToLabel(_nextMovie.frameS);
+			_nextMovie.frameS.clear();
+		}
+
+		if (_nextMovie.frameI != -1) {
+			_currentScore->setCurrentFrame(_nextMovie.frameI);
+			_nextMovie.frameI = -1;
+		}
+
+		debugC(1, kDebugEvents, "Starting playback of score '%s'", _currentScore->getMacName().c_str());
+
+		_currentScore->startLoop();
+
+		debugC(1, kDebugEvents, "Finished playback of score '%s'", _currentScore->getMacName().c_str());
+
+		// If a loop was requested, do it
+		if (!_nextMovie.movie.empty()) {
+			_lingo->restartLingo();
+
+			delete _currentScore;
+
+			Archive *mov = openMainArchive(_nextMovie.movie);
+
+			if (!mov) {
+				warning("nextMovie: No score is loaded");
+
+				return Common::kNoError;
+			}
+
+			_currentScore = new Score(this);
+			_currentScore->setArchive(mov);
+			debug(0, "Switching to score '%s'", _currentScore->getMacName().c_str());
+
+			_nextMovie.movie.clear();
+			loop = true;
+		}
+	}
 
 	return Common::kNoError;
 }
 
-Common::HashMap<Common::String, Score *> DirectorEngine::scanMovies(const Common::String &folder) {
+Common::HashMap<Common::String, Score *> *DirectorEngine::scanMovies(const Common::String &folder) {
 	Common::FSNode directory(folder);
 	Common::FSList movies;
 	const char *sharedMMMname;
@@ -139,10 +225,10 @@ Common::HashMap<Common::String, Score *> DirectorEngine::scanMovies(const Common
 	if (getPlatform() == Common::kPlatformWindows)
 		sharedMMMname = "SHARDCST.MMM";
 	else
-		sharedMMMname = "Shared Cast*";
+		sharedMMMname = "Shared Cast";
 
 
-	Common::HashMap<Common::String, Score *> nameMap;
+	Common::HashMap<Common::String, Score *> *nameMap = new Common::HashMap<Common::String, Score *>();
 	if (!directory.getChildren(movies, Common::FSNode::kListFilesOnly))
 		return nameMap;
 
@@ -152,14 +238,18 @@ Common::HashMap<Common::String, Score *> DirectorEngine::scanMovies(const Common
 
 			if (Common::matchString(i->getName().c_str(), sharedMMMname, true)) {
 				_sharedCastFile = i->getName();
+
+				debugC(2, kDebugLoading, "Shared cast detected: %s", i->getName().c_str());
 				continue;
 			}
 
 			Archive *arc = createArchive();
 
+			warning("name: %s", i->getName().c_str());
 			arc->openFile(i->getName());
-			Score *sc = new Score(this, arc);
-			nameMap[sc->getMacName()] = sc;
+			Score *sc = new Score(this);
+			sc->setArchive(arc);
+			nameMap->setVal(sc->getMacName(), sc);
 
 			debugC(2, kDebugLoading, "Movie name: \"%s\"", sc->getMacName().c_str());
 		}
@@ -168,19 +258,11 @@ Common::HashMap<Common::String, Score *> DirectorEngine::scanMovies(const Common
 	return nameMap;
 }
 
-Common::String DirectorEngine::readPascalString(Common::SeekableReadStream &stream) {
-	byte length = stream.readByte();
-	Common::String x;
+Common::HashMap<int, CastType> *DirectorEngine::getSharedCastTypes() {
+	if (_sharedScore)
+		return &_sharedScore->_castTypes;
 
-	while (length--)
-		x += (char)stream.readByte();
-
-	return x;
-}
-
-void DirectorEngine::setPalette(byte *palette, uint16 count) {
-	_currentPalette = palette;
-	_currentPaletteLength = count;
+	return &_dummyCastType;
 }
 
 } // End of namespace Director

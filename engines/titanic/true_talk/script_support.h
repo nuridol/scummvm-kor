@@ -40,6 +40,10 @@ struct TTnpcScriptResponse {
 	uint _tag;
 	uint _values[4];
 
+	TTnpcScriptResponse() : _tag(0) {
+		_values[0] = _values[1] = _values[2] = _values[3] = 0;
+	}
+
 	/**
 	 * Returns the size of the values list plus 1
 	 */
@@ -59,10 +63,9 @@ struct TTscriptRange {
 		bool isSequential);
 };
 
-
 struct TTsentenceEntry {
 	int _field0;
-	int _field4;
+	int _category;
 	CString _string8;
 	int _fieldC;
 	CString _string10;
@@ -75,7 +78,7 @@ struct TTsentenceEntry {
 	int _field2C;
 	int _field30;
 
-	TTsentenceEntry() : _field0(0), _field4(0), _fieldC(0),
+	TTsentenceEntry() : _field0(0), _category(0), _fieldC(0),
 		_field20(0), _field28(0), _field2C(0), _field30(0) {}
 
 	/**
@@ -131,19 +134,19 @@ public:
 };
 
 struct TThandleQuoteEntry {
+	uint _tag1;
+	uint _tag2;
 	uint _index;
-	uint _tagId;
-	uint _dialogueId;
 
-	TThandleQuoteEntry() : _index(0), _tagId(0), _dialogueId(0) {}
+	TThandleQuoteEntry() : _tag1(0), _tag2(0), _index(0) {}
 };
 
 class TThandleQuoteEntries : public Common::Array<TThandleQuoteEntry> {
 public:
-	uint _tag1, _tag2;
 	uint _rangeStart, _rangeEnd;
+	uint _incr;
 public:
-	TThandleQuoteEntries() : _tag1(0), _tag2(0), _rangeStart(0), _rangeEnd(0) {}
+	TThandleQuoteEntries() : _rangeStart(0), _rangeEnd(0), _incr(0) {}
 	void load(const char *name);
 };
 

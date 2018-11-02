@@ -43,7 +43,7 @@ PartyDrawer::PartyDrawer(XeenEngine *vm): _vm(vm) {
 	_restoreSprites.load("restorex.icn");
 	_hpSprites.load("hpbars.icn");
 	_dseFace.load("dse.fac");
-	_hiliteChar = -1;
+	_hiliteChar = HILIGHT_CHAR_NONE;
 }
 
 void PartyDrawer::drawParty(bool updateFlag) {
@@ -88,7 +88,7 @@ void PartyDrawer::drawParty(bool updateFlag) {
 		_hpSprites.draw(screen, frame, Common::Point(Res.HP_BARS_X[idx], 182));
 	}
 
-	if (_hiliteChar != -1)
+	if (_hiliteChar != HILIGHT_CHAR_NONE)
 		res._globalSprites.draw(screen, 8, Common::Point(Res.CHAR_FACES_X[_hiliteChar] - 1, 149));
 
 	if (updateFlag)
@@ -101,7 +101,7 @@ void PartyDrawer::highlightChar(int charId) {
 
 	if (charId != _hiliteChar && _hiliteChar != HILIGHT_CHAR_DISABLED) {
 		// Handle deselecting any previusly selected char
-		if (_hiliteChar != -1) {
+		if (_hiliteChar != HILIGHT_CHAR_NONE) {
 			res._globalSprites.draw(screen, 9 + _hiliteChar,
 				Common::Point(Res.CHAR_FACES_X[_hiliteChar] - 1, 149));
 		}
@@ -117,16 +117,16 @@ void PartyDrawer::unhighlightChar() {
 	Resources &res = *_vm->_resources;
 	Screen &screen = *_vm->_screen;
 
-	if (_hiliteChar != -1) {
+	if (_hiliteChar != HILIGHT_CHAR_NONE) {
 		res._globalSprites.draw(screen, _hiliteChar + 9,
 			Common::Point(Res.CHAR_FACES_X[_hiliteChar] - 1, 149));
-		_hiliteChar = -1;
+		_hiliteChar = HILIGHT_CHAR_NONE;
 		screen._windows[33].update();
 	}
 }
 
 void PartyDrawer::resetHighlight() {
-	_hiliteChar = -1;
+	_hiliteChar = HILIGHT_CHAR_NONE;
 }
 /*------------------------------------------------------------------------*/
 
@@ -295,7 +295,7 @@ void Interface::perform() {
 				scripts.openGrate(13, 1);
 				eventsFlag = _buttonValue != 0;
 			}
-
+			break;
 		case 6:
 			// Open grate being closed
 			if (!map._isOutdoors) {
@@ -536,7 +536,7 @@ void Interface::perform() {
 			(int)party._activeParty.size() - 1 : spells._lastCaster];
 		do {
 			int spellId = CastSpell::show(_vm, c);
-			if (spellId == -1 || c == nullptr)
+			if (spellId == -1)
 				break;
 
 			result = spells.castSpell(c, (MagicSpell)spellId);
@@ -672,7 +672,7 @@ void Interface::doStepCode() {
 			party.addTime(170);
 		break;
 	case SURFTYPE_CLOUD:
-		if (!party._levitateActive) {
+		if (!party._levitateCount) {
 			party._damageType = DT_PHYSICAL;
 			_falling = true;
 			damage = 100;
@@ -682,7 +682,7 @@ void Interface::doStepCode() {
 		break;
 	}
 
-	if (_vm->_files->_isDarkCc && party._gameFlags[374]) {
+	if (_vm->_files->_isDarkCc && party._gameFlags[1][118]) {
 		_falling = false;
 	} else {
 		if (_falling)
@@ -716,7 +716,7 @@ void Interface::startFalling(bool flag) {
 	Scripts &scripts = *_vm->_scripts;
 	bool isDarkCc = _vm->_files->_isDarkCc;
 
-	if (isDarkCc && party._gameFlags[374]) {
+	if (isDarkCc && party._gameFlags[1][118]) {
 		_falling = 0;
 		return;
 	}
@@ -957,7 +957,7 @@ bool Interface::checkMoveDirection(int key) {
 			if (_vm->_files->_isDarkCc)
 				goto check;
 
-			// Deliberate FAll-through
+			// fall through
 		case 0:
 		case 2:
 		case 4:
@@ -1247,6 +1247,7 @@ void Interface::draw3d(bool updateFlag, bool skipDelay) {
 	Screen &screen = *_vm->_screen;
 	Scripts &scripts = *_vm->_scripts;
 
+	events.updateGameCounter();
 	if (screen._windows[11]._enabled)
 		return;
 
@@ -1750,7 +1751,7 @@ void Interface::assembleBorder() {
 
 	// Draw the animating bat character on the left screen edge to indicate
 	// that the party is being levitated
-	_borderSprites.draw(screen._windows[0], _vm->_party->_levitateActive ? _levitateUIFrame + 16 : 16,
+	_borderSprites.draw(screen._windows[0], _vm->_party->_levitateCount ? _levitateUIFrame + 16 : 16,
 		Common::Point(0, 82));
 	_levitateUIFrame = (_levitateUIFrame + 1) % 12;
 

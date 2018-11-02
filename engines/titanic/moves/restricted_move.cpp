@@ -21,6 +21,7 @@
  */
 
 #include "titanic/moves/restricted_move.h"
+#include "titanic/translation.h"
 
 namespace Titanic {
 
@@ -51,13 +52,15 @@ bool CRestrictedMove::MouseButtonDownMsg(CMouseButtonDownMsg *msg) {
 	if (classNum <= _classNum) {
 		// Okay to change to the given destination
 		changeView(_destination);
-	} else if (classNum != 4) {
+	} else if (classNum != UNCHECKED) {
 		petDisplayMessage(1, CLASS_NOT_ALLOWED_AT_DEST);
 	} else if (compareRoomNameTo("EmbLobby")) {
-		playSound("a#17.wav");
+		if (g_language != Common::DE_DEU)
+			playSound("a#17.wav");
 		petDisplayMessage(1, CHECK_IN_AT_RECEPTION);
 	} else if (compareViewNameTo("Titania.Node 1.S")) {
-		playSound("z#226.wav");
+		CProximity prox(Audio::Mixer::kSpeechSoundType);
+		playSound(TRANSLATE("z#226.wav", "z#132.wav"), prox);
 		changeView(_destination);
 	}
 
@@ -66,9 +69,9 @@ bool CRestrictedMove::MouseButtonDownMsg(CMouseButtonDownMsg *msg) {
 
 bool CRestrictedMove::EnterViewMsg(CEnterViewMsg *msg) {
 	int classNum = getPassengerClass();
-	bool flag = classNum > _classNum;
+	bool flag = classNum <= _classNum;
 
-	if (classNum == 4) {
+	if (classNum == UNCHECKED) {
 		if (compareRoomNameTo("EmbLobby"))
 			flag = false;
 		else if (compareViewNameTo("Titania.Node 1.S"))

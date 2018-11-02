@@ -123,6 +123,9 @@ public:
 	static OSystem_iOS7 *sharedInstance();
 
 	virtual void initBackend();
+	
+	virtual void engineInit();
+	virtual void engineDone();
 
 	virtual bool hasFeature(Feature f);
 	virtual void setFeatureState(Feature f, bool enable);
@@ -150,7 +153,7 @@ public:
 protected:
 	// PaletteManager API
 	virtual void setPalette(const byte *colors, uint start, uint num);
-	virtual void grabPalette(byte *colors, uint start, uint num);
+	virtual void grabPalette(byte *colors, uint start, uint num) const;
 
 public:
 	virtual void copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h);

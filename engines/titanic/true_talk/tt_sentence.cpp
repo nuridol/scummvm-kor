@@ -24,8 +24,14 @@
 #include "titanic/true_talk/tt_concept.h"
 #include "titanic/true_talk/script_handler.h"
 #include "titanic/titanic.h"
+#include "titanic/translation.h"
 
 namespace Titanic {
+
+TTsentenceConcept::~TTsentenceConcept() {
+	for (int idx = 0; idx <= 5; ++idx)
+		delete _concepts[idx];
+}
 
 TTsentenceConcept *TTsentenceConcept::addSibling() {
 	if (_nextP != nullptr)
@@ -41,9 +47,9 @@ TTsentenceConcept *TTsentenceConcept::addSibling() {
 
 TTsentence::TTsentence(int inputCtr, const TTstring &line, CScriptHandler *owner,
 		TTroomScript *roomScript, TTnpcScript *npcScript) :
-		_owner(owner), _field2C(1), _inputCtr(inputCtr), _field34(0),
+		_owner(owner), _category(1), _inputCtr(inputCtr), _field34(0),
 		_field38(0), _initialLine(line), _nodesP(nullptr), _roomScript(roomScript),
-		_npcScript(npcScript), _field58(0), _field5C(0) {
+		_npcScript(npcScript), _field58(5), _field5C(5) {
 	_status = _initialLine.isValid() && _normalizedLine.isValid() ? SS_11: SS_VALID;
 }
 
@@ -77,7 +83,7 @@ void TTsentence::copyFrom(const TTsentence &src) {
 	_field5C = src._field5C;
 	_field34 = src._field34;
 	_field38 = src._field38;
-	_field2C = src._field2C;
+	_category = src._category;
 	_nodesP = nullptr;
 
 	if (src._nodesP) {
@@ -109,10 +115,10 @@ int TTsentence::storeVocabHit(TTword *word) {
 
 bool TTsentence::fn1(const CString &str, int wordId1, const CString &str1, const CString &str2,
 		const CString &str3, int wordId2, int val1, int val2, const TTconceptNode *node) const {
-	if (node)
+	if (!node)
 		node = &_sentenceConcept;
 
-	if (!node && !node)
+	if (!node)
 		return false;
 	if (val1 && !is18(val1, node))
 		return false;
@@ -212,7 +218,7 @@ bool TTsentence::fn2(int slotIndex, const TTstring &str, const TTconceptNode *no
 
 	if (g_vm->_exeResources._owner->_concept1P && (slotIndex == 0 ||
 		slotIndex == 2 || slotIndex == 3 || slotIndex == 4 || slotIndex == 5)) {
-		if (str == g_vm->_exeResources._owner->_concept2P->getText() &&
+		if (str == g_vm->_exeResources._owner->_concept1P->getText() &&
 			(conceptText == "it" || conceptText == "that" || conceptText == "he" ||
 				conceptText == "she" || conceptText == "him" || conceptText == "her" ||
 				conceptText == "them" || conceptText == "they" || conceptText == "those" ||
@@ -221,7 +227,7 @@ bool TTsentence::fn2(int slotIndex, const TTstring &str, const TTconceptNode *no
 	}
 
 	if (g_vm->_exeResources._owner->_concept1P && (slotIndex == 0 || slotIndex == 2)) {
-		if (conceptText == "?" && str == g_vm->_exeResources._owner->_concept2P->getText()) {
+		if (conceptText == "?" && str == g_vm->_exeResources._owner->_concept1P->getText()) {
 			delete concept;
 			concept = getFrameSlot(5, node);
 			conceptText = concept->getText();
@@ -265,7 +271,9 @@ TTconcept *TTsentence::getFrameEntry(int slotIndex, const TTconceptNode *concept
 TTconcept *TTsentence::getFrameSlot(int slotIndex, const TTconceptNode *conceptNode) const {
 	TTconcept *newConcept = new TTconcept();
 	TTconcept *concept = getFrameEntry(slotIndex, conceptNode);
-	newConcept->copyFrom(concept);
+
+	if (concept)
+		newConcept->copyFrom(concept);
 
 	if (!newConcept->isValid()) {
 		delete newConcept;
@@ -304,6 +312,12 @@ bool TTsentence::isConcept34(int slotIndex, const TTconceptNode *node) const {
 bool TTsentence::localWord(const char *str) const {
 	CScriptHandler &scriptHandler = *g_vm->_exeResources._owner;
 	bool foundMatch = false;
+	static const char *const ARTICLES_EN[11] = {
+		"it", "that", "he", "she", "him", "her", "them", "they", "those", "1", "thing"
+	};
+	static const char *const ARTICLES_DE[9] = {
+		"es", "das", "er", "ihn", "ihm", "ihnen", "diese", "man", "ding"
+	};
 
 	if (scriptHandler._concept1P) {
 		TTstring s = scriptHandler._concept1P->getText();
@@ -315,7 +329,7 @@ bool TTsentence::localWord(const char *str) const {
 				foundMatch = true;
 	}
 
-	int val = g_vm->_exeResources.get18();
+	VocabMode mode = g_vm->_exeResources.getVocabMode();
 	bool result = false;
 
 	for (TTsentenceNode *nodeP = _nodesP; nodeP && !result;
@@ -325,15 +339,15 @@ bool TTsentence::localWord(const char *str) const {
 			continue;
 
 		const TTstring wordStr = nodeP->_wordP->_text;
-		if (val == 3 && wordStr == str) {
+		if ((g_language == Common::DE_DEU || mode == VOCAB_MODE_EN) && wordStr == str) {
 			result = true;
-		} else if (nodeP->_wordP->findSynByName(str, &syn, val)) {
+		} else if (nodeP->_wordP->findSynByName(str, &syn, mode)) {
 			result = true;
 		} else if (foundMatch) {
-			result = wordStr == "it" || wordStr == "that" || wordStr == "he"
-				|| wordStr == "she" || wordStr == "him" || wordStr == "her"
-				|| wordStr == "them" || wordStr == "they" || wordStr == "those"
-				|| wordStr == "1" || wordStr == "thing";
+			result = false;
+			for (int idx = 0; idx < TRANSLATE(11, 9) && !result; ++idx) {
+				result = wordStr == TRANSLATE(ARTICLES_EN[idx], ARTICLES_DE[idx]);
+			}
 		}
 	}
 

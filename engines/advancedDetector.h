@@ -117,6 +117,11 @@ struct ADGameDescription {
 typedef Common::Array<const ADGameDescription *> ADGameDescList;
 
 /**
+ * A list of raw game ID strings.
+ */
+typedef Common::Array<const char *> ADGameIdList;
+
+/**
  * End marker for a table of ADGameDescription structs. Use this to
  * terminate a list to be passed to the AdvancedDetector API.
  */
@@ -251,6 +256,17 @@ protected:
 	 */
 	const char * const *_directoryGlobs;
 
+	/**
+	 * If true, filenames will be matched against the entire path, relative to
+	 * the root detection directory (e.g. "foo/bar.000" for a file at
+	 * "<root>/foo/bar.000"). Otherwise, filenames only match the basename
+	 * (e.g. "bar.000" for the same file).
+	 *
+	 * @note _maxScanDepth and _directoryGlobs must still be configured to allow
+	 * the detector to find files inside subdirectories.
+	 */
+	bool _matchFullPaths;
+
 public:
 	AdvancedMetaEngine(const void *descs, uint descItemSize, const PlainGameDescriptor *gameIds, const ADExtraGuiOptionsMap *extraGuiOptions = 0);
 
@@ -317,7 +333,7 @@ protected:
 	 * Log and print a report that we found an unknown game variant, together with the file
 	 * names, sizes and MD5 sums.
 	 */
-	void reportUnknown(const Common::FSNode &path, const ADFilePropertiesMap &filesProps) const;
+	void reportUnknown(const Common::FSNode &path, const ADFilePropertiesMap &filesProps, const ADGameIdList &matchedGameIds = ADGameIdList()) const;
 
 	// TODO
 	void updateGameDescriptor(GameDescriptor &desc, const ADGameDescription *realDesc) const;
@@ -326,7 +342,7 @@ protected:
 	 * Compose a hashmap of all files in fslist.
 	 * Includes nifty stuff like removing trailing dots and ignoring case.
 	 */
-	void composeFileHashMap(FileMap &allFiles, const Common::FSList &fslist, int depth) const;
+	void composeFileHashMap(FileMap &allFiles, const Common::FSList &fslist, int depth, const Common::String &parentName = Common::String()) const;
 
 	/** Get the properties (size and MD5) of this file. */
 	bool getFileProperties(const Common::FSNode &parent, const FileMap &allFiles, const ADGameDescription &game, const Common::String fname, ADFileProperties &fileProps) const;

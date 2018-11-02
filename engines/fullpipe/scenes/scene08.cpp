@@ -33,8 +33,13 @@
 #include "fullpipe/gameloader.h"
 #include "fullpipe/behavior.h"
 #include "fullpipe/interaction.h"
+#include "fullpipe/modal.h"
 
 namespace Fullpipe {
+
+void scene08_clockCallback(int *phase) {
+	// do nothing
+}
 
 void scene08_initScene(Scene *sc) {
 	g_vars->scene08_inArcade = false;
@@ -80,7 +85,7 @@ void scene08_initScene(Scene *sc) {
 		g_vars->scene08_snoringCountdown = 71;
 	}
 
-	g_vars->scene08_clock->_callback2 = 0;
+	g_vars->scene08_clock->_callback2 = scene08_clockCallback;
 
 	if (g_fp->getObjectState(sO_StairsUp_8) == g_fp->getObjectEnumState(sO_StairsUp_8, sO_Broken)) {
 		g_vars->scene08_stairsVisible = false;
@@ -188,9 +193,7 @@ int sceneHandler08_calcOffset(int off, int flag) {
 }
 
 void sceneHandler08_pushCallback(int *par) {
-	Common::Point point;
-
-	int y = g_fp->_aniMan->_oy + g_fp->_aniMan->getSomeXY(point)->y;
+	int y = g_fp->_aniMan->_oy + g_fp->_aniMan->getSomeXY().y;
 
 	if (g_fp->_aniMan->_statics && g_fp->_aniMan->_statics->_staticsId == ST_MAN8_FLYDOWN)
 		y -= 25;
@@ -248,7 +251,7 @@ void sceneHandler08_airMoves() {
 		int y = g_fp->_aniMan->_oy;
 		Common::Point point;
 
-		if (703 - g_fp->_aniMan->getSomeXY(point)->y - y < 150) {
+		if (703 - g_fp->_aniMan->getSomeXY().y - y < 150) {
 			if (g_fp->_aniMan->_statics) {
 				if (g_fp->_aniMan->_statics->_staticsId == ST_MAN8_FLYDOWN) {
 					y -= 25;
@@ -353,7 +356,7 @@ void sceneHandler08_calcFlight() {
 	if (g_vars->scene08_manOffsetY < g_vars->scene08_stairsOffset)
 		g_vars->scene08_manOffsetY = g_vars->scene08_stairsOffset;
 
-	y = y + g_fp->_aniMan->getSomeXY(point)->y;
+	y = y + g_fp->_aniMan->getSomeXY().y;
 
 	if (g_fp->_aniMan->_statics && g_fp->_aniMan->_statics->_staticsId == ST_MAN8_FLYDOWN)
 		y -= 25;
@@ -404,6 +407,15 @@ void sceneHandler08_checkEndArcade() {
 
 		if (y < 80) {
 			sceneHandler08_finishArcade();
+
+			if (g_fp->isDemo() && g_fp->getLanguage() == Common::DE_DEU) {
+				ModalDemo *demo = new ModalDemo;
+				demo->launch();
+
+				g_fp->_modalObject = demo;
+
+				return;
+			}
 
 			ExCommand *ex = new ExCommand(SC_8, 17, 0, 0, 0, 0, 1, 0, 0, 0);
 			ex->_messageNum = 61;

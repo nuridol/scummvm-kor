@@ -69,7 +69,10 @@ static const int ATTACK_TYPE_FX[23] = {
 	4, 5, 4, 9, 27, 29, 44, 51, 53, 61, 71
 };
 
-static const int MONSTER_SHOOT_POW[7] = { 12, 14, 0, 4, 8, 10, 13 };
+static const PowType MONSTER_SHOOT_POW[7] = { 
+	POW_MAGIC_ARROW, POW_SPARKLES, POW_FIREBALL,
+	POW_MEGAVOLTS, POW_COLD_RAY, POW_SPRAY, POW_ENERGY_BLAST
+};
 
 static const int COMBAT_SHOOTING[4] = { 1, 1, 2, 3 };
 
@@ -349,7 +352,7 @@ void Combat::doCharDamage(Character &c, int charNum, int monsterDataIndex) {
 					c._weapons[idx]._bonusFlags |= ITEMFLAG_CURSED;
 				c._armor[idx]._bonusFlags |= ITEMFLAG_CURSED;
 				c._accessories[idx]._bonusFlags |= ITEMFLAG_CURSED;
-				c._misc[idx]._bonusFlags |= ITEMFLAG_CURSED;;
+				c._misc[idx]._bonusFlags |= ITEMFLAG_CURSED;
 			}
 			sound.playFX(37);
 			break;
@@ -540,7 +543,7 @@ void Combat::monstersAttack() {
 	Map &map = *_vm->_map;
 	Party &party = *_vm->_party;
 	Sound &sound = *_vm->_sound;
-	int powNum = -1;
+	PowType powNum = POW_INVALID;
 	MonsterStruct *monsterData = nullptr;
 	OutdoorDrawList &outdoorList = intf._outdoorList;
 	IndoorDrawList &indoorList = intf._indoorList;
@@ -549,12 +552,12 @@ void Combat::monstersAttack() {
 		if (_gmonHit[idx] != -1) {
 			monsterData = &map._monsterData[_gmonHit[idx]];
 			powNum = MONSTER_SHOOT_POW[monsterData->_attackType];
-			if (powNum != 12)
+			if (powNum != POW_MAGIC_ARROW)
 				break;
 		}
 	}
 
-	_powSprites.load(Common::String::format("pow%d.icn", powNum));
+	_powSprites.load(Common::String::format("pow%d.icn", (int)powNum));
 	sound.playFX(ATTACK_TYPE_FX[monsterData->_attackType]);
 
 	for (int charNum = 0; charNum < MAX_PARTY_COUNT; ++charNum) {
@@ -882,8 +885,8 @@ void Combat::doMonsterTurn(int monsterId) {
 						switch (_combatParty[idx]->worstCondition()) {
 						case PARALYZED:
 						case UNCONSCIOUS:
-							if (flag)
-								skip = true;
+							//if (flag)
+							//	skip = true;
 							break;
 						case DEAD:
 						case STONED:
@@ -1323,7 +1326,7 @@ void Combat::attack(Character &c, RangeType rangeType) {
 			divisor = 8;
 			break;
 		default:
-			break;
+			error("Invalid class");
 		}
 
 		int numberOfAttacks = c.getCurrentLevel() / divisor + 1;
@@ -1474,16 +1477,16 @@ void Combat::attack2(int damage, RangeType rangeType) {
 	if (monsterDied) {
 		if (!isDarkCc) {
 			if (_monster2Attack == 20 && party._mazeId == 41)
-				party._gameFlags[11] = true;
+				party._gameFlags[0][11] = true;
 			if (_monster2Attack == 8 && party._mazeId == 78) {
-				party._gameFlags[60] = true;
-				party._quests[23] = false;
+				party._gameFlags[0][60] = true;
+				party._questFlags[0][23] = false;
 
 				for (uint idx = 0; idx < party._activeParty.size(); ++idx)
 					party._activeParty[idx].setAward(42, true);
 
 				if (_monster2Attack == 27 && party._mazeId == 29)
-					party._gameFlags[104] = true;
+					party._gameFlags[0][104] = true;
 			}
 		}
 
@@ -1799,7 +1802,7 @@ void Combat::giveExperience(int experience) {
 	}
 }
 
-void Combat::multiAttack(int powNum) {
+void Combat::rangedAttack(PowType powNum) {
 	Interface &intf = *_vm->_interface;
 	Map &map = *_vm->_map;
 	Party &party = *_vm->_party;
@@ -1809,7 +1812,7 @@ void Combat::multiAttack(int powNum) {
 		_damageType = DT_POISON;
 		_shootType = ST_1;
 		Common::fill(&_shooting[0], &_shooting[6], 1);
-	} else if (powNum == 11) {
+	} else if (powNum == POW_ARROW) {
 		_shootType = ST_1;
 		bool flag = false;
 
@@ -1830,13 +1833,15 @@ void Combat::multiAttack(int powNum) {
 			sound.playFX(21);
 			return;
 		}
+
+		sound.playFX(49);
 	} else {
 		_shooting[0] = 1;
 		_shootType = ST_0;
 	}
 
 	intf._charsShooting = true;
-	_powSprites.load(Common::String::format("pow%d.icn", powNum));
+	_powSprites.load(Common::String::format("pow%d.icn", (int)powNum));
 	int monsterIndex = _monsterIndex;
 	int monster2Attack = _monster2Attack;
 	bool attackedFlag = false;
@@ -1914,7 +1919,7 @@ void Combat::multiAttack(int powNum) {
 		}
 	} else {
 		int cell = map.getCell(2);
-		if (cell < map.mazeData()._difficulties._wallNoPass) {
+		if (cell >= map.mazeData()._difficulties._wallNoPass) {
 			sound.playFX(46);
 			goto finished;
 		}
@@ -1964,7 +1969,7 @@ void Combat::multiAttack(int powNum) {
 		}
 	} else {
 		int cell = map.getCell(7);
-		if (cell < map.mazeData()._difficulties._wallNoPass) {
+		if (cell >= map.mazeData()._difficulties._wallNoPass) {
 			sound.playFX(46);
 			goto finished;
 		}
@@ -2014,7 +2019,7 @@ void Combat::multiAttack(int powNum) {
 		}
 	} else {
 		int cell = map.getCell(14);
-		if (cell < map.mazeData()._difficulties._wallNoPass) {
+		if (cell >= map.mazeData()._difficulties._wallNoPass) {
 			sound.playFX(46);
 			goto finished;
 		}
@@ -2058,7 +2063,7 @@ done:
 void Combat::shootRangedWeapon() {
 	_rangeType = RT_ALL;
 	_damageType = DT_PHYSICAL;
-	multiAttack(11);
+	rangedAttack(POW_ARROW);
 }
 
 } // End of namespace Xeen

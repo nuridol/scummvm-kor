@@ -31,7 +31,7 @@
 
 namespace Fullpipe {
 
-void GameLoader::writeSavegame(Scene *sc, const char *fname) {
+bool GameLoader::writeSavegame(Scene *sc, const char *fname, const Common::String &description) {
 	GameVar *v = _gameVar->getSubVarByName("OBJSTATES")->getSubVarByName("SAVEGAME");
 
 	if (!v) {
@@ -39,7 +39,7 @@ void GameLoader::writeSavegame(Scene *sc, const char *fname) {
 
 		if (!v) {
 			warning("No state to save");
-			return;
+			return false;
 		}
 	}
 
@@ -55,7 +55,7 @@ void GameLoader::writeSavegame(Scene *sc, const char *fname) {
 	header.updateCounter = _updateCounter;
 	header.unkField = 1;
 
-	Common::MemoryWriteStreamDynamic stream;
+	Common::MemoryWriteStreamDynamic stream(DisposeAfterUse::YES);
 
 	MfcArchive *archive = new MfcArchive(&stream);
 
@@ -88,20 +88,20 @@ void GameLoader::writeSavegame(Scene *sc, const char *fname) {
 	debugC(3, kDebugLoading, "Saving %d infos", _sc2array.size());
 
 	for (uint i = 0; i < _sc2array.size(); i++) {
-		archive->writeUint32LE(_sc2array[i]._picAniInfosCount);
+		archive->writeUint32LE(_sc2array[i]._picAniInfos.size());
 
-		if (_sc2array[i]._picAniInfosCount)
-			debugC(3, kDebugLoading, "Count %d: %d", i, _sc2array[i]._picAniInfosCount);
+		if (_sc2array[i]._picAniInfos.size())
+			debugC(3, kDebugLoading, "Count %d: %d", i, _sc2array[i]._picAniInfos.size());
 
-		for (uint j = 0; j < _sc2array[i]._picAniInfosCount; j++) {
-			_sc2array[i]._picAniInfos[j]->save(*archive);
+		for (uint j = 0; j < _sc2array[i]._picAniInfos.size(); j++) {
+			_sc2array[i]._picAniInfos[j].save(*archive);
 		}
 	}
 
 	header.encSize = stream.size();
 
 	// Now obfuscate the data
-	for (uint i = 0; i < header.encSize; i++)
+	for (int i = 0; i < header.encSize; i++)
 		stream.getData()[i] += i & 0x7f;
 
 	if (_savegameCallback)
@@ -112,7 +112,7 @@ void GameLoader::writeSavegame(Scene *sc, const char *fname) {
 
 	if (!saveFile) {
 		warning("Cannot open file for writing: %s", fname);
-		return;
+		return false;
 	}
 
 	saveFile->writeUint32LE(header.version);
@@ -146,6 +146,13 @@ void GameLoader::writeSavegame(Scene *sc, const char *fname) {
 	saveFile->writeUint16LE(header2.time);
 	saveFile->writeUint32LE(header2.playtime);
 
+	// Added in save version 2
+	Common::String desc(description.c_str(), MIN(255u, description.size()));	// Restrict description size
+	saveFile->writeByte(desc.size());
+	saveFile->writeString(desc);
+
+	g_fp->_currentScene->draw();
+
 	Graphics::saveThumbnail(*saveFile); // FIXME. Render proper screen
 
 	saveFile->writeUint32LE(headerPos);	// Store where the header starts
@@ -154,6 +161,8 @@ void GameLoader::writeSavegame(Scene *sc, const char *fname) {
 
 	delete saveFile;
 	delete archive;
+
+	return true;
 }
 
 
@@ -175,6 +184,13 @@ void PicAniInfo::save(MfcArchive &file) {
 	file.writeUint16LE(flags);
 	file.writeUint32LE(field_24);
 	file.writeUint32LE(someDynamicPhaseIndex);
+}
+
+void PicAniInfo::print() {
+	debug("type: %d objectId: %d field_6: %d field_8: %d", type, objectId, field_6, field_8);
+	debug("sceneId: %d field_E: %d ox: %d oy: %d priority: %d", sceneId, field_E, ox, oy, priority);
+	debug("staticsId: %d movementId: %d dynamicPhaseIndex: %d flags: %x field_24: %d someDynamicPhaseIndex: %d",
+			staticsId, movementId, dynamicPhaseIndex, flags, field_24, someDynamicPhaseIndex);
 }
 
 void GameVar::save(MfcArchive &file) {

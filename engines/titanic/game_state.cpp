@@ -21,34 +21,35 @@
  */
 
 #include "titanic/game_state.h"
-#include "titanic/titanic.h"
+#include "titanic/game_view.h"
+#include "titanic/events.h"
 #include "titanic/game_manager.h"
 #include "titanic/support/screen_manager.h"
+#include "titanic/titanic.h"
 
 namespace Titanic {
 
-bool CGameStateMovieList::clear() {
+bool CGameStateMovieList::empty() {
 	for (CGameStateMovieList::iterator i = begin(); i != end(); ) {
-		CMovieListItem *movieItem = *i;
+		CMovie *movie = *i;
 
-		if (movieItem->_item->isActive()) {
+		if (movie->isActive()) {
 			++i;
 		} else {
 			i = erase(i);
-			delete movieItem;
 		}
 	}
 
-	return !empty();
+	return Common::List<CMovie *>::empty();
 }
 
 /*------------------------------------------------------------------------*/
 
 CGameState::CGameState(CGameManager *gameManager) :
-		_gameManager(gameManager), _gameLocation(this),
-		_passengerClass(0), _priorClass(0), _mode(GSMODE_NONE),
-		_seasonNum(SEASON_SUMMER), _petActive(false), _field1C(false), _quitGame(false),
-		_field24(0), _nodeChangeCtr(0), _nodeEnterTicks(0), _field38(0) {
+		_gameManager(gameManager), _gameLocation(this), _passengerClass(NO_CLASS),
+		_priorClass(NO_CLASS), _mode(GSMODE_NONE), _seasonNum(SEASON_SUMMER),
+		_petActive(false), _soundMakerAllowed(false), _quitGame(false), _parrotMet(false),
+		_nodeChangeCtr(0), _nodeEnterTicks(0), _parrotResponseIndex(0) {
 }
 
 void CGameState::save(SimpleFile *file) const {
@@ -56,22 +57,22 @@ void CGameState::save(SimpleFile *file) const {
 	file->writeNumber(_passengerClass);
 	file->writeNumber(_priorClass);
 	file->writeNumber(_seasonNum);
-	file->writeNumber(_field24);
-	file->writeNumber(_field38);
+	file->writeNumber(_parrotMet);
+	file->writeNumber(_parrotResponseIndex);
 	_gameLocation.save(file);
-	file->writeNumber(_field1C);
+	file->writeNumber(_soundMakerAllowed);
 }
 
 void CGameState::load(SimpleFile *file) {
 	_petActive = file->readNumber() != 0;
-	_passengerClass = file->readNumber();
-	_priorClass = file->readNumber();
+	_passengerClass = (PassengerClass)file->readNumber();
+	_priorClass = (PassengerClass)file->readNumber();
 	_seasonNum = (Season)file->readNumber();
-	_field24 = file->readNumber();
-	_field38 = file->readNumber();
+	_parrotMet = file->readNumber();
+	_parrotResponseIndex = file->readNumber();
 	_gameLocation.load(file);
 
-	_field1C = file->readNumber();
+	_soundMakerAllowed = file->readNumber();
 	_nodeChangeCtr = 0;
 	_nodeEnterTicks = 0;
 }
@@ -79,16 +80,16 @@ void CGameState::load(SimpleFile *file) {
 void CGameState::setMode(GameStateMode newMode) {
 	CScreenManager *sm = CScreenManager::_screenManagerPtr;
 
-	if (newMode == GSMODE_CUTSCENE && newMode != _mode) {
+	if (newMode == GSMODE_CUTSCENE && _mode != GSMODE_CUTSCENE) {
 		if (_gameManager)
 			_gameManager->lockInputHandler();
 
 		if (sm && sm->_mouseCursor)
-			sm->_mouseCursor->hide();
+			sm->_mouseCursor->incBusyCount();
 
-	} else if (newMode != GSMODE_CUTSCENE && newMode != _mode) {
+	} else if (newMode != GSMODE_CUTSCENE && _mode == GSMODE_CUTSCENE) {
 		if (sm && sm->_mouseCursor)
-			sm->_mouseCursor->show();
+			sm->_mouseCursor->decBusyCount();
 
 		if (_gameManager)
 			_gameManager->unlockInputHandler();
@@ -104,7 +105,7 @@ void CGameState::enterNode() {
 
 void CGameState::enterView() {
 	CViewItem *oldView = _gameLocation.getView();
-	CViewItem *newView = _movieList._view;
+	CViewItem *newView = _movieList._destView;
 	oldView->preEnterView(newView);
 
 	_gameManager->_gameView->setView(newView);
@@ -113,10 +114,10 @@ void CGameState::enterView() {
 	_gameManager->playClip(_movieList._movieClip, oldRoom, newRoom);
 
 	_gameManager->_sound.preEnterView(newView, newRoom != oldRoom);
-	_gameManager->dec54();
+	_gameManager->decTransitions();
 	oldView->enterView(newView);
 
-	_movieList._view = nullptr;
+	_movieList._destView = nullptr;
 	_movieList._movieClip = nullptr;
 }
 
@@ -130,16 +131,17 @@ void CGameState::changeView(CViewItem *newView, CMovieClip *clip) {
 	oldView->leaveView(newView);
 
 	// If Shift key is pressed, skip showing the transition clip
-	if (g_vm->_window->isSpecialPressed(MK_SHIFT))
+	if (g_vm->_events->isSpecialPressed(MK_SHIFT))
 		clip = nullptr;
 
 	if (_mode == GSMODE_CUTSCENE) {
-		_movieList._view = newView;
+		_movieList._destView = newView;
 		_movieList._movieClip = clip;
+		_gameManager->incTransitions();
 	} else {
 		oldView->preEnterView(newView);
 		_gameManager->_gameView->setView(newView);
-		CRoomItem *oldRoom = newView->findNode()->findRoom();
+		CRoomItem *oldRoom = oldView->findNode()->findRoom();
 		CRoomItem *newRoom = newView->findNode()->findRoom();
 
 		// If a transition clip is defined, play it
@@ -153,15 +155,15 @@ void CGameState::changeView(CViewItem *newView, CMovieClip *clip) {
 }
 
 void CGameState::checkForViewChange() {
-	if (_mode == GSMODE_CUTSCENE && _movieList.clear()) {
+	if (_mode == GSMODE_CUTSCENE && _movieList.empty()) {
 		setMode(GSMODE_INTERACTIVE);
-		if (_movieList._view)
+		if (_movieList._destView)
 			enterView();
 	}
 }
 
 void CGameState::addMovie(CMovie *movie) {
-	_movieList.push_back(new CMovieListItem(movie));
+	_movieList.push_back(movie);
 	setMode(GSMODE_CUTSCENE);
 }
 

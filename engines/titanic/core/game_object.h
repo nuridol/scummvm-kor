@@ -27,6 +27,7 @@
 #include "common/stream.h"
 #include "titanic/core/named_item.h"
 #include "titanic/sound/proximity.h"
+#include "titanic/sound/sound_manager.h"
 #include "titanic/support/mouse_cursor.h"
 #include "titanic/support/credit_text.h"
 #include "titanic/support/movie_range_info.h"
@@ -34,13 +35,19 @@
 #include "titanic/support/strings.h"
 #include "titanic/support/movie_clip.h"
 #include "titanic/pet_control/pet_section.h"
-#include "titanic/pet_control/pet_text.h"
+#include "titanic/gfx/text_control.h"
 #include "titanic/game_state.h"
 
 namespace Titanic {
 
 enum Find { FIND_GLOBAL = 1, FIND_ROOM = 2, FIND_PET = 4, FIND_MAILMAN = 8 };
 enum Found { FOUND_NONE = 0, FOUND_GLOBAL = 1, FOUND_ROOM = 2, FOUND_PET = 3, FOUND_MAILMAN = 4 };
+enum RoomFlagsComparison { RFC_LOCATION = 1, RFC_CLASS_ELEVATOR = 2, RFC_TITANIA = 3 };
+enum StarControlAction {
+	STAR_SHOW = 0, STAR_HIDE, STAR_2, STAR_RESET_POS, STAR_4, STAR_5, STAR_6, STAR_FULL_SPEED,
+	STAR_8, STAR_TOGGLE_MODE, STAR_10, STAR_11, STAR_12, STAR_13, STAR_SET_REFERENCE, STAR_FADE_IN,
+	STAR_FADE_OUT, LOCK_STAR, UNLOCK_STAR, STAR_19
+};
 
 class CDontSaveFileItem;
 class CMailMan;
@@ -76,25 +83,22 @@ private:
 protected:
 	static CCreditText *_credits;
 protected:
-	double _field34;
-	double _field38;
-	double _field3C;
-	int _field40;
-	int _field44;
-	int _field48;
-	int _field4C;
+	double _unused1;
+	double _unused2;
+	double _unused3;
+	bool _nonvisual;
+	byte _toggleR, _toggleG, _toggleB;
 	CMovieClipList _movieClips;
 	int _initialFrame;
 	CMovieRangeInfoList _movieRangeInfoList;
 	int _frameNumber;
-	CPetText *_text;
+	CTextControl *_text;
 	uint _textBorder;
 	uint _textBorderRight;
-	int _field9C;
 	Common::Point _savedPos;
 	CVideoSurface *_surface;
 	CString _resource;
-	int _fieldB8;
+	int _unused4;
 protected:
 	/**
 	 * Saves the current position the object is located at
@@ -132,8 +136,15 @@ protected:
 	 */
 	void loadImage(const CString &name, bool pendingFlag = true);
 
-	void inc54();
-	void dec54();
+	/**
+	 * Increments the number of active transitions
+	 */
+	void incTransitions();
+
+	/**
+	 * Decrements the number of active transitions
+	 */
+	void decTransitions();
 
 	/**
 	 * Locks/hides the mouse
@@ -165,8 +176,15 @@ protected:
 	 */
 	void enableMouse();
 
-	void mouseLockE4();
-	void mouseUnlockE4();
+	/**
+	 * Disables user control of the mouse
+	 */
+	void mouseDisableControl();
+
+	/**
+	 * Re-enables user control of the mouse
+	 */
+	void mouseEnableControl();
 
 	/**
 	 * Sets the mouse to a new position
@@ -212,8 +230,8 @@ protected:
 	 * @param balance		Sound balance (not actually used by original)
 	 * @param repeated		If true, sound will repeat indefinitely
 	 */
-	int queueSound(const CString &name, uint priorHandle, uint volume = 100,
-		int balance = 0, bool repeated = false);
+	int queueSound(const CString &name, uint priorHandle, uint volume = 100, int balance = 0,
+		bool repeated = false, Audio::Mixer::SoundType soundType = Audio::Mixer::kPlainSoundType);
 
 	/**
 	 * Stop a sound
@@ -236,7 +254,7 @@ protected:
 	void setSoundVolume(int handle, uint percent, uint seconds);
 
 	/**
-	 * Plays a sound, and saves it's handle in the global sound handles list
+	 * Plays an ambient sound, and saves it's handle in the ambient sound handles list
 	 * @param resName		Filename of sound to play
 	 * @param mode			Volume mode level
 	 * @param initialMute	If set, sound transitions in from mute over 2 seconds
@@ -244,25 +262,28 @@ protected:
 	 * @param handleIndex	Slot 0 to 3 in the shared sound handle list to store the sound's handle
 	 * @param soundType		Specifies whether the sound is a sound effect or music
 	 */
-	void playGlobalSound(const CString &resName, int mode, bool initialMute, bool repeated,
+	void playAmbientSound(const CString &resName, VolumeMode mode, bool initialMute, bool repeated,
 		int handleIndex, Audio::Mixer::SoundType soundType = Audio::Mixer::kMusicSoundType);
 
 	/**
-	 * Stops a sound saved in the global sound handle list
+	 * Stops playing an ambient sound
 	 * @param transition	If set, the sound transitions to silent before stopping
-	 * @param handleIndex	Index of sound to stop. If -1, all global sounds are stopped
+	 * @param handleIndex	Index of sound to stop. If -1, all ambient sounds are stopped
 	 */
-	void stopGlobalSound(bool transition, int handleIndex);
+	void stopAmbientSound(bool transition, int handleIndex);
 
 	/**
-	 * Updates the volume for a global sound based on the specified mode's volume
+	 * Updates the volume for an ambient sound based on the specified mode's volume
 	 * @param mode			Volume level mode
 	 * @param seconds		Number of seconds to transition to new volume
-	 * @param handleIndex	Index of global sound to update. If -1, all global sounds are updated
+	 * @param handleIndex	Index of ambient sound to update. If -1, all ambient sounds are updated
 	 */
-	void setGlobalSoundVolume(int mode, uint seconds, int handleIndex);
+	void setAmbientSoundVolume(VolumeMode mode, uint seconds, int handleIndex);
 
-	void sound8(bool flag) const;
+	/**
+	 * Stops sound channel 3 or 0
+	 */
+	void stopSoundChannel(bool channel3);
 
 	/**
 	 * Adds a timer
@@ -308,7 +329,7 @@ protected:
 	/**
 	 * Compare the name of the parent room to the item to a passed string
 	 */
-	int compareRoomNameTo(const CString &name);
+	bool compareRoomNameTo(const CString &name);
 
 	/**
 	 * Gets the first object under the system MailMan
@@ -323,7 +344,7 @@ protected:
 	/**
 	 * Find mail by room flags
 	 */
-	CGameObject *findMailByFlags(int mode, uint roomFlags);
+	CGameObject *findMailByFlags(RoomFlagsComparison compareType, uint roomFlags);
 
 	/**
 	 * Find next mail from a given prior one
@@ -372,8 +393,9 @@ protected:
 
 	/**
 	 * Play a cutscene
+	 * @returns		True if the cutscene was not interrupted
 	 */
-	void playCutscene(uint startFrame, uint endFrame);
+	bool playCutscene(uint startFrame, uint endFrame);
 
 	/**
 	 * Play a clip randomly from a passed list of names
@@ -445,14 +467,13 @@ protected:
 	/**
 	 * Set's the player's passenger class
 	 */
-	void setPassengerClass(int newClass);
+	void setPassengerClass(PassengerClass newClass);
 
 	/**
-	 * Overrides whether the object's movie has audio timing
+	 * Sets color RGB for toggles
+	 * @remarks		The color set isn't actually used anywhere
 	 */
-	void movieSetAudioTiming(bool flag);
-
-	void fn10(int v1, int v2, int v3);
+	void setToggleColor(byte r, byte g, byte b);
 
 	/**
 	 * Gets the duration of a specified clip in milliseconds
@@ -472,12 +493,12 @@ protected:
 	/**
 	 * Returns true if a mail with a specified Id exists
 	 */
-	bool mailExists(int id) const;
+	bool mailExists(uint roomFlags) const;
 
 	/**
 	 * Returns a specified mail, if one exists
 	 */
-	CGameObject *findMail(int id) const;
+	CGameObject *findMail(uint roomFlags) const;
 
 	/**
 	 * Resets the Mail Man value
@@ -505,60 +526,15 @@ protected:
 	void setMovieFrameRate(double rate);
 
 	/**
-	 * Set up the text and borders for the object
-	 */
-	void setText(const CString &str, int border = 0, int borderRight = 0);
-
-	/**
-	 * Sets whether the text will use borders
-	 */
-	void setTextHasBorders(bool hasBorders);
-
-	/**
-	 * Sets the bounds for a previously defined text area
-	 */
-	void setTextBounds();
-
-	/**
-	 * Sets the color for the object's text
-	 */
-	void setTextColor(byte r, byte g, byte b);
-
-	/**
-	 * Sets the font number to use for text
-	 */
-	void setTextFontNumber(int fontNumber);
-
-	/**
-	 * Gets the width of the text contents
-	 */
-	int getTextWidth() const;
-
-	/**
-	 * Returns the text cursor
-	 */
-	CTextCursor *getTextCursor() const;
-
-	/**
-	 * Scroll text up
-	 */
-	void scrollTextUp();
-
-	/**
-	 * Scroll text down
-	 */
-	void scrollTextDown();
-
-	/**
 	 * Gets a new random number
 	 */
 	int getRandomNumber(int max, int *oldVal = nullptr);
 public:
 	Rect _bounds;
-	bool _isMail;
-	int _id;
+	bool _isPendingMail;
+	uint _destRoomFlags;
 	uint _roomFlags;
-	int _field60;
+	bool _handleMouseFlag;
 	CursorId _cursorId;
 	bool _visible;
 public:
@@ -602,9 +578,9 @@ public:
 	virtual Rect getBounds() const;
 
 	/**
-	 * Called when the view changes
+	 * Free up any surface the object used
 	 */
-	virtual void viewChange();
+	virtual void freeSurface();
 
 	/**
 	 * Allows the item to draw itself
@@ -630,7 +606,16 @@ public:
 	 * Checks the passed point is validly in the object,
 	 * with extra checking of object flags status
 	 */
-	bool checkPoint(const Point &pt, bool ignore40 = false, bool visibleOnly = false);
+	bool checkPoint(const Point &pt, bool ignoreSurface = false, bool visibleOnly = false);
+
+	/**
+	 * Returns a point that falls within the object. Used for simulating
+	 * mouse clicks for movement when arrow keys are pressed
+	 * @param quadrant	Quadrant (edge) to return point for
+	 * @param pt		Return point
+	 * @returns			True if a point was found
+	 */
+	bool findPoint(Quadrant quadrant, Point &pt);
 
 	/**
 	 * Set the position of the object
@@ -666,6 +651,11 @@ public:
 	 * Stops any movie currently playing for the object
 	 */
 	void stopMovie();
+
+	/**
+	 * Overrides whether the object's movie is playing or paused
+	 */
+	void movieSetPlaying(bool flag);
 
 	/**
 	 * Get the current movie frame
@@ -705,17 +695,17 @@ public:
 	/**
 	 * Return the player's passenger class
 	 */
-	int getPassengerClass() const;
+	PassengerClass getPassengerClass() const;
 
 	/**
 	 * Return the player's previous passenger class
 	 */
-	int getPriorClass() const;
+	PassengerClass getPriorClass() const;
 
 	/**
 	 * Sets the mail identifier for an object
 	 */
-	void setMailId(int mailId);
+	void setMailDest(uint roomFlags);
 
 	/**
 	 * Returns true if there's an attached surface which has a frame
@@ -734,11 +724,6 @@ public:
 	CGameObject *getHiddenObject(const CString &name) const;
 
 	/**
-	 * Sets up credits text
-	 */
-	void createCredits();
-
-	/**
 	 * Support function for drag moving
 	 */
 	void dragMove(const Point &pt);
@@ -748,7 +733,67 @@ public:
 	 */
 	CGameObject *getDraggingObject() const;
 
-	bool compareRoomFlags(int mode, uint flags1, uint flags2);
+	/**
+	 * Compares two sets of room flags together
+	 */
+	static bool compareRoomFlags(RoomFlagsComparison compareType, uint flags1, uint flags2);
+
+	/*--- Text display methods ---*/
+
+	/**
+	 * Sets up credits text
+	 */
+	void createCredits();
+
+	/**
+	 * Set up the text and borders for the object
+	 */
+	void setText(const CString &str, int border = 0, int borderRight = 0);
+
+	/**
+	 * Sets whether the text will use borders
+	 */
+	void setTextHasBorders(bool hasBorders);
+
+	/**
+	 * Sets the bounds for a previously defined text area
+	 */
+	void setTextBounds();
+
+	/**
+	 * Sets the color for the object's text
+	 */
+	void setTextColor(byte r, byte g, byte b);
+
+	/**
+	 * Sets the font number to use for text
+	 */
+	void setTextFontNumber(int fontNumber);
+
+	/**
+	 * Gets the width of the text contents
+	 */
+	int getTextWidth() const;
+
+	/**
+	 * Scroll text up
+	 */
+	void scrollTextUp();
+
+	/**
+	 * Scroll text down
+	 */
+	void scrollTextDown();
+
+	/**
+	 * Returns the text cursor
+	 */
+	CTextCursor *getTextCursor() const;
+
+	/**
+	 * Get the movement, if any, the cursor represents
+	 */
+	Movement getMovement() const;
 
 	/*--- CGameManager Methods ---*/
 
@@ -780,12 +825,12 @@ public:
 	/**
 	 * Adds an object to the mail list
 	 */
-	void addMail(int mailId);
+	void addMail(uint destRoomFlags);
 
 	/**
-	 * Remove an object from the mail list
+	 * Sends a pending mail object to a given destination
 	 */
-	void removeMail(int id, int v);
+	void sendMail(uint currRoomFlags, uint newRoomFlags);
 
 	/**
 	 * Return the full Id of the current view in a
@@ -877,7 +922,7 @@ public:
 	/**
 	 * Gives the player a new assigned room in the specified passenger class
 	 */
-	void petReassignRoom(int passClassNum);
+	void petReassignRoom(PassengerClass passClassNum);
 
 	/**
 	 * Sets a new area in the PET
@@ -894,13 +939,25 @@ public:
 	 */
 	void petSetRoomsWellEntry(int entryNum);
 
-	void petSetRooms1D4(int v);
-
+	/**
+	 * Sets the flag for whether elevator 4 has yet been fixed
+	 */
+	void petSetRoomsElevatorBroken(bool flag);
 
 	/**
 	 * Show the PET
 	 */
 	void petShow();
+
+	/**
+	 * Increment the number of PET area (tab) locks
+	 */
+	void petIncAreaLocks();
+
+	/**
+	 * Decrement the number of PET area (tab) locks
+	 */
+	void petDecAreaLocks();
 
 	/**
 	 * Shows the text cursor in the current section, if applicable
@@ -919,15 +976,17 @@ public:
 	 */
 	CStarControl *getStarControl() const;
 
-	void starFn1(int v);
-	bool starFn2();
-
-	/*--- CTrueTalkManager Methods ---*/
+	/**
+	 * Executes an action in the StarControl subsystem
+	 */
+	void starFn(StarControlAction action);
 
 	/**
-	 * Stop a conversation with the NPC
+	 * Returns true if the starmap puzzle has been solved
 	 */
-	void endTalking(CTrueTalkNPC *npc, bool viewFlag, CViewItem *view = nullptr);
+	bool starIsSolved() const;
+
+	/*--- CTrueTalkManager Methods ---*/
 
 	/**
 	 * Start a conversation with the NPC
@@ -938,6 +997,12 @@ public:
 	 * Start a conversation with the NPC
 	 */
 	void startTalking(const CString &name, uint id, CViewItem *view = nullptr);
+
+	/**
+	 * Start a conversation with the NPC
+	 */
+	void setTalking(CTrueTalkNPC *npc, bool viewFlag, CViewItem *view = nullptr);
+
 
 	/**
 	 * Sets a dial region for a given NPC
@@ -964,7 +1029,10 @@ public:
 
 	/*--- CGameState Methods ---*/
 
-	void setState1C(bool flag);
+	/**
+	 * Sets whether a background sound maker is allowed for the rooms if available
+	 */
+	void stateSetSoundMakerAllowed(bool flag);
 
 	/**
 	 * Change to the next season
@@ -976,10 +1044,25 @@ public:
 	 */
 	Season stateGetSeason() const;
 
-	void stateSet24();
-	int stateGet24() const;
-	void stateInc38();
-	int stateGet38() const;
+	/**
+	 * Sets the flag for the parrot having been met
+	 */
+	void stateSetParrotMet();
+
+	/**
+	 * Returns whether the parrot has been met
+	 */
+	bool stateGetParrotMet() const;
+
+	/**
+	 * Moves the parrot to the next idle response
+	 */
+	void incParrotResponse();
+
+	/**
+	 * Gets the index to use for parrot idle responses
+	 */
+	int getParrotResponse() const;
 
 	/**
 	 * Gets the game state node changed counter

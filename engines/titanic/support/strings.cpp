@@ -21,11 +21,12 @@
  */
 
 #include "titanic/support/strings.h"
+#include "titanic/support/files_manager.h"
 #include "titanic/titanic.h"
 
 namespace Titanic {
 
-Strings::Strings() {
+void Strings::load() {
 	Common::SeekableReadStream *r = g_vm->_filesManager->getResource("TEXT/STRINGS");
 	while (r->pos() < r->size())
 		push_back(readStringFromStream(r));

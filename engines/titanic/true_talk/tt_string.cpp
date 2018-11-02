@@ -55,6 +55,10 @@ TTstring::~TTstring() {
 }
 
 void TTstring::operator=(const TTstring &str) {
+	if (&str == this)
+		// Trying to assign string to itself
+		return;
+
 	// Delete old string reference, if any
 	if (_data && --_data->_referenceCount == 0)
 		delete _data;
@@ -111,7 +115,7 @@ TTstring TTstring::tokenize(const char *delim) {
 	const char *strP = _data->_string.c_str();
 	const char *splitP = nullptr, *chP;
 
-	for (const char *d = delim; d; ++d) {
+	for (const char *d = delim; *d; ++d) {
 		chP = strchr(strP, *d);
 		if (chP && (splitP == nullptr || chP < splitP))
 			splitP = chP;
@@ -122,7 +126,9 @@ TTstring TTstring::tokenize(const char *delim) {
 		_data->_string = CString(splitP + 1);
 		return result;
 	} else {
-		return TTstring();
+		TTstring result(strP);
+		_data->_string = CString();
+		return result;
 	}
 }
 

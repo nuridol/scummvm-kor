@@ -68,6 +68,15 @@ enum CombatMode {
 	COMBATMODE_0 = 0, COMBATMODE_1 = 1, COMBATMODE_2 = 2
 };
 
+enum PowType {
+	POW_INVALID = -1, POW_FIREBALL = 0, POW_INCINERATE = 1,
+	POW_FIERY_FLAIL = 2, POW_LIGHTNING = 3, POW_MEGAVOLTS = 4,
+	POW_SPARKS = 5, POW_STOPPER = 6, POW_MAGIC_ORB = 7,
+	POW_COLD_RAY = 8, POW_FROST_WAVE = 9, POW_SPRAY = 10,
+	POW_ARROW = 11, POW_MAGIC_ARROW = 12, POW_ENERGY_BLAST = 13,
+	POW_SPARKLES = 14, POW_DEADLY_SWARM = 15
+};
+
 class XeenEngine;
 class Character;
 class XeenItem;
@@ -208,7 +217,10 @@ public:
 
 	int stopAttack(const Common::Point &diffPt);
 
-	void multiAttack(int powNum);
+	/**
+	 * Called to do ranged attacks, both with bows or using a spell
+	 */
+	void rangedAttack(PowType powNum);
 
 	/**
 	 * Fires off a ranged attack at all oncoming monsters

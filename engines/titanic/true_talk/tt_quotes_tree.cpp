@@ -20,9 +20,10 @@
  *
  */
 
-#include "common/algorithm.h"
 #include "titanic/true_talk/tt_quotes_tree.h"
+#include "titanic/support/files_manager.h"
 #include "titanic/titanic.h"
+#include "common/algorithm.h"
 
 namespace Titanic {
 
@@ -66,7 +67,7 @@ int TTquotesTree::search(const char *str, QuoteTreeNum treeNum,
 		return -1;
 
 	if (remainder) {
-		while (*str) {
+		for (; *str; ++str) {
 			if (*str >= 'a' && *str != 's')
 				*remainder += *str;
 		}

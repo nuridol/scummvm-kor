@@ -12,6 +12,7 @@ MODULE_OBJS := \
 	engine/features.o \
 	engine/file.o \
 	engine/gc.o \
+	engine/guest_additions.o \
 	engine/kernel.o \
 	engine/kevent.o \
 	engine/kfile.o \
@@ -49,6 +50,7 @@ MODULE_OBJS := \
 	graphics/cursor.o \
 	graphics/font.o \
 	graphics/fontsjis.o \
+	graphics/fontkorean.o \
 	graphics/maciconbar.o \
 	graphics/menu.o \
 	graphics/paint16.o \

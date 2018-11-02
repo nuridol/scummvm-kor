@@ -98,6 +98,8 @@ PegasusEngine::PegasusEngine(OSystem *syst, const PegasusGameDescription *gamede
 }
 
 PegasusEngine::~PegasusEngine() {
+	throwAwayEverything();
+
 	delete _resFork;
 	delete _console;
 	delete _cursor;
@@ -390,7 +392,7 @@ Common::Error PegasusEngine::showSaveDialog() {
 }
 
 void PegasusEngine::showSaveFailedDialog(const Common::Error &status) {
-	Common::String failMessage = Common::String::format(_("Gamestate save failed (%s)! "
+	Common::String failMessage = Common::String::format(_("Failed to save game (%s)! "
 			"Please consult the README for basic information, and for "
 			"instructions on how to obtain further assistance."), status.getDesc().c_str());
 	GUI::MessageDialog dialog(failMessage);
@@ -711,7 +713,7 @@ static bool isValidSaveFileName(const Common::String &desc) {
 
 Common::Error PegasusEngine::saveGameState(int slot, const Common::String &desc) {
 	if (!isValidSaveFileName(desc))
-		return Common::Error(Common::kCreatingFileFailed, _("Invalid save file name"));
+		return Common::Error(Common::kCreatingFileFailed, _("Invalid file name for saving"));
 
 	Common::String output = Common::String::format("pegasus-%s.sav", desc.c_str());
 	Common::OutSaveFile *saveFile = _saveFileMan->openForSaving(output, false);
@@ -939,8 +941,9 @@ void PegasusEngine::doGameMenuCommand(const GameMenuCommand command) {
 			} else {
 				_gfx->doFadeOutSync();
 				useMenu(0);
-				_gfx->clearScreen();
+				_gfx->enableErase();
 				_gfx->updateDisplay();
+				_gfx->disableErase();
 
 				Video::VideoDecoder *video = new Video::QuickTimeDecoder();
 				if (!video->loadFile(_introDirectory + "/Closing.movie"))
@@ -1655,10 +1658,12 @@ void PegasusEngine::startNewGame() {
 	GameState.resetGameState();
 	GameState.setWalkthroughMode(isWalkthrough);
 
-	// TODO: Enable erase
 	_gfx->doFadeOutSync();
 	useMenu(0);
+
+	_gfx->enableErase();
 	_gfx->updateDisplay();
+	_gfx->disableErase();
 	_gfx->enableUpdates();
 
 	createInterface();

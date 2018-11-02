@@ -24,8 +24,8 @@ MODULES += \
 	backends \
 	engines \
 	video \
-	graphics \
 	image \
+	graphics \
 	audio \
 	common \
 	po
@@ -260,6 +260,9 @@ DIST_FILES_ENGINEDATA=
 ifdef ENABLE_ACCESS
 DIST_FILES_ENGINEDATA+=access.dat
 endif
+ifdef ENABLE_CRYO
+DIST_FILES_ENGINEDATA+=cryo.dat
+endif
 ifdef ENABLE_DRASCULA
 DIST_FILES_ENGINEDATA+=drascula.dat
 endif
@@ -286,6 +289,9 @@ DIST_FILES_ENGINEDATA+=sky.cpt
 endif
 ifdef ENABLE_TEENAGENT
 DIST_FILES_ENGINEDATA+=teenagent.dat
+endif
+ifdef ENABLE_TITANIC
+DIST_FILES_ENGINEDATA+=titanic.dat
 endif
 ifdef ENABLE_TONY
 DIST_FILES_ENGINEDATA+=tony.dat

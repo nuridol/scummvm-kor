@@ -69,7 +69,7 @@ byte AgiEngine::getVar(int16 varNr) {
 	switch (varNr) {
 	case VM_VAR_SECONDS:
 		getVarSecondsHeuristicTrigger();
-		// is supposed to fall through
+		// fall through
 	case VM_VAR_MINUTES:
 	case VM_VAR_HOURS:
 	case VM_VAR_DAYS:
@@ -247,7 +247,7 @@ void AgiEngine::setVarSecondsTrigger(byte newSeconds) {
 // This is also called in the main loop, because the game needs to be sync'd to 20 cycles per second
 void AgiEngine::inGameTimerUpdate() {
 	uint32 curPlayTimeMilliseconds = inGameTimerGet();
-	uint32 curPlayTimeCycles = curPlayTimeMilliseconds / 50;
+	uint32 curPlayTimeCycles = curPlayTimeMilliseconds / 25;
 
 	if (curPlayTimeCycles == _lastUsedPlayTimeInCycles) {
 		// No difference, skip updating

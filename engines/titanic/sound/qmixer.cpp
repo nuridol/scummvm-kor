@@ -20,12 +20,17 @@
  *
  */
 
-#include "common/system.h"
 #include "titanic/sound/qmixer.h"
+#include "titanic/debugger.h"
+#include "common/system.h"
 
 namespace Titanic {
 
 QMixer::QMixer(Audio::Mixer *mixer) : _mixer(mixer) {
+}
+
+QMixer::~QMixer() {
+	_channels.clear();
 }
 
 bool QMixer::qsWaveMixInitEx(const QMIXCONFIG &config) {
@@ -60,7 +65,19 @@ void QMixer::qsWaveMixFreeWave(Audio::SoundHandle &handle) {
 }
 
 void QMixer::qsWaveMixFlushChannel(int iChannel, uint flags) {
-	// Not currently implemented in ScummVM
+	if (flags & QMIX_OPENALL) {
+		// Ignore channel, and flush all the channels
+		for (uint idx = 0; idx < _channels.size(); ++idx)
+			qsWaveMixFlushChannel(idx, 0);
+	} else {
+		// Flush the specified channel
+		Common::List<SoundEntry>::iterator i;
+		Common::List<SoundEntry> &sounds = _channels[iChannel]._sounds;
+		for (i = sounds.begin(); i != sounds.end(); ++i)
+			_mixer->stopHandle((*i)._soundHandle);
+
+		sounds.clear();
+	}
 }
 
 void QMixer::qsWaveMixSetPanRate(int iChannel, uint flags, uint rate) {
@@ -76,18 +93,37 @@ void QMixer::qsWaveMixSetVolume(int iChannel, uint flags, uint volume) {
 	assert(volume <= 32767);
 	byte newVolume = (volume >= 32700) ? 255 : volume * 255 / 32767;
 
-	channel._volumeStart = newVolume;
-	channel._volumeEnd = volume * 255 / 100; // Convert from 0-100 (percent) to 0-255
+	channel._volumeStart = channel._volume;
+	channel._volumeEnd = newVolume;
 	channel._volumeChangeStart = g_system->getMillis();
 	channel._volumeChangeEnd = channel._volumeChangeStart + channel._panRate;
+	debugC(DEBUG_DETAILED, kDebugCore, "qsWaveMixSetPanRate vol=%d to %d, start=%u, end=%u",
+		channel._volumeStart, channel._volumeEnd, channel._volumeChangeStart, channel._volumeChangeEnd);
 }
 
 void QMixer::qsWaveMixSetSourcePosition(int iChannel, uint flags, const QSVECTOR &position) {
-	// Not currently implemented in ScummVM
+	ChannelEntry &channel = _channels[iChannel];
+
+	// Flag whether distance should reset when a new sound is started
+	channel._resetDistance = (flags & QMIX_USEONCE) != 0;
+
+	// Currently, we only do a basic simulation of spatial positioning by
+	// getting the distance, and proportionately reducing the volume the
+	// further away the source is
+	channel._distance = sqrt(position.x * position.x + position.y * position.y
+		+ position.z * position.z);
 }
 
 void QMixer::qsWaveMixSetPolarPosition(int iChannel, uint flags, const QSPOLAR &position) {
-	// Not currently implemented in ScummVM
+	ChannelEntry &channel = _channels[iChannel];
+
+	// Flag whether distance should reset when a new sound is started
+	channel._resetDistance = (flags & QMIX_USEONCE) != 0;
+
+	// Currently, we only do a basic simulation of spatial positioning by
+	// getting the distance, and proportionately reducing the volume the
+	// further away the source is
+	channel._distance = position.range;
 }
 
 void QMixer::qsWaveMixSetListenerPosition(const QSVECTOR &position, uint flags) {
@@ -161,9 +197,13 @@ void QMixer::qsWaveMixPump() {
 					(int)(currentTicks - channel._volumeChangeStart) / (int)channel._panRate;
 			}
 
+			debugC(DEBUG_DETAILED, kDebugCore, "qsWaveMixPump time=%u vol=%d",
+				currentTicks, channel._volume);
+
 			if (channel._volume != oldVolume && !channel._sounds.empty()
 					&& channel._sounds.front()._started) {
-				_mixer->setChannelVolume(channel._sounds.front()._soundHandle, channel._volume);
+				_mixer->setChannelVolume(channel._sounds.front()._soundHandle,
+					channel.getRawVolume());
 			}
 		}
 
@@ -172,21 +212,13 @@ void QMixer::qsWaveMixPump() {
 		if (!channel._sounds.empty()) {
 			SoundEntry &sound = channel._sounds.front();
 			if (sound._started && !_mixer->isSoundHandleActive(sound._soundHandle)) {
-				if (sound._loops == -1 || sound._loops-- > 0) {
-					// Need to loop the sound again
-					sound._waveFile->_stream->rewind();
-					_mixer->playStream(sound._waveFile->_soundType,
-						&sound._soundHandle, sound._waveFile->_stream,
-						-1, channel._volume, 0, DisposeAfterUse::NO);
-				} else {
-					// Sound is finished
-					if (sound._callback)
-						// Call the callback to signal end
-						sound._callback(iChannel, sound._waveFile, sound._userData);
+				// Sound is finished
+				if (sound._callback)
+					// Call the callback to signal end
+					sound._callback(iChannel, sound._waveFile, sound._userData);
 
-					// Remove sound record from channel
-					channel._sounds.erase(channel._sounds.begin());
-				}
+				// Remove sound record from channel
+				channel._sounds.erase(channel._sounds.begin());
 			}
 		}
 
@@ -195,13 +227,29 @@ void QMixer::qsWaveMixPump() {
 		if (!channel._sounds.empty()) {
 			SoundEntry &sound = channel._sounds.front();
 			if (!sound._started) {
-				_mixer->playStream(sound._waveFile->_soundType,
-					&sound._soundHandle, sound._waveFile->_stream,
-					-1, channel._volume, 0, DisposeAfterUse::NO);
+				if (channel._resetDistance)
+					channel._distance = 0.0;
+
+				// Play the wave
+				sound._soundHandle = sound._waveFile->play(
+					sound._loops, channel.getRawVolume());
 				sound._started = true;
 			}
 		}
 	}
+}
+
+/*------------------------------------------------------------------------*/
+
+byte QMixer::ChannelEntry::getRawVolume() const {
+	// Emperically decided adjustment divisor for distances
+	const double ADJUSTMENT_FACTOR = 5.0;
+
+	double r = 1.0 + (_distance / ADJUSTMENT_FACTOR);
+	double percent = 1.0 / (r * r);
+
+	double newVolume = _volume * percent;
+	return (byte)newVolume;
 }
 
 } // End of namespace Titanic

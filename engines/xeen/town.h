@@ -31,6 +31,12 @@
 
 namespace Xeen {
 
+enum TownAction {
+	BANK = 0, BLACKSMITH = 1, GUILD = 2, TAVERN = 3, TEMPLE = 4,
+	TRAINING = 5, ARENA = 6, NO_ACTION = 7, REAPER = 8, GOLEM = 9,
+	DWARF1 = 10, SPHINX = 11, ACTION12 = 12, DWARF2 = 13
+};
+
 class XeenEngine;
 class TownMessage;
 
@@ -41,14 +47,14 @@ private:
 	Common::StringArray _textStrings;
 	Common::Array<SpriteResource> _townSprites;
 	int _townMaxId;
-	int _townActionId;
+	TownAction _townActionId;
 	int _v1, _v2;
 	int _donation;
 	int _healCost;
 	int _v5, _v6;
 	int _v10, _v11, _v12;
 	int _v13, _v14;
-	uint _v20;
+	uint _maxLevel;
 	int _v21;
 	uint _v22;
 	int _v23;
@@ -99,7 +105,7 @@ private:
 public:
 	Town(XeenEngine *vm);
 
-	int townAction(int actionId);
+	int townAction(TownAction actionId);
 
 	void drawTownAnim(bool flag);
 

@@ -35,7 +35,7 @@ namespace Titanic {
 
 class CPetGlyphs;
 class CPetSection;
-class CPetText;
+class CTextControl;
 
 enum GlyphActionMode { ACTION_REMOVE = 0, ACTION_REMOVED = 1, ACTION_CHANGE = 2 };
 
@@ -177,7 +177,7 @@ public:
 	/**
 	 * Returns the tooltip text for when the glyph is selected
 	 */
-	virtual void getTooltip(CPetText *text) {}
+	virtual void getTooltip(CTextControl *text) {}
 
 	/**
 	 * Saves the data for the glyph
@@ -273,16 +273,6 @@ private:
 	 * Return a specified glyph
 	 */
 	CPetGlyph *getGlyph(int index) const;
-
-	/**
-	 * Scrolls the glyphs to the left
-	 */
-	void scrollLeft();
-
-	/**
-	 * Scrolls the glyphs to the right
-	 */
-	void scrollRight();
 
 	/**
 	 * Set the first visible glyph index
@@ -456,6 +446,16 @@ public:
 	void scrollToStart() { _firstVisibleIndex = 0; }
 
 	/**
+	 * Scrolls the glyphs to the left
+	 */
+	void scrollLeft();
+
+	/**
+	 * Scrolls the glyphs to the right
+	 */
+	void scrollRight();
+
+	/**
 	 * Increment the currently selected index
 	 */
 	void incSelection();
@@ -474,6 +474,11 @@ public:
 	 * Returns true if the specified glyph is the currently highlighted one
 	 */
 	bool isGlyphHighlighted(const CPetGlyph *glyph) const;
+
+	/**
+	 * Returns the highlighted index, if any
+	 */
+	int getHighlightIndex() const { return _highlightIndex; }
 
 	/**
 	 * Get the top-left position of the currently highlighted glyph

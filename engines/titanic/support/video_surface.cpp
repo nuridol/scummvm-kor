@@ -23,27 +23,41 @@
 #include "titanic/support/video_surface.h"
 #include "titanic/support/image_decoders.h"
 #include "titanic/support/screen_manager.h"
+#include "titanic/support/transparency_surface.h"
 #include "titanic/titanic.h"
 
 namespace Titanic {
 
 int CVideoSurface::_videoSurfaceCounter = 0;
+byte CVideoSurface::_palette1[32][32];
+byte CVideoSurface::_palette2[32][32];
 
 CVideoSurface::CVideoSurface(CScreenManager *screenManager) :
 		_screenManager(screenManager), _rawSurface(nullptr), _movie(nullptr),
-		_pendingLoad(false), _transBlitFlag(false), _fastBlitFlag(false),
-		_movieFrameSurface(nullptr), _transparencyMode(TRANS_DEFAULT),
-		_freeMovieSurface(DisposeAfterUse::NO), _hasFrame(true), _lockCount(0) {
+		_pendingLoad(false), _flipVertically(false), _fastBlitFlag(false),
+		_transparencySurface(nullptr), _transparencyMode(TRANS_DEFAULT),
+		_freeTransparencySurface(DisposeAfterUse::NO), _hasFrame(true), _lockCount(0) {
 	_videoSurfaceNum = _videoSurfaceCounter++;
 }
 
 CVideoSurface::~CVideoSurface() {
-	if (_ddSurface)
-		_videoSurfaceCounter -= freeSurface();
 	--_videoSurfaceCounter;
 
-	if (_freeMovieSurface == DisposeAfterUse::YES)
-		delete _movieFrameSurface;
+	if (_freeTransparencySurface == DisposeAfterUse::YES)
+		delete _transparencySurface;
+}
+
+void CVideoSurface::setupPalette(byte palette[32][32], byte val) {
+	for (uint idx1 = 0; idx1 < 32; ++idx1) {
+		for (uint idx2 = 0, base = 0; idx2 < 32; ++idx2, base += idx1) {
+			uint v = base / 31;
+			palette[idx1][idx2] = (byte)v;
+
+			if (val != 0xff && v != idx2) {
+				assert(0);
+			}
+		}
+	}
 }
 
 void CVideoSurface::setSurface(CScreenManager *screenManager, DirectDrawSurface *surface) {
@@ -56,10 +70,10 @@ void CVideoSurface::blitFrom(const Point &destPos, CVideoSurface *src, const Rec
 		Rect srcBounds, destBounds;
 		clipBounds(srcBounds, destBounds, src, srcRect, &destPos);
 
-		if (src->_transBlitFlag)
-			blitRect2(srcBounds, destBounds, src);
+		if (src->_flipVertically)
+			flippedBlitRect(srcBounds, destBounds, src);
 		else
-			blitRect1(srcBounds, destBounds, src);
+			blitRect(srcBounds, destBounds, src);
 	}
 }
 
@@ -132,44 +146,98 @@ void CVideoSurface::clipBounds(Rect &srcRect, Rect &destRect,
 		error("Invalid rect");
 }
 
-void CVideoSurface::blitRect1(const Rect &srcRect, const Rect &destRect, CVideoSurface *src) {
+void CVideoSurface::blitRect(const Rect &srcRect, const Rect &destRect, CVideoSurface *src) {
 	src->lock();
 	lock();
 
 	if (src->_fastBlitFlag) {
 		_rawSurface->blitFrom(*src->_rawSurface, srcRect, Point(destRect.left, destRect.top));
-	} else if (getMovieFrameSurface()) {
-		movieBlitRect(srcRect, destRect, src);
-	} else {
-		_rawSurface->transBlitFrom(*src->_rawSurface, srcRect, destRect, src->getTransparencyColor());
-	}
+	} else if (src->getTransparencySurface()) {
+		transBlitRect(srcRect, destRect, src, false);
+	} else if (lock()) {
+		if (src->lock()) {
+			const Graphics::ManagedSurface *srcSurface = src->_rawSurface;
+			Graphics::ManagedSurface *destSurface = _rawSurface;
+			const uint transColor = src->getTransparencyColor();
 
-	src->unlock();
-	unlock();
-}
+			destSurface->transBlitFrom(*srcSurface, srcRect, destRect, transColor);
 
-void CVideoSurface::blitRect2(const Rect &srcRect, const Rect &destRect, CVideoSurface *src) {
-	if (getMovieFrameSurface()) {
-		movieBlitRect(srcRect, destRect, src);
-	} else {
-		src->lock();
-		lock();
+			src->unlock();
+		}
 
-		_rawSurface->blitFrom(*src->_rawSurface, srcRect, Point(destRect.left, destRect.top));
-
-		src->unlock();
 		unlock();
 	}
 }
 
-void CVideoSurface::movieBlitRect(const Rect &srcRect, const Rect &destRect, CVideoSurface *src) {
+void CVideoSurface::flippedBlitRect(const Rect &srcRect, const Rect &destRect, CVideoSurface *src) {
+	if (src->getTransparencySurface()) {
+		transBlitRect(srcRect, destRect, src, true);
+	} else if (lock()) {
+		if (src->lock()) {
+			Graphics::ManagedSurface *srcSurface = src->_rawSurface;
+			Graphics::ManagedSurface *destSurface = _rawSurface;
+			const Graphics::Surface srcArea = srcSurface->getSubArea(srcRect);
+			const uint transColor = src->getTransparencyColor();
+
+			// Vertically flip the source area
+			Graphics::ManagedSurface flippedArea(srcArea.w, srcArea.h, srcArea.format);
+			for (int y = 0; y < srcArea.h; ++y) {
+				const byte *pSrc = (const byte *)srcArea.getBasePtr(0, y);
+				byte *pDest = (byte *)flippedArea.getBasePtr(0, flippedArea.h - y - 1);
+				Common::copy(pSrc, pSrc + srcArea.pitch, pDest);
+			}
+
+			destSurface->transBlitFrom(flippedArea,
+				Common::Point(destRect.left, destRect.top), transColor);
+
+			src->unlock();
+		}
+
+		unlock();
+	}
+}
+
+void CVideoSurface::transBlitRect(const Rect &srcRect, const Rect &destRect, CVideoSurface *src, bool flipFlag) {
+	assert(srcRect.width() == destRect.width() && srcRect.height() == destRect.height());
+	assert(src->getPixelDepth() == 2);
+
 	if (lock()) {
 		if (src->lock()) {
 			Graphics::ManagedSurface *srcSurface = src->_rawSurface;
 			Graphics::ManagedSurface *destSurface = _rawSurface;
+			Graphics::Surface destArea = destSurface->getSubArea(destRect);
 
-			// TODO: Handle the transparency mode correctly
-			destSurface->blitFrom(*srcSurface, srcRect, Point(srcRect.left, srcRect.top));
+			const uint16 *srcPtr = (const uint16 *)srcSurface->getBasePtr(
+				srcRect.left, flipFlag ? srcRect.top : srcRect.bottom - 1);
+			uint16 *destPtr = (uint16 *)destArea.getBasePtr(0, destArea.h - 1);
+			bool isAlpha = src->_transparencyMode == TRANS_ALPHA0 ||
+				src->_transparencyMode == TRANS_ALPHA255;
+
+			CTransparencySurface transSurface(src->getTransparencySurface(), src->_transparencyMode);
+
+			for (int yCtr = 0; yCtr < srcRect.height(); ++yCtr) {
+				// Prepare for copying the line
+				const uint16 *lineSrcP = srcPtr;
+				uint16 *lineDestP = destPtr;
+				transSurface.setRow(flipFlag ? srcRect.top + yCtr : srcRect.bottom - yCtr - 1);
+				transSurface.setCol(srcRect.left);
+
+				for (int srcX = srcRect.left; srcX < srcRect.right; ++srcX) {
+					if (transSurface.isPixelOpaque())
+						*lineDestP = *lineSrcP;
+					else if (!transSurface.isPixelTransparent())
+						copyPixel(lineDestP, lineSrcP, transSurface.getAlpha() >> 3, srcSurface->format, isAlpha);
+
+					++lineSrcP;
+					++lineDestP;
+					transSurface.moveX();
+				}
+
+				// Move to next line
+				srcPtr = flipFlag ? srcPtr + (src->getPitch() / 2) :
+					srcPtr - (src->getPitch() / 2);
+				destPtr -= destArea.pitch / 2;
+			}
 
 			src->unlock();
 		}
@@ -179,10 +247,7 @@ void CVideoSurface::movieBlitRect(const Rect &srcRect, const Rect &destRect, CVi
 }
 
 uint CVideoSurface::getTransparencyColor() {
-	uint32 val = -(getPixelDepth() - 2);
-	val &= 0xFFFF8400;
-	val += 0xF81F;
-	return val;
+	return getPixelDepth() == 2 ? 0xf81f : 0x7c1f;
 }
 
 bool CVideoSurface::hasFrame() {
@@ -196,10 +261,40 @@ bool CVideoSurface::hasFrame() {
 	}
 }
 
-/*------------------------------------------------------------------------*/
+#define RGB_SHIFT 3
+void CVideoSurface::copyPixel(uint16 *destP, const uint16 *srcP, byte alpha,
+		const Graphics::PixelFormat &srcFormat, bool isAlpha) {
+	const Graphics::PixelFormat destFormat = _ddSurface->getFormat();
+	alpha &= 0xff;
+	assert(alpha < 32);
 
-byte OSVideoSurface::_palette1[32][32];
-byte OSVideoSurface::_palette2[32][32];
+	// Get the source color
+	byte r, g, b;
+	srcFormat.colorToRGB(*srcP, r, g, b);
+	r >>= RGB_SHIFT;
+	g >>= RGB_SHIFT;
+	b >>= RGB_SHIFT;
+
+	if (isAlpha) {
+		r = _palette1[31 - alpha][r];
+		g = _palette1[31 - alpha][g];
+		b = _palette1[31 - alpha][b];
+	}
+
+	byte r2, g2, b2;
+	destFormat.colorToRGB(*destP, r2, g2, b2);
+	r2 >>= RGB_SHIFT;
+	g2 >>= RGB_SHIFT;
+	b2 >>= RGB_SHIFT;
+	r2 = _palette1[alpha][r2];
+	g2 = _palette1[alpha][g2];
+	b2 = _palette1[alpha][b2];
+
+	*destP = destFormat.RGBToColor((r + r2) << RGB_SHIFT,
+		(g + g2) << RGB_SHIFT, (b + b2) << RGB_SHIFT);
+}
+
+/*------------------------------------------------------------------------*/
 
 OSVideoSurface::OSVideoSurface(CScreenManager *screenManager, DirectDrawSurface *surface) :
 		CVideoSurface(screenManager) {
@@ -219,22 +314,9 @@ OSVideoSurface::OSVideoSurface(CScreenManager *screenManager, const CResourceKey
 	}
 }
 
-void OSVideoSurface::setupPalette(byte palette[32][32], byte val) {
-	for (uint idx1 = 0; idx1 < 32; ++idx1) {
-		for (uint idx2 = 0, base = 0; idx2 < 32; ++idx2, base += idx1) {
-			int64 v = 0x84210843;
-			v *= base;
-			uint v2 = (v >> 36);
-			v = ((v2 >> 31) + v2) & 0xff;
-			palette[idx1][idx2] = v << 3;
-
-			if (val != 0xff && v != idx2) {
-				v = 0x80808081 * v * val;
-				v2 = v >> 39;
-				palette[idx1][idx2] = ((v2 >> 31) + v2) << 3;
-			}
-		}
-	}
+OSVideoSurface::~OSVideoSurface() {
+	if (_ddSurface)
+		_videoSurfaceCounter -= OSVideoSurface::freeSurface();
 }
 
 void OSVideoSurface::loadResource(const CResourceKey &key) {
@@ -342,18 +424,18 @@ int OSVideoSurface::getBpp() {
 	return getPixelDepth();
 }
 
-void OSVideoSurface::recreate(int width, int height) {
+void OSVideoSurface::recreate(int width, int height, int bpp) {
 	freeSurface();
 
-	_screenManager->resizeSurface(this, width, height);
+	_screenManager->resizeSurface(this, width, height, bpp);
 	if (_ddSurface)
 		_videoSurfaceCounter += _ddSurface->getSize();
 }
 
-void OSVideoSurface::resize(int width, int height) {
+void OSVideoSurface::resize(int width, int height, int bpp) {
 	if (!_ddSurface || _ddSurface->getWidth() != width ||
 			_ddSurface->getHeight() != height)
-		recreate(width, height);
+		recreate(width, height, bpp);
 }
 
 void OSVideoSurface::detachSurface() {
@@ -407,6 +489,17 @@ uint16 OSVideoSurface::getPixel(const Common::Point &pt) {
 		return 0;
 
 	if (pt.x >= 0 && pt.y >= 0 && pt.x < getWidth() && pt.y < getHeight()) {
+		if (_transparencySurface) {
+			// WORKAROUND: Original had the setRow _flipVertically check in reverse.
+			// Pretty sure putting it the way is below is the correct way
+			CTransparencySurface transSurface(&_transparencySurface->rawSurface(), _transparencyMode);
+			transSurface.setRow(_flipVertically ? getHeight() - pt.y - 1 : pt.y);
+			transSurface.setCol(pt.x);
+
+			if (transSurface.isPixelTransparent())
+				return getTransparencyColor();
+		}
+
 		lock();
 		uint16 pixel = *(uint16 *)_rawSurface->getBasePtr(pt.x, pt.y);
 		unlock();
@@ -423,29 +516,6 @@ void OSVideoSurface::setPixel(const Point &pt, uint pixel) {
 	*pixelP = pixel;
 }
 
-void OSVideoSurface::changePixel(uint16 *pixelP, uint16 *color, byte srcVal, bool remapFlag) {
-	assert(getPixelDepth() == 2);
-	const Graphics::PixelFormat &destFormat = _ddSurface->getFormat();
-	const Graphics::PixelFormat srcFormat(2, 5, 5, 5, 0, 10, 5, 0, 0);
-
-	// Get the color
-	byte r, g, b;
-	srcFormat.colorToRGB(*color, r, g, b);
-	if (remapFlag) {
-		r = _palette1[31 - srcVal][r >> 3];
-		g = _palette1[31 - srcVal][g >> 3];
-		b = _palette1[31 - srcVal][b >> 3];
-	}
-
-	byte r2, g2, b2;
-	destFormat.colorToRGB(*pixelP, r2, g2, b2);
-	r2 = _palette1[srcVal][r2 >> 3];
-	g2 = _palette1[srcVal][g2 >> 3];
-	b2 = _palette1[srcVal][b2 >> 3];
-
-	*pixelP = destFormat.RGBToColor(r + r2, g + g2, b + b2);
-}
-
 void OSVideoSurface::shiftColors() {
 	if (!loadIfReady())
 		return;
@@ -458,18 +528,18 @@ void OSVideoSurface::clear() {
 	if (!loadIfReady())
 		error("Could not load resource");
 
+	_ddSurface->fill(nullptr, 0);
 }
 
 void OSVideoSurface::playMovie(uint flags, CGameObject *obj) {
 	if (loadIfReady() && _movie)
 		_movie->play(flags, obj);
-
-	_ddSurface->fill(nullptr, 0);
 }
 
 void OSVideoSurface::playMovie(uint startFrame, uint endFrame, uint flags, CGameObject *obj) {
 	if (loadIfReady() && _movie) {
 		_movie->play(startFrame, endFrame, flags, obj);
+		_movie->pause();
 	}
 }
 
@@ -504,7 +574,7 @@ const CMovieRangeInfoList *OSVideoSurface::getMovieRangeInfo() const {
 }
 
 void OSVideoSurface::flipVertically(bool needsLock) {
-	if (!loadIfReady() || !_transBlitFlag)
+	if (!loadIfReady() || !_flipVertically)
 		return;
 
 	if (needsLock)
@@ -523,7 +593,7 @@ void OSVideoSurface::flipVertically(bool needsLock) {
 		Common::copy(lineBuffer, lineBuffer + pitch, line1P);
 	}
 
-	_transBlitFlag = false;
+	_flipVertically = false;
 	if (needsLock)
 		unlock();
 }
@@ -570,8 +640,8 @@ void OSVideoSurface::transPixelate() {
 	unlock();
 }
 
-Graphics::ManagedSurface *OSVideoSurface::dupMovieFrame() const {
-	return _movie ? _movie->duplicateFrame() : nullptr;
+Graphics::ManagedSurface *OSVideoSurface::dupMovieTransparency() const {
+	return _movie ? _movie->duplicateTransparency() : nullptr;
 }
 
 int OSVideoSurface::freeSurface() {

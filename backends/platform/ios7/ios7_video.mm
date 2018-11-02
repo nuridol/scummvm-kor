@@ -55,16 +55,31 @@ bool iOS7_isBigDevice() {
 	return UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad;
 }
 
+static inline void execute_on_main_thread(void (^block)(void)) {
+	if ([NSThread currentThread] == [NSThread mainThread]) {
+		block();
+	}
+	else {
+		dispatch_sync(dispatch_get_main_queue(), block);
+	}
+}
+
 void iOS7_updateScreen() {
 	//printf("Mouse: (%i, %i)\n", mouseX, mouseY);
 	if (!g_needsScreenUpdate) {
 		g_needsScreenUpdate = 1;
-		[[iOS7AppDelegate iPhoneView] performSelectorOnMainThread:@selector(updateSurface) withObject:nil waitUntilDone: NO];
+		execute_on_main_thread(^{
+			[[iOS7AppDelegate iPhoneView] updateSurface];
+		});
 	}
 }
 
 bool iOS7_fetchEvent(InternalEvent *event) {
-	return [[iOS7AppDelegate iPhoneView] fetchEvent:event];
+	__block bool fetched;
+	execute_on_main_thread(^{
+		fetched = [[iOS7AppDelegate iPhoneView] fetchEvent:event];
+	});
+	return fetched;
 }
 
 uint getSizeNextPOT(uint size) {
@@ -442,26 +457,7 @@ uint getSizeNextPOT(uint size) {
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, tex); printOpenGLError();
 
-	GLint filter = GL_LINEAR;
-
-	switch (_videoContext.graphicsMode) {
-	case kGraphicsModeNone:
-		filter = GL_NEAREST;
-		break;
-
-	case kGraphicsModeLinear:
-	case kGraphicsMode2xSaI:
-	case kGraphicsModeSuper2xSaI:
-	case kGraphicsModeSuperEagle:
-	case kGraphicsModeAdvMame2x:
-	case kGraphicsModeAdvMame3x:
-	case kGraphicsModeHQ2x:
-	case kGraphicsModeHQ3x:
-	case kGraphicsModeTV2x:
-	case kGraphicsModeDotMatrix:
-		filter = GL_LINEAR;
-		break;
-	}
+	GLint filter = _videoContext.filtering ? GL_LINEAR : GL_NEAREST;
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter); printOpenGLError();
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter); printOpenGLError();
@@ -478,9 +474,6 @@ uint getSizeNextPOT(uint size) {
 	int scalerScale = 1;
 
 	switch (_videoContext.graphicsMode) {
-	case kGraphicsModeLinear:
-		break;
-
 	case kGraphicsModeNone:
 		break;
 #ifdef USE_SCALERS

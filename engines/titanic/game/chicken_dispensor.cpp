@@ -21,8 +21,10 @@
  */
 
 #include "titanic/game/chicken_dispensor.h"
+#include "titanic/carry/chicken.h"
 #include "titanic/core/project_item.h"
 #include "titanic/pet_control/pet_control.h"
+#include "titanic/translation.h"
 
 namespace Titanic {
 
@@ -37,29 +39,29 @@ BEGIN_MESSAGE_MAP(CChickenDispensor, CBackground)
 END_MESSAGE_MAP()
 
 CChickenDispensor::CChickenDispensor() : CBackground(),
-	_fieldE0(0), _fieldE4(0), _fieldE8(0) {
+	_disabled(false), _dispenseMode(DISPENSE_NONE), _dispensed(false) {
 }
 
 void CChickenDispensor::save(SimpleFile *file, int indent) {
 	file->writeNumberLine(1, indent);
-	file->writeNumberLine(_fieldE0, indent);
-	file->writeNumberLine(_fieldE4, indent);
-	file->writeNumberLine(_fieldE8, indent);
+	file->writeNumberLine(_disabled, indent);
+	file->writeNumberLine(_dispenseMode, indent);
+	file->writeNumberLine(_dispensed, indent);
 	CBackground::save(file, indent);
 }
 
 void CChickenDispensor::load(SimpleFile *file) {
 	file->readNumber();
-	_fieldE0 = file->readNumber();
-	_fieldE4 = file->readNumber();
-	_fieldE8 = file->readNumber();
+	_disabled = file->readNumber();
+	_dispenseMode = (DispenseMode)file->readNumber();
+	_dispensed = file->readNumber();
 
 	CBackground::load(file);
 }
 
 bool CChickenDispensor::StatusChangeMsg(CStatusChangeMsg *msg) {
 	msg->execute("SGTRestLeverAnimation");
-	int v1 = _fieldE8 ? 0 : _fieldE4;
+	DispenseMode dispenseMode = _dispensed ? DISPENSE_NONE : _dispenseMode;
 	CPetControl *pet = getPetControl();
 	CGameObject *obj;
 
@@ -77,34 +79,21 @@ bool CChickenDispensor::StatusChangeMsg(CStatusChangeMsg *msg) {
 		}
 	}
 
-	if (v1 == 1 || v1 == 2)
-		_fieldE8 = 1;
-
-	switch (v1) {
-	case 0:
+	switch (dispenseMode) {
+	case DISPENSE_NONE:
 		petDisplayMessage(1, ONE_ALLOCATED_CHICKEN_PER_CUSTOMER);
 		break;
-	case 1:
-		setVisible(true);
-		if (_fieldE0) {
-			playMovie(0, 12, MOVIE_NOTIFY_OBJECT | MOVIE_GAMESTATE);
-			playSound("z#400.wav");
-			_fieldE4 = 0;
-		} else {
-			playMovie(12, 16, MOVIE_NOTIFY_OBJECT | MOVIE_GAMESTATE);
-			_fieldE8 = 1;
-			_fieldE4 = 0;
-		}
-		break;
 
-	case 2:
+	case DISPENSE_HOT:
+	case DISPENSE_COLD:
+		_dispensed = true;
 		setVisible(true);
-		if (_fieldE0) {
-			playMovie(0, 12, MOVIE_NOTIFY_OBJECT | MOVIE_GAMESTATE);
-			playSound("z#400.wav");
+
+		if (_disabled) {
+			playMovie(0, 12, MOVIE_NOTIFY_OBJECT | MOVIE_WAIT_FOR_FINISH);
+			playSound(TRANSLATE("z#400.wav", "z#145.wav"));
 		} else {
-			playMovie(12, 16, MOVIE_NOTIFY_OBJECT | MOVIE_GAMESTATE);
-			_fieldE8 = 1;
+			playMovie(12, 16, MOVIE_NOTIFY_OBJECT | MOVIE_WAIT_FOR_FINISH);
 		}
 		break;
 
@@ -116,17 +105,32 @@ bool CChickenDispensor::StatusChangeMsg(CStatusChangeMsg *msg) {
 }
 
 bool CChickenDispensor::MovieEndMsg(CMovieEndMsg *msg) {
-	if (getMovieFrame() == 16) {
-		playSound("b#50.wav", 50);
+	int movieFrame = msg->_endFrame;
+	
+	if (movieFrame == 16) {
+		// Dispensed a chicken
+		_cursorId = CURSOR_HAND;
+		playSound(TRANSLATE("b#50.wav", "b#30.wav"), 50);
 		CActMsg actMsg("Dispense Chicken");
 		actMsg.execute("Chicken");
-	} else if (_fieldE8) {
+
+		#ifdef FIX_DISPENSOR_TEMPATURE
+		if (_dispenseMode != DISPENSE_HOT) {
+			// WORKAROUND: If the fuse for the dispensor is removed in Titania's fusebox,
+			// make the dispensed chicken already cold
+			CChicken::_temperature = 0;
+		}
+		#endif
+	} else if (_dispensed) {
+		// Chicken dispensed whilst dispensor is "disabled", which basically
+		// spits the chicken out at high speed directly into the SuccUBus
 		_cursorId = CURSOR_ARROW;
 		loadFrame(0);
 		setVisible(false);
-		if (_fieldE4 == 2)
-			_fieldE8 = 0;
+		if (_dispenseMode == DISPENSE_COLD)
+			_dispensed = false;
 	} else {
+		// Doors closing as the view is being left
 		loadFrame(0);
 		setVisible(false);
 		changeView("SgtLobby.Node 1.N");
@@ -137,13 +141,13 @@ bool CChickenDispensor::MovieEndMsg(CMovieEndMsg *msg) {
 
 bool CChickenDispensor::ActMsg(CActMsg *msg) {
 	if (msg->_action == "EnableObject")
-		_fieldE0 = 0;
+		_disabled = false;
 	else if (msg->_action == "DisableObject")
-		_fieldE0 = 1;
+		_disabled = true;
 	else if (msg->_action == "IncreaseQuantity")
-		_fieldE4 = 2;
+		_dispenseMode = DISPENSE_COLD;
 	else if (msg->_action == "DecreaseQuantity")
-		_fieldE4 = 1;
+		_dispenseMode = DISPENSE_HOT;
 
 	return true;
 }
@@ -153,8 +157,8 @@ bool CChickenDispensor::LeaveViewMsg(CLeaveViewMsg *msg) {
 }
 
 bool CChickenDispensor::EnterViewMsg(CEnterViewMsg *msg) {
-	playSound("b#51.wav");
-	_fieldE8 = 0;
+	playSound(TRANSLATE("b#51.wav", "b#31.wav"));
+	_dispensed = false;
 	_cursorId = CURSOR_ARROW;
 	return true;
 }
@@ -164,7 +168,7 @@ bool CChickenDispensor::MouseDragStartMsg(CMouseDragStartMsg *msg) {
 		setVisible(false);
 		loadFrame(0);
 		_cursorId = CURSOR_ARROW;
-		_fieldE8 = 1;
+		_dispensed = true;
 
 		CVisibleMsg visibleMsg;
 		visibleMsg.execute("Chicken");
@@ -178,10 +182,10 @@ bool CChickenDispensor::MouseDragStartMsg(CMouseDragStartMsg *msg) {
 }
 
 bool CChickenDispensor::TurnOff(CTurnOff *msg) {
-	if (getMovieFrame() == 16)
+	if (getMovieFrame() != 16)
 		setVisible(false);
-	playMovie(16, 12, MOVIE_NOTIFY_OBJECT | MOVIE_GAMESTATE);
-	_fieldE8 = 0;
+	playMovie(16, 12, MOVIE_NOTIFY_OBJECT | MOVIE_WAIT_FOR_FINISH);
+	_dispensed = false;
 
 	return true;
 }

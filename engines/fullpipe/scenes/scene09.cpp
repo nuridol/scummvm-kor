@@ -33,7 +33,6 @@
 #include "fullpipe/interaction.h"
 #include "fullpipe/behavior.h"
 
-
 namespace Fullpipe {
 
 struct Hanger {
@@ -108,17 +107,19 @@ void scene09_initScene(Scene *sc) {
 
 	g_vars->scene09_sceneBalls.clear();
 
-	StaticANIObject *newball = new StaticANIObject(sc->getStaticANIObject1ById(ANI_BALL9, -1));
-	newball->setAlpha(0xc8);
+	StaticANIObject *newball1 = new StaticANIObject(sc->getStaticANIObject1ById(ANI_BALL9, -1));
+	newball1->setAlpha(0xc8);
 
 	for (int i = 0; i < 4; i++) {
-		newball = new StaticANIObject(newball);
+		StaticANIObject *newball = new StaticANIObject(newball1);
 
 		newball->setAlpha(0xc8);
 		g_vars->scene09_sceneBalls.push_back(newball);
 
 		sc->addStaticANIObject(newball, 1);
 	}
+
+	delete newball1;
 
 	g_fp->setObjectState(sO_RightStairs_9, g_fp->getObjectEnumState(sO_RightStairs_9, sO_IsClosed));
 
@@ -189,14 +190,14 @@ void sceneHandler09_spitterClick() {
 	if (g_vars->scene09_spitter->_flags & 4) {
 		PicAniInfo info;
 
-		g_vars->scene09_spitter->getPicAniInfo(&info);
+		g_vars->scene09_spitter->getPicAniInfo(info);
 		g_vars->scene09_spitter->_messageQueueId = 0;
 		g_vars->scene09_spitter->changeStatics2(ST_PLV_SIT);
 
 		int x = g_vars->scene09_spitter->_ox - 10;
 		int y = g_vars->scene09_spitter->_oy + 145;
 
-		g_vars->scene09_spitter->setPicAniInfo(&info);
+		g_vars->scene09_spitter->setPicAniInfo(info);
 
 		if (ABS(x - g_fp->_aniMan->_ox) > 1 || ABS(y - g_fp->_aniMan->_oy) > 1) {
 			MessageQueue *mq = getCurrSceneSc2MotionController()->startMove(g_fp->_aniMan, x, y, 1, ST_MAN_UP);
@@ -403,7 +404,7 @@ void sceneHandler09_hangerStartCycle() {
 		if (g_vars->scene09_intHangerMaxPhase != -1000 && g_vars->scene09_hangers[g_vars->scene09_interactingHanger]->phase != g_vars->scene09_intHangerMaxPhase) {
 			ExCommand *ex = new ExCommand(0, 35, SND_9_019, 0, 0, 0, 1, 0, 0, 0);
 
-			ex->_field_14 = 1;
+			ex->_z = 1;
 			ex->_excFlags |= 2;
 			ex->postMessage();
 
@@ -412,6 +413,10 @@ void sceneHandler09_hangerStartCycle() {
 	} else {
 		g_vars->scene09_interactingHanger = -1;
 	}
+}
+
+void scene09_visCallback(int *phase) {
+	// do nothing
 }
 
 int sceneHandler09(ExCommand *cmd) {
@@ -457,6 +462,13 @@ int sceneHandler09(ExCommand *cmd) {
 		sceneHandler09_showBall();
 		break;
 
+	case 367:
+		if (g_fp->isDemo() && g_fp->getLanguage() == Common::RU_RUS) {
+			g_fp->_needRestart = true;
+			return 0;
+		}
+		break;
+
 	case 33:
 		{
 			int res = 0;
@@ -473,6 +485,8 @@ int sceneHandler09(ExCommand *cmd) {
 					g_fp->_currentScene->_x = x - g_fp->_sceneRect.right + 300;
 
 				res = 1;
+
+				g_fp->sceneAutoScrolling();
 			} else {
 				if (g_fp->_aniMan->_movement && g_fp->_aniMan->_movement->_id != MV_MAN9_SHOOT)
 					g_fp->_aniMan2 = g_fp->_aniMan;
@@ -495,7 +509,7 @@ int sceneHandler09(ExCommand *cmd) {
 	case 30:
 		if (g_vars->scene09_interactingHanger >= 0)  {
 			if (ABS(g_vars->scene09_hangers[g_vars->scene09_interactingHanger]->phase) < 15) {
-				g_vars->scene09_hangers[g_vars->scene09_interactingHanger]->ani->_callback2 = 0;
+				g_vars->scene09_hangers[g_vars->scene09_interactingHanger]->ani->_callback2 = 0; // Really NULL
 				g_vars->scene09_hangers[g_vars->scene09_interactingHanger]->ani->changeStatics2(ST_VSN_NORMAL);
 			}
 		}
@@ -536,12 +550,12 @@ int sceneHandler09(ExCommand *cmd) {
 						if (!g_vars->scene09_hangers[hng]->ani->_movement || g_vars->scene09_hangers[hng]->ani->_movement->_id != MV_VSN_CYCLE2) {
 							g_vars->scene09_hangers[hng]->ani->changeStatics2(ST_VSN_NORMAL);
 							g_vars->scene09_hangers[hng]->ani->startAnim(MV_VSN_CYCLE2, 0, -1);
-							g_vars->scene09_hangers[hng]->ani->_callback2 = 0;
+							g_vars->scene09_hangers[hng]->ani->_callback2 = scene09_visCallback;
 						}
 
 						ExCommand *ex = new ExCommand(0, 35, SND_9_018, 0, 0, 0, 1, 0, 0, 0);
 
-						ex->_field_14 = 1;
+						ex->_z = 1;
 						ex->_excFlags |= 2;
 						ex->postMessage();
 					}

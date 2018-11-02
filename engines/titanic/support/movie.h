@@ -50,7 +50,6 @@ protected:
 public:
 	bool _handled;
 	bool _hasVideoFrame;
-	bool _hasAudioTiming;
 public:
 	static CMovieList *_playingMovies;
 	static CVideoSurface *_movieSurface;
@@ -86,8 +85,17 @@ public:
 	/**
 	 * Plays a sub-section of a movie, and doesn't return until either
 	 * the playback ends or a key has been pressed
+	 * @returns		True if the cutscene was not interrupted
 	 */
-	virtual void playCutscene(const Rect &drawRect, uint startFrame, uint endFrame) = 0;
+	virtual bool playCutscene(const Rect &drawRect, uint startFrame, uint endFrame) = 0;
+
+	/**
+	 * Pauses a movie
+	 * @remarks	Acts a workaround for our video decoder, since some movies started
+	 * as part of a scene load need to be paused until the scene is interactive,
+	 * or else they get played back too quickly
+	 */
+	virtual void pause() = 0;
 
 	/**
 	 * Stops the movie
@@ -130,9 +138,14 @@ public:
 	virtual void setFrameRate(double rate) = 0;
 
 	/**
-	* Creates a duplicate of the movie's frame
-	*/
-	virtual Graphics::ManagedSurface *duplicateFrame() const = 0;
+	 * Sets whether the video is playing (versus paused)
+	 */
+	virtual void setPlaying(bool playingFlag) = 0;
+
+	/**
+	 * Creates a duplicate of the transparency surface
+	 */
+	virtual Graphics::ManagedSurface *duplicateTransparency() const = 0;
 
 	/**
 	 * Removes the movie from the list of currently playing movies
@@ -185,8 +198,17 @@ public:
 	/**
 	 * Plays a sub-section of a movie, and doesn't return until either
 	 * the playback ends or a key has been pressed
+	 * @returns		True if the cutscene was not interrupted
 	 */
-	virtual void playCutscene(const Rect &drawRect, uint startFrame, uint endFrame);
+	virtual bool playCutscene(const Rect &drawRect, uint startFrame, uint endFrame);
+
+	/**
+	 * Pauses a movie
+	 * @remarks		Acts a workaround for our video decoder, since some movies started
+	 * as part of a scene load need to be paused until the scene is interactive,
+	 * or else they get played back too quickly
+	 */
+	virtual void pause();
 
 	/**
 	 * Stops the movie
@@ -229,9 +251,14 @@ public:
 	virtual void setFrameRate(double rate);
 
 	/**
-	 * Creates a duplicate of the frame info
+	 * Sets whether the video is playing (versus paused)
 	 */
-	virtual Graphics::ManagedSurface *duplicateFrame() const;
+	virtual void setPlaying(bool playingFlag);
+
+	/**
+	 * Creates a duplicate of the transparency surface
+	 */
+	virtual Graphics::ManagedSurface *duplicateTransparency() const;
 };
 
 } // End of namespace Titanic

@@ -76,7 +76,7 @@ void DrasculaEngine::moveCursor() {
 	moveCharacters();
 	updateRefresh();
 
-	if (!strcmp(textName, "hacker") && _hasName) {
+	if (!strcmp(textName, _textmisc[3]) && _hasName) {
 		if (_color != kColorRed && !_menuScreen)
 			color_abc(kColorRed);
 	} else if (!_menuScreen && _color != kColorLightGreen)
@@ -154,7 +154,7 @@ void DrasculaEngine::showFrame(Common::SeekableReadStream *stream, bool firstFra
 }
 
 void DrasculaEngine::copyBackground(int xorg, int yorg, int xdes, int ydes, int width, int height, byte *src, byte *dest) {
-	debug(1, "DrasculaEngine::copyBackground(xorg:%d, yorg:%d, xdes:%d, ydes:%d width:%d height:%d, src, dest)", xorg, yorg, xdes, ydes, width,height);
+	debug(5, "DrasculaEngine::copyBackground(xorg:%d, yorg:%d, xdes:%d, ydes:%d width:%d height:%d, src, dest)", xorg, yorg, xdes, ydes, width,height);
 	dest += xdes + ydes * 320;
 	src += xorg + yorg * 320;
 	/* Unoptimized code
@@ -195,6 +195,11 @@ void DrasculaEngine::copyRect(int xorg, int yorg, int xdes, int ydes, int width,
 
 	dest += xdes + ydes * 320;
 	src += xorg + yorg * 320;
+
+	assert(xorg >= 0);
+	assert(yorg >= 0);
+	assert(xorg + width <= 320);
+	assert(yorg + height <= 200);
 
 	int ptr = 0;
 	for (y = 0; y < height; y++) {

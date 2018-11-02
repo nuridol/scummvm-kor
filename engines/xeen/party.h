@@ -77,18 +77,36 @@ class Party {
 	friend class InventoryItems;
 private:
 	static XeenEngine *_vm;
+	Character _itemsCharacter;
 
 	/**
 	 * Give a treasure item to the given character's inventory
 	 */
 	void giveTreasureToCharacter(Character &c, ItemCategory category, int itemIndex);
+
+	/**
+	 * Enter an amount of how much
+	 */
+	int howMuch();
+
+	/**
+	 * Subtracts an amount from the party time
+	 */
+	void subPartyTime(int time);
+
+	void resetYearlyBits();
+
+	/**
+	 * Applies interest to any gold and gems in the player's bank account
+	 */
+	void giveBankInterest();
 public:
 	// Dynamic data that's saved
 	Direction _mazeDirection;
 	Common::Point _mazePosition;
 	int _mazeId;
 	int _priorMazeId;
-	bool _levitateActive;
+	int _levitateCount;
 	bool _automapOn;
 	bool _wizardEyeActive;
 	bool _clairvoyanceActive;
@@ -125,9 +143,9 @@ public:
 	uint _bankGems;
 	int _totalTime;
 	bool _rested;
-	bool _gameFlags[512];
+	bool _gameFlags[2][256];
 	bool _worldFlags[128];
-	bool _quests[64];
+	bool _questFlags[2][30];
 	int _questItems[TOTAL_QUEST_ITEMS];
 	bool _characterFlags[30][24];
 public:
@@ -196,7 +214,15 @@ public:
 
 	bool canShoot() const;
 
-	bool giveTake(int mode1, uint32 mask1, int mode2, int mask2, int charIdx);
+	/**
+	 * Gives and/or takes amounts from various character and/or party properties
+	 */
+	bool giveTake(int takeMode, uint takeVal, int giveMode, uint giveVal, int charIdx);
+
+	/**
+	 * Resets the inventory that Blacksmiths sell
+	 */
+	void resetBlacksmithWares();
 };
 
 } // End of namespace Xeen

@@ -36,9 +36,9 @@ enum CursorId {
 	CURSOR_MOVE_LEFT = 2,
 	CURSOR_MOVE_RIGHT = 3,
 	CURSOR_MOVE_FORWARD = 4,
-	CURSOR_MOVE_UP = 5,
-	CURSOR_MOVE_DOWN1 = 6,
-	CURSOR_MOVE_FORWARD2 = 7,
+	CURSOR_LOOK_UP = 5,
+	CURSOR_LOOK_DOWN = 6,
+	CURSOR_MOVE_THROUGH = 7,
 	CURSOR_HAND = 8,
 	CURSOR_ACTIVATE = 9,
 	CURSOR_INVALID = 10,
@@ -54,11 +54,10 @@ class CVideoSurface;
 
 class CMouseCursor {
 	struct CursorEntry {
-		CVideoSurface *_videoSurface;
-		Graphics::ManagedSurface *_frameSurface;
+		Graphics::ManagedSurface *_surface;
 		Common::Point _centroid;
 
-		CursorEntry() : _videoSurface(nullptr), _frameSurface(nullptr) {}
+		CursorEntry() : _surface(nullptr) {}
 		~CursorEntry();
 	};
 private:
@@ -66,26 +65,57 @@ private:
 	CursorId _cursorId;
 	CursorEntry _cursors[NUM_CURSORS];
 	uint _setCursorCount;
-	int _fieldE4;
+	int _hideCounter;
+	int _busyCount;
+	bool _cursorSuppressed;
 	int _fieldE8;
+	Common::Point _moveStartPos;
+	Common::Point _moveDestPos;
+	uint32 _moveStartTime, _moveEndTime;
 
 	/**
 	 * Load the images for each cursor
 	 */
 	void loadCursorImages();
 public:
+	bool _inputEnabled;
+public:
 	CMouseCursor(CScreenManager *screenManager);
 	~CMouseCursor();
 
 	/**
-	 * Make the mouse cursor visible
+	 * Increment the busy count for the cursor, showing an hourglass
 	 */
-	void show();
+	void incBusyCount();
 
 	/**
-	 * Hide the mouse cursor
+	 * Decrements the busy count, resetting back to an arrow cursor
+	 * when the count reaches zero
 	 */
-	void hide();
+	void decBusyCount();
+
+	/**
+	 * Decrements the hide counter, and shows the mouse if
+	 * it's reached zero
+	 */
+	void incHideCounter();
+
+	/**
+	 * Increments the hide counter, hiding the mouse if it's the first call
+	 */
+	void decHideCounter();
+
+	/**
+	 * Suppresses the cursor. When suppressed, the cursor isn't drawn,
+	 * even if it's not otherwise being hidden
+	 */
+	void suppressCursor();
+
+	/**
+	 * Unflags the cursor as being suppressed, allowing it to be drawn
+	 * again if it's enabled
+	 */
+	void unsuppressCursor();
 
 	/**
 	 * Set the cursor
@@ -102,13 +132,20 @@ public:
 	 */
 	uint getChangeCount() const { return _setCursorCount; }
 
-	void lockE4();
-	void unlockE4();
+	/**
+	 * Disables user control of the mouse
+	 */
+	void disableControl();
 
 	/**
-	 * Sets the mouse to a new position
+	 * Re-enables user control of the mouse
 	 */
-	void setPosition(const Point &pt, double rate);
+	void enableControl();
+
+	/**
+	 * Move the mouse to a new position
+	 */
+	void setPosition(const Point &pt, double duration);
 };
 
 

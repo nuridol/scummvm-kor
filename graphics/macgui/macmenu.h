@@ -23,12 +23,14 @@
 #ifndef GRAPHICS_MACGUI_MACMENU_H
 #define GRAPHICS_MACGUI_MACMENU_H
 
+#include "common/str-array.h"
+
 namespace Graphics {
 
-struct MenuItem;
-struct MenuSubItem;
+struct MacMenuItem;
+struct MacMenuSubItem;
 
-struct MenuData {
+struct MacMenuData {
 	int menunum;
 	const char *title;
 	int action;
@@ -36,25 +38,28 @@ struct MenuData {
 	bool enabled;
 };
 
-class Menu : public BaseMacWindow {
+class MacMenu : public BaseMacWindow {
 public:
-	Menu(int id, const Common::Rect &bounds, MacWindowManager *wm);
-	~Menu();
+	MacMenu(int id, const Common::Rect &bounds, MacWindowManager *wm);
+	~MacMenu();
+
+	static Common::StringArray *readMenuFromResource(Common::SeekableReadStream *res);
 
 	void setCommandsCallback(void (*callback)(int, Common::String &, void *), void *data) { _ccallback = callback; _cdata = data; }
 
-	void addStaticMenus(const MenuData *data);
+	void addStaticMenus(const MacMenuData *data);
 	void calcDimensions();
 
 	int addMenuItem(const char *name);
 	void addMenuSubItem(int id, const char *text, int action, int style = 0, char shortcut = 0, bool enabled = true);
-	void createSubMenuFromString(int id, const char *string);
+	void createSubMenuFromString(int id, const char *string, int commandId);
 	void clearSubMenu(int id);
 
 	bool draw(ManagedSurface *g, bool forceRedraw = false);
 	bool processEvent(Common::Event &event);
 
 	void enableCommand(int menunum, int action, bool state);
+	void enableCommand(const char *menuitem, const char *menuaction, bool state);
 	void disableAllMenus();
 
 	void setActive(bool active) { _menuActivated = active; }
@@ -68,10 +73,10 @@ private:
 
 private:
 	const Font *getMenuFont();
-	const char *getAcceleratorString(MenuSubItem *item, const char *prefix);
-	int calculateMenuWidth(MenuItem *menu);
-	void calcMenuBounds(MenuItem *menu);
-	void renderSubmenu(MenuItem *menu);
+	const char *getAcceleratorString(MacMenuSubItem *item, const char *prefix);
+	int calculateMenuWidth(MacMenuItem *menu);
+	void calcMenuBounds(MacMenuItem *menu);
+	void renderSubmenu(MacMenuItem *menu);
 
 	bool keyEvent(Common::Event &event);
 	bool mouseClick(int x, int y);
@@ -80,7 +85,7 @@ private:
 
 	bool processMenuShortCut(byte flags, uint16 ascii);
 
-	Common::Array<MenuItem *> _items;
+	Common::Array<MacMenuItem *> _items;
 
 	const Font *_font;
 

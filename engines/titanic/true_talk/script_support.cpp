@@ -21,6 +21,7 @@
  */
 
 #include "titanic/true_talk/script_support.h"
+#include "titanic/support/files_manager.h"
 #include "titanic/titanic.h"
 
 namespace Titanic {
@@ -38,7 +39,7 @@ int TTnpcScriptResponse::size() const {
 
 TTscriptRange::TTscriptRange(uint id, const Common::Array<uint> &values,
 		bool isRandom, bool isSequential) :
-		_id(id), _nextP(nullptr) {
+		_id(id), _nextP(nullptr), _priorIndex(0) {
 	_mode = SF_NONE;
 	if (isRandom)
 		_mode = SF_RANDOM;
@@ -57,7 +58,7 @@ bool TTsentenceEntry::load(Common::SeekableReadStream *s) {
 		return false;
 
 	_field0 = s->readUint32LE();
-	_field4 = s->readUint32LE();
+	_category = s->readUint32LE();
 	_string8 = readStringFromStream(s);
 	_fieldC = s->readUint32LE();
 	_string10 = readStringFromStream(s);
@@ -145,16 +146,15 @@ void TTwordEntries::load(const char *name) {
 void TThandleQuoteEntries::load(const char *name) {
 	Common::SeekableReadStream *r = g_vm->_filesManager->getResource(name);
 
-	_tag1 = r->readUint32LE();
-	_tag2 = r->readUint32LE();
 	_rangeStart = r->readUint32LE();
 	_rangeEnd = r->readUint32LE();
+	_incr = r->readUint32LE();
 
 	while (r->pos() < r->size()) {
 		TThandleQuoteEntry qe;
+		qe._tag1 = r->readUint32LE();
+		qe._tag2= r->readUint32LE();
 		qe._index = r->readUint32LE();
-		qe._tagId = r->readUint32LE();
-		qe._dialogueId = r->readUint32LE();
 
 		push_back(qe);
 	}

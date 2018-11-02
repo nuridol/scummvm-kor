@@ -35,9 +35,6 @@ namespace Sci {
 
 Kernel::Kernel(ResourceManager *resMan, SegManager *segMan)
 	: _resMan(resMan), _segMan(segMan), _invalid("<invalid>") {
-#ifdef ENABLE_SCI32
-	_kernelFunc_StringId = 0;
-#endif
 }
 
 Kernel::~Kernel() {
@@ -125,10 +122,14 @@ void Kernel::loadSelectorNames() {
 	Resource *r = _resMan->findResource(ResourceId(kResourceTypeVocab, VOCAB_RESOURCE_SELECTORS), 0);
 	bool oldScriptHeader = (getSciVersion() == SCI_VERSION_0_EARLY);
 
+#ifdef ENABLE_SCI32_MAC
 	// Starting with KQ7, Mac versions have a BE name table. GK1 Mac and earlier (and all
 	// other platforms) always use LE.
-	bool isBE = (g_sci->getPlatform() == Common::kPlatformMacintosh && getSciVersion() >= SCI_VERSION_2_1_EARLY
+	const bool isBE = (g_sci->getPlatform() == Common::kPlatformMacintosh && getSciVersion() >= SCI_VERSION_2_1_EARLY
 			&& g_sci->getGameId() != GID_GK1);
+#else
+	const bool isBE = false;
+#endif
 
 	if (!r) { // No such resource?
 		// Check if we have a table for this game
@@ -149,13 +150,13 @@ void Kernel::loadSelectorNames() {
 		return;
 	}
 
-	int count = (isBE ? READ_BE_UINT16(r->data) : READ_LE_UINT16(r->data)) + 1; // Counter is slightly off
+	int count = (isBE ? r->getUint16BEAt(0) : r->getUint16LEAt(0)) + 1; // Counter is slightly off
 
 	for (int i = 0; i < count; i++) {
-		int offset = isBE ? READ_BE_UINT16(r->data + 2 + i * 2) : READ_LE_UINT16(r->data + 2 + i * 2);
-		int len = isBE ? READ_BE_UINT16(r->data + offset) : READ_LE_UINT16(r->data + offset);
+		int offset = isBE ? r->getUint16BEAt(2 + i * 2) : r->getUint16LEAt(2 + i * 2);
+		int len = isBE ? r->getUint16BEAt(offset) : r->getUint16LEAt(offset);
 
-		Common::String tmp((const char *)r->data + offset + 2, len);
+		Common::String tmp = r->getStringAt(offset + 2, len);
 		_selectorNames.push_back(tmp);
 		//debug("%s", tmp.c_str());
 
@@ -380,7 +381,7 @@ uint16 Kernel::findRegType(reg_t reg) {
 	if (!reg.getSegment())
 		return SIG_TYPE_INTEGER | (reg.getOffset() ? 0 : SIG_TYPE_NULL);
 
-	if (reg.getSegment() == 0xFFFF)
+	if (reg.getSegment() == kUninitializedSegment)
 		return SIG_TYPE_UNINITIALIZED;
 
 	// Otherwise it's an object
@@ -410,7 +411,6 @@ uint16 Kernel::findRegType(reg_t reg) {
 	case SEG_TYPE_HUNK:
 #ifdef ENABLE_SCI32
 	case SEG_TYPE_ARRAY:
-	case SEG_TYPE_STRING:
 	case SEG_TYPE_BITMAP:
 #endif
 		result |= SIG_TYPE_REFERENCE;
@@ -602,7 +602,6 @@ void Kernel::mapFunctions() {
 		_kernelFuncs[id].workarounds = NULL;
 		_kernelFuncs[id].subFunctions = NULL;
 		_kernelFuncs[id].subFunctionCount = 0;
-		_kernelFuncs[id].debugLogging = false;
 		if (kernelName.empty()) {
 			// No name was given -> must be an unknown opcode
 			warning("Kernel function %x unknown", id);
@@ -615,11 +614,7 @@ void Kernel::mapFunctions() {
 			continue;
 		}
 
-#ifdef ENABLE_SCI32
-		if (kernelName == "String") {
-			_kernelFunc_StringId = id;
-		}
-
+#ifdef ENABLE_SCI32_MAC
 		// HACK: Phantasmagoria Mac uses a modified kDoSound (which *nothing*
 		// else seems to use)!
 		if (g_sci->getPlatform() == Common::kPlatformMacintosh && g_sci->getGameId() == GID_PHANTASMAGORIA && kernelName == "DoSound") {
@@ -665,7 +660,7 @@ void Kernel::mapFunctions() {
 					kernelSubMap++;
 				}
 				if (!subFunctionCount)
-					error("k%s[%x]: no subfunctions found for requested version", kernelName.c_str(), id);
+					error("k%s[%x]: no subfunctions found for requested version %s", kernelName.c_str(), id, getSciVersionDesc(mySubVersion));
 				// Now allocate required memory and go through it again
 				_kernelFuncs[id].subFunctionCount = subFunctionCount;
 				KernelSubFunction *subFunctions = new KernelSubFunction[subFunctionCount];
@@ -723,91 +718,12 @@ void Kernel::mapFunctions() {
 	return;
 }
 
-bool Kernel::debugSetFunction(const char *kernelName, int logging, int breakpoint) {
-	if (strcmp(kernelName, "*")) {
-		for (uint id = 0; id < _kernelFuncs.size(); id++) {
-			if (_kernelFuncs[id].name) {
-				if (strcmp(kernelName, _kernelFuncs[id].name) == 0) {
-					if (_kernelFuncs[id].subFunctions) {
-						// sub-functions available and main name matched, in that case set logging of all sub-functions
-						KernelSubFunction *kernelSubCall = _kernelFuncs[id].subFunctions;
-						uint kernelSubCallCount = _kernelFuncs[id].subFunctionCount;
-						for (uint subId = 0; subId < kernelSubCallCount; subId++) {
-							if (kernelSubCall->function) {
-								if (logging != -1)
-									kernelSubCall->debugLogging = logging == 1 ? true : false;
-								if (breakpoint != -1)
-									kernelSubCall->debugBreakpoint = breakpoint == 1 ? true : false;
-							}
-							kernelSubCall++;
-						}
-						return true;
-					}
-					// function name matched, set for this one and exit
-					if (logging != -1)
-						_kernelFuncs[id].debugLogging = logging == 1 ? true : false;
-					if (breakpoint != -1)
-						_kernelFuncs[id].debugBreakpoint = breakpoint == 1 ? true : false;
-					return true;
-				} else {
-					// main name was not matched
-					if (_kernelFuncs[id].subFunctions) {
-						// Sub-Functions available
-						KernelSubFunction *kernelSubCall = _kernelFuncs[id].subFunctions;
-						uint kernelSubCallCount = _kernelFuncs[id].subFunctionCount;
-						for (uint subId = 0; subId < kernelSubCallCount; subId++) {
-							if (kernelSubCall->function) {
-								if (strcmp(kernelName, kernelSubCall->name) == 0) {
-									// sub-function name matched, set for this one and exit
-									if (logging != -1)
-										kernelSubCall->debugLogging = logging == 1 ? true : false;
-									if (breakpoint != -1)
-										kernelSubCall->debugBreakpoint = breakpoint == 1 ? true : false;
-									return true;
-								}
-							}
-							kernelSubCall++;
-						}
-					}
-				}
-			}
-		}
-		return false;
-	}
-	// Set debugLogging for all calls
-	for (uint id = 0; id < _kernelFuncs.size(); id++) {
-		if (_kernelFuncs[id].name) {
-			if (!_kernelFuncs[id].subFunctions) {
-				// No sub-functions, enable actual kernel function
-				if (logging != -1)
-					_kernelFuncs[id].debugLogging = logging == 1 ? true : false;
-				if (breakpoint != -1)
-					_kernelFuncs[id].debugBreakpoint = breakpoint == 1 ? true : false;
-			} else {
-				// Sub-Functions available, enable those too
-				KernelSubFunction *kernelSubCall = _kernelFuncs[id].subFunctions;
-				uint kernelSubCallCount = _kernelFuncs[id].subFunctionCount;
-				for (uint subId = 0; subId < kernelSubCallCount; subId++) {
-					if (kernelSubCall->function) {
-						if (logging != -1)
-							kernelSubCall->debugLogging = logging == 1 ? true : false;
-						if (breakpoint != -1)
-							kernelSubCall->debugBreakpoint = breakpoint == 1 ? true : false;
-					}
-					kernelSubCall++;
-				}
-			}
-		}
-	}
-	return true;
-}
-
 #ifdef ENABLE_SCI32
 enum {
 	kKernelEntriesSci2 = 0x8b,
 	kKernelEntriesGk2Demo = 0xa0,
 	kKernelEntriesSci21 = 0x9d,
-	kKernelEntriesSci3 = 0xa1
+	kKernelEntriesSci3 = 0xa2
 };
 #endif
 
@@ -919,7 +835,6 @@ void Kernel::loadKernelNames(GameFeatures *features) {
 		_kernelNames[0x39] = "Dummy";	// ShowMovie in SCI2.1
 		_kernelNames[0x4c] = "Dummy";	// ScrollWindow in SCI2.1
 		_kernelNames[0x56] = "Dummy";	// VibrateMouse in SCI2.1 (only used in QFG4 floppy)
-		_kernelNames[0x64] = "Dummy";	// AvoidPath in SCI2.1
 		_kernelNames[0x66] = "Dummy";	// MergePoly in SCI2.1
 		_kernelNames[0x8d] = "MessageBox";	// Dummy in SCI2.1
 		_kernelNames[0x9b] = "Minimize";	// Dummy in SCI2.1
@@ -932,37 +847,57 @@ void Kernel::loadKernelNames(GameFeatures *features) {
 		break;
 	}
 
+#ifdef ENABLE_SCI32
+	// Reserve a high range of kernel call IDs (0xe0 to 0xef) that can be used
+	// by ScummVM to improve integration and fix bugs in games that require
+	// more help than can be provided by a simple script patch (e.g. spinloops
+	// in Hoyle5).
+	// Using a new high range instead of just replacing dummied kernel calls in
+	// the normal kernel range is intended to avoid any conflicts with fangames
+	// that might try to add their own kernel calls in the same manner. It also
+	// helps to separate ScummVM interpreter's kernel calls from SSCI's standard
+	// kernel calls.
+	if (getSciVersion() >= SCI_VERSION_2) {
+		const uint kernelListSize = _kernelNames.size();
+		_kernelNames.resize(0xe2);
+		for (uint id = kernelListSize; id < 0xe0; ++id) {
+			_kernelNames[id] = "Dummy";
+		}
+
+		// Used by Hoyle5 script patches to remove CPU spinning on kGetTime
+		// (this repurposes the existing SCI16 kWait call that was removed in SCI32)
+		_kernelNames[kScummVMWaitId] = "Wait";
+
+		// Used by GuestAdditions to support integrated save/load dialogue
+		_kernelNames[kScummVMSaveLoadId] = "ScummVMSaveLoad";
+	}
+#endif
+
 	mapFunctions();
 }
 
 Common::String Kernel::lookupText(reg_t address, int index) {
-	char *seeker;
-	Resource *textres;
-
 	if (address.getSegment())
 		return _segMan->getString(address);
 
-	int textlen;
-	int _index = index;
-	textres = _resMan->findResource(ResourceId(kResourceTypeText, address.getOffset()), 0);
+	Resource *textres = _resMan->findResource(ResourceId(kResourceTypeText, address.getOffset()), false);
 
 	if (!textres) {
 		error("text.%03d not found", address.getOffset());
-		return NULL; /* Will probably segfault */
 	}
 
-	textlen = textres->size;
-	seeker = (char *) textres->data;
+	int textlen = textres->size();
+	const char *seeker = (const char *)textres->getUnsafeDataAt(0);
 
+	int _index = index;
 	while (index--)
-		while ((textlen--) && (*seeker++))
+		while (textlen-- && *seeker++)
 			;
 
 	if (textlen)
 		return seeker;
 
 	error("Index %d out of bounds in text.%03d", _index, address.getOffset());
-	return NULL;
 }
 
 // TODO: script_adjust_opcode_formats should probably be part of the
@@ -990,10 +925,8 @@ void script_adjust_opcode_formats() {
 	}
 
 	if (getSciVersion() >= SCI_VERSION_3) {
-		// TODO: There are also opcodes in
-		// here to get the superclass, and possibly the species too.
-		g_sci->_opcode_formats[0x4d/2][0] = Script_None;
-		g_sci->_opcode_formats[0x4e/2][0] = Script_None;
+		g_sci->_opcode_formats[op_info][0] = Script_None;
+		g_sci->_opcode_formats[op_superP][0] = Script_None;
 	}
 #endif
 }

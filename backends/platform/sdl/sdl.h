@@ -59,10 +59,8 @@ public:
 
 	// Override functions from ModularBackend and OSystem
 	virtual void initBackend();
-#if defined(USE_TASKBAR)
 	virtual void engineInit();
 	virtual void engineDone();
-#endif
 	virtual void quit();
 	virtual void fatalError();
 
@@ -83,6 +81,9 @@ public:
 	virtual Audio::Mixer *getMixer();
 	virtual Common::TimerManager *getTimerManager();
 	virtual Common::SaveFileManager *getSavefileManager();
+
+	//Screenshots
+	virtual Common::String getScreenshotsPath();
 
 protected:
 	bool _inited;

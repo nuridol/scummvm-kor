@@ -211,7 +211,7 @@ void sceneHandler33_clickZones(ExCommand *cmd) {
 	double mindist = 1e10;
 
 	for (uint i = 0; i < g_fp->_currentScene->_staticANIObjectList1.size(); i++) {
-		StaticANIObject *ani = (StaticANIObject *)g_fp->_currentScene->_staticANIObjectList1[i];
+		StaticANIObject *ani = g_fp->_currentScene->_staticANIObjectList1[i];
 
 		if (ani->_id == ANI_VENT_33) {
 			int dx = ani->_ox - cmd->_sceneClickX;
@@ -296,6 +296,8 @@ int sceneHandler33(ExCommand *cmd) {
 
 			if (x > g_fp->_sceneRect.right - 200)
 				g_fp->_currentScene->_x = x + 300 - g_fp->_sceneRect.right;
+
+			g_fp->sceneAutoScrolling();
 		}
 
 		if (g_vars->scene33_cube)

@@ -98,6 +98,8 @@ const char *const Resources::THE_PARTY_NEEDS_REST = "\x0B""012The Party needs re
 const char *const Resources::WHO_WILL = "\x03""c\x0B""000\x09""000%s\x0A\x0A"
 	"Who will\x0A%s?\x0A\x0B""055F1 - F%d";
 
+const char *const Resources::HOW_MUCH = "\x3""cHow Much\n\n";
+
 const char *const Resources::WHATS_THE_PASSWORD = "What's the Password?";
 
 const char *const Resources::IN_NO_CONDITION = "\x0B""007%s is not in any condition to perform actions!";
@@ -689,14 +691,15 @@ const int Resources::TOWN_MAXES[2][11] = {
 	{ 26, 19, 48, 27, 26, 37, 16, 16, 16, 16, 16 }
 };
 
-const char *const Resources::TOWN_ACTION_MUSIC[14] = {
-	"bank.m", "smith.m", "guild.m", "tavern.m", "temple.m",
-	"grounds.m", "endgame.m", "bank.m", "sf09.m", "guild.m",
-	"tavern.m", "temple.m", "smith.m", "endgame.m"
+const char *const Resources::TOWN_ACTION_MUSIC[2][7] = {
+	{ "bank.m", "smith.m", "guild.m", "tavern.m",
+	"temple.m", "grounds.m", "endgame.m" },
+	{ "bank.m", "sf09.m", "guild.m", "tavern.m",
+	"temple.m", "smith.m", "endgame.m" }
 };
 
-const char *const Resources::TOWN_ACTION_SHAPES[4] = {
-	"bankr", "blck", "gild", "tvrn"
+const char *const Resources::TOWN_ACTION_SHAPES[7] = {
+	"bankr", "blck", "gild", "tvrn", "tmpl", "trng", "eface08"
 };
 
 const int Resources::TOWN_ACTION_FILES[2][7] = {
@@ -1127,7 +1130,7 @@ const char *const Resources::WEAPON_NAMES[35] = {
 };
 
 const char *const Resources::ARMOR_NAMES[14] = {
-	nullptr, "Robes ", "Scale rmor ", "ring mail ", "chain mail ",
+	nullptr, "robes ", "sale armor ", "ring mail ", "chain mail ",
 	"splint mail ", "plate mail ", "plate armor ", "shield ",
 	"helm ", "boots ", "cloak ", "cape ", "gauntlets "
 };
@@ -1255,7 +1258,7 @@ const int Resources::WEAPON_BASE_COSTS[35] = {
 	100, 15, 30, 15, 200, 80, 250, 150, 400, 100, 40, 120,
 	300, 100, 200, 300, 25, 100, 50, 15, 0
 };
-const int Resources::ARMOR_BASE_COSTS[25] = {
+const int Resources::ARMOR_BASE_COSTS[14] = {
 	0, 20, 100, 200, 400, 600, 1000, 2000, 100, 60, 40, 250, 200, 100
 };
 const int Resources::ACCESSORY_BASE_COSTS[11] = {
@@ -1311,7 +1314,7 @@ const char *const Resources::X_FOR_Y_GOLD =
 const char *const Resources::FMT_CHARGES = "\x3rr\t000Charges\x3l";
 
 const char *const Resources::AVAILABLE_GOLD_COST =
-	"\x1\fd\r\x3l\v000\t000Available %s%s\t150Gold - %lu\x3r\t000Cost"
+	"\x1\fd\r\x3l\v000\t000Available %s\t150Gold - %lu\x3r\t000Cost"
 	"\x3l\v011\x2%s%s%s%s%s%s%s%s%s\x1\xC""d";
 
 const char *const Resources::CHARGES = "Charges";

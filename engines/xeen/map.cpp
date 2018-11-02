@@ -38,6 +38,24 @@ const int MAP_GRID_PRIOR_INDEX2[] = { 0, 0, 0, 0, 2, 3, 4, 1, 0 };
 
 const int MAP_GRID_PRIOR_DIRECTION2[] = { 0, 1, 2, 3, 0, 1, 2, 3, 0 };
 
+const char *const MUSIC_FILES1[5] = {
+	"outdoors.m", "town.m", "cavern.m", "dungeon.m", "castle.m"
+};
+
+const char *const MUSIC_FILES2[6][7] = {
+	{ "outday1.m", "outday2.m", "outday4.m", "outnght1.m",
+	"outnght2.m", "outnght4.m", "daydesrt.m" },
+	{ "townday1.m", "twnwlk.m", "newbrigh.m", "twnnitea.m",
+	"twnniteb.m", "twnwlk.m", "townday1.m" },
+	{ "cavern1.m", "cavern2.m", "cavern3a.m", "cavern1.m",
+	"cavern2.m", "cavern3a.m", "cavern1.m" },
+	{ "dngon1.m", "dngon2.m", "dngon3.m", "dngon1.m",
+	"dngon2.m", "dngon3.m", "dngon1.m" },
+	{ "cstl1rev.m", "cstl2rev.m", "cstl3rev.m", "cstl1rev.m",
+	"cstl2rev.m", "cstl3rev.m", "cstl1rev.m" },
+	{ "sf05.m", "sf05.m", "sf05.m", "sf05.m", "sf05.m", "sf05.m", "sf05.m" }
+};
+
 MonsterStruct::MonsterStruct() {
 	_experience = 0;
 	_hp = 0;
@@ -528,6 +546,9 @@ MazeDifficulties::MazeDifficulties() {
 	_bashDoor = 0;
 	_bashGrate = 0;
 	_bashWall = 0;
+	_wallNoPass = -1;
+	_surfaceNoPass = -1;
+	_chance2Run = -1;
 }
 
 void MazeDifficulties::synchronize(Common::SeekableReadStream &s) {
@@ -563,6 +584,7 @@ void MazeData::clear() {
 	_trapDamage = 0;
 	_wallKind = 0;
 	_tavernTips = 0;
+	_mazeId = 0;
 }
 
 void MazeData::synchronize(Common::SeekableReadStream &s) {
@@ -886,6 +908,7 @@ Map::Map(XeenEngine *vm) : _vm(vm), _mobData(vm) {
 void Map::load(int mapId) {
 	Interface &intf = *_vm->_interface;
 	Screen &screen = *_vm->_screen;
+	Sound &sound = *_vm->_sound;
 	IndoorDrawList &indoorList = _vm->_interface->_indoorList;
 	OutdoorDrawList &outdoorList = _vm->_interface->_outdoorList;
 
@@ -952,7 +975,7 @@ void Map::load(int mapId) {
 				break;
 			default:
 				_animationInfo.load("dark.dat");
-				_monsterData.load("ddark.mon");
+				_monsterData.load("dark.mon");
 				_wallPicSprites.load("darkpic.dat");
 				break;
 			}
@@ -983,7 +1006,7 @@ void Map::load(int mapId) {
 
 			if (isDarkCc && mapId == 50)
 				mazeDataP->setAllTilesStepped();
-			if (!isDarkCc && _vm->_party->_gameFlags[25] &&
+			if (!isDarkCc && _vm->_party->_gameFlags[0][25] &&
 					(mapId == 42 || mapId == 43 || mapId == 4)) {
 				mazeDataP->clearCellSurfaces();
 			}
@@ -1024,7 +1047,7 @@ void Map::load(int mapId) {
 					if ((_mobData._monsters[0]._position.x > 31 || _mobData._monsters[0]._position.y > 31) &&
 						(_mobData._monsters[1]._position.x > 31 || _mobData._monsters[1]._position.y > 31) &&
 						(_mobData._monsters[2]._position.x > 31 || _mobData._monsters[2]._position.y > 31)) {
-						_vm->_party->_gameFlags[56] = true;
+						_vm->_party->_gameFlags[0][56] = true;
 					}
 				}
 			}
@@ -1057,7 +1080,7 @@ void Map::load(int mapId) {
 			_mobData._objects[29]._spriteId = 0;
 			_mobData._objects[29]._id = 8;
 			_mobData._objectSprites[i]._sprites.clear();
-		} else if (mapId == 12 && _vm->_party->_gameFlags[43] &&
+		} else if (mapId == 12 && _vm->_party->_gameFlags[0][43] &&
 			_mobData._objectSprites[i]._spriteId == 118 && !isDarkCc) {
 			filename = "085.obj";
 			_mobData._objectSprites[0]._spriteId = 85;
@@ -1094,8 +1117,19 @@ void Map::load(int mapId) {
 
 	// Handle loading miscellaneous sprites for the map
 	if (_isOutdoors) {
-		warning("TODO");	// Sound loading
+		// Start playing relevant music
+		Common::String musName;
 
+		if (_vm->_files->_isDarkCc) {
+			int randIndex = _vm->getRandomNumber(6);
+			musName = MUSIC_FILES2[_mazeData->_wallKind][randIndex];
+		} else {
+			musName = "outdoors.m";
+		}
+		if (musName != sound._currentMusic)
+			sound.playSong(musName, 207);
+
+		// Load sprite sets needed for scene rendering
 		_groundSprites.load("water.out");
 		_tileSprites.load("outdoor.til");
 		outdoorList._sky1._sprites = &_skySprites[0];
@@ -1115,8 +1149,20 @@ void Map::load(int mapId) {
 				_surfaceSprites[i].load(Res.SURFACE_NAMES[_mazeData[0]._surfaceTypes[i]]);
 		}
 	} else {
-		warning("TODO");	// Sound loading
+		// Start playing relevant music
+		const int MUS_INDEXES[] = { 1, 2, 3, 4, 3, 5 };
+		Common::String musName;
 
+		if (_vm->_files->_isDarkCc) {
+			int randIndex = _vm->getRandomNumber(6);
+			musName = MUSIC_FILES2[MUS_INDEXES[_mazeData->_wallKind]][randIndex];
+		} else {
+			musName = MUSIC_FILES1[MUS_INDEXES[_mazeData->_wallKind]];
+		}
+		if (musName != sound._currentMusic)
+			sound.playSong(musName, 207);
+
+		// Load sprite sets needed for scene rendering
 		_skySprites[1].load(Common::String::format("%s.sky",
 			Res.TERRAIN_TYPES[_mazeData[0]._wallKind]));
 		_groundSprites.load(Common::String::format("%s.gnd",
@@ -1447,11 +1493,11 @@ int Map::getCell(int idx) {
 				_currentWall = INVALID_CELL;
 				return INVALID_CELL;
 			}
-
-			_mazeDataIndex = 0;
-			while (_mazeData[_mazeDataIndex]._mazeId != mapId)
-				++_mazeDataIndex;
 		}
+
+		_mazeDataIndex = 0;
+		while (_mazeData[_mazeDataIndex]._mazeId != mapId)
+			++_mazeDataIndex;
 	}
 
 	if (pt.x & 16) {
@@ -1490,10 +1536,10 @@ int Map::getCell(int idx) {
 			++_mazeDataIndex;
 	}
 
+	assert(pt.x >= 0 && pt.x < 16 && pt.y >= 0 && pt.y < 16);
 	int wallData = _mazeData[_mazeDataIndex]._wallData[pt.y][pt.x]._data;
 	if (_isOutdoors) {
 		if (mapId) {
-			// TODO: tile is set to word of (wallLayers >> 8) && 0xff? Makes no sense
 			_currentTile = (wallData >> 8) & 0xFF;
 			_currentWall = (wallData >> 4) & 0xF;
 			_currentSurfaceId = wallData & 0xF;
@@ -1506,11 +1552,7 @@ int Map::getCell(int idx) {
 		if (!mapId)
 			return 0;
 
-		if (pt.x > 31 || pt.y > 31)
-			_currentSurfaceId = 7;
-		else
-			_currentSurfaceId = _mazeData[_mazeDataIndex]._cells[pt.y][pt.x]._surfaceId;
-
+		_currentSurfaceId = _mazeData[_mazeDataIndex]._cells[pt.y][pt.x]._surfaceId;
 		_currentWall = wallData;
 		return (_currentWall >> Res.WALL_SHIFTS[dir][idx]) & 0xF;
 	}

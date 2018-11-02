@@ -33,7 +33,7 @@ namespace Xeen {
 Town::Town(XeenEngine *vm) : ButtonContainer(vm) {
 	Common::fill(&_arr1[0], &_arr1[6], 0);
 	_townMaxId = 0;
-	_townActionId = 0;
+	_townActionId = BANK;
 	_drawFrameIndex = 0;
 	_currentCharLevel = 0;
 	_v1 = 0;
@@ -44,7 +44,7 @@ Town::Town(XeenEngine *vm) : ButtonContainer(vm) {
 	_v10 = _v11 = 0;
 	_v12 = _v13 = 0;
 	_v14 = 0;
-	_v20 = 0;
+	_maxLevel = 0;
 	_v21 = 0;
 	_v22 = 0;
 	_v23 = 0;
@@ -64,7 +64,7 @@ void Town::loadStrings(const Common::String &name) {
 	f.close();
 }
 
-int Town::townAction(int actionId) {
+int Town::townAction(TownAction actionId) {
 	Interface &intf = *_vm->_interface;
 	Map &map = *_vm->_map;
 	Party &party = *_vm->_party;
@@ -72,7 +72,7 @@ int Town::townAction(int actionId) {
 	Sound &sound = *_vm->_sound;
 	bool isDarkCc = _vm->_files->_isDarkCc;
 
-	if (actionId == 12) {
+	if (actionId == ACTION12) {
 		pyramidEvent();
 		return 0;
 	}
@@ -92,7 +92,7 @@ int Town::townAction(int actionId) {
 	_icons2.clear();
 
 	switch (actionId) {
-	case 0:
+	case BANK:
 		// Bank
 		_icons1.load("bank.icn");
 		_icons2.load("bank2.icn");
@@ -105,10 +105,10 @@ int Town::townAction(int actionId) {
 		vocName = isDarkCc ? "bank1.voc" : "banker.voc";
 		break;
 
-	case 1:
+	case BLACKSMITH:
 		// Blacksmith
 		_icons1.load("esc.icn");
-		addButton(Common::Rect(261, 100, 285, 120), Common::KEYCODE_ESCAPE, &_icons1);
+		addButton(Common::Rect(261, 108, 285, 128), Common::KEYCODE_ESCAPE, &_icons1);
 		addButton(Common::Rect(234, 54, 308, 62), 0);
 		addButton(Common::Rect(234, 64, 308, 72), Common::KEYCODE_b);
 		addButton(Common::Rect(234, 74, 308, 82), 0);
@@ -118,11 +118,11 @@ int Town::townAction(int actionId) {
 		vocName = isDarkCc ? "see2.voc" : "whaddayo.voc";
 		break;
 
-	case 2:
+	case GUILD:
 		// Guild
 		loadStrings("spldesc.bin");
 		_icons1.load("esc.icn");
-		addButton(Common::Rect(261, 100, 285, 120), Common::KEYCODE_ESCAPE, &_icons1);
+		addButton(Common::Rect(261, 108, 285, 128), Common::KEYCODE_ESCAPE, &_icons1);
 		addButton(Common::Rect(234, 54, 308, 62), 0);
 		addButton(Common::Rect(234, 64, 308, 72), Common::KEYCODE_b);
 		addButton(Common::Rect(234, 74, 308, 82), Common::KEYCODE_s);
@@ -133,7 +133,7 @@ int Town::townAction(int actionId) {
 		vocName = isDarkCc ? "parrot1.voc" : "guild10.voc";
 		break;
 
-	case 3:
+	case TAVERN:
 		// Tavern
 		loadStrings("tavern.bin");
 		_icons1.load("tavern.icn");
@@ -149,10 +149,10 @@ int Town::townAction(int actionId) {
 		vocName = isDarkCc ? "hello1.voc" : "hello.voc";
 		break;
 
-	case 4:
+	case TEMPLE:
 		// Temple
 		_icons1.load("esc.icn");
-		addButton(Common::Rect(261, 100, 285, 120), Common::KEYCODE_ESCAPE, &_icons1);
+		addButton(Common::Rect(261, 108, 285, 128), Common::KEYCODE_ESCAPE, &_icons1);
 		addButton(Common::Rect(234, 54, 308, 62), Common::KEYCODE_h);
 		addButton(Common::Rect(234, 64, 308, 72), Common::KEYCODE_d);
 		addButton(Common::Rect(234, 74, 308, 82), Common::KEYCODE_u);
@@ -162,40 +162,40 @@ int Town::townAction(int actionId) {
 		vocName = isDarkCc ? "help2.voc" : "maywe2.voc";
 		break;
 
-	case 5:
+	case TRAINING:
 		// Training
 		Common::fill(&_arr1[0], &_arr1[6], 0);
 		_v2 = 0;
 
 		_icons1.load("train.icn");
 		addButton(Common::Rect(281, 108, 305, 128), Common::KEYCODE_ESCAPE, &_icons1);
-		addButton(Common::Rect(242, 108, 266, 128), Common::KEYCODE_t);
+		addButton(Common::Rect(242, 108, 266, 128), Common::KEYCODE_t, &_icons1);
 
 		sound.stopSound();
 		vocName = isDarkCc ? "training.voc" : "youtrn1.voc";
 		break;
 
-	case 6:
+	case ARENA:
 		// Arena event
 		arenaEvent();
 		return false;
 
-	case 8:
+	case REAPER:
 		// Reaper event
 		reaperEvent();
 		return false;
 
-	case 9:
+	case GOLEM:
 		// Golem event
 		golemEvent();
 		return false;
 
-	case 10:
-	case 13:
+	case DWARF1:
+	case DWARF2:
 		dwarfEvent();
 		return false;
 
-	case 11:
+	case SPHINX:
 		sphinxEvent();
 		return false;
 
@@ -203,7 +203,7 @@ int Town::townAction(int actionId) {
 		break;
 	}
 
-	sound.playSong(Res.TOWN_ACTION_MUSIC[actionId], 223);
+	sound.playSong(Res.TOWN_ACTION_MUSIC[_vm->_files->_isDarkCc][actionId], 223);
 
 	_townSprites.resize(Res.TOWN_ACTION_FILES[isDarkCc][actionId]);
 	for (uint idx = 0; idx < _townSprites.size(); ++idx) {
@@ -220,7 +220,7 @@ int Town::townAction(int actionId) {
 	intf._levitateUIFrame = 0;
 
 	_townSprites[_drawFrameIndex / 8].draw(screen, _drawFrameIndex % 8, _townPos);
-	if (actionId == 0 && isDarkCc) {
+	if (actionId == BANK && isDarkCc) {
 		_townSprites[4].draw(screen, _vm->getRandomNumber(13, 18),
 			Common::Point(8, 30));
 	}
@@ -236,7 +236,7 @@ int Town::townAction(int actionId) {
 	intf.highlightChar(0);
 	drawTownAnim(1);
 
-	if (actionId == 0)
+	if (actionId == BANK)
 		intf._overallFrame = 2;
 
 	sound.playSound(vocName, 1);
@@ -244,12 +244,16 @@ int Town::townAction(int actionId) {
 	do {
 		townWait();
 		charP = doTownOptions(charP);
+		if (_vm->shouldQuit())
+			return 0;
+
+		title = createTownText(*charP);
 		screen._windows[10].writeString(title);
 		drawButtons(&screen);
-	} while (!_vm->shouldQuit() && _buttonValue != Common::KEYCODE_ESCAPE);
+	} while (_buttonValue != Common::KEYCODE_ESCAPE);
 
 	switch (actionId) {
-	case 1:
+	case BLACKSMITH:
 		// Leave blacksmith
 		if (isDarkCc) {
 			sound.stopSound();
@@ -257,14 +261,14 @@ int Town::townAction(int actionId) {
 		}
 		break;
 
-	case 3: {
+	case TAVERN:
 		// Leave Tavern
 		sound.stopSound();
 		sound.playSound(isDarkCc ? "gdluck1.voc" : "goodbye.voc", 1);
 
 		map.mazeData()._mazeNumber = party._mazeId;
 		break;
-	}
+
 	default:
 		break;
 	}
@@ -334,29 +338,30 @@ Common::String Town::createTownText(Character &ch) {
 	Common::String msg;
 
 	switch (_townActionId) {
-	case 0:
+	case BANK:
 		// Bank
 		return Common::String::format(Res.BANK_TEXT,
 			XeenEngine::printMil(party._bankGold).c_str(),
 			XeenEngine::printMil(party._bankGems).c_str(),
 			XeenEngine::printMil(party._gold).c_str(),
 			XeenEngine::printMil(party._gems).c_str());
-	case 1:
+
+	case BLACKSMITH:
 		// Blacksmith
 		return Common::String::format(Res.BLACKSMITH_TEXT,
-			XeenEngine::printMil(party._gold).c_str());
+			ch._name.c_str(), XeenEngine::printMil(party._gold).c_str());
 
-	case 2:
+	case GUILD:
 		// Guild
 		return !ch.guildMember() ? Res.GUILD_NOT_MEMBER_TEXT :
 			Common::String::format(Res.GUILD_TEXT, ch._name.c_str());
 
-	case 3:
+	case TAVERN:
 		// Tavern
 		return Common::String::format(Res.TAVERN_TEXT, ch._name.c_str(),
 			Res.FOOD_AND_DRINK, XeenEngine::printMil(party._gold).c_str());
 
-	case 4:
+	case TEMPLE:
 		// Temple
 		_donation = 0;
 		_uncurseCost = 0;
@@ -425,52 +430,62 @@ Common::String Town::createTownText(Character &ch) {
 			_healCost, _donation, XeenEngine::printK(_uncurseCost).c_str(),
 			XeenEngine::printMil(party._gold).c_str());
 
-	case 5:
+	case TRAINING:
 		// Training
 		if (_vm->_files->_isDarkCc) {
 			switch (party._mazeId) {
 			case 29:
-				_v20 = 30;
+				// Castleview
+				_maxLevel = 30;
 				break;
 			case 31:
-				_v20 = 50;
+				// Sandcaster
+				_maxLevel = 50;
 				break;
 			case 37:
-				_v20 = 200;
+				// Olympus
+				_maxLevel = 200;
 				break;
 			default:
-				_v20 = 100;
+				// Kalindra's Castle
+				_maxLevel = 100;
 				break;
 			}
 		} else {
 			switch (party._mazeId) {
 			case 28:
-				_v20 = 10;
+				// Vertigo
+				_maxLevel = 10;
 				break;
 			case 30:
-				_v20 = 15;
+				// Rivercity
+				_maxLevel = 15;
 				break;
 			default:
-				_v20 = 20;
+				// Newcastle
+				_maxLevel = 20;
 				break;
 			}
 		}
 
 		_experienceToNextLevel = ch.experienceToNextLevel();
 
-		if (_experienceToNextLevel >= 0x10000 && ch._level._permanent < _v20) {
+		if (_experienceToNextLevel && ch._level._permanent < _maxLevel) {
+			// Need more experience
 			int nextLevel = ch._level._permanent + 1;
-			return Common::String::format(Res.EXPERIENCE_FOR_LEVEL,
+			msg = Common::String::format(Res.EXPERIENCE_FOR_LEVEL,
 				ch._name.c_str(), _experienceToNextLevel, nextLevel);
-		} else if (ch._level._permanent >= 20) {
+		} else if (ch._level._permanent >= _maxLevel) {
+			// At maximum level
 			_experienceToNextLevel = 1;
 			msg = Common::String::format(Res.LEARNED_ALL, ch._name.c_str());
 		} else {
+			// Eligble for level increase
 			msg = Common::String::format(Res.ELIGIBLE_FOR_LEVEL,
 				ch._name.c_str(), ch._level._permanent + 1);
 		}
 
-		return Common::String::format(Res.TRAINING_TEXT,
+		return Common::String::format(Res.TRAINING_TEXT, msg.c_str(),
 			XeenEngine::printMil(party._gold).c_str());
 
 	default:
@@ -480,26 +495,27 @@ Common::String Town::createTownText(Character &ch) {
 
 Character *Town::doTownOptions(Character *c) {
 	switch (_townActionId) {
-	case 0:
+	case BANK:
 		// Bank
 		c = doBankOptions(c);
 		break;
-	case 1:
+	case BLACKSMITH:
 		// Blacksmith
 		c = doBlacksmithOptions(c);
 		break;
-	case 2:
+	case GUILD:
 		// Guild
 		c = doGuildOptions(c);
 		break;
-	case 3:
+	case TAVERN:
 		// Tavern
 		c = doTavernOptions(c);
 		break;
-	case 4:
+	case TEMPLE:
 		// Temple
 		c = doTempleOptions(c);
-	case 5:
+		break;
+	case TRAINING:
 		// Training
 		c = doTrainingOptions(c);
 		break;
@@ -902,7 +918,7 @@ Character *Town::doTrainingOptions(Character *c) {
 			_drawFrameIndex = 0;
 
 			Common::String name;
-			if (c->_level._permanent >= _v20) {
+			if (c->_level._permanent >= _maxLevel) {
 				name = isDarkCc ? "gtlost.voc" : "trainin1.voc";
 			} else {
 				name = isDarkCc ? "gtlost.voc" : "trainin0.voc";
@@ -1071,7 +1087,7 @@ void Town::drawTownAnim(bool flag) {
 	}
 
 	switch (_townActionId) {
-	case 0:
+	case BANK:
 		if (sound.isPlaying() || (isDarkCc && intf._overallFrame)) {
 			if (isDarkCc) {
 				if (sound.isPlaying() || intf._overallFrame == 1) {
@@ -1089,7 +1105,7 @@ void Town::drawTownAnim(bool flag) {
 		}
 		break;
 
-	case 2:
+	case GUILD:
 		if (sound.isPlaying()) {
 			if (isDarkCc) {
 				if (intf._overallFrame) {
@@ -1102,19 +1118,20 @@ void Town::drawTownAnim(bool flag) {
 		}
 		break;
 
-	case 3:
+	case TAVERN:
 		if (sound.isPlaying() && isDarkCc) {
 			_townSprites[4].draw(screen, _vm->getRandomNumber(7), Common::Point(153, 49));
 		}
 		break;
-	case 4:
+
+	case TEMPLE:
 		if (sound.isPlaying()) {
 			_townSprites[3].draw(screen, _vm->getRandomNumber(2, 4), Common::Point(8, 8));
 
 		}
 		break;
 
-	case 5:
+	case TRAINING:
 		if (sound.isPlaying()) {
 			if (isDarkCc) {
 				_townSprites[_drawFrameIndex / 8].draw(screen, _drawFrameIndex % 8, _townPos);
@@ -1127,6 +1144,10 @@ void Town::drawTownAnim(bool flag) {
 				_townSprites[1].draw(screen, _vm->getRandomNumber(8, 12), Common::Point(8, 8));
 			}
 		}
+		break;
+
+	default:
+		break;
 	}
 
 	if (flag) {
@@ -1193,19 +1214,23 @@ bool TownMessage::execute(int portrait, const Common::String &name, const Common
 		int confirm) {
 	EventsManager &events = *_vm->_events;
 	Interface &intf = *_vm->_interface;
+	Map &map = *_vm->_map;
+	Party &party = *_vm->_party;
+	Resources &res = *_vm->_resources;
 	Screen &screen = *_vm->_screen;
 	Town &town = *_vm->_town;
 	Window &w = screen._windows[11];
 
 	town._townMaxId = 4;
-	town._townActionId = 7;
+	town._townActionId = NO_ACTION;
 	town._drawFrameIndex = 0;
 	town._townPos = Common::Point(23, 22);
 
 	if (!confirm)
 		loadButtons();
 
-	if (town._townSprites[0].empty()) {
+	if (town._townSprites.empty()) {
+		town._townSprites.resize(2);
 		town._townSprites[0].load(Common::String::format("face%02d.fac", portrait));
 		town._townSprites[1].load("frame.fac");
 	}
@@ -1215,25 +1240,32 @@ bool TownMessage::execute(int portrait, const Common::String &name, const Common
 
 	int result = -1;
 	Common::String msgText = text;
-	for (;;) {
+	do {
 		Common::String msg = Common::String::format("\r\v014\x03c\t125%s\t000\v054%s",
 			name.c_str(), msgText.c_str());
-		const char *msgEnd = w.writeString(msg.c_str());
+
+		// Count the number of words
+		const char *msgEnd = w.writeString(msg);
 		int wordCount = 0;
 
-		for (const char *msgP = msg.c_str(); msgP < msgEnd; ++msgP) {
+		for (const char *msgP = msg.c_str(); msgP != msgEnd && *msgP; ++msgP) {
 			if (*msgP == ' ')
 				++wordCount;
 		}
 
-		town._drawCtr2 = wordCount * 2;
+		town._drawCtr2 = wordCount * 2;	// Set timeout
 		town._townSprites[1].draw(screen, 0, Common::Point(16, 16));
 		town._townSprites[0].draw(screen, town._drawFrameIndex, Common::Point(23, 22));
 		w.update();
 
-		if (!msgEnd) {
-			// Doesn't look like the code here in original can ever be reached
-			assert(0);
+		if (!msgEnd && !confirm) {
+			res._globalSprites.draw(screen, 7, Common::Point(232, 74));
+			res._globalSprites.draw(screen, 0, Common::Point(235, 75));
+			res._globalSprites.draw(screen, 2, Common::Point(260, 75));
+			screen._windows[34].update();
+
+			intf._face1State = map._headData[party._mazePosition.y][party._mazePosition.x]._left;
+			intf._face2State = map._headData[party._mazePosition.y][party._mazePosition.x]._right;
 		}
 
 		if (confirm == 2) {
@@ -1248,28 +1280,31 @@ bool TownMessage::execute(int portrait, const Common::String &name, const Common
 				clearButtons();
 
 			do {
-				events.wait(3);
+				events.pollEventsAndWait();
 				checkEvents(_vm);
+
 				if (_vm->shouldQuit())
 					return false;
 
-				town.drawTownAnim(false);
-				events.updateGameCounter();
+				while (events.timeElapsed() >= 3) {
+					town.drawTownAnim(false);
+					events.updateGameCounter();
+				}
 			} while (!_buttonValue);
 
 			if (msgEnd)
+				// Another screen of text remaining
 				break;
 
-			if (!msgEnd) {
-				if (confirm || _buttonValue == Common::KEYCODE_ESCAPE ||
-						_buttonValue == Common::KEYCODE_n)
-					result = 0;
-				else if (_buttonValue == Common::KEYCODE_y)
-					result = 1;
-			}
+			if (confirm || _buttonValue == Common::KEYCODE_ESCAPE ||
+					_buttonValue == Common::KEYCODE_n)
+				result = 0;
+			else if (_buttonValue == Common::KEYCODE_y)
+				result = 1;
 		} while (result == -1);
 
 		if (msgEnd) {
+			// Text remaining, so cut off already displayed page's
 			msgText = Common::String(msgEnd);
 			town._drawCtr2 = wordCount;
 			continue;
@@ -1282,6 +1317,7 @@ bool TownMessage::execute(int portrait, const Common::String &name, const Common
 
 	town._townSprites[0].clear();
 	town._townSprites[1].clear();
+	events.clearEvents();
 	return result == 1;
 }
 

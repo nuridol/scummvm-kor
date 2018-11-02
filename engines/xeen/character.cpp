@@ -759,7 +759,7 @@ void Character::synchronize(Common::Serializer &s) {
 	}
 
 	// Synchronize spell list
-	for (int i = 0; i < MAX_SPELLS_PER_CLASS - 1; ++i)
+	for (int i = 0; i < MAX_SPELLS_PER_CLASS; ++i)
 		s.syncAsByte(_spells[i]);
 	s.syncAsByte(_lloydMap);
 	s.syncAsByte(_lloydPosition.x);
@@ -1089,7 +1089,7 @@ int Character::getThievery() const {
 
 	result += itemScan(10);
 
-	// If the character doesn't have a thievery skill, then do'nt allow any result
+	// If the character doesn't have a thievery skill, then don't allow any result
 	if (!_skills[THIEVERY])
 		result = 0;
 
@@ -1157,8 +1157,8 @@ int Character::itemScan(int itemId) const {
 			for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
 				const XeenItem &item = _accessories[idx];
 
-				if (item._frame && !(item._bonusFlags & 0xC0) && itemId < 11 && itemId != 3) {
-					if (item._material >= 59 && item._material <= 130) {
+				if (item._frame && !(item._bonusFlags & 0xC0)) {
+					if (itemId < 11 && itemId != 3 && item._material >= 59 && item._material <= 130) {
 						int mIndex = (int)item.getAttributeCategory();
 						if (mIndex > PERSONALITY)
 							++mIndex;
@@ -1174,11 +1174,18 @@ int Character::itemScan(int itemId) const {
 						if (mIndex == itemId)
 							result += Res.ELEMENTAL_RESISTENCES[item._material];
 					}
+
+					if (itemId == 9) {
+						result += Res.ARMOR_STRENGTHS[item._id];
+						if (item._material >= 37 && item._material <= 58) {
+							result += Res.METAL_LAC[item._material - 37];
+						}
+					}
 				}
 			}
 			break;
 		}
-	};
+	}
 
 	return result;
 }
@@ -1380,8 +1387,7 @@ void Character::setValue(int id, uint value) {
 		party._food = value;
 		break;
 	case 69:
-		// Set levitate active
-		party._levitateActive = value != 0;
+		party._levitateCount = value;
 		break;
 	case 70:
 		party._lightCount = value;
@@ -1403,7 +1409,7 @@ void Character::setValue(int id, uint value) {
 		party._electricityResistence = value;
 		party._fireResistence = value;
 		party._lightCount = value;
-		party._levitateActive = value != 0;
+		party._levitateCount = value;
 		break;
 	case 76:
 		// Set day of the year (0-99)
@@ -1413,7 +1419,7 @@ void Character::setValue(int id, uint value) {
 		party._wizardEyeActive = true;
 		break;
 	case 83:
-		scripts._nEdamageType = value;
+		scripts._nEdamageType = (DamageType)value;
 		break;
 	case 84:
 		party._mazeDirection = (Direction)value;
@@ -1463,6 +1469,7 @@ uint Character::nextExperienceLevel() const {
 		shift = 10;
 	} else {
 		base = 0;
+		assert(_level._permanent > 0);
 		shift = _level._permanent - 1;
 	}
 
@@ -1473,7 +1480,7 @@ uint Character::getCurrentExperience() const {
 	int lev = _level._permanent - 1;
 	int shift, base;
 
-	if (lev > 0 && lev < 12)
+	if (lev == 0)
 		return _experience;
 
 	if (lev >= 12) {
@@ -1659,20 +1666,15 @@ int Character::makeItem(int p1, int itemIndex, int p3) {
 			rval = vm->getRandomNumber(1, 100);
 			if (rval <= 25) {
 				mult = 0;
-			}
-			else if (rval <= 45) {
+			} else if (rval <= 45) {
 				mult = 1;
-			}
-			else if (rval <= 60) {
+			} else if (rval <= 60) {
 				mult = 2;
-			}
-			else if (rval <= 75) {
+			} else if (rval <= 75) {
 				mult = 3;
-			}
-			else if (rval <= 95) {
+			} else if (rval <= 95) {
 				mult = 4;
-			}
-			else {
+			} else {
 				mult = 5;
 			}
 
@@ -1704,14 +1706,16 @@ int Character::makeItem(int p1, int itemIndex, int p3) {
 				mult = 9;
 			}
 
-			v12 = Res.MAKE_ITEM_ARR1[vm->getRandomNumber(Res.MAKE_ITEM_ARR3[mult][p1][0],
+			v14 = Res.MAKE_ITEM_ARR1[vm->getRandomNumber(Res.MAKE_ITEM_ARR3[mult][p1][0],
 				Res.MAKE_ITEM_ARR3[mult][p1][1])];
 			break;
 
 		case 3:
 			mult = p1 == 7 || vm->getRandomNumber(1, 100) > 70 ? 1 : 0;
-			v16 = vm->getRandomNumber(Res.MAKE_ITEM_ARR4[mult][p1][0],
-				Res.MAKE_ITEM_ARR4[mult][p1][1]);
+			v16 = vm->getRandomNumber(Res.MAKE_ITEM_ARR4[mult][p1 - 1][0],
+				Res.MAKE_ITEM_ARR4[mult][p1 - 1][1]);
+			if (mult)
+				v16 += 9;
 			break;
 
 		case 4:
@@ -1780,7 +1784,7 @@ void Character::subtractHitPoints(int amount) {
 		int v = getMaxHP() + _currentHp;
 		if (v >= 1) {
 			_conditions[UNCONSCIOUS] = 1;
-			sound.playFX(38);;
+			sound.playFX(38);
 		} else {
 			_conditions[DEAD] = 1;
 			flag = true;

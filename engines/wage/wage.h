@@ -49,6 +49,7 @@
 #define WAGE_WAGE_H
 
 #include "engines/engine.h"
+#include "audio/mixer.h"
 #include "common/debug.h"
 #include "common/endian.h"
 #include "common/rect.h"
@@ -103,7 +104,6 @@ enum {
 	// the current limitation is 32 debug levels (1 << 31 is the last one)
 };
 
-Common::String readPascalString(Common::SeekableReadStream *in);
 Common::Rect *readRect(Common::SeekableReadStream *in);
 const char *getIndefiniteArticle(const Common::String &word);
 const char *prependGenderSpecificPronoun(int gender);
@@ -126,6 +126,8 @@ public:
 	const char *getGameFile() const;
 	void processTurn(Common::String *textInput, Designed *clickInput);
 	void regen();
+
+	const char *getTargetName() { return _targetName.c_str(); }
 
 private:
 	bool loadWorld(Common::MacResManager *resMan);
@@ -192,6 +194,8 @@ public:
 	bool _isGameOver;
 	bool _commandWasQuick;
 
+	bool _shouldQuit;
+
 	Common::String _inputText;
 
 	void playSound(Common::String soundName);
@@ -234,7 +238,7 @@ private:
 
 	Common::MacResManager *_resManager;
 
-	bool _shouldQuit;
+	Audio::SoundHandle _soundHandle;
 };
 
 // Example console class
