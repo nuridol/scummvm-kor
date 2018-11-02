@@ -33,6 +33,7 @@
 #include "common/debug-channels.h"
 #include "common/debug.h"
 #include "image/bmp.h"
+#include "graphics/macgui/macfontmanager.h"
 
 #include "macventure/gui.h"
 #include "macventure/dialog.h"
@@ -67,7 +68,7 @@ enum {
 
 const bool kLoadStaticMenus = true;
 
-static const Graphics::MenuData menuSubItems[] = {
+static const Graphics::MacMenuData menuSubItems[] = {
 	{ kMenuHighLevel,	"File",				0, 0, false },
 	{ kMenuHighLevel,	"Edit",				0, 0, false },
 	{ kMenuHighLevel,	"Special",			0, 0, false },
@@ -266,7 +267,7 @@ const WindowData &Gui::getWindowData(WindowReference reference) {
 }
 
 const Graphics::Font &Gui::getCurrentFont() {
-	return *_wm.getFont("Chicago-12", Graphics::FontManager::kBigGUIFont);
+	return *_wm._fontMan->getFont(Graphics::MacFont(Graphics::kMacFontChicago, 12));
 }
 
 void Gui::bringToFront(WindowReference winID) {
@@ -334,7 +335,7 @@ WindowReference Gui::createInventoryWindow(ObjID objRef) {
 	Graphics::MacWindow *newWindow = _wm.addWindow(true, true, true);
 	WindowData newData;
 	GlobalSettings settings = _engine->getGlobalSettings();
-	newData.refcon = (WindowReference)ABS(_inventoryWindows.size() + kInventoryStart); // This is a HACK
+	newData.refcon = (WindowReference)(_inventoryWindows.size() + kInventoryStart); // This is a HACK
 
 	if (_windowData->back().refcon < 0x80) { // There is already another inventory window
 		newData.bounds = _windowData->back().bounds; // Inventory windows are always last

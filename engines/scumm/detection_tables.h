@@ -60,7 +60,7 @@ static const char *const directoryGlobs[] = {
 
 /**
  * This table contains all game IDs supported by the SCUMM engine, and maps
- * them to the full humand readable game name.
+ * them to the full human readable game name.
  */
 static const PlainGameDescriptor gameDescriptions[] = {
 	{ "atlantis", "Indiana Jones and the Fate of Atlantis" },
@@ -904,6 +904,7 @@ static const GameFilenamePattern gameFilenamesTable[] = {
 
 	{ "spyfox", "spyfox", kGenHEPC, UNK_LANG, Common::kPlatformWindows, 0 },
 	{ "spyfox", "Fuchsdem", kGenHEMac, Common::DE_DEU, Common::kPlatformMacintosh, 0 },
+	{ "spyfox", "FUCHS", kGenHEPC, Common::DE_DEU, Common::kPlatformWindows, 0 },
 	{ "spyfox", "FUCHSDEM", kGenHEPC, Common::DE_DEU, UNK, 0 },
 	{ "spyfox", "FoxDemo", kGenHEMac, UNK_LANG, Common::kPlatformMacintosh, 0 },
 	{ "spyfox", "foxdemo", kGenHEPC, UNK_LANG, Common::kPlatformWindows, 0 },

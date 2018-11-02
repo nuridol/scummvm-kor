@@ -142,7 +142,7 @@ bool MusicDriver::cmdChangeFrequency(const byte *&srcP, byte param) {
 		srcP += 3;
 	}
 
-	return true;
+	return false;
 }
 
 bool MusicDriver::musEndSubroutine(const byte *&srcP, byte param) {
@@ -200,7 +200,6 @@ bool MusicDriver::fxEndSubroutine(const byte *&srcP, byte param) {
 
 void MusicDriver::playFX(uint effectId, const byte *data) {
 	if (!_fxPlaying || effectId < 7 || effectId >= 11) {
-		_musStartPtr = nullptr;
 		_fxDataPtr = _fxStartPtr = data;
 		_fxCountdownTimer = 0;
 		_channels[7]._changeFrequency = _channels[8]._changeFrequency = false;
@@ -356,7 +355,7 @@ void AdlibMusicDriver::pausePostProcess() {
 		}
 	}
 
-	for (int channelNum = 8; channelNum != 6 || (channelNum == 7 && _exclude7); --channelNum) {
+	for (int channelNum = 8; channelNum > (_exclude7 ? 7 : 6); --channelNum) {
 		Channel &chan = _channels[channelNum];
 		if (!chan._changeFrequency || (chan._freqCtr += chan._freqCtrChange) >= 0)
 			continue;
@@ -736,6 +735,9 @@ void Music::playSong(Common::SeekableReadStream &stream) {
 }
 
 void Music::playSong(const Common::String &name, int param) {
+	_priorMusic = _currentMusic;
+	_currentMusic = name;
+
 	File f(name);
 	playSong(f);
 }

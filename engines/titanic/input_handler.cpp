@@ -21,18 +21,21 @@
  */
 
 #include "titanic/input_handler.h"
+#include "titanic/events.h"
 #include "titanic/game_manager.h"
-#include "titanic/titanic.h"
+#include "titanic/core/project_item.h"
 #include "titanic/messages/mouse_messages.h"
 #include "titanic/pet_control/pet_control.h"
+#include "titanic/support/files_manager.h"
 #include "titanic/support/screen_manager.h"
+#include "titanic/titanic.h"
 
 namespace Titanic {
 
 CInputHandler::CInputHandler(CGameManager *owner) :
 		_gameManager(owner), _inputTranslator(nullptr), _dragging(false),
 		_buttonDown(false), _dragItem(nullptr),  _lockCount(0),
-		_singleton(false) {
+		_abortMessage(false) {
 	CScreenManager::_screenManagerPtr->_inputHandler = this;
 }
 
@@ -49,34 +52,39 @@ void CInputHandler::incLockCount() {
 }
 
 void CInputHandler::decLockCount() {
-	if (--_lockCount == 0 && _inputTranslator) {
+	--_lockCount;
+	assert(_lockCount >= 0);
+
+	if (_lockCount == 0 && _inputTranslator) {
 		if (_dragging && !_inputTranslator->isMousePressed()) {
 			CMouseButtonUpMsg upMsg(_mousePos, MK_LBUTTON);
 			handleMessage(upMsg);
 		}
 
 		_buttonDown = _inputTranslator->isMousePressed();
-		_singleton = true;
+		_abortMessage = true;
 	}
 }
 
-void CInputHandler::handleMessage(CMessage &msg, bool respectLock) {
+bool CInputHandler::handleMessage(CMessage &msg, bool respectLock) {
 	if (!respectLock || _lockCount <= 0) {
 		if (_gameManager->_gameState._mode == GSMODE_INTERACTIVE) {
-			processMessage(&msg);
+			return processMessage(&msg);
 		} else if (!msg.isMouseMsg()) {
 			g_vm->_filesManager->loadDrive();
 		}
 	}
+
+	return false;
 }
 
-void CInputHandler::processMessage(CMessage *msg) {
+bool CInputHandler::processMessage(CMessage *msg) {
 	const CMouseMsg *mouseMsg = dynamic_cast<const CMouseMsg *>(msg);
-	_singleton = false;
-	dispatchMessage(msg);
+	_abortMessage = false;
+	bool handled = dispatchMessage(msg);
 
-	if (_singleton) {
-		_singleton = false;
+	if (_abortMessage) {
+		_abortMessage = false;
 	} else if (mouseMsg) {
 		// Keep the game state mouse position up to date
 		if (_mousePos != mouseMsg->_mousePos) {
@@ -97,8 +105,8 @@ void CInputHandler::processMessage(CMessage *msg) {
 					CMouseDragMoveMsg moveMsg(_mousePos);
 					moveMsg.execute(_dragItem);
 				}
-			} else {
-				if (mouseMsg->isButtonUpMsg() && _dragItem) {
+			} else if (mouseMsg->isButtonUpMsg()) {
+				if (_dragItem) {
 					// Mouse drag ended
 					CGameObject *target = dragEnd(_mousePos, _dragItem);
 					CMouseDragEndMsg endMsg(_mousePos, target);
@@ -107,6 +115,7 @@ void CInputHandler::processMessage(CMessage *msg) {
 
 				_dragging = false;
 				_dragItem = nullptr;
+				_gameManager->_dragItem = nullptr;
 			}
 		} else if (_buttonDown) {
 			if (!mouseMsg->isMouseMoveMsg()) {
@@ -128,7 +137,7 @@ void CInputHandler::processMessage(CMessage *msg) {
 
 					if (_dragItem) {
 						CMouseDragMoveMsg moveMsg(_dragStartPos);
-						dispatchMessage(&moveMsg);
+						moveMsg.execute(_dragItem);
 					}
 
 					_dragging = true;
@@ -136,14 +145,18 @@ void CInputHandler::processMessage(CMessage *msg) {
 			}
 		}
 	}
+
+	return handled;
 }
 
-void CInputHandler::dispatchMessage(CMessage *msg) {
+bool CInputHandler::dispatchMessage(CMessage *msg) {
 	CPetControl *pet = _gameManager->_project->getPetControl();
 	if (!pet || !msg->execute(pet, nullptr, MSGFLAG_BREAK_IF_HANDLED)) {
 		CViewItem *view = _gameManager->getView();
-		msg->execute(view);
+		return msg->execute(view);
 	}
+
+	return true;
 }
 
 CGameObject *CInputHandler::dragEnd(const Point &pt, CTreeItem *dragItem) {
@@ -151,7 +164,7 @@ CGameObject *CInputHandler::dragEnd(const Point &pt, CTreeItem *dragItem) {
 	if (!view)
 		return nullptr;
 
-	// Scan through the view items to find the item being dropped on
+	// Scan through the view items to find the element being dropped on
 	CGameObject *target = nullptr;
 	for (CTreeItem *treeItem = view->scan(view); treeItem; treeItem = treeItem->scan(view)) {
 		CGameObject *gameObject = dynamic_cast<CGameObject *>(treeItem);
@@ -161,7 +174,7 @@ CGameObject *CInputHandler::dragEnd(const Point &pt, CTreeItem *dragItem) {
 		}
 	}
 
-	if (target) {
+	if (!target) {
 		// Check if the cursor is on the PET. If so, pass to the PET
 		// to see what specific element the drag ended on
 		CProjectItem *project = view->getRoot();

@@ -21,6 +21,7 @@
  */
 
 #include "titanic/game/sgt/sgt_nav.h"
+#include "titanic/pet_control/pet_control.h"
 
 namespace Titanic {
 
@@ -43,24 +44,26 @@ bool SGTNav::MouseButtonDownMsg(CMouseButtonDownMsg *msg) {
 	CTurnOn onMsg;
 	CTurnOff offMsg;
 
-	if (_statics->_v6 == "Open" && _statics->_v1 == "Open") {
-		if (_statics->_v3 == "Open")
+	CPetControl *pet = getPetControl();
+	if (_statics->_chestOfDrawers == "Open" && _statics->_bedhead == "Open"
+			&& pet->isInAssignedRoom()) {
+		if (_statics->_vase == "Open")
 			offMsg.execute("Vase");
-		if (_statics->_v4 == "Closed")
+		if (_statics->_tv == "Closed")
 			onMsg.execute("SGTTV");
-		if (_statics->_v7 == "Open")
+		if (_statics->_drawer == "Open")
 			offMsg.execute("Drawer");
-		if (_statics->_v8 == "Open")
+		if (_statics->_armchair == "Open")
 			offMsg.execute("Armchair");
-		if (_statics->_v9 == "Open")
+		if (_statics->_deskchair == "Open")
 			offMsg.execute("Deskchair");
-		if (_statics->_v12 == "Open")
+		if (_statics->_toilet == "Open")
 			offMsg.execute("Toilet");
 
 		changeView("SGTState.Node 2.E");
-	} else if (_statics->_v1 == "Open") {
+	} else if (_statics->_bedhead != "Open") {
 		petDisplayMessage(1, YOUR_STATEROOM);
-	} else if (_statics->_v6 == "Closed") {
+	} else if (_statics->_chestOfDrawers == "Closed") {
 		petDisplayMessage(1, BED_NOT_SUPPORT_YOUR_WEIGHT);
 	}
 
@@ -68,10 +71,14 @@ bool SGTNav::MouseButtonDownMsg(CMouseButtonDownMsg *msg) {
 }
 
 bool SGTNav::MouseMoveMsg(CMouseMoveMsg *msg) {
-	if (_statics->_v6 == "Open" && _statics->_v1 == "Open")
-		_cursorId = CURSOR_MOVE_FORWARD;
-	else
-		_cursorId = CURSOR_ARROW;
+	_cursorId = CURSOR_ARROW;
+
+	if (_statics->_chestOfDrawers == "Open" && _statics->_bedhead == "Open") {
+		CPetControl *pet = getPetControl();
+		if (pet->isInAssignedRoom()) {
+			_cursorId = CURSOR_MOVE_FORWARD;
+		}
+	}
 
 	return true;
 }

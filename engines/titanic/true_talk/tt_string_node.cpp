@@ -25,7 +25,8 @@
 
 namespace Titanic {
 
-TTstringNode::TTstringNode() : TTnode() {
+TTstringNode::TTstringNode() : TTnode(), _file(HANDLE_STDIN),
+		_mode(0), _field1C(0) {
 }
 
 void TTstringNode::initialize(int mode) {
@@ -54,9 +55,9 @@ void TTstringNode::initialize(TTstringNode *oldNode) {
 	delete oldNode;
 }
 
-TTstringNode *TTstringNode::findByName(const TTstring &str, int mode) {
+TTstringNode *TTstringNode::findByName(const TTstring &str, VocabMode mode) {
 	for (TTstringNode *nodeP = this; nodeP; nodeP = dynamic_cast<TTstringNode *>(nodeP->_nextP)) {
-		if (nodeP->_mode == mode || (mode == 3 && nodeP->_mode < 3)) {
+		if (nodeP->_mode == mode || (mode == VOCAB_MODE_EN && nodeP->_mode < 3)) {
 			if (nodeP->_string == str)
 				return nodeP;
 		}

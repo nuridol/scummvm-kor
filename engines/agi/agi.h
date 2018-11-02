@@ -27,6 +27,7 @@
 #include "common/error.h"
 #include "common/util.h"
 #include "common/file.h"
+#include "common/keyboard.h"
 #include "common/rect.h"
 #include "common/rendermode.h"
 #include "common/stack.h"
@@ -465,8 +466,6 @@ struct AgiGame {
 
 	ScreenObjEntry addToPicView;
 
-	int32 ver;                      /**< detected game version */
-
 	bool automaticSave;             /**< set by CmdSetSimple() */
 	char automaticSaveDescription[SAVEDGAME_DESCRIPTION_LEN + 1];
 
@@ -717,7 +716,20 @@ struct AgiArtificialDelayEntry {
 	uint16 millisecondsDelay;
 };
 
-typedef void (*AgiCommand)(AgiGame *state, AgiEngine *vm, uint8 *p);
+typedef void (*AgiOpCodeFunction)(AgiGame *state, AgiEngine *vm, uint8 *p);
+
+struct AgiOpCodeEntry {
+	const char *name;
+	const char *parameters;
+	AgiOpCodeFunction functionPtr;
+	uint16     parameterSize;
+};
+
+struct AgiOpCodeDefinitionEntry {
+	const char *name;
+	const char *parameters;
+	AgiOpCodeFunction functionPtr;
+};
 
 class AgiEngine : public AgiBase {
 protected:
@@ -855,7 +867,7 @@ public:
 	void unloadLogic(int16 logicNr);
 	int runLogic(int16 logicNr);
 	void debugConsole(int, int, const char *);
-	int testIfCode(int);
+	bool testIfCode(int16 logicNr);
 	void executeAgiCommand(uint8, uint8 *);
 
 private:
@@ -936,6 +948,7 @@ public:
 	int getDirection(int16 objX, int16 objY, int16 destX, int16 destY, int16 stepSize);
 
 	bool _keyHoldMode;
+	Common::KeyCode _keyHoldModeLastKey;
 
 	// Keyboard
 	int doPollKeyboard();
@@ -978,15 +991,18 @@ public:
 	void inGameTimerUpdate();
 
 private:
-	uint32 _lastUsedPlayTimeInCycles; // 20 per second
+	uint32 _lastUsedPlayTimeInCycles; // 40 per second
 	uint32 _lastUsedPlayTimeInSeconds; // actual seconds
 	uint32 _passedPlayTimeCycles; // increased by 1 every time we passed a cycle
 
 private:
-	AgiCommand _agiCommands[183];
-	AgiCommand _agiCondCommands[256];
+	AgiOpCodeEntry _opCodes[256]; // always keep those at 256, so that there is no way for invalid memory access
+	AgiOpCodeEntry _opCodesCond[256];
 
-	void setupOpcodes();
+	void setupOpCodes(uint16 version);
+
+public:
+	const AgiOpCodeEntry *getOpCodesTable() { return _opCodes; }
 };
 
 } // End of namespace Agi

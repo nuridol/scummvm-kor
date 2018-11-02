@@ -28,6 +28,8 @@
 
 #include "common/events.h"
 
+// multiplier used to increase resolution for keyboard/joystick mouse
+#define MULTIPLIER 16
 
 /**
  * The SDL event source.
@@ -47,7 +49,13 @@ public:
 	/**
 	 * Resets keyboard emulation after a video screen change
 	 */
-	virtual void resetKeyboadEmulation(int16 x_max, int16 y_max);
+	virtual void resetKeyboardEmulation(int16 x_max, int16 y_max);
+
+	/**
+	 * Emulates a mouse movement that would normally be caused by a mouse warp
+	 * of the system mouse.
+	 */
+	void fakeWarpMouse(const int x, const int y);
 
 protected:
 	/** @name Keyboard mouse emulation
@@ -58,8 +66,9 @@ protected:
 	//@{
 
 	struct KbdMouse {
-		int16 x, y, x_vel, y_vel, x_max, y_max, x_down_count, y_down_count;
+		int16 x, y, x_vel, y_vel, x_max, y_max, x_down_count, y_down_count, joy_x, joy_y;
 		uint32 last_time, delay_time, x_down_time, y_down_time;
+		bool modifier;
 	};
 	KbdMouse _km;
 
@@ -106,7 +115,7 @@ protected:
 	virtual bool handleJoyButtonDown(SDL_Event &ev, Common::Event &event);
 	virtual bool handleJoyButtonUp(SDL_Event &ev, Common::Event &event);
 	virtual bool handleJoyAxisMotion(SDL_Event &ev, Common::Event &event);
-	virtual void handleKbdMouse();
+	virtual bool handleKbdMouse(Common::Event &event);
 
 	//@}
 
@@ -114,7 +123,7 @@ protected:
 	 * Assigns the mouse coords to the mouse event. Furthermore notify the
 	 * graphics manager about the position change.
 	 */
-	virtual void processMouseEvent(Common::Event &event, int x, int y);
+	virtual bool processMouseEvent(Common::Event &event, int x, int y);
 
 	/**
 	 * Remaps key events. This allows platforms to configure
@@ -152,6 +161,18 @@ protected:
 	 * Extracts the keycode for the specified key sym.
 	 */
 	SDLKey obtainKeycode(const SDL_keysym keySym);
+
+	/**
+	 * Whether _fakeMouseMove contains an event we need to send.
+	 */
+	bool _queuedFakeMouseMove;
+
+	/**
+	 * A fake mouse motion event sent when the graphics manager is told to warp
+	 * the mouse but the system mouse is unable to be warped (e.g. because the
+	 * window is not focused).
+	 */
+	Common::Event _fakeMouseMove;
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 	/**

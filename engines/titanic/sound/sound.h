@@ -52,6 +52,7 @@ public:
 	CSoundItem(File *dialogueFile, int speechId) : ListItem(), _waveFile(nullptr),
 		_dialogueFileHandle(dialogueFile), _speechId(speechId), _active(false),
 		_disposeAfterUse(DisposeAfterUse::NO) {}
+	virtual ~CSoundItem();
 };
 
 class CSoundItemList : public List<CSoundItem> {
@@ -76,6 +77,7 @@ public:
 	QSoundManager _soundManager;
 public:
 	CSound(CGameManager *owner, Audio::Mixer *mixer);
+	~CSound();
 
 	/**
 	 * Save the data for the class to file
@@ -115,7 +117,7 @@ public:
 	/**
 	 * Returns true if a sound with the specified handle is active
 	 */
-	bool isActive(int handle) const;
+	bool isActive(int handle);
 
 	/**
 	 * Sets the volume for a sound

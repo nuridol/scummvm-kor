@@ -69,6 +69,7 @@ private:
 	StringArray _replacements1;
 	StringArray _replacements2;
 	StringArray _replacements3;
+	StringArray _replacements4;
 	StringArray _phrases;
 	NumberArray _numbers;
 	TTparserNode *_nodesP;
@@ -95,7 +96,7 @@ private:
 	 * Submethod called by normalize to handle expanding contacted word pairs
 	 * like can't, should've, and so on.
 	 */
-	bool normalizeContraction(const TTstring &srcLine, int srcIndex, TTstring &destLine);
+	bool normalizeContraction(const TTstring &srcLine, int &srcIndex, TTstring &destLine);
 
 	/**
 	 * Checks for what is likely special developer cheat codes
@@ -168,6 +169,12 @@ private:
 	 * Detaches a node from the main node list
 	 */
 	void removeNode(TTparserNode *node);
+
+	/**
+	 * Handles any preprocessing for the German version
+	 * @param line		Line to check and update
+	 */
+	void preprocessGerman(TTstring &line);
 
 	int processModifiers(int modifier, TTword *word);
 

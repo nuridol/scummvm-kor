@@ -57,10 +57,6 @@ enum AbortGameState {
 	kAbortQuitGame = 3
 };
 
-// slot 0 is the ScummVM auto-save slot, which is not used by us, but is still reserved
-#define SAVEGAMESLOT_FIRST 1
-#define SAVEGAMESLOT_LAST 99
-
 // We assume that scripts give us savegameId 0->99 for creating a new save slot
 //  and savegameId 100->199 for existing save slots. Refer to kfile.cpp
 enum {
@@ -99,6 +95,21 @@ struct VideoState {
 	}
 };
 
+/**
+ * Trace information about a VM function call.
+ */
+struct SciCallOrigin {
+	int scriptNr; //< The source script of the function
+	Common::String objectName; //< The name of the object being called
+	Common::String methodName; //< The name of the method being called
+	int localCallOffset; //< The byte offset of a local script subroutine called by the origin method. -1 if not in a local subroutine.
+	int roomNr; //< The room that was loaded at the time of the call
+
+	Common::String toString() const {
+		return Common::String::format("method %s::%s (room %d, script %d, localCall %x)", objectName.c_str(), methodName.c_str(), roomNr, scriptNr, localCallOffset);
+	}
+};
+
 struct EngineState : public Common::Serializable {
 public:
 	EngineState(SegManager *segMan);
@@ -115,9 +126,11 @@ public:
 	uint32 _screenUpdateTime;	/**< The last time the game updated the screen */
 
 	void speedThrottler(uint32 neededSleep);
-	void wait(int16 ticks);
+	int wait(int16 ticks);
 
-	uint32 _throttleCounter; /**< total times kAnimate was invoked */
+#ifdef ENABLE_SCI32
+	uint32 _eventCounter; /**< total times kGetEvent was invoked since the last call to kFrameOut */
+#endif
 	uint32 _throttleLastTime; /**< last time kAnimate was invoked */
 	bool _throttleTrigger;
 	bool _gameIsBenchmarking;
@@ -132,9 +145,7 @@ public:
 	int16 _lastSaveNewId;    // last newly created filename-id by kSaveGame
 
 	// see detection.cpp / SciEngine::loadGameState()
-	bool _delayedRestoreGame;  // boolean, that triggers delayed restore (triggered by ScummVM menu)
 	int _delayedRestoreGameId; // the saved game id, that it supposed to get restored (triggered by ScummVM menu)
-	bool _delayedRestoreFromLauncher; // is set, when the the delayed restore game was triggered from launcher
 
 	uint _chosenQfGImportItem; // Remembers the item selected in QfG import rooms
 
@@ -203,12 +214,21 @@ public:
 
 	// TODO: Excise video code from the state manager
 	VideoState _videoState;
-	bool _syncedAudioOptions;
 
 	/**
 	 * Resets the engine state.
 	 */
 	void reset(bool isRestoring);
+
+	/**
+	 * Finds and returns the origin of the current call.
+	 */
+	SciCallOrigin getCurrentCallOrigin() const;
+
+	/**
+	 * Determines whether the given object method is in the current stack.
+	 */
+	bool callInStack(const reg_t object, const Selector selector) const;
 };
 
 } // End of namespace Sci

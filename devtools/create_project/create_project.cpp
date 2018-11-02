@@ -192,7 +192,7 @@ int main(int argc, char *argv[]) {
 
 			msvcVersion = atoi(argv[++i]);
 
-			if (msvcVersion != 9 && msvcVersion != 10 && msvcVersion != 11 && msvcVersion != 12 && msvcVersion != 14) {
+			if (msvcVersion != 9 && msvcVersion != 10 && msvcVersion != 11 && msvcVersion != 12 && msvcVersion != 14 && msvcVersion != 15) {
 				std::cerr << "ERROR: Unsupported version: \"" << msvcVersion << "\" passed to \"--msvc-version\"!\n";
 				return -1;
 			}
@@ -300,6 +300,19 @@ int main(int argc, char *argv[]) {
 		for (EngineDescList::iterator j = setup.engines.begin(); j != setup.engines.end(); ++j)
 			j->enable = false;
 	}
+	
+	// Disable engines for which we are missing dependencies
+	for (EngineDescList::const_iterator i = setup.engines.begin(); i != setup.engines.end(); ++i) {
+		if (i->enable) {
+			for (StringList::const_iterator ef = i->requiredFeatures.begin(); ef != i->requiredFeatures.end(); ++ef) {
+				FeatureList::iterator feature = std::find(setup.features.begin(), setup.features.end(), *ef);
+				if (feature != setup.features.end() && !feature->enable) {
+					setEngineBuildState(i->name, setup.engines, false);
+					break;
+				}
+			}
+		}
+	}
 
 	// Print status
 	cout << "Enabled engines:\n\n";
@@ -373,14 +386,18 @@ int main(int argc, char *argv[]) {
 #endif
 	}
 
-	// Define scummvm-kor
-	setup.defines.push_back("SCUMMVMKOR");
-
-	bool updatesEnabled = false;
+	bool updatesEnabled = false, curlEnabled = false, sdlnetEnabled = false;
 	for (FeatureList::const_iterator i = setup.features.begin(); i != setup.features.end(); ++i) {
-		if (i->enable && !strcmp(i->name, "updates"))
-			updatesEnabled = true;
+		if (i->enable) {
+			if (!strcmp(i->name, "updates"))
+				updatesEnabled = true;
+			else if (!strcmp(i->name, "libcurl"))
+				curlEnabled = true;
+			else if (!strcmp(i->name, "sdlnet"))
+				sdlnetEnabled = true;
+		}
 	}
+
 	if (updatesEnabled) {
 		setup.defines.push_back("USE_SPARKLE");
 		if (projectType != kProjectXcode)
@@ -388,6 +405,11 @@ int main(int argc, char *argv[]) {
 		else
 			setup.libraries.push_back("sparkle");
 	}
+
+	if (curlEnabled && projectType == kProjectMSVC)
+		setup.defines.push_back("CURL_STATICLIB");
+	if (sdlnetEnabled && projectType == kProjectMSVC)
+		setup.libraries.push_back("iphlpapi");
 
 	setup.defines.push_back("SDL_BACKEND");
 	if (!setup.useSDL2) {
@@ -557,7 +579,7 @@ int main(int argc, char *argv[]) {
 		globalWarnings.push_back("6385");
 		globalWarnings.push_back("6386");
 
-		if (msvcVersion == 14) {
+		if (msvcVersion == 14 || msvcVersion == 15) {
 			globalWarnings.push_back("4267");
 			globalWarnings.push_back("4577");
 		}
@@ -679,7 +701,8 @@ void displayHelp(const char *exe) {
 	        "                           11 stands for \"Visual Studio 2012\"\n"
 	        "                           12 stands for \"Visual Studio 2013\"\n"
 	        "                           14 stands for \"Visual Studio 2015\"\n"
-	        "                           The default is \"9\", thus \"Visual Studio 2008\"\n"
+	        "                           15 stands for \"Visual Studio 2017\"\n"
+	        "                           The default is \"12\", thus \"Visual Studio 2013\"\n"
 	        " --build-events           Run custom build events as part of the build\n"
 	        "                          (default: false)\n"
 	        " --installer              Create NSIS installer after the build (implies --build-events)\n"
@@ -897,7 +920,7 @@ namespace {
  */
 bool parseEngine(const std::string &line, EngineDesc &engine) {
 	// Format:
-	// add_engine engine_name "Readable Description" enable_default ["SubEngineList"]
+	// add_engine engine_name "Readable Description" enable_default ["SubEngineList"] ["base games"] ["dependencies"]
 	TokenList tokens = tokenize(line);
 
 	if (tokens.size() < 4)
@@ -912,8 +935,14 @@ bool parseEngine(const std::string &line, EngineDesc &engine) {
 	engine.name = *token; ++token;
 	engine.desc = *token; ++token;
 	engine.enable = (*token == "yes"); ++token;
-	if (token != tokens.end())
+	if (token != tokens.end()) {
 		engine.subEngines = tokenize(*token);
+		++token;
+		if (token != tokens.end())
+			++token;
+		if (token != tokens.end())
+			engine.requiredFeatures = tokenize(*token);
+	}
 
 	return true;
 }
@@ -1015,6 +1044,7 @@ const Feature s_features[] = {
 	{         "scalers",          "USE_SCALERS",         "", true,  "Scalers" },
 	{       "hqscalers",       "USE_HQ_SCALERS",         "", true,  "HQ scalers" },
 	{           "16bit",        "USE_RGB_COLOR",         "", true,  "16bit color support" },
+	{         "highres",          "USE_HIGHRES",         "", true,  "high resolution" },
 	{         "mt32emu",          "USE_MT32EMU",         "", true,  "integrated MT-32 emulator" },
 	{            "nasm",             "USE_NASM",         "", true,  "IA-32 assembly support" }, // This feature is special in the regard, that it needs additional handling.
 	{          "opengl",           "USE_OPENGL",         "", true,  "OpenGL support" },
@@ -1140,7 +1170,9 @@ bool producesObjectFile(const std::string &fileName) {
 }
 
 std::string toString(int num) {
-	return static_cast<std::ostringstream*>(&(std::ostringstream() << num))->str();
+	std::ostringstream os;
+	os << num;
+	return os.str();
 }
 
 /**
@@ -1518,7 +1550,8 @@ void ProjectProvider::addFilesToProject(const std::string &dir, std::ofstream &p
 	StringList duplicate;
 
 	for (StringList::const_iterator i = includeList.begin(); i != includeList.end(); ++i) {
-		const std::string fileName = getLastPathComponent(*i);
+		std::string fileName = getLastPathComponent(*i);
+		std::transform(fileName.begin(), fileName.end(), fileName.begin(), tolower);
 
 		// Leave out non object file names.
 		if (fileName.size() < 2 || fileName.compare(fileName.size() - 2, 2, ".o"))
@@ -1531,7 +1564,9 @@ void ProjectProvider::addFilesToProject(const std::string &dir, std::ofstream &p
 		// Search for duplicates
 		StringList::const_iterator j = i; ++j;
 		for (; j != includeList.end(); ++j) {
-			if (fileName == getLastPathComponent(*j)) {
+			std::string candidateFileName = getLastPathComponent(*j);
+			std::transform(candidateFileName.begin(), candidateFileName.end(), candidateFileName.begin(), tolower);
+			if (fileName == candidateFileName) {
 				duplicate.push_back(fileName);
 				break;
 			}
@@ -1737,18 +1772,20 @@ void ProjectProvider::createModuleList(const std::string &moduleDir, const Strin
 			if (std::find(defines.begin(), defines.end(), *i) == defines.end())
 				shouldInclude.push(false);
 			else
-				shouldInclude.push(true);
+				shouldInclude.push(true && shouldInclude.top());
 		} else if (*i == "ifndef") {
 			if (tokens.size() < 2)
 				error("Malformed ifndef in " + moduleMkFile);
 			++i;
 
 			if (std::find(defines.begin(), defines.end(), *i) == defines.end())
-				shouldInclude.push(true);
+				shouldInclude.push(true && shouldInclude.top());
 			else
 				shouldInclude.push(false);
 		} else if (*i == "else") {
-			shouldInclude.top() = !shouldInclude.top();
+			bool last = shouldInclude.top();
+			shouldInclude.pop();
+			shouldInclude.push(!last && shouldInclude.top());
 		} else if (*i == "endif") {
 			if (shouldInclude.size() <= 1)
 				error("endif without ifdef found in " + moduleMkFile);

@@ -68,6 +68,7 @@ Vars::Vars() {
 	scene04_mamasha = 0;
 	scene04_boot = 0;
 	scene04_speaker = 0;
+	scene04_musicStage = 0;
 
 	scene04_ladder = 0;
 	scene04_coinPut = false;
@@ -199,7 +200,7 @@ Vars::Vars() {
 	scene11_swingOldAngle = 1.0;
 	scene11_swingSpeed = 1.0;
 	scene11_swingAngleDiff = 1.0;
-	scene11_swingInertia = 0.0;
+	scene11_swingInertia = 0.01;
 	scene11_swingCounter = 0;
 	scene11_swingCounterPrevTurn = 0;
 	scene11_swingDirection = 0;
@@ -445,7 +446,7 @@ Vars::Vars() {
 
 	scene37_rings.clear();
 	scene37_lastDudeX = -1;
-	scene37_cursorIsLocked = 0;
+	scene37_pipeIsOpen = 0;
 	scene37_plusMinus1 = 0;
 	scene37_plusMinus2 = 0;
 	scene37_plusMinus3 = 0;
@@ -472,6 +473,7 @@ Vars::Vars() {
 	sceneFinal_var01 = 0;
 	sceneFinal_var02 = 0;
 	sceneFinal_var03 = 0;
+	sceneFinal_trackHasStarted = false;
 
 	selector = 0;
 }
@@ -517,16 +519,27 @@ int FullpipeEngine::getSceneFromTag(int tag) {
 	return 1;
 }
 
-bool FullpipeEngine::sceneSwitcher(EntranceInfo *entrance) {
+void FullpipeEngine::sceneAutoScrolling() {
+	if (_aniMan2 == _aniMan && _currentScene && !_currentScene->_messageQueueId) {
+		if (800 - _mouseScreenPos.x >= 47 || _sceneRect.right >= _sceneWidth - 1 || _aniMan->_ox <= _sceneRect.left + 230) {
+			if (_mouseScreenPos.x < 47 && _sceneRect.left > 0 && _aniMan->_ox < _sceneRect.right - 230)
+				_currentScene->_x = -10;
+		} else {
+			_currentScene->_x = 10;
+		}
+	}
+}
+
+bool FullpipeEngine::sceneSwitcher(const EntranceInfo &entrance) {
 	GameVar *sceneVar;
 	Common::Point sceneDim;
 
-	Scene *scene = accessScene(entrance->_sceneId);
+	Scene *scene = accessScene(entrance._sceneId);
 
 	if (!scene)
 		return 0;
 
-	((PictureObject *)scene->_picObjList.front())->getDimensions(&sceneDim);
+	sceneDim = scene->_picObjList.front()->getDimensions();
 	_sceneWidth = sceneDim.x;
 	_sceneHeight = sceneDim.y;
 
@@ -540,8 +553,8 @@ bool FullpipeEngine::sceneSwitcher(EntranceInfo *entrance) {
 
 	_aniMan->setOXY(0, 0);
 	_aniMan->clearFlags();
-	_aniMan->_callback1 = 0;
-	_aniMan->_callback2 = 0;
+	_aniMan->_callback1 = 0; // Really NULL
+	_aniMan->_callback2 = 0; // Really NULL
 	_aniMan->_shadowsOn = 1;
 
 	_scrollSpeed = 8;
@@ -550,7 +563,7 @@ bool FullpipeEngine::sceneSwitcher(EntranceInfo *entrance) {
 	_updateFlag = true;
 	_flgCanOpenMap = true;
 
-	if (entrance->_sceneId == SC_DBGMENU) {
+	if (entrance._sceneId == SC_DBGMENU) {
 		_inventoryScene = 0;
 	} else {
 		_gameLoader->loadScene(SC_INV);
@@ -560,15 +573,15 @@ bool FullpipeEngine::sceneSwitcher(EntranceInfo *entrance) {
 	if (_soundEnabled) {
 		if (scene->_soundList) {
 			_currSoundListCount = 2;
-			_currSoundList1[0] = accessScene(SC_COMMON)->_soundList;
-			_currSoundList1[1] = scene->_soundList;
+			_currSoundList1[0] = accessScene(SC_COMMON)->_soundList.get();
+			_currSoundList1[1] = scene->_soundList.get();
 
 			for (int i = 0; i < scene->_soundList->getCount(); i++) {
-				scene->_soundList->getSoundByIndex(i)->updateVolume();
+				scene->_soundList->getSoundByIndex(i).updateVolume();
 			}
 		} else {
 			_currSoundListCount = 1;
-			_currSoundList1[0] = accessScene(SC_COMMON)->_soundList;
+			_currSoundList1[0] = accessScene(SC_COMMON)->_soundList.get();
 		}
 	}
 
@@ -581,7 +594,7 @@ bool FullpipeEngine::sceneSwitcher(EntranceInfo *entrance) {
 	_aniMan->setOXY(0, 0);
 
 	_aniMan2 = _aniMan;
-	MctlCompound *cmp = getSc2MctlCompoundBySceneId(entrance->_sceneId);
+	MctlCompound *cmp = getSc2MctlCompoundBySceneId(entrance._sceneId);
 	cmp->initMctlGraph();
 	cmp->attachObject(_aniMan);
 	cmp->activate();
@@ -599,23 +612,34 @@ bool FullpipeEngine::sceneSwitcher(EntranceInfo *entrance) {
 	removeMessageHandler(2, -1);
 	_updateScreenCallback = 0;
 
-	switch (entrance->_sceneId) {
+	switch (entrance._sceneId) {
 	case SC_INTRO1:
 		sceneVar = _gameLoader->_gameVar->getSubVarByName("SC_INTRO1");
 		scene->preloadMovements(sceneVar);
-		sceneIntro_initScene(scene);
+
+		if (!(g_fp->isDemo() && g_fp->getLanguage() == Common::RU_RUS))
+			sceneIntro_initScene(scene);
+		else
+			sceneIntroDemo_initScene(scene);
+
 		_behaviorManager->initBehavior(scene, sceneVar);
 		scene->initObjectCursors("SC_INTRO1");
 		setSceneMusicParameters(sceneVar);
-		addMessageHandler(sceneHandlerIntro, 2);
-		_updateCursorCallback = sceneIntro_updateCursor;
+
+		if (!(g_fp->isDemo() && g_fp->getLanguage() == Common::RU_RUS)) {
+			addMessageHandler(sceneHandlerIntro, 2);
+			_updateCursorCallback = sceneIntro_updateCursor;
+		} else {
+			addMessageHandler(sceneHandlerIntroDemo, 2);
+			_updateCursorCallback = sceneIntroDemo_updateCursor;
+		}
 		break;
 
 	case SC_1:
 		scene01_fixEntrance();
 		sceneVar = _gameLoader->_gameVar->getSubVarByName("SC_1");
 		scene->preloadMovements(sceneVar);
-		scene01_initScene(scene, entrance->_field_4);
+		scene01_initScene(scene, entrance._field_4);
 		_behaviorManager->initBehavior(scene, sceneVar);
 		scene->initObjectCursors("SC_1");
 		setSceneMusicParameters(sceneVar);
@@ -830,7 +854,7 @@ bool FullpipeEngine::sceneSwitcher(EntranceInfo *entrance) {
 
 			scene18_initScene2(g_fp->_scene3);
 			scene18_preload();
-			scene19_setMovements(g_fp->_scene3, entrance->_field_4);
+			scene19_setMovements(g_fp->_scene3, entrance._field_4);
 
 			g_vars->scene18_inScene18p1 = true;
 		}
@@ -914,12 +938,12 @@ bool FullpipeEngine::sceneSwitcher(EntranceInfo *entrance) {
 	case SC_25:
 		sceneVar = _gameLoader->_gameVar->getSubVarByName("SC_25");
 		scene->preloadMovements(sceneVar);
-		scene25_initScene(scene, entrance->_field_4);
+		scene25_initScene(scene, entrance._field_4);
 		_behaviorManager->initBehavior(scene, sceneVar);
 		scene->initObjectCursors("SC_25");
 		setSceneMusicParameters(sceneVar);
 		addMessageHandler(sceneHandler25, 2);
-		scene25_setupWater(scene, entrance->_field_4);
+		scene25_setupWater(scene, entrance._field_4);
 		_updateCursorCallback = scene25_updateCursor;
 		break;
 
@@ -971,7 +995,7 @@ bool FullpipeEngine::sceneSwitcher(EntranceInfo *entrance) {
 	case SC_30:
 		sceneVar = _gameLoader->_gameVar->getSubVarByName("SC_30");
 		scene->preloadMovements(sceneVar);
-		scene30_initScene(scene, entrance->_field_4);
+		scene30_initScene(scene, entrance._field_4);
 		_behaviorManager->initBehavior(scene, sceneVar);
 		scene->initObjectCursors("SC_30");
 		setSceneMusicParameters(sceneVar);
@@ -1091,7 +1115,7 @@ bool FullpipeEngine::sceneSwitcher(EntranceInfo *entrance) {
 		break;
 
 	default:
-		error("Unknown scene %d", entrance->_sceneId);
+		error("Unknown scene %d", entrance._sceneId);
 		break;
 	}
 

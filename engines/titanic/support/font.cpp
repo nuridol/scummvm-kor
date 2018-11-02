@@ -90,7 +90,7 @@ int STFont::getTextBounds(const CString &str, int maxWidth, Point *sizeOut) cons
 				strP += 4;
 			} else {
 				if (*strP == ' ') {
-					// Check fo rline wrapping
+					// Check for line wrapping
 					checkLineWrap(textSize, maxWidth, strP);
 				}
 
@@ -152,7 +152,7 @@ int STFont::writeString(CVideoSurface *surface, const Rect &rect1, const Rect &d
 			setColor(r, g, b);
 		} else {
 			if (*srcP == ' ') {
-				// Check fo rline wrapping
+				// Check for line wrapping
 				checkLineWrap(textSize, rect1.width(), srcP);
 				if (!*srcP)
 					return endP - str.c_str();
@@ -214,6 +214,7 @@ void STFont::writeString(CVideoSurface *surface, const Point &destPos, Rect &cli
 		// Form a rect of the area of the next character to draw
 		Rect charRect(_chars[c]._offset, textRect.top,
 			_chars[c]._offset + _chars[c]._width, textRect.bottom);
+		int textX = textPt.x;
 
 		if (textPt.x < clipRect.left) {
 			// Character is either partially or entirely left off-screen
@@ -237,6 +238,7 @@ void STFont::writeString(CVideoSurface *surface, const Point &destPos, Rect &cli
 		// At this point, we know we've got to draw at least part of a character,
 		// and have figured out the area of the character to draw
 		copyRect(surface, textPt, charRect);
+		textPt.x = textX + _chars[c]._width;
 	}
 }
 
@@ -245,11 +247,8 @@ WriteCharacterResult STFont::writeChar(CVideoSurface *surface, unsigned char c, 
 	if (c == 233)
 		c = '$';
 
-	Rect tempRect;
-	tempRect.left = _chars[c]._offset;
-	tempRect.right = _chars[c]._offset + _chars[c]._width;
-	tempRect.top = 0;
-	tempRect.bottom = _fontHeight;
+	Rect charRect(_chars[c]._offset, 0,
+		_chars[c]._offset + _chars[c]._width, _fontHeight);
 	Point destPos(pt.x + destRect.left, pt.y + destRect.top);
 
 	if (srcRect->isEmpty())
@@ -257,34 +256,34 @@ WriteCharacterResult STFont::writeChar(CVideoSurface *surface, unsigned char c, 
 	if (destPos.y > srcRect->bottom)
 		return WC_OUTSIDE_BOTTOM;
 
-	if ((destPos.y + tempRect.height()) > srcRect->bottom) {
-		tempRect.bottom += tempRect.top - destPos.y;
+	if ((destPos.y + charRect.height()) > srcRect->bottom) {
+		charRect.bottom += srcRect->bottom - (destPos.y + charRect.height());
 	}
 
 	if (destPos.y < srcRect->top) {
-		if ((tempRect.height() + destPos.y) < srcRect->top)
+		if ((charRect.height() + destPos.y) < srcRect->top)
 			return WC_OUTSIDE_TOP;
 
-		tempRect.top += srcRect->top - destPos.y;
+		charRect.top += srcRect->top - destPos.y;
 		destPos.y = srcRect->top;
 	}
 
 	if (destPos.x < srcRect->left) {
-		if ((tempRect.width() + destPos.x) < srcRect->left)
+		if ((charRect.width() + destPos.x) < srcRect->left)
 			return WC_OUTSIDE_LEFT;
 
-		tempRect.left += srcRect->left - destPos.x;
+		charRect.left += srcRect->left - destPos.x;
 		destPos.x = srcRect->left;
 	} else {
-		if ((tempRect.width() + destPos.x) > srcRect->right) {
+		if ((destPos.x + charRect.width()) > srcRect->right) {
 			if (destPos.x > srcRect->right)
 				return WC_OUTSIDE_RIGHT;
 
-			tempRect.right += srcRect->left - destPos.x;
+			charRect.right += srcRect->right - destPos.x - charRect.width();
 		}
 	}
 
-	copyRect(surface, destPos, tempRect);
+	copyRect(surface, destPos, charRect);
 	return WC_IN_BOUNDS;
 }
 
@@ -296,8 +295,9 @@ void STFont::copyRect(CVideoSurface *surface, const Point &pt, Rect &rect) {
 		for (int yp = rect.top; yp < rect.bottom; ++yp, lineP += surface->getWidth()) {
 			uint16 *destP = lineP;
 			for (int xp = rect.left; xp < rect.right; ++xp, ++destP) {
-				const byte *srcP = _dataPtr + yp * _dataWidth + xp;
-				surface->changePixel(destP, &color, *srcP >> 3, true);
+				const byte *transP = _dataPtr + yp * _dataWidth + xp;
+				surface->copyPixel(destP, &color, *transP >> 3,
+					surface->getRawSurface()->format, true);
 			}
 		}
 
@@ -317,10 +317,10 @@ void STFont::extendBounds(Point &textSize, byte c, int maxWidth) const {
 void STFont::checkLineWrap(Point &textSize, int maxWidth, const char *&str) const {
 	bool flag = false;
 	int totalWidth = 0;
-	for (const char *srcPtr = str; *srcPtr && *srcPtr != ' '; ++srcPtr) {
-		if (*srcPtr == ' ' && flag)
-			break;
 
+	// Loop forward getting the width of the word (including preceding space)
+	// until a space is encountered following at least one character
+	for (const char *srcPtr = str; *srcPtr && (*srcPtr != ' ' || !flag); ++srcPtr) {
 		if (*srcPtr == TEXTCMD_NPC) {
 			srcPtr += 3;
 		} else if (*srcPtr == TEXTCMD_SET_COLOR) {

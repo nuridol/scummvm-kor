@@ -62,10 +62,8 @@ namespace Video {
  */
 class AVIDecoder : public VideoDecoder {
 public:
-	typedef bool(*SelectTrackFn)(bool isVideo, int trackNumber);
-	AVIDecoder(Audio::Mixer::SoundType soundType = Audio::Mixer::kPlainSoundType, SelectTrackFn trackFn = nullptr);
-	AVIDecoder(const Common::Rational &frameRateOverride, Audio::Mixer::SoundType soundType = Audio::Mixer::kPlainSoundType,
-		SelectTrackFn trackFn = nullptr);
+	AVIDecoder();
+	AVIDecoder(const Common::Rational &frameRateOverride);
 	virtual ~AVIDecoder();
 
 	bool loadStream(Common::SeekableReadStream *stream);
@@ -77,6 +75,27 @@ public:
 	bool isRewindable() const { return true; }
 	bool isSeekable() const;
 
+	/**
+	 * Decode the next frame into a surface and return the latter.
+	 *
+	 * A subclass may override this, but must still call this function. As an
+	 * example, a subclass may do this to apply some global video scale to
+	 * individual track's frame.
+	 *
+	 * Note that this will call readNextPacket() internally first before calling
+	 * the next video track's decodeNextFrame() function.
+	 *
+	 * @return a surface containing the decoded frame, or 0
+	 * @note Ownership of the returned surface stays with the VideoDecoder,
+	 *       hence the caller must *not* free it.
+	 * @note this may return 0, in which case the last frame should be kept on screen
+	 */
+	virtual const Graphics::Surface *decodeNextFrame();
+
+	/**
+	 * Decodes the next transparency track frame
+	 */
+	const Graphics::Surface *decodeNextTransparency();
 protected:
 	// VideoDecoder API
 	void readNextPacket();
@@ -190,6 +209,7 @@ protected:
 
 		uint16 getWidth() const { return _bmInfo.width; }
 		uint16 getHeight() const { return _bmInfo.height; }
+		uint16 getBitCount() const { return _bmInfo.bitCount; }
 		Graphics::PixelFormat getPixelFormat() const;
 		int getCurFrame() const { return _curFrame; }
 		int getFrameCount() const { return _frameCount; }
@@ -210,9 +230,38 @@ protected:
 		bool isRewindable() const { return true; }
 		bool rewind();
 
-	protected:
+		/**
+		 * Set the video track to play in reverse or forward.
+		 *
+		 * By default, a VideoTrack must decode forward.
+		 *
+		 * @param reverse true for reverse, false for forward
+		 * @return true for success, false for failure
+		 */
+		virtual bool setReverse(bool reverse);
+
+		/**
+		 * Is the video track set to play in reverse?
+		 */
+		virtual bool isReversed() const { return _reversed; }
+
+		/**
+		 * Returns true if at the end of the video track
+		 */
+		virtual bool endOfTrack() const;
+
+		/**
+		 * Get track frame rate
+		 */
 		Common::Rational getFrameRate() const { return Common::Rational(_vidsHeader.rate, _vidsHeader.scale); }
 
+		/**
+		 * Force sets a new frame rate
+		 */
+		void setFrameRate(const Common::Rational &r) {
+			_vidsHeader.rate = r.getNumerator();
+			_vidsHeader.scale = r.getDenominator();
+		}
 	private:
 		AVIStreamHeader _vidsHeader;
 		BitmapInfoHeader _bmInfo;
@@ -220,6 +269,7 @@ protected:
 		byte *_initialPalette;
 		mutable bool _dirtyPalette;
 		int _frameCount, _curFrame;
+		bool _reversed;
 
 		Image::Codec *_videoCodec;
 		const Graphics::Surface *_lastFrame;
@@ -233,7 +283,6 @@ protected:
 
 		virtual void createAudioStream();
 		virtual void queueSound(Common::SeekableReadStream *stream);
-		Audio::Mixer::SoundType getSoundType() const { return _soundType; }
 		void skipAudio(const Audio::Timestamp &time, const Audio::Timestamp &frameTime);
 		virtual void resetStream();
 		uint32 getCurChunk() const { return _curChunk; }
@@ -258,7 +307,6 @@ protected:
 
 		AVIStreamHeader _audsHeader;
 		PCMWaveFormat _wvInfo;
-		Audio::Mixer::SoundType _soundType;
 		Audio::AudioStream *_audioStream;
 		Audio::PacketizedAudioStream *_packetStream;
 		uint32 _curChunk;
@@ -272,22 +320,25 @@ protected:
 		uint32 chunkSearchOffset;
 	};
 
+	class IndexEntries : public Common::Array<OldIndex> {
+	public:
+		OldIndex *find(uint index, uint frameNumber);
+	};
+
 	AVIHeader _header;
 
 	void readOldIndex(uint32 size);
-	Common::Array<OldIndex> _indexEntries;
+	IndexEntries _indexEntries;
 
 	Common::SeekableReadStream *_fileStream;
 	bool _decodedHeader;
 	bool _foundMovieList;
 	uint32 _movieListStart, _movieListEnd;
 
-	Audio::Mixer::SoundType _soundType;
 	Common::Rational _frameRateOverride;
 
 	int _videoTrackCounter, _audioTrackCounter;
 	Track *_lastAddedTrack;
-	SelectTrackFn _selectTrackFn;
 
 	void initCommon();
 
@@ -297,15 +348,26 @@ protected:
 	void handleStreamHeader(uint32 size);
 	void readStreamName(uint32 size);
 	uint16 getStreamType(uint32 tag) const { return tag & 0xFFFF; }
-	byte getStreamIndex(uint32 tag) const;
+	static byte getStreamIndex(uint32 tag);
 	void checkTruemotion1();
+	uint getVideoTrackOffset(uint trackIndex, uint frameNumber = 0);
 
 	void handleNextPacket(TrackStatus& status);
 	bool shouldQueueAudio(TrackStatus& status);
-	Common::Array<TrackStatus> _videoTracks, _audioTracks;
+	void seekTransparencyFrame(int frame);
 
+	Common::Array<TrackStatus> _videoTracks, _audioTracks;
+	TrackStatus _transparencyTrack;
 public:
 	virtual AVIAudioTrack *createAudioTrack(AVIStreamHeader sHeader, PCMWaveFormat wvInfo);
+
+	/**
+	 * Seek to a given frame.
+	 *
+	 * This only works when the video track(s) supports getFrameTime().
+	 * This calls seek() internally.
+	 */
+	virtual bool seekToFrame(uint frame);
 };
 
 } // End of namespace Video

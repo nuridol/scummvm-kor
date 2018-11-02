@@ -24,6 +24,7 @@
 #include "common/algorithm.h"
 #include "xeen/party.h"
 #include "xeen/dialogs_error.h"
+#include "xeen/dialogs_input.h"
 #include "xeen/files.h"
 #include "xeen/resources.h"
 #include "xeen/saves.h"
@@ -31,6 +32,8 @@
 #include "xeen/xeen.h"
 
 namespace Xeen {
+
+/*------------------------------------------------------------------------*/
 
 Roster::Roster() {
 	resize(TOTAL_CHARACTERS);
@@ -75,7 +78,7 @@ Party::Party(XeenEngine *vm) {
 	_vm = vm;
 	_mazeDirection = DIR_NORTH;
 	_mazeId = _priorMazeId = 0;
-	_levitateActive = false;
+	_levitateCount = 0;
 	_automapOn = false;
 	_wizardEyeActive = false;
 	_clairvoyanceActive = false;
@@ -109,9 +112,11 @@ Party::Party(XeenEngine *vm) {
 	_totalTime = 0;
 	_rested = false;
 
-	Common::fill(&_gameFlags[0], &_gameFlags[512], false);
+	Common::fill(&_gameFlags[0][0], &_gameFlags[0][256], false);
+	Common::fill(&_gameFlags[1][0], &_gameFlags[1][256], false);
 	Common::fill(&_worldFlags[0], &_worldFlags[128], false);
-	Common::fill(&_quests[0], &_quests[64], false);
+	Common::fill(&_questFlags[0][0], &_questFlags[0][30], false);
+	Common::fill(&_questFlags[1][0], &_questFlags[1][30], false);
 	Common::fill(&_questItems[0], &_questItems[85], 0);
 
 	for (int i = 0; i < TOTAL_CHARACTERS; ++i)
@@ -158,7 +163,7 @@ void Party::synchronize(Common::Serializer &s) {
 	s.syncBytes(dummy, 3);
 
 	s.syncAsByte(_priorMazeId);
-	s.syncAsByte(_levitateActive);
+	s.syncAsByte(_levitateCount);
 	s.syncAsByte(_automapOn);
 	s.syncAsByte(_wizardEyeActive);
 	s.syncAsByte(_clairvoyanceActive);
@@ -201,9 +206,11 @@ void Party::synchronize(Common::Serializer &s) {
 	s.syncAsUint32LE(_bankGems);
 	s.syncAsUint32LE(_totalTime);
 	s.syncAsByte(_rested);
-	SavesManager::syncBitFlags(s, &_gameFlags[0], &_gameFlags[512]);
+	SavesManager::syncBitFlags(s, &_gameFlags[0][0], &_gameFlags[0][256]);
+	SavesManager::syncBitFlags(s, &_gameFlags[1][0], &_gameFlags[1][256]);
 	SavesManager::syncBitFlags(s, &_worldFlags[0], &_worldFlags[128]);
-	SavesManager::syncBitFlags(s, &_quests[0], &_quests[64]);
+	SavesManager::syncBitFlags(s, &_questFlags[0][0], &_questFlags[0][30]);
+	SavesManager::syncBitFlags(s, &_questFlags[1][0], &_questFlags[1][30]);
 
 	for (int i = 0; i < 85; ++i)
 		s.syncAsByte(_questItems[i]);
@@ -281,8 +288,10 @@ void Party::changeTime(int numMinutes) {
 					!player._conditions[ERADICATED]) {
 				for (int statNum = 0; statNum < TOTAL_STATS; ++statNum) {
 					int statVal = player.getStat((Attribute)statNum);
-					if (statVal < 1)
+					if (statVal < 1) {
 						player._conditions[DEAD] = 1;
+						killed = true;
+					}
 				}
 			}
 
@@ -387,7 +396,8 @@ void Party::addTime(int numMinutes) {
 
 	if ((_day % 10) == 1 || numMinutes > (24 * 60)) {
 		if (_day != day) {
-			warning("TODO: resetBlacksmith? and giveInterest?");
+			resetBlacksmithWares();
+			giveBankInterest();
 		}
 	}
 
@@ -441,7 +451,7 @@ void Party::resetTemps() {
 	_electricityResistence = 0;
 	_fireResistence = 0;
 	_lightCount = 0;
-	_levitateActive = false;
+	_levitateCount = 0;
 	_walkOnWaterActive = false;
 	_wizardEyeActive = false;
 	_clairvoyanceActive = false;
@@ -725,9 +735,806 @@ bool Party::canShoot() const {
 	return false;
 }
 
-bool Party::giveTake(int mode1, uint32 mask1, int mode2, int mask2, int charIdx) {
-	error("TODO");
+bool Party::giveTake(int takeMode, uint takeVal, int giveMode, uint giveVal, int charIdx) {
+	Combat &combat = *_vm->_combat;
+	FileManager &files = *_vm->_files;
+	Interface &intf = *_vm->_interface;
+	Scripts &scripts = *_vm->_scripts;
+
+	if (charIdx > 7) {
+		charIdx = 7;
+		takeMode = 0;
+	}
+
+	Character &ps = _activeParty[charIdx];
+	if (takeMode && !takeVal && takeMode != 104) {
+		takeVal = howMuch();
+		if (!takeVal)
+			return true;
+
+		if (giveMode && !giveVal)
+			giveVal = takeVal;
+	} else if (takeMode == giveMode && takeVal == giveVal) {
+		if (giveVal)
+			takeVal = _vm->getRandomNumber(1, giveVal);
+		giveVal = 0;
+		giveMode = 0;
+	}
+
+	switch (takeMode) {
+	case 8:
+		combat.giveCharDamage(takeVal, scripts._nEdamageType, charIdx);
+		break;
+	case 9:
+		if (ps._hasSpells) {
+			ps._currentSp -= takeVal;
+			if (ps._currentSp < 1)
+				ps._currentSp = 0;
+		}
+		break;
+	case 10:
+	case 77:
+		ps._ACTemp -= takeVal;
+		break;
+	case 11:
+		ps._level._temporary -= takeVal;
+		break;
+	case 12:
+		ps._tempAge -= takeVal;
+		break;
+	case 13:
+		ps._skills[THIEVERY] = 0;
+		break;
+	case 15:
+		ps.setAward(takeVal, false);
+		break;
+	case 16:
+		ps._experience -= takeVal;
+		break;
+	case 17:
+		_poisonResistence -= takeVal;
+		break;
+	case 18:
+		ps._conditions[takeVal] = 0;
+		break;
+	case 19: {
+		int idx2 = 0;
+		switch (ps._class) {
+		case CLASS_PALADIN:
+		case CLASS_CLERIC:
+			idx2 = 0;
+			break;
+		case CLASS_ARCHER:
+		case CLASS_SORCERER:
+			idx2 = 1;
+			break;
+		case CLASS_DRUID:
+		case CLASS_RANGER:
+			idx2 = 2;
+			break;
+		default:
+			break;
+		}
+
+		for (int idx = 0; idx < 39; ++idx) {
+			if (Res.SPELLS_ALLOWED[idx2][idx] == takeVal) {
+				ps._spells[idx] = 0;
+				break;
+			}
+		}
+		break;
+	}
+	case 20:
+		_gameFlags[files._isDarkCc][takeVal] = false;
+		break;
+	case 21: {
+		bool found = false;
+		for (int idx = 0; idx < 9; ++idx) {
+			if (takeVal < 35) {
+				if (ps._weapons[idx]._id == takeVal) {
+					ps._weapons[idx].clear();
+					ps._weapons.sort();
+					found = true;
+					break;
+				}
+			} else if (takeVal < 49) {
+				if (ps._armor[idx]._id == (takeVal - 35)) {
+					ps._armor[idx].clear();
+					ps._armor.sort();
+					found = true;
+					break;
+				}
+			} else if (takeVal < 60) {
+				if (ps._accessories[idx]._id == (takeVal - 49)) {
+					ps._accessories[idx].clear();
+					ps._accessories.sort();
+					found = true;
+					break;
+				}
+			} else if (takeVal < 82) {
+				if (ps._misc[idx]._material == ((int)takeVal - 60)) {
+					ps._misc[idx].clear();
+					ps._misc.sort();
+					found = true;
+					break;
+				}
+			} else {
+				error("Invalid id");
+			}
+		}
+		if (!found)
+			return true;
+		break;
+	}
+	case 25:
+		changeTime(takeVal);
+		break;
+	case 34:
+		if (!subtract(0, takeVal, 0, WT_3))
+			return true;
+		break;
+	case 35:
+		if (!subtract(1, takeVal, 0, WT_3))
+			return true;
+		break;
+	case 37:
+		ps._might._temporary -= takeVal;
+		break;
+	case 38:
+		ps._intellect._temporary -= takeVal;
+		break;
+	case 39:
+		ps._personality._temporary -= takeVal;
+		break;
+	case 40:
+		ps._endurance._temporary -= takeVal;
+		break;
+	case 41:
+		ps._speed._temporary -= takeVal;
+		break;
+	case 42:
+		ps._accuracy._temporary -= takeVal;
+		break;
+	case 43:
+		ps._luck._temporary -= takeVal;
+		break;
+	case 45:
+		ps._might._permanent -= takeVal;
+		break;
+	case 46:
+		ps._intellect._permanent -= takeVal;
+		break;
+	case 47:
+		ps._personality._permanent -= takeVal;
+		break;
+	case 48:
+		ps._endurance._permanent -= takeVal;
+		break;
+	case 49:
+		ps._speed._permanent -= takeVal;
+		break;
+	case 50:
+		ps._accuracy._permanent -= takeVal;
+		break;
+	case 51:
+		ps._luck._permanent -= takeVal;
+		break;
+	case 52:
+		ps._fireResistence._permanent -= takeVal;
+		break;
+	case 53:
+		ps._electricityResistence._permanent -= takeVal;
+		break;
+	case 54:
+		ps._coldResistence._permanent -= takeVal;
+		break;
+	case 55:
+		ps._poisonResistence._permanent -= takeVal;
+		break;
+	case 56:
+		ps._energyResistence._permanent -= takeVal;
+		break;
+	case 57:
+		ps._magicResistence._permanent -= takeVal;
+		break;
+	case 58:
+		ps._fireResistence._temporary -= takeVal;
+		break;
+	case 59:
+		ps._electricityResistence._temporary -= takeVal;
+		break;
+	case 60:
+		ps._coldResistence._temporary -= takeVal;
+		break;
+	case 61:
+		ps._poisonResistence._temporary -= takeVal;
+		break;
+	case 62:
+		ps._energyResistence._temporary -= takeVal;
+		break;
+	case 63:
+		ps._magicResistence._temporary -= takeVal;
+		break;
+	case 64:
+		ps._level._permanent -= takeVal;
+		break;
+	case 65:
+		if (!subtract(2, takeVal, 0, WT_3))
+			return true;
+		break;
+	case 69:
+		_levitateCount -= takeVal;
+		break;
+	case 70:
+		_lightCount -= takeVal;
+		break;
+	case 71:
+		_fireResistence -= takeVal;
+		break;
+	case 72:
+		_electricityResistence -= takeVal;
+		break;
+	case 73:
+		_coldResistence -= takeVal;
+		break;
+	case 74:
+		_levitateCount -= takeVal;
+		_lightCount -= takeVal;
+		_fireResistence -= takeVal;
+		_electricityResistence -= takeVal;
+		_coldResistence -= takeVal;
+		_poisonResistence -= takeVal;
+		_walkOnWaterActive = false;
+		break;
+	case 76:
+		subPartyTime(takeVal * 1440);
+		break;
+	case 79:
+		_wizardEyeActive = false;
+		break;
+	case 85:
+		_year -= takeVal;
+		break;
+	case 94:
+		_walkOnWaterActive = false;
+		break;
+	case 103:
+		_worldFlags[takeVal] = false;
+		break;
+	case 104:
+		_questFlags[files._isDarkCc][takeVal] = false;
+		break;
+	case 107:
+		_characterFlags[ps._rosterId][takeVal] = false;
+		break;
+	default:
+		break;
+	}
+
+	switch (giveMode) {
+	case 3:
+		ps._sex = (Sex)giveVal;
+		break;
+	case 4:
+		ps._race = (Race)giveVal;
+		break;
+	case 5:
+		ps._class = (CharacterClass)giveVal;
+		break;
+	case 8:
+		intf.spellFX(&ps);
+		ps._currentHp += giveVal;
+		break;
+	case 9:
+		ps._currentSp += giveVal;
+		break;
+	case 10:
+		ps._ACTemp += giveVal;
+		break;
+	case 11:
+		ps._level._temporary += giveVal;
+		break;
+	case 12:
+		ps._tempAge += giveVal;
+		break;
+	case 13:
+		assert(giveVal < 18);
+		ps._skills[giveVal]++;
+		break;
+	case 15:
+		ps.setAward(giveVal, true);
+		if (giveVal != 8)
+			intf.spellFX(&ps);
+		break;
+	case 16:
+		ps._experience += giveVal;
+		intf.spellFX(&ps);
+		break;
+	case 17:
+		_poisonResistence += giveVal;
+		break;
+	case 18:
+		if (giveVal == 16) {
+			Common::fill(&ps._conditions[0], &ps._conditions[16], 0);
+		} else if (giveVal == 6) {
+			ps._conditions[giveVal] = 1;
+		} else {
+			assert(giveVal < 16);
+			ps._conditions[giveVal]++;
+		}
+
+		if (giveVal >= 13 && giveVal <= 15 && ps._currentHp > 0)
+			ps._currentHp = 0;
+		break;
+	case 19: {
+		int idx2 = 0;
+		switch (ps._class) {
+		case CLASS_PALADIN:
+		case CLASS_CLERIC:
+			idx2 = 0;
+			break;
+		case CLASS_ARCHER:
+		case CLASS_SORCERER:
+			idx2 = 1;
+			break;
+		case CLASS_DRUID:
+		case CLASS_RANGER:
+			idx2 = 2;
+			break;
+		default:
+			break;
+		}
+
+		for (int idx = 0; idx < 39; ++idx) {
+			if (Res.SPELLS_ALLOWED[idx2][idx] == giveVal) {
+				ps._spells[idx] = 1;
+				intf.spellFX(&ps);
+				break;
+			}
+		}
+		break;
+	}
+	case 20:
+		_gameFlags[files._isDarkCc][giveVal] = true;
+		break;
+	case 21: {
+		int idx;
+		if (giveVal < 35) {
+			for (idx = 0; idx < 10 && _treasure._weapons[idx]._id; ++idx);
+			if (idx < 10) {
+				_treasure._weapons[idx]._id = giveVal;
+				_treasure._hasItems = true;
+				return false;
+			}
+		} else if (giveVal < 49) {
+			for (idx = 0; idx < 10 && _treasure._armor[idx]._id; ++idx);
+			if (idx < 10) {
+				_treasure._armor[idx]._id = giveVal - 35;
+				_treasure._hasItems = true;
+				return false;
+			}
+		} else if (giveVal < 60) {
+			for (idx = 0; idx < 10 && _treasure._accessories[idx]._id; ++idx);
+			if (idx < 10) {
+				_treasure._accessories[idx]._id = giveVal - 49;
+				_treasure._hasItems = true;
+				return false;
+			}
+		} else if (giveVal < 82) {
+			for (idx = 0; idx < 10 && _treasure._misc[idx]._material; ++idx);
+			if (idx < 10) {
+				_treasure._accessories[idx]._material = giveVal - 60;
+				_treasure._hasItems = true;
+				return false;
+			}
+		} else {
+			error("Invalid id");
+		}
+		return true;
+	}	
+	case 25:
+		subPartyTime(giveVal);
+		intf.spellFX(&ps);
+		break;
+	case 34:
+		_gold += giveVal;
+		break;
+	case 35:
+		_gems += giveVal;
+		break;
+	case 37:
+		ps._might._temporary = MIN(ps._might._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 38:
+		ps._intellect._temporary = MIN(ps._intellect._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 39:
+		ps._personality._temporary = MIN(ps._personality._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 40:
+		ps._endurance._temporary = MIN(ps._endurance._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 41:
+		ps._speed._temporary = MIN(ps._speed._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 42:
+		ps._accuracy._temporary = MIN(ps._accuracy._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 43:
+		ps._luck._temporary = MIN(ps._luck._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 45:
+		ps._might._permanent = MIN(ps._might._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 46:
+		ps._intellect._permanent = MIN(ps._intellect._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 47:
+		ps._personality._permanent = MIN(ps._personality._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 48:
+		ps._endurance._permanent = MIN(ps._endurance._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 49:
+		ps._speed._permanent = MIN(ps._speed._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 50:
+		ps._accuracy._permanent = MIN(ps._accuracy._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 51:
+		ps._luck._permanent = MIN(ps._luck._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 52:
+		ps._fireResistence._permanent = MIN(ps._fireResistence._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 53:
+		ps._electricityResistence._permanent = MIN(ps._electricityResistence._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 54:
+		ps._coldResistence._permanent = MIN(ps._coldResistence._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 55:
+		ps._poisonResistence._permanent = MIN(ps._poisonResistence._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 56:
+		ps._energyResistence._permanent = MIN(ps._energyResistence._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 57:
+		ps._magicResistence._permanent = MIN(ps._magicResistence._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 58:
+		ps._luck._temporary = MIN(ps._luck._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 59:
+		ps._electricityResistence._temporary = MIN(ps._electricityResistence._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 60:
+		ps._coldResistence._temporary = MIN(ps._coldResistence._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 61:
+		ps._poisonResistence._temporary = MIN(ps._poisonResistence._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 62:
+		ps._energyResistence._temporary = MIN(ps._energyResistence._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 63:
+		ps._magicResistence._temporary = MIN(ps._magicResistence._temporary + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 64:
+		ps._level._permanent = MIN(ps._level._permanent + giveVal, (uint)255);
+		intf.spellFX(&ps);
+		break;
+	case 65:
+		_food += giveVal;
+		break;
+	case 66: {
+		warning("TODO: Verify case 66");
+		Character &c = _itemsCharacter;
+		int idx = -1;
+		if (scripts._itemType != 0) {
+			for (idx = 0; idx < 10 && _treasure._misc[idx]._material; ++idx);
+			if (idx == 10)
+				return true;
+		}
+
+		int result = ps.makeItem(giveVal, 0, (idx == -1) ? 12 : 0);
+		switch (result) {
+		case 0:
+			for (idx = 0; idx < 10 && _treasure._weapons[idx]._id; ++idx);
+			if (idx == 10)
+				return true;
+
+			ps._weapons[idx]._material = c._weapons[0]._material;
+			ps._weapons[idx]._id = c._weapons[0]._id;
+			ps._weapons[idx]._bonusFlags = c._weapons[0]._bonusFlags;
+			_treasure._hasItems = true;
+			break;
+
+		case 1:
+			for (idx = 0; idx < 10 && _treasure._armor[idx]._id; ++idx);
+			if (idx == 10)
+				return true;
+
+			ps._armor[idx]._material = c._armor[0]._material;
+			ps._armor[idx]._id = c._armor[0]._id;
+			ps._armor[idx]._bonusFlags = c._armor[0]._bonusFlags;
+			_treasure._hasItems = true;
+			break;
+
+		case 2:
+			for (idx = 0; idx < 10 && _treasure._accessories[idx]._id; ++idx);
+			if (idx == 10)
+				return true;
+
+			ps._accessories[idx]._material = c._accessories[0]._material;
+			ps._accessories[idx]._id = c._accessories[0]._id;
+			ps._accessories[idx]._bonusFlags = c._accessories[0]._bonusFlags;
+			_treasure._hasItems = true;
+			break;
+
+		case 3:
+			for (idx = 0; idx < 10 && _treasure._misc[idx]._material; ++idx);
+			if (idx == 10)
+				return true;
+
+			ps._misc[idx]._material = c._misc[0]._material;
+			ps._misc[idx]._id = c._misc[0]._id;
+			ps._misc[idx]._bonusFlags = c._misc[0]._bonusFlags;
+			_treasure._hasItems = true;
+			break;
+
+		default:
+			return true;
+		}
+		break;
+	}
+	case 69:
+		_levitateCount += giveVal;
+		break;
+	case 70:
+		_lightCount += giveVal;
+		break;
+	case 71:
+		_fireResistence += giveVal;
+		break;
+	case 72:
+		_electricityResistence += giveVal;
+		break;
+	case 73:
+		_coldResistence += giveVal;
+		break;
+	case 74:
+		_levitateCount += giveVal;
+		_lightCount += giveVal;
+		_fireResistence += giveVal;
+		_electricityResistence += giveVal;
+		_coldResistence += giveVal;
+		_poisonResistence += giveVal;
+		_walkOnWaterActive = false;
+		break;
+	case 76:
+		addTime(giveVal * 1440);
+		break;
+	case 77:
+		ps._ACTemp += giveVal;
+		intf.spellFX(&ps);
+		break;
+	case 78:
+		ps._currentHp = ps.getMaxHP();
+		intf.spellFX(&ps);
+		break;
+	case 79:
+		_wizardEyeActive = true;
+		break;
+	case 81:
+		ps._currentSp = ps.getMaxSP();
+		intf.spellFX(&ps);
+		break;
+	case 82:
+		combat.giveCharDamage(giveVal, scripts._nEdamageType, charIdx);
+		break;
+	case 85:
+		_year += giveVal;
+		resetYearlyBits();
+		resetTemps();
+		_rested = true;
+		break;
+	case 94:
+		_walkOnWaterActive = true;
+		break;
+	case 100:
+		_gold += _vm->getRandomNumber(1, giveVal);
+		break;
+	case 103:
+		assert(takeVal < 128);
+		_worldFlags[takeVal] = true;
+		break;
+	case 104:
+		assert(giveVal < 30);
+		_questFlags[files._isDarkCc][giveVal] = true;
+		break;
+	case 107:
+		assert(takeVal < 24);
+		_characterFlags[ps._rosterId][takeVal] = true;
+		break;
+	default:
+		break;
+	}
+
+	return false;
 }
 
+int Party::howMuch() {
+	return HowMuch::show(_vm);
+}
+
+void Party::subPartyTime(int time) {
+	for (_minutes -= time; _minutes < 0; _minutes += 1440) {
+		if (--_day < 0) {
+			_day += 100;
+			--_year;
+		}
+	}
+}
+
+void Party::resetYearlyBits() {
+	_gameFlags[0][55] = false;
+	_gameFlags[0][155] = false;
+	_gameFlags[0][222] = false;
+	_gameFlags[0][231] = false;
+}
+
+const int BLACKSMITH_DATA1[4][4] = {
+	{ 15, 5, 5, 5 },{ 5, 10, 5, 5 },{ 0, 5, 10, 5 },{ 0, 0, 0, 5 }
+};
+const int BLACKSMITH_DATA2[4][4] = {
+	{ 10, 5, 0, 5 },{ 10, 5, 5, 5 },{ 0, 5, 5, 10 },{ 0, 5, 10, 0 }
+};
+
+void Party::resetBlacksmithWares() {
+	Character &c = _itemsCharacter;
+	int catCount[4];
+
+	// Clear existing blacksmith wares
+	for (int i = 0; i < 2; ++i) {
+		for (int j = 0; j < ITEMS_COUNT; ++j) {
+			_blacksmithWeapons[i][j].clear();
+			_blacksmithArmor[i][j].clear();
+			_blacksmithAccessories[i][j].clear();
+			_blacksmithWeapons[i][j].clear();
+		}
+	}
+
+	for (int idx1 = 0; idx1 < 4; ++idx1) {
+		Common::fill(&catCount[0], &catCount[4], 0);
+
+		for (int idx2 = 0; idx2 < 4; ++idx2) {
+			for (int idx3 = 0; idx3 < BLACKSMITH_DATA1[idx2][idx1]; ++idx3) {
+				int itemCat = c.makeItem(idx2 + 1, 0, 0);
+				if (catCount[itemCat] < 8) {
+					switch (itemCat) {
+					case CATEGORY_WEAPON: {
+						XeenItem &item = _blacksmithWeapons[0][catCount[itemCat] * 4 + idx1];
+						item._id = c._weapons[0]._id;
+						item._material = c._weapons[0]._material;
+						item._bonusFlags = c._weapons[0]._bonusFlags;
+						break;
+					}
+
+					case CATEGORY_ARMOR: {
+						XeenItem &item = _blacksmithArmor[0][catCount[itemCat] * 4 + idx1];
+						item._id = c._armor[0]._id;
+						item._material = c._armor[0]._material;
+						item._bonusFlags = c._armor[0]._bonusFlags;
+						break;
+					}
+
+					case CATEGORY_ACCESSORY: {
+						XeenItem &item = _blacksmithAccessories[0][catCount[itemCat] * 4 + idx1];
+						item._id = c._accessories[0]._id;
+						item._material = c._accessories[0]._material;
+						item._bonusFlags = c._accessories[0]._bonusFlags;
+						break;
+					}
+
+					case CATEGORY_MISC: {
+						XeenItem &item = _blacksmithMisc[0][catCount[itemCat] * 4 + idx1];
+						item._id = c._misc[0]._id;
+						item._material = c._misc[0]._material;
+						item._bonusFlags = c._misc[0]._bonusFlags;
+						break;
+					}
+
+					default:
+						break;
+					}
+
+					++catCount[itemCat];
+				}
+			}
+		}
+	}
+
+	for (int idx1 = 0; idx1 < 4; ++idx1) {
+		Common::fill(&catCount[0], &catCount[4], 0);
+
+		for (int idx2 = 0; idx2 < 4; ++idx2) {
+			for (int idx3 = 0; idx3 < BLACKSMITH_DATA2[idx2][idx1]; ++idx3) {
+				int itemCat = c.makeItem(idx2 + (idx1 >= 2 ? 3 : 1), 0, 0);
+				if (catCount[itemCat] < 8) {
+					switch (itemCat) {
+					case CATEGORY_WEAPON: {
+						XeenItem &item = _blacksmithWeapons[1][catCount[itemCat] * 4 + idx1];
+						item._id = c._weapons[0]._id;
+						item._material = c._weapons[0]._material;
+						item._bonusFlags = c._weapons[0]._bonusFlags;
+						break;
+					}
+
+					case CATEGORY_ARMOR: {
+						XeenItem &item = _blacksmithArmor[1][catCount[itemCat] * 4 + idx1];
+						item._id = c._armor[0]._id;
+						item._material = c._armor[0]._material;
+						item._bonusFlags = c._armor[0]._bonusFlags;
+						break;
+					}
+
+					case CATEGORY_ACCESSORY: {
+						XeenItem &item = _blacksmithAccessories[1][catCount[itemCat] * 4 + idx1];
+						item._id = c._accessories[0]._id;
+						item._material = c._accessories[0]._material;
+						item._bonusFlags = c._accessories[0]._bonusFlags;
+						break;
+					}
+
+					case CATEGORY_MISC: {
+						XeenItem &item = _blacksmithMisc[1][catCount[itemCat] * 4 + idx1];
+						item._id = c._misc[0]._id;
+						item._material = c._misc[0]._material;
+						item._bonusFlags = c._misc[0]._bonusFlags;
+						break;
+					}
+
+					default:
+						break;
+					}
+
+					++catCount[itemCat];
+				}
+			}
+		}
+	}
+}
+
+void Party::giveBankInterest() {
+	_bankGold += _bankGold / 100;
+	_bankGems += _bankGems / 100;
+}
 
 } // End of namespace Xeen

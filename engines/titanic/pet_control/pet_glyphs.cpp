@@ -39,7 +39,7 @@ void CPetGlyph::drawAt(CScreenManager *screenManager, const Point &pt, bool isHi
 }
 
 void CPetGlyph::updateTooltip() {
-	CPetText *petText = getPetSection()->getText();
+	CTextControl *petText = getPetSection()->getText();
 	if (petText) {
 		petText->setColor(getPetSection()->getColor(0));
 		getTooltip(petText);
@@ -101,9 +101,9 @@ void CPetGlyphs::setup(int numVisible, CPetSection *owner) {
 	int buttonsLeft = numVisible * 70 + 21;
 
 	_scrollLeft.setBounds(Rect(0, 0, 31, 15));
-	_scrollLeft.translate(buttonsLeft, 373);
+	_scrollLeft.translate(buttonsLeft + 7, 373);
 	_scrollRight.setBounds(Rect(0, 0, 31, 15));
-	_scrollRight.translate(buttonsLeft, 413);
+	_scrollRight.translate(buttonsLeft + 7, 413);
 }
 
 void CPetGlyphs::reset() {
@@ -155,11 +155,11 @@ void CPetGlyphs::draw(CScreenManager *screenManager) {
 		int itemIndex = getItemIndex(index);
 
 		if (itemIndex >= 0 && itemIndex < listSize) {
-			Point pt = getPosition(itemIndex);
+			Point pt = getPosition(index);
 			CPetGlyph *glyph = getGlyph(itemIndex);
 
 			if (glyph)
-				glyph->drawAt(screenManager, pt, index == _highlightIndex);
+				glyph->drawAt(screenManager, pt, itemIndex == _highlightIndex);
 		}
 	}
 
@@ -415,21 +415,6 @@ bool CPetGlyphs::KeyCharMsg(int key) {
 }
 
 bool CPetGlyphs::VirtualKeyCharMsg(CVirtualKeyCharMsg *msg) {
-	Common::KeyCode key = msg->_keyState.keycode;
-
-	switch (key) {
-	case Common::KEYCODE_LEFT:
-		decSelection();
-		return true;
-
-	case Common::KEYCODE_RIGHT:
-		incSelection();
-		return true;
-
-	default:
-		break;
-	}
-
 	if (_highlightIndex >= 0) {
 		CPetGlyph *glyph = getGlyph(_highlightIndex);
 		if (glyph && glyph->VirtualKeyCharMsg(msg))
@@ -558,8 +543,8 @@ void CPetGlyphs::removeInvalid() {
 			}
 		}
 
-		_firstVisibleIndex = CLIP(_firstVisibleIndex, 0,
-			(int)size() - _numVisibleGlyphs);
+		int max = MAX((int)size() - _numVisibleGlyphs, 0);
+		_firstVisibleIndex = CLIP(_firstVisibleIndex, 0, max);
 	}
 }
 

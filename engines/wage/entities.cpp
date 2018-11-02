@@ -54,6 +54,7 @@
 
 #include "common/memstream.h"
 #include "graphics/managed_surface.h"
+#include "graphics/macgui/macfontmanager.h"
 
 namespace Wage {
 
@@ -86,8 +87,7 @@ Scene::Scene() {
 	_script = NULL;
 	_design = NULL;
 	_textBounds = NULL;
-	_fontSize = 0;
-	_fontType = 0;
+	_font = NULL;
 
 	for (int i = 0; i < 4; i++)
 		_blocked[i] = false;
@@ -111,8 +111,7 @@ Scene::Scene(Common::String name, Common::SeekableReadStream *data) {
 
 	_script = NULL;
 	_textBounds = NULL;
-	_fontSize = 0;
-	_fontType = 0;
+	_font = NULL;
 
 	setDesignBounds(readRect(data));
 	_worldY = data->readSint16BE();
@@ -124,11 +123,11 @@ Scene::Scene(Common::String name, Common::SeekableReadStream *data) {
 	_soundFrequency = data->readSint16BE();
 	_soundType = data->readByte();
 	data->readByte(); // unknown
-	_messages[NORTH] = readPascalString(data);
-	_messages[SOUTH] = readPascalString(data);
-	_messages[EAST] = readPascalString(data);
-	_messages[WEST] = readPascalString(data);
-	_soundName = readPascalString(data);
+	_messages[NORTH] = data->readPascalString();
+	_messages[SOUTH] = data->readPascalString();
+	_messages[EAST] = data->readPascalString();
+	_messages[WEST] = data->readPascalString();
+	_soundName = data->readPascalString();
 
 	_visited = false;
 
@@ -138,6 +137,7 @@ Scene::Scene(Common::String name, Common::SeekableReadStream *data) {
 Scene::~Scene() {
 	delete _script;
 	delete _textBounds;
+	delete _font;
 }
 
 void Scene::paint(Graphics::ManagedSurface *surface, int x, int y) {
@@ -155,15 +155,6 @@ void Scene::paint(Graphics::ManagedSurface *surface, int x, int y) {
 		debug(2, "painting Chr: %s", (*it)->_name.c_str());
 		(*it)->_design->paint(surface, *((WageEngine *)g_engine)->_world->_patterns, x, y);
 	}
-}
-
-const char *Scene::getFontName() {
-	const char *name = ((WageEngine *)g_engine)->_gui->_wm.getFontName(_fontType, _fontSize);
-
-	if (!name)
-		return "Unknown";
-
-	return name;
 }
 
 Designed *Scene::lookUpEntity(int x, int y) {
@@ -238,12 +229,12 @@ Obj::Obj(Common::String name, Common::SeekableReadStream *data, int resourceId) 
 	else
 		error("Obj <%s> had weird returnTo set", name.c_str());
 
-	_sceneOrOwner = readPascalString(data);
-	_clickMessage = readPascalString(data);
-	_operativeVerb = readPascalString(data);
-	_failureMessage = readPascalString(data);
-	_useMessage = readPascalString(data);
-	_sound = readPascalString(data);
+	_sceneOrOwner = data->readPascalString();
+	_clickMessage = data->readPascalString();
+	_operativeVerb = data->readPascalString();
+	_failureMessage = data->readPascalString();
+	_useMessage = data->readPascalString();
+	_sound = data->readPascalString();
 
 	delete data;
 }
@@ -338,27 +329,27 @@ Chr::Chr(Common::String name, Common::SeekableReadStream *data) {
 	else
 		_nameProperNoun = false;
 
-	_initialScene = readPascalString(data);
-	_nativeWeapon1 = readPascalString(data);
-	_operativeVerb1 = readPascalString(data);
-	_nativeWeapon2 = readPascalString(data);
-	_operativeVerb2 = readPascalString(data);
+	_initialScene = data->readPascalString();
+	_nativeWeapon1 = data->readPascalString();
+	_operativeVerb1 = data->readPascalString();
+	_nativeWeapon2 = data->readPascalString();
+	_operativeVerb2 = data->readPascalString();
 
-	_initialComment = readPascalString(data);
-	_scoresHitComment = readPascalString(data);
-	_receivesHitComment = readPascalString(data);
-	_makesOfferComment = readPascalString(data);
-	_rejectsOfferComment = readPascalString(data);
-	_acceptsOfferComment = readPascalString(data);
-	_dyingWords = readPascalString(data);
+	_initialComment = data->readPascalString();
+	_scoresHitComment = data->readPascalString();
+	_receivesHitComment = data->readPascalString();
+	_makesOfferComment = data->readPascalString();
+	_rejectsOfferComment = data->readPascalString();
+	_acceptsOfferComment = data->readPascalString();
+	_dyingWords = data->readPascalString();
 
-	_initialSound = readPascalString(data);
-	_scoresHitSound = readPascalString(data);
-	_receivesHitSound = readPascalString(data);
-	_dyingSound = readPascalString(data);
+	_initialSound = data->readPascalString();
+	_scoresHitSound = data->readPascalString();
+	_receivesHitSound = data->readPascalString();
+	_dyingSound = data->readPascalString();
 
-	_weaponSound1 = readPascalString(data);
-	_weaponSound2 = readPascalString(data);
+	_weaponSound1 = data->readPascalString();
+	_weaponSound2 = data->readPascalString();
 
 	for (int i = 0; i < NUMBER_OF_ARMOR_TYPES; i++)
 		_armor[i] = NULL;

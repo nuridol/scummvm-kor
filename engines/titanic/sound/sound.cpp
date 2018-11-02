@@ -26,9 +26,20 @@
 
 namespace Titanic {
 
+CSoundItem::~CSoundItem() {
+	delete _waveFile;
+}
+
+/*------------------------------------------------------------------------*/
+
 CSound::CSound(CGameManager *owner, Audio::Mixer *mixer) :
 		_gameManager(owner), _soundManager(mixer) {
 	g_vm->_movieManager.setSoundManager(&_soundManager);
+}
+
+CSound::~CSound() {
+	_soundManager.qsWaveMixCloseSession();
+	_sounds.destroyContents();
 }
 
 void CSound::save(SimpleFile *file) const {
@@ -57,7 +68,7 @@ void CSound::preEnterView(CViewItem *newView, bool isNewRoom) {
 	_soundManager.setListenerPosition(xp, yp, zp, cosVal, sinVal, 0, isNewRoom);
 }
 
-bool CSound::isActive(int handle) const {
+bool CSound::isActive(int handle) {
 	if (handle != 0 && handle != -1)
 		return _soundManager.isActive(handle);
 
@@ -159,7 +170,7 @@ int CSound::playSound(const CString &name, CProximity &prox) {
 	if (!waveFile)
 		return -1;
 
-	prox._soundDuration = waveFile->getDuration();
+	prox._soundDuration = waveFile->getDurationTicks();
 	if (prox._soundType != Audio::Mixer::kPlainSoundType)
 		waveFile->_soundType = prox._soundType;
 
@@ -209,9 +220,11 @@ int CSound::playSpeech(CDialogueFile *dialogueFile, int speechId, CProximity &pr
 	if (!waveFile)
 		return -1;
 
-	prox._soundDuration = waveFile->getDuration();
-	activateSound(waveFile, prox._disposeAfterUse);
+	prox._soundDuration = waveFile->getDurationTicks();
+	if (prox._soundType != Audio::Mixer::kPlainSoundType)
+		waveFile->_soundType = prox._soundType;
 
+	activateSound(waveFile, prox._disposeAfterUse);
 	return _soundManager.playSound(*waveFile, prox);
 }
 

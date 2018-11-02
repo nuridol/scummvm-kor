@@ -98,7 +98,7 @@
 				size = '15, 0'
 		/>
 		<widget name = 'TabWidget.Tab'
-				size = '75, 27'
+				size = '40, 27'
 				padding = '0, 0, 8, 0'
 		/>
 
@@ -242,8 +242,47 @@
 				<widget name = 'Cancel'
 						type = 'Button'
 				/>
+				<widget name = 'Apply'
+						type = 'Button'
+				/>
 				<widget name = 'Ok'
 						type = 'Button'
+				/>
+			</layout>
+		</layout>
+	</dialog>
+	
+	<dialog name = 'GlobalOptions_Control' overlays = 'Dialog.GlobalOptions.TabWidget'>
+		<layout type = 'vertical' padding = '16, 16, 16, 16' spacing = '8'>
+			<widget name = 'grOnScreenCheckbox'
+					type = 'Checkbox'
+			/>
+			<widget name = 'grTouchpadCheckbox'
+					type = 'Checkbox'
+			/>
+			<widget name = 'grSwapMenuAndBackBtnsCheckbox'
+					type = 'Checkbox'
+			/>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10'>
+				<widget name = 'grKbdMouseSpeedDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grKbdMouseSpeedSlider'
+						type = 'Slider'
+				/>
+				<widget name = 'grKbdMouseSpeedLabel'
+						type = 'SmallLabel'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'grJoystickDeadzoneDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grJoystickDeadzoneSlider'
+						type = 'Slider'
+				/>
+				<widget name = 'grJoystickDeadzoneLabel'
+						type = 'SmallLabel'
 				/>
 			</layout>
 		</layout>
@@ -273,6 +312,22 @@
 			<widget name = 'grFullscreenCheckbox'
 					type = 'Checkbox'
 			/>
+			<widget name = 'grFilteringCheckbox'
+					type = 'Checkbox'
+			/>
+		</layout>
+	</dialog>
+
+	<dialog name = 'GlobalOptions_Shader' overlays = 'Dialog.GlobalOptions.TabWidget'>
+		<layout type = 'vertical' padding = '16, 16, 16, 16' spacing = '8'>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
+				<widget name = 'grShaderPopUpDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grShaderPopUp'
+						type = 'PopUp'
+				/>
+			</layout>
 		</layout>
 	</dialog>
 
@@ -291,14 +346,6 @@
 						type = 'OptionsLabel'
 				/>
 				<widget name = 'auOPLPopup'
-						type = 'PopUp'
-				/>
-			</layout>
-			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
-				<widget name = 'auSampleRatePopupDesc'
-						type = 'OptionsLabel'
-				/>
-				<widget name = 'auSampleRatePopup'
 						type = 'PopUp'
 				/>
 			</layout>
@@ -872,12 +919,6 @@
 						type = 'PopUp'
 				/>
 			</layout>
-			<space size = '4'/>
-			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' center = 'true'>
-				<widget name = 'V1modeCheckbox'
-						type = 'Checkbox'
-				/>
-            </layout>
 		</layout>
 	</dialog>
 
@@ -1250,7 +1291,7 @@
 				<widget name = 'List' />
 				<widget name = 'Thumbnail'
 						width = '180'
-						height = '200'
+						height = '155'
 				/>
 			</layout>
 			<layout type = 'horizontal' padding = '0, 0, 0, 0'>

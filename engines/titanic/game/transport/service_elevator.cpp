@@ -23,6 +23,7 @@
 #include "titanic/game/transport/service_elevator.h"
 #include "titanic/core/room_item.h"
 #include "titanic/npcs/doorbot.h"
+#include "titanic/translation.h"
 
 namespace Titanic {
 
@@ -107,7 +108,7 @@ bool CServiceElevator::ServiceElevatorMsg(CServiceElevatorMsg *msg) {
 		if (!_string1.empty()) {
 			if (_string1 == "DeepSpace") {
 				disableMouse();
-				_soundHandle1 = playSound("z#413.wav", 50);
+				_soundHandle1 = playSound(TRANSLATE("z#413.wav", "z#157.wav"), 50);
 				_timerId = addTimer(1, 1000, 500);
 			} else {
 				changeView(_string1);
@@ -116,27 +117,28 @@ bool CServiceElevator::ServiceElevatorMsg(CServiceElevatorMsg *msg) {
 		break;
 
 	case 5:
+		// Reaching destination floor
 		_fieldF8 = false;
 		_fieldDC = _v3;
-		loadSound("z#423.wav");
+		loadSound(TRANSLATE("z#423.wav", "z#168.wav"));
 		stopSound(_soundHandle2);
-		_soundHandle2 = playSound("z#423.wav", 80);
+		_soundHandle2 = playSound(TRANSLATE("z#423.wav", "z#168.wav"), 80);
 
 		switch (_fieldDC) {
 		case 0:
 			_string1 = "DeepSpace";
-			_string2 = "a#2.wav";
-			queueSound("z#416.wav", _soundHandle2, 50);
+			_string2 = TRANSLATE("a#2.wav", "a#54.wav");
+			queueSound(TRANSLATE("z#416.wav", "z#160.wav"), _soundHandle2, 50);
 			break;
 
 		case 1:
 			_string1 = _v2 ? "BilgeRoomWith.Node 2.N" : "BilgeRoom.Node 1.N";
-			queueSound("z#421.wav", _soundHandle2, 50);
+			queueSound(TRANSLATE("z#421.wav", "z#165.wav"), _soundHandle2, 50);
 			break;
 
 		case 2:
 			_string1 = _v1 ?  "MoonEmbLobby.Node 1.NE" : "EmbLobby.Node 1.NE";
-			queueSound("z#411.wav", _soundHandle2, 50);
+			queueSound(TRANSLATE("z#411.wav", "z#155.wav"), _soundHandle2, 50);
 			break;
 
 		default:
@@ -164,16 +166,18 @@ bool CServiceElevator::TimerMsg(CTimerMsg *msg) {
 		if (!isSoundActive(_soundHandle1)) {
 			stopAnimTimer(_timerId);
 			if (msg->_actionVal == 0) {
+				// Elevator in motion after pressing button
 				_fieldF8 = true;
 				CServiceElevatorFloorChangeMsg changeMsg(_fieldDC, _v3);
-				changeMsg.execute(getRoom());
-				_soundHandle2 = playSound("z#424.wav");
+				changeMsg.execute(getRoom(), nullptr, MSGFLAG_SCAN);
+				_soundHandle2 = playSound(TRANSLATE("z#424.wav", "z#169.wav"));
 
 				if (doorbot) {
 					CActMsg actMsg("DoorbotPlayerPressedTopButton");
 					actMsg.execute(doorbot);
 				}
 			} else {
+				// Finished playing message for bottom/middle floor disabled
 				enableMouse();
 				if (doorbot) {
 					CActMsg actMsg;
@@ -206,43 +210,44 @@ bool CServiceElevator::ServiceElevatorFloorRequestMsg(CServiceElevatorFloorReque
 	CDoorbot *doorbot = dynamic_cast<CDoorbot *>(findRoom()->findByName("Doorbot"));
 
 	if (doorbot && _v3 == 0) {
-		_soundHandle1 = playSound("z#415.wav", 50);
-		addTimer(1, 1000, 500);
+		_soundHandle1 = playSound(TRANSLATE("z#415.wav", "z#159.wav"), 50);
+		_timerId = addTimer(1, 1000, 500);
 	} else if (doorbot && _v3 == 1) {
-		_soundHandle1 = playSound("z#417.wav", 50);
-		addTimer(1, 1000, 500);
+		_soundHandle1 = playSound(TRANSLATE("z#417.wav", "z#161.wav"), 50);
+		_timerId = addTimer(1, 1000, 500);
 	} else if (_fieldDC == _v3) {
 		switch (_v3) {
 		case 0:
-			_soundHandle1 = playSound("z#415.wav", 50);
+			_soundHandle1 = playSound(TRANSLATE("z#415.wav", "z#159.wav"), 50);
 			break;
 		case 1:
-			_soundHandle1 = playSound("z#420.wav", 50);
+			_soundHandle1 = playSound(TRANSLATE("z#420.wav", "z#164.wav"), 50);
 			break;
 		case 2:
-			_soundHandle1 = playSound("z#410.wav", 50);
+			_soundHandle1 = playSound(TRANSLATE("z#410.wav", "z#154.wav"), 50);
 			break;
 		default:
 			break;
 		}
 
-		addTimer(1, 1000, 500);
+		_timerId = addTimer(1, 1000, 500);
 	} else {
 		switch (_v3) {
 		case 0:
-			_soundHandle1 = playSound("z#414.wav", 50);
+			_soundHandle1 = playSound(TRANSLATE("z#414.wav", "z#158.wav"), 50);
 			break;
 		case 1:
-			_soundHandle1 = playSound(_fieldDC ? "z#419.wav" : "z#418.wav", 50);
+			_soundHandle1 = playSound(_fieldDC ? TRANSLATE("z#419.wav", "z#163.wav")
+				: TRANSLATE("z#418.wav", "z#162.wav"), 50);
 			break;
 		case 2:
-			_soundHandle1 = playSound("z#414.wav", 50);
+			_soundHandle1 = playSound(TRANSLATE("z#409.wav", "z#153.wav"), 50);
 			break;
 		default:
 			break;
 		}
 
-		addTimer(0, 1000, 500);
+		_timerId = addTimer(0, 1000, 500);
 	}
 
 	return true;

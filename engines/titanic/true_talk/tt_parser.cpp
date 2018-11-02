@@ -21,13 +21,16 @@
  */
 
 #include "titanic/true_talk/tt_parser.h"
+#include "titanic/support/files_manager.h"
 #include "titanic/true_talk/script_handler.h"
+#include "titanic/true_talk/true_talk_manager.h"
 #include "titanic/true_talk/tt_action.h"
 #include "titanic/true_talk/tt_concept.h"
 #include "titanic/true_talk/tt_picture.h"
 #include "titanic/true_talk/tt_sentence.h"
 #include "titanic/true_talk/tt_word.h"
 #include "titanic/titanic.h"
+#include "titanic/translation.h"
 
 namespace Titanic {
 
@@ -62,6 +65,8 @@ void TTparser::loadArrays() {
 	loadArray(_replacements1, "TEXT/REPLACEMENTS1");
 	loadArray(_replacements2, "TEXT/REPLACEMENTS2");
 	loadArray(_replacements3, "TEXT/REPLACEMENTS3");
+	if (g_language == Common::DE_DEU)
+		loadArray(_replacements4, "TEXT/REPLACEMENTS4");
 	loadArray(_phrases, "TEXT/PHRASES");
 	loadArray(_pronouns, "TEXT/PRONOUNS");
 
@@ -81,14 +86,24 @@ int TTparser::preprocess(TTsentence *sentence) {
 	if (normalize(sentence))
 		return 0;
 
-	// Scan for and replace common slang and contractions with verbose versions
-	searchAndReplace(sentence->_normalizedLine, _replacements1);
-	searchAndReplace(sentence->_normalizedLine, _replacements2);
+	if (g_language == Common::DE_DEU) {
+		preprocessGerman(sentence->_normalizedLine);
+	} else {
+		// Scan for and replace common slang and contractions with verbose versions
+		searchAndReplace(sentence->_normalizedLine, _replacements1);
+		searchAndReplace(sentence->_normalizedLine, _replacements2);
+	}
 
 	// Check entire normalized line against common phrases to replace
 	for (uint idx = 0; idx < _phrases.size(); idx += 2) {
 		if (!_phrases[idx].compareTo(sentence->_normalizedLine))
 			sentence->_normalizedLine = _phrases[idx + 1];
+	}
+
+	if (g_language == Common::DE_DEU) {
+		// Scan for and replace common slang and contractions with verbose versions
+		searchAndReplace(sentence->_normalizedLine, _replacements1);
+		searchAndReplace(sentence->_normalizedLine, _replacements2);
 	}
 
 	// Do a further search and replace of roman numerals to decimal
@@ -131,7 +146,7 @@ int TTparser::normalize(TTsentence *sentence) {
 			if (!destLine->empty() && destLine->lastChar() != ' ')
 				(*destLine) += ' ';
 		} else if (Common::isUpper(c)) {
-			(*destLine) += toupper(c);
+			(*destLine) += tolower(c);
 		} else if (Common::isDigit(c)) {
 			if (c == '0' && isEmoticon(srcLine, index)) {
 				sentence->set38(10);
@@ -256,7 +271,7 @@ int TTparser::isEmoticon(const TTstring &str, int &index) {
 	}
 }
 
-bool TTparser::normalizeContraction(const TTstring &srcLine, int srcIndex, TTstring &destLine) {
+bool TTparser::normalizeContraction(const TTstring &srcLine, int &srcIndex, TTstring &destLine) {
 	int startIndex = srcIndex + 1;
 	switch (srcLine[startIndex]) {
 	case 'd':
@@ -364,6 +379,7 @@ int TTparser::searchAndReplace(TTstring &line, int startIndex, const StringArray
 				// Replace the text in the line with it's replacement
 				line = CString(line.c_str(), line.c_str() + startIndex) + replacementStr +
 					CString(line.c_str() + startIndex + origStr.size());
+				lineSize = line.size();
 
 				startIndex += replacementStr.size();
 				break;
@@ -394,10 +410,10 @@ int TTparser::replaceNumbers(TTstring &line, int startIndex) {
 		return index;
 
 	bool flag1 = false, flag2 = false, flag3 = false;
-	int total = 0, factor = 0;
+	int total = 0, factor = 0, endIndex;
 
 	do {
-		if (numEntry->_flags & NF_1) {
+		if (!(numEntry->_flags & NF_1)) {
 			flag2 = true;
 			if (numEntry->_flags & NF_8)
 				flag1 = true;
@@ -416,8 +432,11 @@ int TTparser::replaceNumbers(TTstring &line, int startIndex) {
 				factor += numEntry->_value;
 			}
 		}
-	} while (replaceNumbers2(line, &index));
 
+		endIndex = index;
+	} while ((numEntry = replaceNumbers2(line, &index)) != nullptr);
+
+	index = endIndex;
 	if (!flag2)
 		return index;
 
@@ -432,8 +451,13 @@ int TTparser::replaceNumbers(TTstring &line, int startIndex) {
 		total = -total;
 
 	CString numStr = CString::format("%d", total);
-	line = CString(line.c_str(), line.c_str() + startIndex) + numStr +
-		CString(line.c_str() + index);
+	line = CString::format("%s%s%s",
+		CString(line.c_str(), line.c_str() + startIndex).c_str(),
+		numStr.c_str(),
+		(index == -1) ? "" : line.c_str() + index - 1
+	);
+
+	index = startIndex + numStr.size();
 	return index;
 }
 
@@ -482,28 +506,30 @@ int TTparser::findFrames(TTsentence *sentence) {
 	TTstring *line = sentence->_normalizedLine.copy();
 	TTstring wordString;
 	int status = 0;
-	for (int ctr = 1; !status; ++ctr) {
+	for (int ctr = 1; status <= 1; ++ctr) {
 		// Keep stripping words off the start of the passed input
 		wordString = line->tokenize(" \n");
 		if (wordString.empty())
 			break;
 
 		TTword *srcWord = nullptr;
-		TTword *word = _owner->_vocab->getWord(wordString, &word);
+		TTword *word = _owner->_vocab->getWord(wordString, &srcWord);
 		sentence->storeVocabHit(srcWord);
 
 		if (!word && ctr == 1) {
 			word = new TTword(wordString, WC_UNKNOWN, 0);
 		}
 
-		for (TTword *currP = word; currP && !status; currP = currP->_nextP)
+		for (TTword *currP = word; currP && status <= 1; currP = currP->_nextP)
 			status = processRequests(currP);
 
-		word->deleteSiblings();
-		delete word;
+		if (word) {
+			word->deleteSiblings();
+			delete word;
+		}
 	}
 
-	if (!status) {
+	if (status <= 1) {
 		status = checkForAction();
 	}
 
@@ -514,7 +540,7 @@ int TTparser::findFrames(TTsentence *sentence) {
 int TTparser::loadRequests(TTword *word) {
 	int status = 0;
 
-	if (word->_tag != MKTAG('Z', 'Z', 'Z', 'T'))
+	if (word->_tag != MKTAG('Z', 'Z', 'Z', '['))
 		addNode(word->_tag);
 
 	switch (word->_wordClass) {
@@ -523,50 +549,50 @@ int TTparser::loadRequests(TTword *word) {
 
 	case WC_ACTION:
 		if (word->_id != 0x70 && word->_id != 0x71)
-			addNode(1);
-		addNode(17);
+			addNode(CHECK_COMMAND_FORM);
+		addNode(SET_ACTION);
 
 		switch (word->_id) {
 		case 101:
 		case 110:
-			addNode(5);
-			addNode(4);
+			addNode(SEEK_OBJECT);
+			addNode(SEEK_ACTOR);
 			break;
 
 		case 102:
-			addNode(4);
+			addNode(SEEK_ACTOR);
 			break;
 
 		case 103:
 		case 111:
-			addNode(8);
-			addNode(7);
-			addNode(5);
-			addNode(4);
+			addNode(SEEK_FROM);
+			addNode(SEEK_TO);
+			addNode(SEEK_OBJECT);
+			addNode(SEEK_ACTOR);
 			break;
 
 		case 104:
 		case 107:
-			addNode(15);
-			addNode(5);
-			addNode(4);
+			addNode(SEEK_NEW_FRAME);
+			addNode(SEEK_OBJECT);
+			addNode(SEEK_ACTOR);
 			break;
 
 		case 106:
-			addNode(7);
-			addNode(4);
+			addNode(SEEK_TO);
+			addNode(SEEK_ACTOR);
 			break;
 
 		case 108:
-			addNode(5);
-			addNode(4);
-			addNode(23);
+			addNode(SEEK_OBJECT);
+			addNode(SEEK_ACTOR);
+			addNode(WORD_TYPE_IS_SENTENCE_TYPE);
 			break;
 
 		case 112:
 		case 113:
-			addNode(13);
-			addNode(5);
+			addNode(SEEK_STATE);
+			addNode(SEEK_OBJECT);
 			break;
 
 		default:
@@ -584,24 +610,24 @@ int TTparser::loadRequests(TTword *word) {
 	case WC_THING:
 		if (word->checkTag() && _sentence->_field58 > 0)
 			_sentence->_field58--;
-		addNode(14);
+		addNode(SEEK_MODIFIERS);
 		break;
 
 	case WC_ABSTRACT:
 		switch (word->_id) {
 		case 300:
-			addNode(14);
+			addNode(SEEK_MODIFIERS);
 			status = 1;
 			break;
 
 		case 306:
-			addNode(23);
-			addNode(4);
+			addNode(WORD_TYPE_IS_SENTENCE_TYPE);
+			addNode(SEEK_ACTOR);
 			break;
 
 		case 307:
 		case 308:
-			addNode(23);
+			addNode(WORD_TYPE_IS_SENTENCE_TYPE);
 			break;
 
 		default:
@@ -610,22 +636,23 @@ int TTparser::loadRequests(TTword *word) {
 
 		if (status != 1) {
 			addToConceptList(word);
-			addNode(14);
+			addNode(SEEK_STATE);
+			addNode(SEEK_MODIFIERS);
 		}
 		break;
 
 	case WC_ARTICLE:
-		addNode(2);
+		addNode(EXPECT_THING);
 		status = 1;
 		break;
 
 	case WC_CONJUNCTION:
-		if (_sentence->check2C()) {
+		if (_sentence->checkCategory()) {
 			_sentenceConcept->_field1C = 1;
 			_sentenceConcept = _sentenceConcept->addSibling();
 			delete this;
 		} else {
-			addNode(23);
+			addNode(WORD_TYPE_IS_SENTENCE_TYPE);
 		}
 		break;
 
@@ -636,20 +663,20 @@ int TTparser::loadRequests(TTword *word) {
 	case WC_PREPOSITION:
 		switch (word->_id) {
 		case 700:
-			addNode(6);
-			addNode(5);
+			addNode(SEEK_OBJECT_OVERRIDE);
+			addNode(SEEK_OBJECT);
 			break;
 		case 701:
-			addNode(11);
+			addNode(SEEK_LOCATION);
 			break;
 		case 702:
 			status = 1;
 			break;
 		case 703:
-			addNode(9);
+			addNode(SEEK_TO_OVERRIDE);
 			break;
 		case 704:
-			addNode(10);
+			addNode(SEEK_FROM_OVERRIDE);
 			break;
 		default:
 			break;
@@ -659,7 +686,7 @@ int TTparser::loadRequests(TTword *word) {
 		if (word->_id == 304) {
 			// Nothing
 		} else if (word->_id == 801) {
-			addNode(22);
+			addNode(STATE_IDENTITY);
 		} else {
 			if (word->proc16())
 				_sentence->_field58++;
@@ -674,15 +701,15 @@ int TTparser::loadRequests(TTword *word) {
 		case 901:
 		case 902:
 		case 904:
-			if (_sentence->_field2C == 9) {
+			if (_sentence->_category == 9) {
 				_sentenceConcept->_field1C = 1;
 				_sentenceConcept = _sentenceConcept->addSibling();
-				addNode(1);
+				addNode(CHECK_COMMAND_FORM);
 			}
 			else {
-				addNode(23);
-				addNode(13);
-				addNode(1);
+				addNode(WORD_TYPE_IS_SENTENCE_TYPE);
+				addNode(SEEK_STATE);
+				addNode(CHECK_COMMAND_FORM);
 			}
 			break;
 
@@ -690,19 +717,19 @@ int TTparser::loadRequests(TTword *word) {
 		case 907:
 		case 908:
 		case 909:
-			addNode(23);
+			addNode(WORD_TYPE_IS_SENTENCE_TYPE);
 			break;
 
 		case 906:
-			addNode(23);
+			addNode(WORD_TYPE_IS_SENTENCE_TYPE);
 			status = 1;
 			break;
 
 		case 910:
-			addNode(4);
-			addNode(24);
-			addNode(23);
-			addNode(14);
+			addNode(SEEK_ACTOR);
+			addNode(COMPLEX_VERB);
+			addNode(WORD_TYPE_IS_SENTENCE_TYPE);
+			addNode(SEEK_MODIFIERS);
 			status = 1;
 			break;
 
@@ -711,7 +738,7 @@ int TTparser::loadRequests(TTword *word) {
 		}
 
 		if (word->_id == 906) {
-			addNode(14);
+			addNode(SEEK_MODIFIERS);
 			status = 1;
 		}
 		break;
@@ -736,10 +763,10 @@ int TTparser::considerRequests(TTword *word) {
 	for (TTparserNode *nodeP = _nodesP; nodeP; ) {
 		switch (nodeP->_tag) {
 		case CHECK_COMMAND_FORM:
-			if (_sentenceConcept->_concept1P && _sentence->_field2C == 1 &&
+			if (_sentenceConcept->_concept1P && _sentence->_category == 1 &&
 					!_sentenceConcept->_concept0P) {
-				concept = new TTconcept(_sentence->_npcScript, ST_NPC_SCRIPT);
-				_sentenceConcept->_concept0P = concept;
+				TTconcept *newConcept = new TTconcept(_sentence->_npcScript, ST_NPC_SCRIPT);
+				_sentenceConcept->_concept0P = newConcept;
 				_sentenceConcept->_field18 = 3;
 			}
 
@@ -750,7 +777,7 @@ int TTparser::considerRequests(TTword *word) {
 			if (!word->_wordClass) {
 				word->_wordClass = WC_THING;
 				addToConceptList(word);
-				addNode(14);
+				addNode(SEEK_MODIFIERS);
 			}
 
 			flag = true;
@@ -782,7 +809,7 @@ int TTparser::considerRequests(TTword *word) {
 				flag = true;
 			} else if (!_sentenceConcept->_concept2P) {
 				if (filterConcepts(5, 2) && _sentenceConcept->_concept2P->checkWordId1())
-					addNode(5);
+					addNode(SEEK_OBJECT);
 			} else if (word->_wordClass == WC_THING && _sentence->fn2(2, TTstring("?"), _sentenceConcept)) {
 				TTconcept *oldConcept = _sentenceConcept->_concept2P;
 				flag = filterConcepts(5, 2);
@@ -790,8 +817,8 @@ int TTparser::considerRequests(TTword *word) {
 				if (flag)
 					delete oldConcept;
 			} else if (!_sentenceConcept->_concept3P &&
-					(!_sentenceConcept->_concept1P || (_sentenceConcept->_concept1P->getWordId() &&
-					_sentenceConcept->_concept1P->getWordId() == 112)) &&
+					(!_sentenceConcept->_concept1P || (_sentenceConcept->_concept1P->getWordId() != 113 &&
+					_sentenceConcept->_concept1P->getWordId() != 112)) &&
 					_sentenceConcept->_concept2P->checkWordId1() &&
 					(word->_wordClass == WC_THING || word->_wordClass == WC_PRONOUN)) {
 				_sentenceConcept->changeConcept(0, &_sentenceConcept->_concept2P, 3);
@@ -862,11 +889,11 @@ int TTparser::considerRequests(TTword *word) {
 				}
 
 				if (_sentenceConcept->_concept4P || !_sentenceConcept->_concept0P) {
-					addNode(7);
+					addNode(SEEK_TO);
 				} else {
 					_sentenceConcept->changeConcept(1, &_sentenceConcept->_concept0P, 4);
 					concept = nullptr;
-					addNode(7);
+					addNode(SEEK_TO);
 				}
 			} else {
 				flag = true;
@@ -879,12 +906,12 @@ int TTparser::considerRequests(TTword *word) {
 				_sentenceConcept->_concept4P = nullptr;
 			}
 
-			addNode(8);
+			addNode(SEEK_FROM);
 			flag = true;
 			break;
 
 		case SEEK_LOCATION:
-			addNode(5);
+			addNode(SEEK_OBJECT);
 			_sentenceConcept->createConcept(0, 5, word);
 			flag = true;
 			break;
@@ -1027,11 +1054,11 @@ int TTparser::considerRequests(TTword *word) {
 					_sentence->fn4(1, 107, _sentenceConcept)) {
 				concept = _sentenceConcept->_concept1P;
 				_sentenceConcept->_concept1P = nullptr;
-				addNode(15);
+				addNode(SEEK_NEW_FRAME);
 			}
 
-			if (_sentence->check2C() && word->_id == 113)
-				addNode(4);
+			if (_sentence->checkCategory() && word->_id == 113)
+				addNode(SEEK_ACTOR);
 
 			if (word->_wordClass == WC_ACTION)
 				_sentenceConcept->createConcept(0, 1, word);
@@ -1053,10 +1080,10 @@ int TTparser::considerRequests(TTword *word) {
 			break;
 
 		case WORD_TYPE_IS_SENTENCE_TYPE:
-			if (_sentence->_field2C == 1 || _sentence->_field2C == 10) {
+			if (_sentence->_category == 1 || _sentence->_category == 10) {
 				for (TTword *wordP = _currentWordP; wordP; wordP = wordP->_nextP) {
 					if (wordP->_id == 906) {
-						_sentence->_field2C = 12;
+						_sentence->_category = 12;
 						flag = true;
 						break;
 					}
@@ -1066,61 +1093,61 @@ int TTparser::considerRequests(TTword *word) {
 				TTconcept *newConceptP;
 				switch (word->_id) {
 				case 108:
-					_sentence->_field2C = 8;
+					_sentence->_category = 8;
 					break;
 				case 113:
 					if (!_sentenceConcept->_concept3P)
-						_sentence->_field2C = 22;
-					break;
-				case 304:
-					_sentence->_field2C = 25;
-					break;
-				case 305:
-					_sentence->_field2C = 24;
+						_sentence->_category = 22;
 					break;
 				case 306:
-					_sentence->_field2C = 7;
+					_sentence->_category = 7;
+					break;
+				case 307:
+					_sentence->_category = 24;
+					break;
+				case 308:
+					_sentence->_category = 25;
 					break;
 				case 501:
-					_sentence->_field2C = 9;
+					_sentence->_category = 9;
 					break;
 				case 900:
-					_sentence->_field2C = 5;
+					_sentence->_category = 5;
 					break;
 				case 901:
-					_sentence->_field2C = 4;
+					_sentence->_category = 4;
 					break;
 				case 904:
-					_sentence->_field2C = 6;
+					_sentence->_category = 6;
 					break;
 				case 905:
-					_sentence->_field2C = 11;
+					_sentence->_category = 11;
 					break;
 				case 906:
-					_sentence->_field2C = 12;
+					_sentence->_category = 12;
 					break;
 				case 907:
-					_sentence->_field2C = 13;
+					_sentence->_category = 13;
 					break;
 				case 908:
-					_sentence->_field2C = 2;
+					_sentence->_category = 2;
 					if (!_sentenceConcept->_concept0P) {
 						newPictP = new TTpicture(TTstring("?"), WC_THING, 0, 0, 0, 0, 0);
 						newConceptP = new TTconcept(newPictP);
 
 						_sentenceConcept->_concept0P = newConceptP;
 						delete newPictP;
-						addNode(4);
+						addNode(SEEK_ACTOR);
 					}
 					break;
 				case 909:
-					_sentence->_field2C = 3;
+					_sentence->_category = 3;
 					newPictP = new TTpicture(TTstring("?"), WC_THING, 0, 0, 0, 0, 0);
 					newConceptP = new TTconcept(newPictP);
 
 					_sentenceConcept->_concept2P = newConceptP;
 					delete newPictP;
-					addNode(4);
+					addNode(SEEK_ACTOR);
 					break;
 
 				default:
@@ -1141,19 +1168,18 @@ int TTparser::considerRequests(TTword *word) {
 						_sentenceConcept->get18());
 					status = _sentenceConcept->createConcept(1, 1, verbP);
 					delete verbP;
+					flag = true;
 				}
-
-				flag = true;
 			}
 			break;
 
 		case MKTAG('C', 'O', 'M', 'E'):
-			addNode(7);
-			addNode(5);
-			addNode(21);
+			addNode(SEEK_TO);
+			addNode(SEEK_OBJECT);
+			addNode(ACTOR_IS_OBJECT);
 
-			if (!_sentence->_field2C)
-				_sentence->_field2C = 15;
+			if (!_sentence->_category)
+				_sentence->_category = 15;
 			break;
 
 		case MKTAG('C', 'U', 'R', 'S'):
@@ -1164,12 +1190,12 @@ int TTparser::considerRequests(TTword *word) {
 			break;
 
 		case MKTAG('E', 'X', 'I', 'T'):
-			addNode(8);
-			addNode(5);
-			addNode(21);
+			addNode(SEEK_FROM);
+			addNode(SEEK_OBJECT);
+			addNode(ACTOR_IS_OBJECT);
 
-			if (!_sentence->_field2C)
-				_sentence->_field2C = 14;
+			if (!_sentence->_category)
+				_sentence->_category = 14;
 			break;
 
 		case MKTAG('F', 'A', 'R', 'R'):
@@ -1182,19 +1208,19 @@ int TTparser::considerRequests(TTword *word) {
 			break;
 
 		case MKTAG('G', 'O', 'G', 'O'):
-			addNode(7);
-			addNode(5);
-			addNode(21);
+			addNode(SEEK_TO);
+			addNode(SEEK_OBJECT);
+			addNode(ACTOR_IS_OBJECT);
 
-			if (_sentence->_field2C == 1)
-				_sentence->_field2C = 14;
+			if (_sentence->_category == 1)
+				_sentence->_category = 14;
 
 			flag = true;
 			break;
 
 		case MKTAG('H', 'E', 'L', 'P'):
-			if (_sentence->_field2C == 1)
-				_sentence->_field2C = 18;
+			if (_sentence->_category == 1)
+				_sentence->_category = 18;
 
 			flag = true;
 			break;
@@ -1245,20 +1271,20 @@ int TTparser::considerRequests(TTword *word) {
 			break;
 
 		case MKTAG('S', 'A', 'A', 'O'):
-			addNode(5);
-			addNode(4);
+			addNode(SEEK_OBJECT);
+			addNode(SEEK_ACTOR);
 			flag = true;
 			break;
 
 		case MKTAG('S', 'S', 'T', 'A'):
-			addNode(13);
-			addNode(5);
+			addNode(SEEK_STATE);
+			addNode(SEEK_OBJECT);
 			flag = true;
 			break;
 
 		case MKTAG('T', 'E', 'A', 'C'):
-			if (_sentence->_field2C == 1)
-				_sentence->_field2C = 10;
+			if (_sentence->_category == 1)
+				_sentence->_category = 10;
 
 			flag = true;
 			break;
@@ -1274,8 +1300,11 @@ int TTparser::considerRequests(TTword *word) {
 		}
 
 		TTparserNode *nextP = dynamic_cast<TTparserNode *>(nodeP->_nextP);
-		if (flag)
-			delete nodeP;
+		if (flag) {
+			removeNode(nodeP);
+			flag = false;
+		}
+
 		nodeP = nextP;
 	}
 
@@ -1393,7 +1422,7 @@ int TTparser::checkForAction() {
 			// Chain of words, so we need to find the last word of the chain,
 			// and set the last-but-one's _nextP to nullptr to detach the last one
 			TTword *prior = nullptr;
-			for (word = word->_nextP; word->_nextP; word = word->_nextP) {
+			for (; word->_nextP; word = word->_nextP) {
 				prior = word;
 			}
 
@@ -1402,8 +1431,8 @@ int TTparser::checkForAction() {
 		} else {
 			// No chain, so singular word can simply be removed
 			_currentWordP = nullptr;
-			if (word->_id == 906 && _sentence->_field2C == 1)
-				_sentence->_field2C = 12;
+			if (word->_id == 906 && _sentence->_category == 1)
+				_sentence->_category = 12;
 		}
 
 		if (word->_text == "do" || word->_text == "doing" || word->_text == "does" ||
@@ -1453,28 +1482,28 @@ int TTparser::checkForAction() {
 
 	if (_sentence->fn2(3, TTstring("thePlayer"), _sentenceConcept) && !flag) {
 		if (_sentenceConcept->concept1WordId() == 101) {
-			_sentence->_field2C = 16;
-		} else if (_sentence->_field2C != 18 && _sentenceConcept->concept1WordId() == 102) {
+			_sentence->_category = 16;
+		} else if (_sentence->_category != 18 && _sentenceConcept->concept1WordId() == 102) {
 			if (_sentence->fn2(0, TTstring("targetNpc"), _sentenceConcept))
-				_sentence->_field2C = 15;
+				_sentence->_category = 15;
 		}
 	}
 
 	if (_sentence->fn2(2, TTstring("thePlayer"), _sentenceConcept) &&
 			_sentenceConcept->concept1WordId() == 101 && flag)
-		_sentence->_field2C = 17;
+		_sentence->_category = 17;
 
 	if (!_sentenceConcept->_concept0P && !_sentenceConcept->_concept1P &&
 			!_sentenceConcept->_concept2P && !_sentenceConcept->_concept5P && !flag) {
 		if (_conceptP)
 			filterConcepts(5, 2);
 
-		if (!_sentenceConcept->_concept2P && _sentence->_field2C == 1)
-			_sentence->_field2C = 0;
+		if (!_sentenceConcept->_concept2P && _sentence->_category == 1)
+			_sentence->_category = 0;
 	}
 
-	if (_sentence->_field58 < 5 && _sentence->_field2C == 1 && !flag)
-		_sentence->_field2C = 19;
+	if (_sentence->_field58 < 5 && _sentence->_category == 1 && !flag)
+		_sentence->_category = 19;
 
 	for (TTconceptNode *nodeP = &_sentence->_sentenceConcept; nodeP; nodeP = nodeP->_nextP) {
 		if (nodeP->_field18 == 0 && nodeP->_concept1P) {
@@ -1490,15 +1519,15 @@ int TTparser::checkForAction() {
 		}
 	}
 
-	if (_sentence->_field2C == 1 && _sentenceConcept->_concept5P &&
+	if (_sentence->_category == 1 && _sentenceConcept->_concept5P &&
 			_sentenceConcept->_concept2P) {
 		if (_sentence->fn4(1, 113, nullptr)) {
 			if (_sentence->fn2(2, TTstring("targetNpc"), nullptr)) {
-				_sentence->_field2C = 20;
+				_sentence->_category = 20;
 			} else if (_sentence->fn2(2, TTstring("thePlayer"), nullptr)) {
-				_sentence->_field2C = 21;
+				_sentence->_category = 21;
 			} else {
-				_sentence->_field2C = 22;
+				_sentence->_category = 22;
 			}
 		}
 	} else if (!_sentenceConcept->_concept0P && !_sentenceConcept->_concept1P &&
@@ -1506,8 +1535,8 @@ int TTparser::checkForAction() {
 		if (_conceptP)
 			filterConcepts(5, 2);
 
-		if (!_sentenceConcept->_concept2P && _sentence->_field2C == 1)
-			_sentence->_field2C = 0;
+		if (!_sentenceConcept->_concept2P && _sentence->_category == 1)
+			_sentence->_category = 0;
 	}
 
 	return status;
@@ -1516,11 +1545,11 @@ int TTparser::checkForAction() {
 int TTparser::fn2(TTword *word) {
 	switch (word->_id) {
 	case 600:
-		addNode(13);
+		addNode(SEEK_STATE);
 		return 0;
 
 	case 601:
-		addNode(12);
+		addNode(SEEK_OWNERSHIP);
 		return 1;
 
 	case 602:
@@ -1578,7 +1607,10 @@ bool TTparser::checkConcept2(TTconcept *concept, int conceptMode) {
 		return concept->checkWordId1();
 
 	case 9:
-		if (!concept->checkWordId3() && _sentenceConcept->_concept2P) {
+		if (concept->checkWordId3())
+			return true;
+
+		if (_sentenceConcept->_concept2P) {
 			if (!_sentenceConcept->_concept2P->checkWordId2() || !concept->checkWordId2()) {
 				return _sentenceConcept->_concept2P->checkWordClass() &&
 					concept->checkWordClass();
@@ -1596,7 +1628,9 @@ bool TTparser::checkConcept2(TTconcept *concept, int conceptMode) {
 int TTparser::filterConcepts(int conceptMode, int conceptIndex) {
 	int result = 0;
 
-	for (TTconcept *currP = _conceptP; currP && !result; currP = currP->_nextP) {
+	for (TTconcept *nextP, *currP = _conceptP; currP && !result; currP = nextP) {
+		nextP = currP->_nextP;
+
 		if (checkConcept2(currP, conceptMode)) {
 			TTconcept **ptrPP = _sentenceConcept->setConcept(conceptIndex, currP);
 			TTconcept *newConcept = new TTconcept(*currP);
@@ -1632,14 +1666,14 @@ int TTparser::processModifiers(int modifier, TTword *word) {
 	TTconcept *newConcept = new TTconcept(word, ST_UNKNOWN_SCRIPT);
 
 	// Cycles through each word
-	for (TTword *currP = _currentWordP; currP != word; currP = _currentWordP) {
+	for (TTword *currP = _currentWordP; currP && currP != word; currP = _currentWordP) {
 		if ((modifier == 2 && currP->_wordClass == WC_ADJECTIVE) ||
 				(modifier == 1 && currP->_wordClass == WC_ADVERB)) {
 			newConcept->_string2 += ' ';
 			newConcept->_string2 += _currentWordP->getText();
 		} else if (word->_id == 113 && currP->_wordClass == WC_ADJECTIVE) {
 			addToConceptList(currP);
-			addNode(13);
+			addNode(SEEK_STATE);
 		}
 
 		if (modifier == 2 || modifier == 3) {
@@ -1658,8 +1692,8 @@ int TTparser::processModifiers(int modifier, TTword *word) {
 
 			case 204:
 				newConcept->_field34 = 1;
-				if (_sentence->_field2C == 1)
-					_sentence->_field2C = 12;
+				if (_sentence->_category == 1)
+					_sentence->_category = 12;
 				newConcept->_field14 = 1;
 				break;
 
@@ -1708,6 +1742,39 @@ int TTparser::processModifiers(int modifier, TTword *word) {
 	}
 
 	return 0;
+}
+
+void TTparser::preprocessGerman(TTstring &line) {
+	static const char *const SUFFIXES[12] = {
+		" ", "est ", "em ", "en ", "er ", "es ",
+		"et ", "st ", "s ", "e ", "n ", "t "
+	};
+
+	for (uint idx = 0; idx < _replacements4.size(); ++idx) {
+		if (!line.hasSuffix(_replacements4[idx]))
+			continue;
+
+		const char *lineP = line.c_str();
+		const char *p = strstr(lineP, _replacements4[idx].c_str());
+		if (!p || p == lineP || *(p - 1) != ' ')
+			continue;
+
+		const char *wordEndP = p + _replacements4[idx].size();
+		
+		for (int sIdx = 0; sIdx < 12; ++sIdx) {
+			const char *suffixP = SUFFIXES[sIdx];
+			if (!strncmp(wordEndP, suffixP, strlen(suffixP))) {
+				// Form a new line with the replacement word
+				const char *nextWordP = wordEndP + strlen(suffixP);
+				line = Common::String::format("%s %s %s",
+					Common::String(lineP, p).c_str(),
+					_replacements4[idx + 1].c_str(),
+					nextWordP
+					);
+				return;
+			}
+		}
+	}
 }
 
 } // End of namespace Titanic

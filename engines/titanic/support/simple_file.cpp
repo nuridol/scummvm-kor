@@ -424,8 +424,10 @@ bool SimpleFile::scanf(const char *format, ...) {
 			formatStr.deleteChar(0);
 
 			safeRead(&c, 1);
-			if (!Common::isSpace(c))
+			if (!Common::isSpace(c)) {
+				va_end(va);
 				return false;
+			}
 
 			// Skip over whitespaces
 			skipSpaces();
@@ -467,7 +469,7 @@ void SimpleFile::skipSpaces() {
 /*------------------------------------------------------------------------*/
 
 bool StdCWadFile::open(const Common::String &filename) {
-	File f;
+	Common::File f;
 	CString name = filename;
 
 	// Check for whether it is indeed a file/resource pair
@@ -476,9 +478,11 @@ bool StdCWadFile::open(const Common::String &filename) {
 	if (idx < 0) {
 		// Nope, so open up file for standard reading
 		assert(!name.empty());
-		f.open(name);
+		if (!f.open(name))
+			return false;
 
 		SimpleFile::open(f.readStream(f.size()));
+		f.close();
 		return true;
 	}
 
@@ -489,7 +493,8 @@ bool StdCWadFile::open(const Common::String &filename) {
 	int resIndex = resStr.readInt();
 
 	// Open up the index for access
-	f.open(fname);
+	if (!f.open(fname))
+		return false;
 	int indexSize = f.readUint32LE() / 4;
 	assert(resIndex < indexSize);
 

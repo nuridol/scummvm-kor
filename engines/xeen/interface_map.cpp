@@ -965,6 +965,7 @@ void InterfaceMap::setMazeBits() {
 		break;
 	case 6:
 		++_wo[206];
+		break;
 	case 8:
 		++_wo[146];
 		break;
@@ -1208,6 +1209,7 @@ void InterfaceMap::setMazeBits() {
 		break;
 	case 10:
 		++_wo[237];
+		break;
 	case 11:
 		++_wo[157];
 		break;
@@ -1510,6 +1512,7 @@ void InterfaceMap::setMazeBits() {
 		break;
 	case 2:
 		++_wo[168];
+		break;
 	case 3:
 	case 12:
 		++_wo[88];
@@ -4284,7 +4287,7 @@ void InterfaceMap::drawIndoors() {
 		_indoorList._fwl_1F1R._sprites = &map._wallSprites._fwl2;
 	} else if (_wo[167]) {
 		_indoorList._fwl_1F1R._frame = _overallFrame + 1;
-		_indoorList._fwl_1F1R._sprites = &map._wallSprites._fwl2;
+		_indoorList._fwl_1F1R._sprites = &map._wallSprites._fwl1;
 	} else if (_wo[127]) {
 		_indoorList._fwl_1F1R._frame = 1;
 		_indoorList._fwl_1F1R._sprites = &map._wallSprites._fwl2;
@@ -4399,6 +4402,7 @@ void InterfaceMap::drawOutdoors() {
 	const int TERRAIN_INDEXES4[5] = { 5, 9, 7, 0, 4 };
 
 	// Loops to set draw entries for the terrain
+	assert(map._currentWall != INVALID_CELL);
 	for (int idx = 0; idx < 9; ++idx) {
 		map.getCell(TERRAIN_INDEXES1[idx]);
 		SpriteResource &spr = map._wallSprites._surfaces[map._currentWall];

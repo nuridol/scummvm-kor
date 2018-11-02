@@ -42,6 +42,13 @@ struct TitanicSavegameHeader {
 	int _year, _month, _day;
 	int _hour, _minute;
 	int _totalFrames;
+
+	TitanicSavegameHeader() { clear(); }
+
+	/**
+	 * Clear the header
+	 */
+	void clear();
 };
 
 
@@ -118,7 +125,7 @@ private:
 	/**
 	 * Finds the next sibling occurance of a given class type
 	 */
-	CTreeItem *findSiblingInstanceOf(ClassDef *classDef, CTreeItem *startItem) const;
+	CTreeItem *findSiblingChildInstanceOf(ClassDef *classDef, CTreeItem *startItem) const;
 private:
 	/**
 	 * Load project data from the passed file
@@ -152,6 +159,7 @@ public:
 public:
 	CLASSDEF;
 	CProjectItem();
+	virtual ~CProjectItem() { destroyChildren(); }
 
 	/**
 	 * Save the data for the class to file
@@ -227,6 +235,22 @@ public:
 	 * Finds a view
 	 */
 	CViewItem *findView(int roomNumber, int nodeNumber, int viewNumber);
+
+	/**
+	 * Parses a view into it's components of room, node, and view,
+	 * and locates the designated view
+	 */
+	CViewItem *parseView(const CString &viewString);
+
+	/**
+	 * Change the view
+	 */
+	bool changeView(const CString &viewName, const CString &clipName);
+
+	/**
+	 * Change the view
+	 */
+	bool changeView(const CString &viewName);
 };
 
 } // End of namespace Titanic

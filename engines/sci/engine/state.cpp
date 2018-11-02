@@ -19,14 +19,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
-
 #include "common/system.h"
 
 #include "sci/sci.h"	// for INCLUDE_OLDGFX
 #include "sci/debug.h"	// for g_debug_sleeptime_factor
-#include "sci/event.h"
-
 #include "sci/engine/file.h"
+#include "sci/engine/guest_additions.h"
 #include "sci/engine/kernel.h"
 #include "sci/engine/state.h"
 #include "sci/engine/selector.h"
@@ -84,12 +82,11 @@ void EngineState::reset(bool isRestoring) {
 		_memorySegmentSize = 0;
 		_fileHandles.resize(5);
 		abortScriptProcessing = kAbortNone;
+	} else {
+		g_sci->_guestAdditions->reset();
 	}
 
-	// reset delayed restore game functionality
-	_delayedRestoreGame = false;
-	_delayedRestoreGameId = 0;
-	_delayedRestoreFromLauncher = false;
+	_delayedRestoreGameId = -1;
 
 	executionStackBase = 0;
 	_executionStackPosChanged = false;
@@ -104,7 +101,9 @@ void EngineState::reset(bool isRestoring) {
 
 	gcCountDown = 0;
 
-	_throttleCounter = 0;
+#ifdef ENABLE_SCI32
+	_eventCounter = 0;
+#endif
 	_throttleLastTime = 0;
 	_throttleTrigger = false;
 	_gameIsBenchmarking = false;
@@ -120,7 +119,6 @@ void EngineState::reset(bool isRestoring) {
 	scriptGCInterval = GC_INTERVAL;
 
 	_videoState.reset();
-	_syncedAudioOptions = false;
 }
 
 void EngineState::speedThrottler(uint32 neededSleep) {
@@ -138,13 +136,14 @@ void EngineState::speedThrottler(uint32 neededSleep) {
 	}
 }
 
-void EngineState::wait(int16 ticks) {
+int EngineState::wait(int16 ticks) {
 	uint32 time = g_system->getMillis();
-	r_acc = make_reg(0, ((long)time - (long)lastWaitTime) * 60 / 1000);
+	const int tickDelta = ((long)time - (long)lastWaitTime) * 60 / 1000;
 	lastWaitTime = time;
 
 	ticks *= g_debug_sleeptime_factor;
 	g_sci->sleep(ticks * 1000 / 60);
+	return tickDelta;
 }
 
 void EngineState::initGlobals() {
@@ -159,11 +158,11 @@ void EngineState::initGlobals() {
 }
 
 uint16 EngineState::currentRoomNumber() const {
-	return variables[VAR_GLOBAL][13].toUint16();
+	return variables[VAR_GLOBAL][kGlobalVarNewRoomNo].toUint16();
 }
 
 void EngineState::setRoomNumber(uint16 roomNumber) {
-	variables[VAR_GLOBAL][13] = make_reg(0, roomNumber);
+	variables[VAR_GLOBAL][kGlobalVarNewRoomNo] = make_reg(0, roomNumber);
 }
 
 void EngineState::shrinkStackToBase() {
@@ -378,6 +377,63 @@ void SciEngine::checkVocabularySwitch() {
 		_vocabulary->reset();
 		_vocabularyLanguage = parserLanguage;
 	}
+}
+
+SciCallOrigin EngineState::getCurrentCallOrigin() const {
+	// IMPORTANT: This method must always return values that match *exactly* the
+	// values in the workaround tables in workarounds.cpp, or workarounds will
+	// be broken
+
+	Common::String curObjectName = _segMan->getObjectName(xs->sendp);
+	Common::String curMethodName;
+	const Script *localScript = _segMan->getScriptIfLoaded(xs->local_segment);
+	int curScriptNr = localScript->getScriptNumber();
+
+	Selector debugSelector = xs->debugSelector;
+	int debugExportId = xs->debugExportId;
+
+	if (xs->debugLocalCallOffset != -1) {
+		// if lastcall was actually a local call search back for a real call
+		Common::List<ExecStack>::const_iterator callIterator = _executionStack.end();
+		while (callIterator != _executionStack.begin()) {
+			callIterator--;
+			const ExecStack &loopCall = *callIterator;
+			if (loopCall.debugSelector != -1 || loopCall.debugExportId != -1) {
+				debugSelector = loopCall.debugSelector;
+				debugExportId = loopCall.debugExportId;
+				break;
+			}
+		}
+	}
+
+	if (xs->type == EXEC_STACK_TYPE_CALL) {
+		if (debugSelector != -1) {
+			curMethodName = g_sci->getKernel()->getSelectorName(debugSelector);
+		} else if (debugExportId != -1) {
+			curObjectName = "";
+			curMethodName = Common::String::format("export %d", debugExportId);
+		}
+	}
+
+	SciCallOrigin reply;
+	reply.objectName = curObjectName;
+	reply.methodName = curMethodName;
+	reply.scriptNr = curScriptNr;
+	reply.localCallOffset = xs->debugLocalCallOffset;
+	reply.roomNr = currentRoomNumber();
+	return reply;
+}
+
+bool EngineState::callInStack(const reg_t object, const Selector selector) const {
+	Common::List<ExecStack>::const_iterator it;
+	for (it = _executionStack.begin(); it != _executionStack.end(); ++it) {
+		const ExecStack &call = *it;
+		if (call.sendp == object && call.debugSelector == selector) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 } // End of namespace Sci

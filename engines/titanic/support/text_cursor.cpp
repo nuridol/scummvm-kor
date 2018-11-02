@@ -20,10 +20,11 @@
  *
  */
 
-#include "common/textconsole.h"
 #include "titanic/support/text_cursor.h"
+#include "titanic/events.h"
 #include "titanic/support/screen_manager.h"
 #include "titanic/titanic.h"
+#include "common/textconsole.h"
 
 namespace Titanic {
 
@@ -32,7 +33,7 @@ CTextCursor::CTextCursor(CScreenManager *screenManager) :
 		_backRenderSurface(nullptr), _frontRenderSurface(nullptr),
 		_blinkDelay(300), _size(2, 10), _priorBlinkTime(0),
 		_cursorR(0), _cursorG(0), _cursorB(0), _mode(-1) {
-	_surface = screenManager->createSurface(10, 10);
+	_surface = screenManager->createSurface(10, 10, 16);
 }
 
 CTextCursor::~CTextCursor() {

@@ -38,7 +38,7 @@
 #include "gui/widgets/tab.h"
 #include "gui/widgets/popup.h"
 
-#ifdef USE_LIBCURL
+#if defined(USE_CLOUD) && defined(USE_LIBCURL)
 #include "backends/cloud/cloudmanager.h"
 #endif
 
@@ -152,9 +152,7 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	_langPopUp->appendEntry("", (uint32)Common::UNK_LANG);
 	const Common::LanguageDescription *l = Common::g_languages;
 	for (; l->code; ++l) {
-#ifndef SCUMMVMKOR
 		if (checkGameGUIOptionLanguage(l->id, _guioptionsString))
-#endif
 			_langPopUp->appendEntry(l->description, l->id);
 	}
 
@@ -170,14 +168,6 @@ EditGameDialog::EditGameDialog(const String &domain, const String &desc)
 	for (; p->code; ++p) {
 		_platformPopUp->appendEntry(p->description, p->id);
 	}
-
-#ifdef SCUMMVMKOR
-	// Korean Mode popup
-	if (g_system->getOverlayWidth() > 320)
-		_koreanModeCheckbox = new CheckboxWidget(tab, "GameOptions_Game.V1modeCheckbox", _("Use V1 Korean Mode"), 0, 0);
-	else
-		_koreanModeCheckbox = new CheckboxWidget(tab, "GameOptions_Game.V1modeCheckbox", _c("Use V1 Korean Mode", "lowres"), 0, 0);
-#endif
 
 	//
 	// 2) The engine tab (shown only if there are custom engine options)
@@ -359,11 +349,7 @@ void EditGameDialog::open() {
 	if (ConfMan.hasKey("language", _domain)) {
 		_langPopUp->setSelectedTag(lang);
 	} else {
-#ifdef SCUMMVMKOR
-		_langPopUp->setSelectedTag(Common::parseLanguage("kr"));
-#else
 		_langPopUp->setSelectedTag((uint32)Common::UNK_LANG);
-#endif
 	}
 
 	if (_langPopUp->numEntries() <= 3) { // If only one language is avaliable
@@ -393,56 +379,45 @@ void EditGameDialog::open() {
 			sel = i + 2;
 	}
 	_platformPopUp->setSelected(sel);
-#ifdef SCUMMVMKOR
-	if (ConfMan.hasKey("v1_korean_mode", _domain))
-		_koreanModeCheckbox->setState(ConfMan.getBool("v1_korean_mode", _domain));
-#endif
 }
 
-
-void EditGameDialog::close() {
-	if (getResult()) {
-		ConfMan.set("description", _descriptionWidget->getEditString(), _domain);
-
-		Common::Language lang = (Common::Language)_langPopUp->getSelectedTag();
-		if (lang < 0)
-			ConfMan.removeKey("language", _domain);
-		else
-			ConfMan.set("language", Common::getLanguageCode(lang), _domain);
-
-		String gamePath(_gamePathWidget->getLabel());
-		if (!gamePath.empty())
-			ConfMan.set("path", gamePath, _domain);
-
-		String extraPath(_extraPathWidget->getLabel());
-		if (!extraPath.empty() && (extraPath != _c("None", "path")))
-			ConfMan.set("extrapath", extraPath, _domain);
-		else
-			ConfMan.removeKey("extrapath", _domain);
-
-		String savePath(_savePathWidget->getLabel());
-		if (!savePath.empty() && (savePath != _("Default")))
-			ConfMan.set("savepath", savePath, _domain);
-		else
-			ConfMan.removeKey("savepath", _domain);
-
-		Common::Platform platform = (Common::Platform)_platformPopUp->getSelectedTag();
-		if (platform < 0)
-			ConfMan.removeKey("platform", _domain);
-		else
-			ConfMan.set("platform", Common::getPlatformCode(platform), _domain);
-
-#ifdef SCUMMVMKOR
-		ConfMan.setBool("v1_korean_mode", _koreanModeCheckbox->getState(), _domain);
-		ConfMan.setBool("v1_korean_only", _koreanModeCheckbox->getState(), _domain);
-#endif
-
-		// Set the state of engine-specific checkboxes
-		for (uint i = 0; i < _engineOptions.size(); i++) {
-			ConfMan.setBool(_engineOptions[i].configOption, _engineCheckboxes[i]->getState(), _domain);
-		}
+void EditGameDialog::apply() {
+	ConfMan.set("description", _descriptionWidget->getEditString(), _domain);
+	
+	Common::Language lang = (Common::Language)_langPopUp->getSelectedTag();
+	if (lang < 0)
+		ConfMan.removeKey("language", _domain);
+	else
+		ConfMan.set("language", Common::getLanguageCode(lang), _domain);
+	
+	String gamePath(_gamePathWidget->getLabel());
+	if (!gamePath.empty())
+		ConfMan.set("path", gamePath, _domain);
+	
+	String extraPath(_extraPathWidget->getLabel());
+	if (!extraPath.empty() && (extraPath != _c("None", "path")))
+		ConfMan.set("extrapath", extraPath, _domain);
+	else
+		ConfMan.removeKey("extrapath", _domain);
+	
+	String savePath(_savePathWidget->getLabel());
+	if (!savePath.empty() && (savePath != _("Default")))
+		ConfMan.set("savepath", savePath, _domain);
+	else
+		ConfMan.removeKey("savepath", _domain);
+	
+	Common::Platform platform = (Common::Platform)_platformPopUp->getSelectedTag();
+	if (platform < 0)
+		ConfMan.removeKey("platform", _domain);
+	else
+		ConfMan.set("platform", Common::getPlatformCode(platform), _domain);
+	
+	// Set the state of engine-specific checkboxes
+	for (uint i = 0; i < _engineOptions.size(); i++) {
+		ConfMan.setBool(_engineOptions[i].configOption, _engineCheckboxes[i]->getState(), _domain);
 	}
-	OptionsDialog::close();
+
+	OptionsDialog::apply();
 }
 
 void EditGameDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data) {
@@ -529,7 +504,7 @@ void EditGameDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 			// User made his choice...
 			Common::FSNode dir(browser.getResult());
 			_savePathWidget->setLabel(dir.getPath());
-#ifdef USE_LIBCURL
+#if defined(USE_CLOUD) && defined(USE_LIBCURL)
 			MessageDialog warningMessage(_("Saved games sync feature doesn't work with non-default directories. If you want your saved games to sync, use default directory."));
 			warningMessage.runModal();
 #endif
@@ -564,7 +539,7 @@ void EditGameDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 			_domain = newDomain;
 		}
 	}
-	// FALL THROUGH to default case
+	// fall through
 	default:
 		OptionsDialog::handleCommand(sender, cmd, data);
 	}

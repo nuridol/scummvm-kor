@@ -21,9 +21,17 @@
  */
 
 #include "titanic/debugger.h"
-#include "titanic/titanic.h"
+#include "titanic/core/node_item.h"
+#include "titanic/core/room_item.h"
 #include "titanic/core/tree_item.h"
+#include "titanic/core/view_item.h"
+#include "titanic/game_manager.h"
+#include "titanic/game/movie_tester.h"
+#include "titanic/main_game_window.h"
 #include "titanic/pet_control/pet_control.h"
+#include "titanic/support/movie.h"
+#include "titanic/titanic.h"
+#include "common/str-array.h"
 
 namespace Titanic {
 
@@ -33,6 +41,10 @@ Debugger::Debugger(TitanicEngine *vm) : GUI::Debugger(), _vm(vm) {
 	registerCmd("room",			WRAP_METHOD(Debugger, cmdRoom));
 	registerCmd("pet",			WRAP_METHOD(Debugger, cmdPET));
 	registerCmd("item",			WRAP_METHOD(Debugger, cmdItem));
+	registerCmd("movie",		WRAP_METHOD(Debugger, cmdMovie));
+	registerCmd("sound",		WRAP_METHOD(Debugger, cmdSound));
+	registerCmd("cheat",        WRAP_METHOD(Debugger, cmdCheat));
+	registerCmd("frame",        WRAP_METHOD(Debugger, cmdFrame));
 }
 
 int Debugger::strToInt(const char *s) {
@@ -156,9 +168,18 @@ bool Debugger::cmdRoom(int argc, const char **argv) {
 	} else if (argc >= 2) {
 		CRoomItem *roomItem = findRoom(argv[1]);
 
-		if (!roomItem)
-			debugPrintf("Could not find room - %s\n", argv[1]);
-		else if (argc == 2)
+		if (!roomItem && argc == 2) {
+			// Presume it's a full view specified
+			CProjectItem *project = g_vm->_window->_project;
+			CViewItem *view = project->parseView(argv[1]);
+
+			if (view) {
+				project->changeView(argv[1]);
+				return false;
+			} else {
+				debugPrintf("Could not find view - %s\n", argv[1]);
+			}
+		} else if (argc == 2)
 			listRoom(roomItem);
 		else {
 			CNodeItem *nodeItem = findNode(roomItem, argv[2]);
@@ -194,7 +215,7 @@ bool Debugger::cmdPET(int argc, const char **argv) {
 
 		if (s == "on") {
 			gameState._petActive = true;
-			gameManager.initBounds();
+			gameManager.markAllDirty();
 			debugPrintf("PET is now on\n");
 			return true;
 		} else if (s == "off") {
@@ -248,7 +269,7 @@ bool Debugger::cmdItem(int argc, const char **argv) {
 		} else if (CString(argv[2]) == "add") {
 			// Ensure the PET is active and add the item to the inventory
 			gameState._petActive = true;
-			gameManager.initBounds();
+			gameManager.markAllDirty();
 			item->petAddToInventory();
 
 			return false;
@@ -258,6 +279,96 @@ bool Debugger::cmdItem(int argc, const char **argv) {
 	}
 
 	return true;
+}
+
+bool Debugger::cmdMovie(int argc, const char **argv) {
+	if (argc < 2) {
+		debugPrintf("movie filename.avi [startFrame endFrame]\n");
+		return true;
+	}
+
+	CViewItem *view = g_vm->_window->_gameManager->getView();
+	CMovieTester *tester = static_cast<CMovieTester *>(
+		view->findChildInstanceOf(CMovieTester::_type));
+	if (!tester) {
+		// No movie tester present, so create one
+		tester = new CMovieTester();
+		tester->addUnder(view);
+	}
+
+	CString filename(argv[1]);
+
+	if (filename == "reverse" || filename == "doubletake") {
+		// Tests reverse playback transparency frames
+		tester->loadMovie("y457.avi");
+		if (filename == "reverse") {
+			tester->playMovie(436, 0, MOVIE_STOP_PREVIOUS);
+		} else {
+			tester->playMovie(436, 432, MOVIE_STOP_PREVIOUS);
+			tester->playMovie(432, 436, 0);
+			tester->playMovie(436, 432, 0);
+			tester->playMovie(432, 436, 0);
+		}
+
+		return false;
+	}
+
+	if (!filename.hasSuffix(".avi"))
+		filename += ".avi";
+	tester->loadMovie(filename);
+
+	if (argc == 2) {
+		tester->playMovie(MOVIE_STOP_PREVIOUS);
+	} else {
+		uint startFrame = strToInt(argv[2]);
+		uint endFrame = (argc == 3) ? startFrame : strToInt(argv[3]);
+		tester->playMovie(startFrame, endFrame, MOVIE_STOP_PREVIOUS);
+	}
+
+	return false;
+}
+
+bool Debugger::cmdSound(int argc, const char **argv) {
+	if (argc == 2) {
+		Common::String name = argv[1];
+		if (!name.contains("#"))
+			name = "z#" + name;
+
+		CGameManager *gameManager = g_vm->_window->_gameManager;
+		CProximity prox;
+		gameManager->_sound.playSound(name, prox);
+		return false;
+	} else {
+		debugPrintf("sound <name>\n");
+		return true;
+	}
+}
+
+bool Debugger::cmdCheat(int argc, const char **argv) {
+	CGameManager *gameManager = g_vm->_window->_gameManager;
+	CProjectItem *project = g_vm->_window->_project;
+
+	CViewItem *newView = project->parseView("Cheat Room.Node 1.Cheat Rooms View");
+	gameManager->_gameState.changeView(newView, nullptr);
+	return false;
+}
+
+bool Debugger::cmdFrame(int argc, const char **argv) {
+	if (argc == 3) {
+		CGameObject *obj = dynamic_cast<CGameObject *>(
+			g_vm->_window->_project->findByName(argv[1]));
+		
+		if (obj) {
+			obj->loadFrame(strToInt(argv[2]));
+			return false;
+		} else {
+			debugPrintf("Object not found\n");
+			return true;
+		}
+	} else {
+		debugPrintf("frame <object> <frame number>");
+		return true;
+	}
 }
 
 } // End of namespace Titanic

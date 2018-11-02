@@ -82,10 +82,6 @@
 
 #include "audio/mixer.h"
 
-#ifdef SCUMMVMKOR
-#include "scumm/korean.h"
-#endif
-
 using Common::File;
 
 namespace Scumm {
@@ -110,7 +106,8 @@ static const dbgChannelDesc debugChannels[] = {
 	{"ACTORS", "Actor-related debug", DEBUG_ACTORS},
 	{"SOUND", "Sound related debug", DEBUG_SOUND},
 	{"INSANE", "Track INSANE", DEBUG_INSANE},
-	{"SMUSH", "Track SMUSH", DEBUG_SMUSH}
+	{"SMUSH", "Track SMUSH", DEBUG_SMUSH},
+	{"MOONBASEAI", "Track Moonbase AI", DEBUG_MOONBASE_AI}
 };
 
 ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
@@ -325,10 +322,6 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_costumeRenderer = NULL;
 	_2byteFontPtr = 0;
 	_V1TalkingActor = 0;
-#ifdef SCUMMVMKOR
-	for(int i = 0; i < 20; i++)
-		_2byteMultiFontPtr[i] = NULL;
-#endif
 	_NESStartStrip = 0;
 
 	_skipDrawObject = 0;
@@ -607,16 +600,8 @@ ScummEngine::~ScummEngine() {
 	}
 
 	delete[] _sortedActors;
-#ifdef SCUMMVMKOR
-	if (_koreanMode) unloadKoreanFiles();
-	if (_2byteFontPtr && !_useMultiFont)
-		delete _2byteFontPtr;
-	for (int i = 0; i < 20; i++)
-		if (_2byteMultiFontPtr[i])
-			delete _2byteMultiFontPtr[i];
-#else
+
 	delete[] _2byteFontPtr;
-#endif
 	delete _charset;
 	delete _messageDialog;
 	delete _pauseDialog;
@@ -967,7 +952,7 @@ ScummEngine_v100he::~ScummEngine_v100he() {
 ScummEngine_vCUPhe::ScummEngine_vCUPhe(OSystem *syst, const DetectorResult &dr) : Engine(syst){
 	_syst = syst;
 	_game = dr.game;
-	_filenamePattern = dr.fp,
+	_filenamePattern = dr.fp;
 
 	_cupPlayer = new CUP_Player(syst, this, _mixer);
 }
@@ -977,7 +962,7 @@ ScummEngine_vCUPhe::~ScummEngine_vCUPhe() {
 }
 
 Common::Error ScummEngine_vCUPhe::run() {
-	initGraphics(CUP_Player::kDefaultVideoWidth, CUP_Player::kDefaultVideoHeight, true);
+	initGraphics(CUP_Player::kDefaultVideoWidth, CUP_Player::kDefaultVideoHeight);
 
 	if (_cupPlayer->open(_filenamePattern.pattern)) {
 		_cupPlayer->play();
@@ -1260,44 +1245,9 @@ Common::Error ScummEngine::init() {
 	// Load it earlier so _useCJKMode variable could be set
 	loadCJKFont();
 
-#ifdef SCUMMVMKOR
-	// 개선의 여지가 약간 있지만, 일단은 그대로 남겨둠
-	_koreanMode = 0;
-	_koreanOnly = 0;
-	_highRes = 0;
-	
-	if(_language == Common::KO_KOR) {
-		_koreanMode = ConfMan.getBool("v1_korean_mode");
-		_koreanOnly = ConfMan.getBool("v1_korean_only") && _koreanMode;
-		if((_game.version == 8 || _game.heversion > 72) && _koreanMode)
-			_highRes = true;
-		if((_game.id == GID_DIG || _game.id == GID_CMI) && _koreanMode) {
-			debug("You can not use V1 mode in this game");
-			_koreanMode = 0;
-			_koreanOnly = 0;
-			_highRes = 0;
-		}
-		if(_koreanMode) {
-			debug("Korean V1 translation mode.");
-			loadKoreanFiles(/*getGameName()*/_game.gameid);
-			//_useCJKMode = 0;	// V1과 V2를 동시에 사용하지 않는다
-			_useCJKMode = 1;	// V1과 V2를 동시에 사용한다
-		} else {
-			if(_useCJKMode) {
-				debug("Korean V2 mode for DUMB edition or COMI Korean version");
-			}
-		}
-	}
-	debug("_game.id = %d", _game.id);
-	debug("_game.gameid = %s", _game.gameid);
-	debug("_game.version = %d, _game.heversion = %d", _game.version, _game.heversion);
-	debug("_koreanMode = %d, _koreanOnly = %d, _useCJKMode = %d", _koreanMode, _koreanOnly, _useCJKMode);
-	debug("_highRes = %d", _highRes);
-#endif
-
 	// Initialize backend
 	if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG) {
-		initGraphics(kHercWidth, kHercHeight, true);
+		initGraphics(kHercWidth, kHercHeight);
 	} else {
 		int screenWidth = _screenWidth;
 		int screenHeight = _screenHeight;
@@ -1316,7 +1266,7 @@ Common::Error ScummEngine::init() {
 			_outputPixelFormat = Graphics::PixelFormat(2, 5, 5, 5, 0, 10, 5, 0, 0);
 
 			if (_game.platform != Common::kPlatformFMTowns && _game.platform != Common::kPlatformPCEngine) {
-				initGraphics(screenWidth, screenHeight, screenWidth > 320, &_outputPixelFormat);
+				initGraphics(screenWidth, screenHeight, &_outputPixelFormat);
 				if (_outputPixelFormat != _system->getScreenFormat())
 					return Common::kUnsupportedColorMode;
 			} else {
@@ -1331,14 +1281,14 @@ Common::Error ScummEngine::init() {
 					}
 				}
 
-				initGraphics(screenWidth, screenHeight, screenWidth > 320, tryModes);
+				initGraphics(screenWidth, screenHeight, tryModes);
 				if (_system->getScreenFormat().bytesPerPixel != 2)
 					return Common::kUnsupportedColorMode;
 			}
 #else
 			if (_game.platform == Common::kPlatformFMTowns && _game.version == 3) {
 				warning("Starting game without the required 16bit color support.\nYou may experience color glitches");
-				initGraphics(screenWidth, screenHeight, (screenWidth > 320));
+				initGraphics(screenWidth, screenHeight);
 			} else {
 				return Common::Error(Common::kUnsupportedColorMode, "16bit color support is required for this game");
 			}
@@ -1348,7 +1298,7 @@ Common::Error ScummEngine::init() {
 		if (_game.platform == Common::kPlatformFMTowns && _game.version == 5)
 			return Common::Error(Common::kUnsupportedColorMode, "This game requires dual graphics layer support which is disabled in this build");
 #endif
-			initGraphics(screenWidth, screenHeight, (screenWidth > 320));
+			initGraphics(screenWidth, screenHeight);
 		}
 	}
 
@@ -2256,21 +2206,6 @@ void ScummEngine::scummLoop(int delta) {
 	if (_talkDelay < 0)
 		_talkDelay = 0;
 
-#ifdef SCUMMVMKOR
-	for(int numb = 0; numb < MAX_KOR; numb++) {
-		if (_strKSet1[numb].delay != -1) { // kor
-			_strKSet1[numb].delay -= delta;
-			if (_strKSet1[numb].delay < 0)
-				_strKSet1[numb].delay = 0;
-		}
-		if (_strKDesc[numb].delay != -1) { // kor
-			_strKDesc[numb].delay -= 5;
-			if (_strKDesc[numb].delay < 0)
-				_strKDesc[numb].delay = 0;
-		}
-	}
-#endif
-
 	// Record the current ego actor before any scripts (including input scripts)
 	// get a chance to run.
 	int oldEgo = 0;
@@ -2491,14 +2426,14 @@ void ScummEngine::scummLoop_handleSaveLoad() {
 		if (_saveLoadFlag == 1) {
 			success = saveState(_saveLoadSlot, _saveTemporaryState, filename);
 			if (!success)
-				errMsg = _("Failed to save game state to file:\n\n%s");
+				errMsg = _("Failed to save game to file:\n\n%s");
 
 			if (success && _saveTemporaryState && VAR_GAME_LOADED != 0xFF && _game.version <= 7)
 				VAR(VAR_GAME_LOADED) = 201;
 		} else {
 			success = loadState(_saveLoadSlot, _saveTemporaryState, filename);
 			if (!success)
-				errMsg = _("Failed to load game state from file:\n\n%s");
+				errMsg = _("Failed to load saved game from file:\n\n%s");
 
 			if (success && _saveTemporaryState && VAR_GAME_LOADED != 0xFF)
 				VAR(VAR_GAME_LOADED) = (_game.version == 8) ? 1 : 203;
@@ -2509,7 +2444,7 @@ void ScummEngine::scummLoop_handleSaveLoad() {
 		} else if (_saveLoadFlag == 1 && _saveLoadSlot != 0 && !_saveTemporaryState) {
 			// Display "Save successful" message, except for auto saves
 			char buf[256];
-			snprintf(buf, sizeof(buf), _("Successfully saved game state in file:\n\n%s"), filename.c_str());
+			snprintf(buf, sizeof(buf), _("Successfully saved game in file:\n\n%s"), filename.c_str());
 
 			GUI::TimedMessageDialog dialog(buf, 1500);
 			runDialog(dialog);

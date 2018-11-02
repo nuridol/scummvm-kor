@@ -235,6 +235,17 @@ public:
 	 */
 	void trim();
 
+	/**
+	 * Wraps the text in the string to the given line maximum. Lines will be
+	 * broken at any whitespace character. New lines are assumed to be
+	 * represented using '\n'.
+	 *
+	 * This is a very basic line wrap which does not perform tab stop
+	 * calculation, consecutive whitespace collapsing, auto-hyphenation, or line
+	 * balancing.
+	 */
+	void wordWrap(const uint32 maxLength);
+
 	uint hash() const;
 
 	/**@{
@@ -443,6 +454,17 @@ size_t strlcpy(char *dst, const char *src, size_t size);
  *         size + strlen(src) is returned.
  */
 size_t strlcat(char *dst, const char *src, size_t size);
+
+/**
+ * Determine the length of a string up to a maximum of `maxSize` characters.
+ * This should be used instead of `strlen` when reading the length of a C string
+ * from potentially unsafe or corrupt sources, like game assets.
+ *
+ * @param src The source string.
+ * @param maxSize The maximum size of the string.
+ * @return The length of the string.
+ */
+size_t strnlen(const char *src, size_t maxSize);
 
 /**
  * Convenience wrapper for tag2string which "returns" a C string.

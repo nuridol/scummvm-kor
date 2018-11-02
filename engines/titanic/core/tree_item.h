@@ -127,7 +127,7 @@ public:
 	/**
 	 * Returns true if the item's name matches a passed name
 	 */
-	virtual bool isEquals(const CString &name, int maxLen = 0) const { return false; }
+	virtual bool isEquals(const CString &name, bool startsWith = false) const{ return false; }
 
 	/**
 	 * Compares the name of the item to a passed name
@@ -155,9 +155,9 @@ public:
 	virtual Rect getBounds() const { return Rect(); }
 
 	/**
-	 * Called when the view changes
+	 * Free up any surface the object used
 	 */
-	virtual void viewChange() {}
+	virtual void freeSurface() {}
 
 	/**
 	 * Get the parent for the given item

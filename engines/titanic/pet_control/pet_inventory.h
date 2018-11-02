@@ -26,7 +26,7 @@
 #include "titanic/support/simple_file.h"
 #include "titanic/pet_control/pet_section.h"
 #include "titanic/pet_control/pet_inventory_glyphs.h"
-#include "titanic/pet_control/pet_text.h"
+#include "titanic/gfx/text_control.h"
 
 namespace Titanic {
 
@@ -35,13 +35,13 @@ namespace Titanic {
  */
 class CPetInventory : public CPetSection {
 private:
-	CPetText _text;
+	CTextControl _text;
 	CPetInventoryGlyphs _items;
 	CGameObject *_itemBackgrounds[46];
 	CGameObject *_itemGlyphs[46];
 	CGameObject *_movie;
 	bool _isLoading;
-	int _field298;
+	int _titaniaBitFlags;
 private:
 	/**
 	 * Handles initial setup
@@ -86,6 +86,11 @@ public:
 	virtual void changed(int changeType);
 
 	/**
+	 * Called when a new room is entered
+	 */
+	virtual void enterRoom(CRoomItem *room);
+
+	/**
 	 * Following are handlers for the various messages that the PET can
 	 * pass onto the currently active section/area
 	 */
@@ -94,6 +99,7 @@ public:
 	virtual bool MouseButtonUpMsg(CMouseButtonUpMsg *msg);
 	virtual bool MouseDoubleClickMsg(CMouseDoubleClickMsg *msg);
 	virtual bool VirtualKeyCharMsg(CVirtualKeyCharMsg *msg);
+	virtual bool MouseWheelMsg(CMouseWheelMsg *msg);
 
 	/**
 	 * Returns item a drag-drop operation has dropped on, if any
@@ -133,7 +139,7 @@ public:
 	/**
 	 * Get a reference to the tooltip text associated with the section
 	 */
-	virtual CPetText *getText() { return &_text; }
+	virtual CTextControl *getText() { return &_text; }
 
 	/**
 	 * Special retrieval of glyph background image
@@ -160,12 +166,16 @@ public:
 	 */
 	void highlightItem(CGameObject *item);
 
-	CGameObject *getImage(int index);
+	/**
+	 * Gets the object, if any, containing the transformation animation played 
+	 * when pieces of Titania are added to the inventory for the first time.
+	 */
+	CGameObject *getTransformAnimation(int index);
 
 	/**
 	 * Play the animated movie for an object
 	 */
-	void playMovie(CGameObject *movie, int flag);
+	void playMovie(CGameObject *movie, bool repeat = true);
 };
 
 } // End of namespace Titanic

@@ -23,6 +23,7 @@
 #ifndef FULLPIPE_OBJECTS_H
 #define FULLPIPE_OBJECTS_H
 
+#include "common/ptr.h"
 #include "fullpipe/utils.h"
 
 namespace Fullpipe {
@@ -33,13 +34,12 @@ class SceneTagList;
 class GameProject : public CObject {
  public:
 	int _field_4;
-	char *_headerFilename;
-	SceneTagList *_sceneTagList;
+	Common::String _headerFilename;
+	Common::ScopedPtr<SceneTagList> _sceneTagList;
 	int _field_10;
 
  public:
 	GameProject();
-	~GameProject();
 	virtual bool load(MfcArchive &file);
 };
 
@@ -62,9 +62,11 @@ struct PicAniInfo {
 
 	bool load(MfcArchive &file);
 	void save(MfcArchive &file);
+	void print();
 
 	PicAniInfo() { memset(this, 0, sizeof(PicAniInfo)); }
 };
+typedef Common::Array<PicAniInfo> PicAniInfoList;
 
 union VarValue {
 	float floatValue;
@@ -79,7 +81,7 @@ class GameVar : public CObject {
 	GameVar *_parentVarObj;
 	GameVar *_subVars;
 	GameVar *_field_14;
-	char *_varName;
+	Common::String _varName;
 	VarValue _value;
 	int _varType;
 
@@ -89,10 +91,10 @@ class GameVar : public CObject {
 
 	virtual bool load(MfcArchive &file);
 	virtual void save(MfcArchive &file);
-	GameVar *getSubVarByName(const char *name);
-	bool setSubVarAsInt(const char *name, int value);
-	int getSubVarAsInt(const char *name);
-	GameVar *addSubVarAsInt(const char *name, int value);
+	GameVar *getSubVarByName(const Common::String &name);
+	bool setSubVarAsInt(const Common::String &name, int value);
+	int getSubVarAsInt(const Common::String &name);
+	GameVar *addSubVarAsInt(const Common::String &name, int value);
 	bool addSubVar(GameVar *subvar);
 	int getSubVarsCount();
 	GameVar *getSubVarByIndex(int idx);

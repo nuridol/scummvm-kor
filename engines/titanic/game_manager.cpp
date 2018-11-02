@@ -20,13 +20,16 @@
  *
  */
 
-#include "titanic/titanic.h"
 #include "titanic/game_manager.h"
-#include "titanic/game_view.h"
-#include "titanic/support/screen_manager.h"
 #include "titanic/core/project_item.h"
+#include "titanic/events.h"
+#include "titanic/game_view.h"
 #include "titanic/messages/messages.h"
 #include "titanic/pet_control/pet_control.h"
+#include "titanic/sound/background_sound_maker.h"
+#include "titanic/support/files_manager.h"
+#include "titanic/support/screen_manager.h"
+#include "titanic/titanic.h"
 
 namespace Titanic {
 
@@ -35,7 +38,7 @@ CGameManager::CGameManager(CProjectItem *project, CGameView *gameView, Audio::Mi
 		_inputHandler(this), _inputTranslator(&_inputHandler),
 		_gameState(this), _sound(this, mixer), _musicRoom(this),
 		_treeItem(nullptr), _soundMaker(nullptr), _movieRoom(nullptr),
-		_dragItem(nullptr), _field54(0), _lastDiskTicksCount(0), _tickCount2(0) {
+		_dragItem(nullptr), _transitionCtr(0), _lastDiskTicksCount(0), _tickCount2(0) {
 
 	CTimeEventInfo::_nextId = 0;
 	_movie = nullptr;
@@ -81,8 +84,8 @@ void CGameManager::preLoad() {
 	_timers.destroyContents();
 	_soundMaker = nullptr;
 
-	_trueTalkManager.preLoad();
 	_sound.preLoad();
+	_trueTalkManager.preLoad();
 }
 
 void CGameManager::postLoad(CProjectItem *project) {
@@ -126,17 +129,20 @@ void CGameManager::postSave() {
 	_sound.postSave();
 }
 
-void CGameManager::initBounds() {
-	_bounds = Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-}
-
 void CGameManager::roomTransition(CRoomItem *oldRoom, CRoomItem *newRoom) {
 	delete _movie;
 	_movie = nullptr;
 
-	CResourceKey movieKey = (oldRoom == newRoom) ? oldRoom->getTransitionMovieKey() :
-		oldRoom->getExitMovieKey();
-	CString filename = movieKey.exists();
+	CResourceKey movieKey;
+	if (newRoom == oldRoom) {
+		movieKey = oldRoom->getTransitionMovieKey();
+		_movieRoom = oldRoom;
+	} else {
+		movieKey = oldRoom->getExitMovieKey();
+		_movieRoom = nullptr;
+	}
+
+	CString filename = movieKey.getFilename();
 	if (g_vm->_filesManager->fileExists(filename)) {
 		_movieSurface->freeSurface();
 		_movie = g_vm->_movieManager.createMovie(filename, _movieSurface);
@@ -150,11 +156,12 @@ void CGameManager::playClip(CMovieClip *clip, CRoomItem *oldRoom, CRoomItem *new
 	if (clip && clip->_startFrame != clip->_endFrame && _movie) {
 		// Clip details specifying a sub-section of movie to play
 		Rect tempRect(20, 10, SCREEN_WIDTH - 20, 350);
+		CMouseCursor &mouseCursor = *CScreenManager::_screenManagerPtr->_mouseCursor;
 
 		lockInputHandler();
-		CScreenManager::_screenManagerPtr->_mouseCursor->hide();
+		mouseCursor.incHideCounter();
 		_movie->playCutscene(tempRect, clip->_startFrame, clip->_endFrame);
-		CScreenManager::_screenManagerPtr->_mouseCursor->show();
+		mouseCursor.decHideCounter();
 		unlockInputHandler();
 	}
 }
@@ -169,30 +176,32 @@ void CGameManager::update() {
 
 	CViewItem *view = getView();
 	if (view) {
-		// Expand the game manager's bounds to encompass all the view's items
+		// Expand the game manager's bounds to encompass any modified
+		// areas of any of the view's items
 		for (CTreeItem *item = view; item; item = item->scan(view)) {
 			Rect r = item->getBounds();
 			if (!r.isEmpty())
-				_bounds.extend(r);
+				_bounds.combine(r);
 		}
 
-		// Also include the PET control in the bounds
+		// Also include any modified area of the PET control
 		if (_project) {
 			CPetControl *pet = _project->getPetControl();
+
 			if (pet)
-				_bounds.extend(pet->getBounds());
+				_bounds.combine(pet->getBounds());
 		}
 
 		// And the text cursor
 		CScreenManager *screenManager = CScreenManager::_screenManagerPtr;
 		CTextCursor *textCursor = screenManager->_textCursor;
 		if (textCursor && textCursor->_active)
-			_bounds.extend(textCursor->getCursorBounds());
+			_bounds.combine(textCursor->getCursorBounds());
 
-		// Set the surface bounds
-		screenManager->setSurfaceBounds(SURFACE_BACKBUFFER, _bounds);
+		// Set the screen's modified area bounds
+		screenManager->setSurfaceBounds(SURFACE_PRIMARY, _bounds);
 
-		// Handle redrawing the view
+		// Handle redrawing the view if there is any changed area
 		if (!_bounds.isEmpty()) {
 			_gameView->draw(_bounds);
 			_bounds = Rect();
@@ -219,6 +228,9 @@ void CGameManager::updateMovies() {
 			if (movie->_handled)
 				continue;
 
+			// Flag the movie to have been handled
+			movie->_handled = true;
+
 			CMovieEventList eventsList;
 			if (!movie->handleEvents(eventsList))
 				movie->removeFromPlayingMovies();
@@ -244,10 +256,9 @@ void CGameManager::updateMovies() {
 				}
 
 				eventsList.remove(movieEvent);
+				delete movieEvent;
 			}
 
-			// Flag the movie as having been handled
-			movie->_handled = true;
 			repeatFlag = true;
 			break;
 		}
@@ -258,7 +269,7 @@ void CGameManager::updateDiskTicksCount() {
 	_lastDiskTicksCount = g_vm->_events->getTicksCount();
 }
 
-void CGameManager::viewChange() {
+void CGameManager::roomChange() {
 	delete _movie;
 	delete _movieSurface;
 
@@ -267,9 +278,9 @@ void CGameManager::viewChange() {
 	_trueTalkManager.clear();
 
 	for (CTreeItem *treeItem = _project; treeItem; treeItem = treeItem->scan(_project))
-		treeItem->viewChange();
+		treeItem->freeSurface();
 
-	initBounds();
+	markAllDirty();
 }
 
 void CGameManager::frameMessage(CRoomItem *room) {
@@ -278,7 +289,7 @@ void CGameManager::frameMessage(CRoomItem *room) {
 		CFrameMsg frameMsg(g_vm->_events->getTicksCount());
 		frameMsg.execute(room, nullptr, MSGFLAG_SCAN);
 
-		if (!_soundMaker) {
+		if (_gameState._soundMakerAllowed && !_soundMaker) {
 			// Check for a sound maker in the room
 			_soundMaker = dynamic_cast<CBackgroundSoundMaker *>(
 				_project->findByName("zBackgroundSoundMaker"));
@@ -290,11 +301,15 @@ void CGameManager::frameMessage(CRoomItem *room) {
 	}
 }
 
-void CGameManager::extendBounds(const Rect &r) {
+void CGameManager::addDirtyRect(const Rect &r) {
 	if (_bounds.isEmpty())
 		_bounds = r;
 	else
 		_bounds.combine(r);
+}
+
+void CGameManager::markAllDirty() {
+	_bounds = Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 }
 
 CScreenManager *CGameManager::setScreenManager() const {

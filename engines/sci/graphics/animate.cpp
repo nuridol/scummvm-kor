@@ -122,7 +122,7 @@ bool GfxAnimate::detectFastCast() {
 	// within that game. Which means even though we detect it as having the capability, it's never actually used.
 	// The original multilingual KQ5 interpreter did have this feature disabled.
 	// Sierra probably used latest system scripts and that's why we detect it.
-	if (_scriptPatcher->findSignature(magicDWord, magicDWordOffset, fastCastSignature, "fast cast detection", scriptData, scriptSize) >= 0) {
+	if (_scriptPatcher->findSignature(magicDWord, magicDWordOffset, fastCastSignature, "fast cast detection", SciSpan<const byte>(scriptData, scriptSize)) >= 0) {
 		// Signature found, game seems to use fast cast for kAnimate
 		return true;
 	}
@@ -145,7 +145,7 @@ bool GfxAnimate::invoke(List *list, int argc, reg_t *argv) {
 		if (_fastCastEnabled) {
 			// Check if the game has a fastCast object set
 			//  if we don't abort kAnimate processing, at least in kq5 there will be animation cels drawn into speech boxes.
-			if (!_s->variables[VAR_GLOBAL][84].isNull()) {
+			if (!_s->variables[VAR_GLOBAL][kGlobalVarFastCast].isNull()) {
 				// This normally points to an object called "fastCast",
 				// but for example in Eco Quest 1 it may also point to an object called "EventHandler" (see bug #5170)
 				// Original SCI only checked, if this global was not 0.
@@ -338,7 +338,7 @@ void GfxAnimate::applyGlobalScaling(AnimateList::iterator entry, GfxView *view) 
 	int16 maxScale = readSelectorValue(_s->_segMan, entry->object, SELECTOR(maxScale));
 	int16 celHeight = view->getHeight(entry->loopNo, entry->celNo);
 	int16 maxCelHeight = (maxScale * celHeight) >> 7;
-	reg_t globalVar2 = _s->variables[VAR_GLOBAL][2]; // current room object
+	reg_t globalVar2 = _s->variables[VAR_GLOBAL][kGlobalVarCurrentRoom]; // current room object
 	int16 vanishingY = readSelectorValue(_s->_segMan, globalVar2, SELECTOR(vanishingY));
 
 	int16 fixedPortY = _ports->getPort()->rect.bottom - vanishingY;

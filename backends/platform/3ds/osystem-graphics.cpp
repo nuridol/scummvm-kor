@@ -150,7 +150,7 @@ void OSystem_3DS::initSize(uint width, uint height,
 	_overlay.create(getOverlayWidth(), getOverlayHeight(), _pfGameTexture);
 
 	if (format) {
-		debug("pixelformat: %d %d %d %d %d", format->bytesPerPixel, format->rBits(), format->gBits(), format->bBits(), format->aBits());;
+		debug("pixelformat: %d %d %d %d %d", format->bytesPerPixel, format->rBits(), format->gBits(), format->bBits(), format->aBits());
 		_pfGame = *format;
 	}
 
@@ -230,7 +230,7 @@ void OSystem_3DS::setPalette(const byte *colors, uint start, uint num) {
 		flushGameScreen();
 	}
 }
-void OSystem_3DS::grabPalette(byte *colors, uint start, uint num) {
+void OSystem_3DS::grabPalette(byte *colors, uint start, uint num) const {
 	assert(start + num <= 256);
 	memcpy(colors, _palette + 3 * start, 3 * num);
 }

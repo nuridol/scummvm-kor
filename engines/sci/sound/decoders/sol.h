@@ -33,7 +33,7 @@ enum SOLFlags {
 	kStereo     = 16
 };
 
-template <bool STEREO, bool S16BIT>
+template <bool STEREO, bool S16BIT, bool OLDDPCM8>
 class SOLStream : public Audio::SeekableAudioStream {
 private:
 	/**
@@ -42,18 +42,12 @@ private:
 	Common::DisposablePtr<Common::SeekableReadStream> _stream;
 
 	/**
-	 * Start offset of the audio data in the read stream.
-	 */
-	int32 _dataOffset;
-
-	/**
 	 * Sample rate of audio data.
 	 */
 	uint16 _sampleRate;
 
 	/**
-	 * The raw (possibly-compressed) size of audio data in
-	 * the stream.
+	 * The raw (possibly-compressed) size of audio data in the stream.
 	 */
 	int32 _rawDataSize;
 
@@ -61,8 +55,8 @@ private:
 	 * The last sample from the previous DPCM decode.
 	 */
 	union {
-		int16 _dpcmCarry16;
-		uint8 _dpcmCarry8;
+		struct { int16 l; int16 r; } _dpcmCarry16;
+		struct { uint8 l; uint8 r; } _dpcmCarry8;
 	};
 
 	/**
@@ -79,11 +73,9 @@ private:
 	virtual bool rewind() override;
 
 public:
-	SOLStream(Common::SeekableReadStream *stream, const DisposeAfterUse::Flag disposeAfterUse, const int32 dataOffset, const uint16 sampleRate, const int32 rawDataSize);
+	SOLStream(Common::SeekableReadStream *stream, const DisposeAfterUse::Flag disposeAfterUse, const uint16 sampleRate, const int32 rawDataSize);
 };
 
 Audio::SeekableAudioStream *makeSOLStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse);
-
-Audio::SeekableAudioStream *makeSOLStream(Common::SeekableReadStream *headerStream, Common::SeekableReadStream *dataStream, DisposeAfterUse::Flag disposeAfterUse);
 }
 #endif

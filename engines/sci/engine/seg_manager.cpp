@@ -24,6 +24,9 @@
 #include "sci/engine/seg_manager.h"
 #include "sci/engine/state.h"
 #include "sci/engine/script.h"
+#ifdef ENABLE_SCI32
+#include "sci/engine/guest_additions.h"
+#endif
 
 namespace Sci {
 
@@ -42,7 +45,6 @@ SegManager::SegManager(ResourceManager *resMan, ScriptPatcher *scriptPatcher)
 
 #ifdef ENABLE_SCI32
 	_arraysSegId = 0;
-	_stringSegId = 0;
 	_bitmapSegId = 0;
 #endif
 
@@ -72,7 +74,6 @@ void SegManager::resetSegMan() {
 
 #ifdef ENABLE_SCI32
 	_arraysSegId = 0;
-	_stringSegId = 0;
 	_bitmapSegId = 0;
 #endif
 
@@ -88,9 +89,8 @@ void SegManager::initSysStrings() {
 		_parserPtr = make_reg(_saveDirPtr.getSegment(), _saveDirPtr.getOffset() + 256);
 #ifdef ENABLE_SCI32
 	} else {
-		SciString *saveDirString = allocateString(&_saveDirPtr);
-		saveDirString->setSize(256);
-		saveDirString->setValue(0, 0);
+		SciArray *saveDirString = allocateArray(kArrayTypeString, 256, &_saveDirPtr);
+		saveDirString->byteAt(0) = '\0';
 
 		_parserPtr = NULL_REG;	// no SCI2 game had a parser
 #endif
@@ -275,27 +275,20 @@ const char *SegManager::getObjectName(reg_t pos) {
 	if (nameReg.isNull())
 		return "<no name>";
 
-	const char *name = 0;
-	if (nameReg.getSegment())
-		name  = derefString(nameReg);
+	const char *name = derefString(nameReg);
+
 	if (!name) {
-		// Crazy Nick Laura Bow is missing some object names needed for the static
-		// selector vocabulary
-		if (g_sci->getGameId() == GID_CNICK_LAURABOW && pos == make_reg(1, 0x2267))
-			return "Character";
-		else
-			return "<invalid name>";
+		return "<invalid name>";
 	}
 
 	return name;
 }
 
-reg_t SegManager::findObjectByName(const Common::String &name, int index) {
+Common::Array<reg_t> SegManager::findObjectsByName(const Common::String &name) {
 	Common::Array<reg_t> result;
-	uint i;
 
 	// Now all values are available; iterate over all objects.
-	for (i = 0; i < _heap.size(); i++) {
+	for (uint i = 0; i < _heap.size(); i++) {
 		const SegmentObj *mobj = _heap[i];
 
 		if (!mobj)
@@ -326,12 +319,18 @@ reg_t SegManager::findObjectByName(const Common::String &name, int index) {
 		}
 	}
 
+	return result;
+}
+
+reg_t SegManager::findObjectByName(const Common::String &name, int index) {
+	Common::Array<reg_t> result = findObjectsByName(name);
+
 	if (result.empty())
 		return NULL_REG;
 
 	if (result.size() > 1 && index < 0) {
 		debug("findObjectByName(%s): multiple matches:", name.c_str());
-		for (i = 0; i < result.size(); i++)
+		for (uint i = 0; i < result.size(); i++)
 			debug("  %3x: [%04x:%04x]", i, PRINT_REG(result[i]));
 		return NULL_REG; // Ambiguous
 	}
@@ -615,7 +614,25 @@ static inline void setChar(const SegmentRef &ref, uint offset, byte value) {
 		val->setOffset((val->getOffset() & 0xff00) | value);
 }
 
-// TODO: memcpy, strcpy and strncpy could maybe be folded into a single function
+template <bool STRING>
+static void forwardCopy(byte *dest, const byte *src, size_t n) {
+	const bool zeroPad = (STRING && n != 0xFFFFFFFFU);
+
+	while (n) {
+		--n;
+		const byte b = *src++;
+		*dest++ = b;
+		if (STRING && b == '\0') {
+			break;
+		}
+	}
+	if (zeroPad) {
+		while (n--) {
+			*dest++ = '\0';
+		}
+	}
+}
+
 void SegManager::strncpy(reg_t dest, const char* src, size_t n) {
 	SegmentRef dest_r = dereference(dest);
 	if (!dest_r.isValid()) {
@@ -625,11 +642,7 @@ void SegManager::strncpy(reg_t dest, const char* src, size_t n) {
 
 
 	if (dest_r.isRaw) {
-		// raw -> raw
-		if (n == 0xFFFFFFFFU)
-			::strcpy((char *)dest_r.raw, src);
-		else
-			::strncpy((char *)dest_r.raw, src, n);
+		forwardCopy<true>(dest_r.raw, (const byte *)src, n);
 	} else {
 		// raw -> non-raw
 		for (uint i = 0; i < n; i++) {
@@ -712,7 +725,7 @@ void SegManager::memcpy(reg_t dest, const byte* src, size_t n) {
 
 	if (dest_r.isRaw) {
 		// raw -> raw
-		::memcpy((char *)dest_r.raw, src, n);
+		forwardCopy<false>(dest_r.raw, src, n);
 	} else {
 		// raw -> non-raw
 		for (uint i = 0; i < n; i++)
@@ -768,7 +781,7 @@ void SegManager::memcpy(byte *dest, reg_t src, size_t n) {
 
 	if (src_r.isRaw) {
 		// raw -> raw
-		::memcpy(dest, src_r.raw, n);
+		forwardCopy<false>(dest, src_r.raw, n);
 	} else {
 		// non-raw -> raw
 		for (uint i = 0; i < n; i++) {
@@ -789,7 +802,10 @@ size_t SegManager::strlen(reg_t str) {
 	}
 
 	if (str_r.isRaw) {
-		return ::strlen((const char *)str_r.raw);
+		// There is no guarantee that raw strings are zero-terminated; for
+		// example, Phant1 reads "\r\n" from a pointer of size 2 during the
+		// chase
+		return Common::strnlen((const char *)str_r.raw, str_r.maxSize);
 	} else {
 		int i = 0;
 		while (getChar(str_r, i))
@@ -799,7 +815,7 @@ size_t SegManager::strlen(reg_t str) {
 }
 
 
-Common::String SegManager::getString(reg_t pointer, int entries) {
+Common::String SegManager::getString(reg_t pointer) {
 	Common::String ret;
 	if (pointer.isNull())
 		return ret;	// empty text
@@ -809,23 +825,24 @@ Common::String SegManager::getString(reg_t pointer, int entries) {
 		warning("SegManager::getString(): Attempt to dereference invalid pointer %04x:%04x", PRINT_REG(pointer));
 		return ret;
 	}
-	if (entries > src_r.maxSize) {
-		warning("Trying to dereference pointer %04x:%04x beyond end of segment", PRINT_REG(pointer));
-		return ret;
-	}
-	if (src_r.isRaw)
-		ret = (char *)src_r.raw;
-	else {
+
+	if (src_r.isRaw) {
+		// There is no guarantee that raw strings are zero-terminated; for
+		// example, Phant1 reads "\r\n" from a pointer of size 2 during the
+		// chase
+		const uint size = Common::strnlen((const char *)src_r.raw, src_r.maxSize);
+		ret = Common::String((const char *)src_r.raw, size);
+	} else {
 		uint i = 0;
-		for (;;) {
-			char c = getChar(src_r, i);
+		while (i < (uint)src_r.maxSize) {
+			const char c = getChar(src_r, i);
 
 			if (!c)
 				break;
 
 			i++;
 			ret += c;
-		};
+		}
 	}
 	return ret;
 }
@@ -863,7 +880,10 @@ bool SegManager::freeDynmem(reg_t addr) {
 }
 
 #ifdef ENABLE_SCI32
-SciArray<reg_t> *SegManager::allocateArray(reg_t *addr) {
+#pragma mark -
+#pragma mark Arrays
+
+SciArray *SegManager::allocateArray(SciArrayType type, uint16 size, reg_t *addr) {
 	ArrayTable *table;
 	int offset;
 
@@ -875,10 +895,14 @@ SciArray<reg_t> *SegManager::allocateArray(reg_t *addr) {
 	offset = table->allocEntry();
 
 	*addr = make_reg(_arraysSegId, offset);
-	return &table->at(offset);
+
+	SciArray *array = &table->at(offset);
+	array->setType(type);
+	array->resize(size);
+	return array;
 }
 
-SciArray<reg_t> *SegManager::lookupArray(reg_t addr) {
+SciArray *SegManager::lookupArray(reg_t addr) {
 	if (_heap[addr.getSegment()]->getType() != SEG_TYPE_ARRAY)
 		error("Attempt to use non-array %04x:%04x as array", PRINT_REG(addr));
 
@@ -891,6 +915,11 @@ SciArray<reg_t> *SegManager::lookupArray(reg_t addr) {
 }
 
 void SegManager::freeArray(reg_t addr) {
+	// SSCI memory manager ignores attempts to free null handles
+	if (addr.isNull()) {
+		return;
+	}
+
 	if (_heap[addr.getSegment()]->getType() != SEG_TYPE_ARRAY)
 		error("Attempt to use non-array %04x:%04x as array", PRINT_REG(addr));
 
@@ -899,54 +928,17 @@ void SegManager::freeArray(reg_t addr) {
 	if (!arrayTable.isValidEntry(addr.getOffset()))
 		error("Attempt to use non-array %04x:%04x as array", PRINT_REG(addr));
 
-	arrayTable[addr.getOffset()].destroy();
 	arrayTable.freeEntry(addr.getOffset());
 }
 
-SciString *SegManager::allocateString(reg_t *addr) {
-	StringTable *table;
-	int offset;
-
-	if (!_stringSegId) {
-		table = (StringTable *)allocSegment(new StringTable(), &(_stringSegId));
-	} else
-		table = (StringTable *)_heap[_stringSegId];
-
-	offset = table->allocEntry();
-
-	*addr = make_reg(_stringSegId, offset);
-	return &table->at(offset);
-}
-
-SciString *SegManager::lookupString(reg_t addr) {
-	if (_heap[addr.getSegment()]->getType() != SEG_TYPE_STRING)
-		error("lookupString: Attempt to use non-string %04x:%04x as string", PRINT_REG(addr));
-
-	StringTable &stringTable = *(StringTable *)_heap[addr.getSegment()];
-
-	if (!stringTable.isValidEntry(addr.getOffset()))
-		error("lookupString: Attempt to use non-string %04x:%04x as string", PRINT_REG(addr));
-
-	return &(stringTable[addr.getOffset()]);
-}
-
-void SegManager::freeString(reg_t addr) {
-	if (_heap[addr.getSegment()]->getType() != SEG_TYPE_STRING)
-		error("freeString: Attempt to use non-string %04x:%04x as string", PRINT_REG(addr));
-
-	StringTable &stringTable = *(StringTable *)_heap[addr.getSegment()];
-
-	if (!stringTable.isValidEntry(addr.getOffset()))
-		error("freeString: Attempt to use non-string %04x:%04x as string", PRINT_REG(addr));
-
-	stringTable[addr.getOffset()].destroy();
-	stringTable.freeEntry(addr.getOffset());
+bool SegManager::isArray(reg_t addr) const {
+	return addr.getSegment() == _arraysSegId;
 }
 
 #pragma mark -
 #pragma mark Bitmaps
 
-SciBitmap *SegManager::allocateBitmap(reg_t *addr, const int16 width, const int16 height, const uint8 skipColor, const int16 displaceX, const int16 displaceY, const int16 scaledWidth, const int16 scaledHeight, const uint32 paletteSize, const bool remap, const bool gc) {
+SciBitmap *SegManager::allocateBitmap(reg_t *addr, const int16 width, const int16 height, const uint8 skipColor, const int16 originX, const int16 originY, const int16 xResolution, const int16 yResolution, const uint32 paletteSize, const bool remap, const bool gc) {
 	BitmapTable *table;
 	int offset;
 
@@ -961,7 +953,7 @@ SciBitmap *SegManager::allocateBitmap(reg_t *addr, const int16 width, const int1
 	*addr = make_reg(_bitmapSegId, offset);
 	SciBitmap &bitmap = table->at(offset);
 
-	bitmap.create(width, height, skipColor, displaceX, displaceY, scaledWidth, scaledHeight, paletteSize, remap, gc);
+	bitmap.create(width, height, skipColor, originX, originY, xResolution, yResolution, paletteSize, remap, gc);
 
 	return &bitmap;
 }
@@ -995,22 +987,20 @@ void SegManager::freeBitmap(const reg_t addr) {
 #endif
 
 void SegManager::createClassTable() {
-	Resource *vocab996 = _resMan->findResource(ResourceId(kResourceTypeVocab, 996), 1);
+	Resource *vocab996 = _resMan->findResource(ResourceId(kResourceTypeVocab, 996), false);
 
 	if (!vocab996)
 		error("SegManager: failed to open vocab 996");
 
-	int totalClasses = vocab996->size >> 2;
+	int totalClasses = vocab996->size() >> 2;
 	_classTable.resize(totalClasses);
 
 	for (uint16 classNr = 0; classNr < totalClasses; classNr++) {
-		uint16 scriptNr = READ_SCI11ENDIAN_UINT16(vocab996->data + classNr * 4 + 2);
+		uint16 scriptNr = vocab996->getUint16SEAt(classNr * 4 + 2);
 
 		_classTable[classNr].reg = NULL_REG;
 		_classTable[classNr].script = scriptNr;
 	}
-
-	_resMan->unlockResource(vocab996);
 }
 
 reg_t SegManager::getClassAddress(int classnr, ScriptLoadType lock, uint16 callerSegment) {
@@ -1019,15 +1009,16 @@ reg_t SegManager::getClassAddress(int classnr, ScriptLoadType lock, uint16 calle
 
 	if (classnr < 0 || (int)_classTable.size() <= classnr || _classTable[classnr].script < 0) {
 		error("[VM] Attempt to dereference class %x, which doesn't exist (max %x)", classnr, _classTable.size());
-		return NULL_REG;
 	} else {
 		Class *the_class = &_classTable[classnr];
 		if (!the_class->reg.getSegment()) {
 			getScriptSegment(the_class->script, lock);
 
 			if (!the_class->reg.getSegment()) {
-				error("[VM] Trying to instantiate class %x by instantiating script 0x%x (%03d) failed;", classnr, the_class->script, the_class->script);
-				return NULL_REG;
+				if (lock == SCRIPT_GET_DONT_LOAD)
+					return NULL_REG;
+
+				error("[VM] Trying to instantiate class %x by instantiating script 0x%x (%03d) failed", classnr, the_class->script, the_class->script);
 			}
 		} else
 			if (callerSegment != the_class->reg.getSegment())
@@ -1045,7 +1036,7 @@ int SegManager::instantiateScript(int scriptNum) {
 			scr->incrementLockers();
 			return segmentId;
 		} else {
-			scr->freeScript();
+			scr->freeScript(true);
 		}
 	} else {
 		scr = allocateScript(scriptNum, &segmentId);
@@ -1055,6 +1046,9 @@ int SegManager::instantiateScript(int scriptNum) {
 	scr->initializeLocals(this);
 	scr->initializeClasses(this);
 	scr->initializeObjects(this, segmentId);
+#ifdef ENABLE_SCI32
+	g_sci->_guestAdditions->instantiateScriptHook(*scr);
+#endif
 
 	return segmentId;
 }

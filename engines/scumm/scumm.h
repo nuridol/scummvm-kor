@@ -172,7 +172,8 @@ enum {
 	DEBUG_SOUND	=	1 << 7,		// General Sound Debug
 	DEBUG_ACTORS	=	1 << 8,		// General Actor Debug
 	DEBUG_INSANE	=	1 << 9,		// Track INSANE
-	DEBUG_SMUSH	=	1 << 10		// Track SMUSH
+	DEBUG_SMUSH	=	1 << 10,		// Track SMUSH
+	DEBUG_MOONBASE_AI = 1 << 11		// Moonbase AI
 };
 
 struct VerbSlot;
@@ -1210,10 +1211,6 @@ protected:
 	virtual void CHARSET_1();
 	bool newLine();
 	void drawString(int a, const byte *msg);
-#ifdef SCUMMVMKOR
-	void drawEnglish(int a, const byte *msg);
-	void drawKorean(const byte *buffer, uint16 kr_xpos, uint16 kr_ypos, uint8 kr_color, int option);
-#endif
 	void debugMessage(const byte *msg);
 	void showMessageDialog(const byte *msg);
 
@@ -1231,27 +1228,13 @@ public:
 
 	// Somewhat hackish stuff for 2 byte support (Chinese/Japanese/Korean)
 	bool _useCJKMode;
-#ifdef SCUMMVMKOR
-	bool _useMultiFont;
-	int _numLoadedFont;
-	int _currentFont;
-	int _2byteShadow;
-	void loadCJKFonts();
-#endif
 	int _2byteHeight;
 	int _2byteWidth;
 	byte _newLineCharacter;
 	byte *get2byteCharPtr(int idx);
-#ifdef SCUMMVMKOR
-	byte *_2byteFontPtr;
-	byte *_2byteMultiFontPtr[20];
-	int _2byteMultiHeight[20];
-	int _2byteMultiWidth[20];
-	int _2byteMultiShadow[20];
-#else
+
 protected:
 	byte *_2byteFontPtr;
-#endif
 
 public:
 

@@ -5,11 +5,11 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleDisplayName</key>
-	<string>ScummVM-kor</string>
+	<string>ScummVM</string>
 	<key>CFBundleExecutable</key>
 	<string>scummvm</string>
 	<key>CFBundleGetInfoString</key>
-	<string>1.9.0, Copyright 2001-2016 The ScummVM Team</string>
+	<string>2.0.0, Copyright 2001-2017 The ScummVM Team</string>
 	<key>CFBundleIconFile</key>
 	<string>scummvm.icns</string>
 	<key>CFBundleIdentifier</key>
@@ -41,15 +41,15 @@
 		<string>uk</string>
 	</array>
 	<key>CFBundleName</key>
-	<string>ScummVM-kor</string>
+	<string>ScummVM</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.9.0</string>
+	<string>2.0.0</string>
 	<key>CFBundleVersion</key>
-	<string>1.9.0</string>
+	<string>2.0.0</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright 2001-2016 The ScummVM Team</string>
+	<string>Copyright 2001-2017 The ScummVM Team</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>SUFeedURL</key>

@@ -43,6 +43,8 @@ public:
 	int &operator[](int idx) { return _array[idx]; }
 	int *getSlot(int idx) { return &_array[16 + idx * 4]; }
 	void resetFlags();
+
+	void copyData();
 };
 
 class TTnpcScriptBase : public TTscriptBase {
@@ -267,7 +269,12 @@ public:
 	virtual bool handleWord(uint id) const;
 
 	virtual int handleQuote(const TTroomScript *roomScript, const TTsentence *sentence,
-		uint val, uint tagId, uint remainder);
+		uint tag1, uint tag2, uint remainder);
+
+	/**
+	 * Returns true if the NPC's dial region affects quote responses
+	 */
+	virtual bool isQuoteDialled() const { return false; }
 
 	/**
 	 * Given an Id for a previously registered set of random number values,
@@ -308,7 +315,11 @@ public:
 	virtual void load(SimpleFile *file);
 	virtual void saveBody(SimpleFile *file);
 	virtual void loadBody(SimpleFile *file);
-	virtual int proc31() const;
+
+	/**
+	 * Returns the number of range records that are non-random
+	 */
+	virtual int getRangesCount() const;
 
 	/**
 	 * Sets a given dial to be pointing in a specified region (0 to 2)

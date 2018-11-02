@@ -21,6 +21,7 @@
  */
 
 #include "titanic/game/sgt/desk.h"
+#include "titanic/translation.h"
 
 namespace Titanic {
 
@@ -41,38 +42,38 @@ void CDesk::load(SimpleFile *file) {
 }
 
 bool CDesk::TurnOn(CTurnOn *msg) {
-	if (_statics->_v5 == "Closed" && _statics->_v1 != "RestingG"
-			&& _statics->_v1 != "OpenWrong") {
-		_statics->_v5 = "Open";
-		_fieldE0 = false;
+	if (_statics->_desk == "Closed" && _statics->_bedhead != "RestingG"
+			&& _statics->_bedhead != "OpenWrong") {
+		_statics->_desk = "Open";
+		_isClosed = false;
 		_startFrame = 1;
 		_endFrame = 26;
-		playMovie(1, 26, MOVIE_NOTIFY_OBJECT | MOVIE_GAMESTATE);
-		playSound("b#12.wav");
+		playMovie(1, 26, MOVIE_NOTIFY_OBJECT | MOVIE_WAIT_FOR_FINISH);
+		playSound(TRANSLATE("b#12.wav", "b#97.wav"));
 	}
 
 	return true;
 }
 
 bool CDesk::TurnOff(CTurnOff *msg) {
-	if (_statics->_v5 == "Open" && _statics->_v6 == "Closed"
-			&& _statics->_v1 == "Open") {
+	if (_statics->_desk == "Open" && _statics->_chestOfDrawers == "Closed"
+			&& _statics->_bedhead != "Open") {
 		CVisibleMsg visibleMsg(false);
 		visibleMsg.execute("ChestOfDrawers");
 
-		_statics->_v5 = "Closed";
-		_fieldE0 = true;
+		_statics->_desk = "Closed";
+		_isClosed = true;
 		_startFrame = 26;
 		_endFrame = 51;
-		playMovie(26, 51, MOVIE_GAMESTATE);
-		playSound("b#9.wav");
+		playMovie(26, 51, MOVIE_WAIT_FOR_FINISH);
+		playSound(TRANSLATE("b#9.wav", "b#94.wav"));
 	}
 
 	return true;
 }
 
 bool CDesk::MovieEndMsg(CMovieEndMsg *msg) {
-	if (_statics->_v5 == "Open") {
+	if (_statics->_desk == "Open") {
 		CVisibleMsg visibleMsg(true);
 		visibleMsg.execute("ChestOfDrawers");
 	}

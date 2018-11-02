@@ -39,10 +39,6 @@
 #include "scumm/usage_bits.h"
 #include "scumm/util.h"
 
-#ifdef SCUMMVMKOR
-#include "scumm/korean.h"
-#endif
-
 namespace Scumm {
 
 byte Actor::kInvalidBox = 0;
@@ -941,7 +937,6 @@ L2A33:;
 	}
 
 	if ((_moving & 0x0F) == 3) {
-L2C36:;
 		setTmpFromActor();
 
 		if (!_walkDirX) {
@@ -984,7 +979,6 @@ L2C36:;
 
 	// 2ADA
 	if ((_moving & 0x0F) == 4) {
-L2CA3:;
 		setTmpFromActor();
 
 		if (!_walkDirY) {
@@ -1049,7 +1043,7 @@ L2CA3:;
 
 				directionUpdate();
 				animateActor(newDirToOldDir(_facing));
-				goto L2C36;
+				return;
 
 			} else {
 				// 2B39
@@ -1068,7 +1062,7 @@ L2CA3:;
 
 				directionUpdate();
 				animateActor(newDirToOldDir(_facing));
-				goto L2CA3;
+				return;
 			}
 		}
 	}
@@ -1514,10 +1508,11 @@ void Actor::putActor(int dstX, int dstY, int newRoom) {
 		((Actor_v0 *)this)->_newWalkBoxEntered = false;
 		((Actor_v0 *)this)->_CurrentWalkTo = _pos;
 		((Actor_v0 *)this)->_NewWalkTo = _pos;
-
-		// V0 always sets the actor to face the camera upon entering a room
-		setDirection(oldDirToNewDir(2));
 	}
+
+	// V0-V1 Maniac always sets the actor to face the camera upon entering a room
+	if (_vm->_game.id == GID_MANIAC && _vm->_game.version <= 1 && _vm->_game.platform != Common::kPlatformNES)
+		setDirection(oldDirToNewDir(2));
 }
 
 static bool inBoxQuickReject(const BoxCoords &box, int x, int y, int threshold) {
@@ -2419,6 +2414,7 @@ void Actor_v0::startAnimActor(int f) {
 			return;
 
 		_speaking = 1;
+		speakCheck();
 		return;
 	}
 
@@ -2471,6 +2467,7 @@ void Actor::animateActor(int anim) {
 			setDirection(dir);
 			break;
 		}
+		// fall through
 	default:
 		if (_vm->_game.version <= 2)
 			startAnimActor(anim / 4);
@@ -2751,9 +2748,6 @@ void ScummEngine_v7::actorTalk(const byte *msg) {
 	_charsetBufPos = 0;
 	_talkDelay = 0;
 	_haveMsg = 1;
-#ifdef SCUMMVMKOR
-	INIT_KOR_DELAYS;
-#endif
 	if (_game.id == GID_FT)
 		VAR(VAR_HAVE_MSG) = 0xFF;
 	_haveActorSpeechMsg = (_game.id == GID_FT) ? true : (!_sound->isSoundRunning(kTalkSoundID));
@@ -2831,9 +2825,6 @@ void ScummEngine::actorTalk(const byte *msg) {
 	_charsetBufPos = 0;
 	_talkDelay = 0;
 	_haveMsg = 0xFF;
-#ifdef SCUMMVMKOR
-	INIT_KOR_DELAYS;
-#endif
 	VAR(VAR_HAVE_MSG) = 0xFF;
 	if (VAR_CHARCOUNT != 0xFF)
 		VAR(VAR_CHARCOUNT) = 0;
@@ -2872,9 +2863,6 @@ void ScummEngine::stopTalk() {
 	_haveMsg = 0;
 	_talkDelay = 0;
 
-#ifdef SCUMMVMKOR
-	INIT_KOR_DELAYS;
-#endif
 	act = getTalkingActor();
 	if (act && act < 0x80) {
 		Actor *a = derefActor(act, "stopTalk");

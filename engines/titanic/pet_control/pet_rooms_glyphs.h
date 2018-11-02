@@ -24,9 +24,11 @@
 #define TITANIC_PET_ROOMS_GLYPHS_H
 
 #include "titanic/pet_control/pet_glyphs.h"
-#include "titanic/support/simple_file.h"
+#include "titanic/game_location.h"
 
 namespace Titanic {
+
+class SimpleFile;
 
 enum RoomGlyphMode {
 	RGM_UNASSIGNED = 0, RGM_ASSIGNED_ROOM = 1, RGM_PREV_ASSIGNED_ROOM = 2
@@ -35,16 +37,16 @@ enum RoomGlyphMode {
 class CPetRoomsGlyph : public CPetGlyph {
 private:
 	uint _roomFlags;
-	int _field38;
+	uint _mailFlag;
 	RoomGlyphMode _mode;
-	CGameObject *_object0;
-	CGameObject *_object1;
-	CGameObject *_object2;
-	CGameObject *_object3;
-	CGameObject *_object4;
-	CGameObject *_object5;
-	CGameObject *_object6;
-	CGameObject *_object7;
+	CGameObject *_chevLeftOnDim;
+	CGameObject *_chevLeftOffDim;
+	CGameObject *_chevLeftOnLit;
+	CGameObject *_chevLeftOffLit;
+	CGameObject *_chevRightOnDim;
+	CGameObject *_chevRightOffDim;
+	CGameObject *_chevRightOnLit;
+	CGameObject *_chevRightOffLit;
 private:
 	/**
 	 * Find the selected button under the given point, based on the buttons
@@ -88,7 +90,7 @@ public:
 	/**
 	 * Returns the tooltip text for when the glyph is selected
 	 */
-	virtual void getTooltip(CPetText *text);
+	virtual void getTooltip(CTextControl *text);
 
 	/**
 	 * Saves the data for the glyph
@@ -112,14 +114,20 @@ public:
 	 */
 	uint getRoomFlags() const { return _roomFlags; }
 
-	void set38(int val) { _field38 = val; }
+	/**
+	 * Set mail status flag
+	 */
+	void setFlag(uint val) { _mailFlag = val; }
 
 	/**
 	 * Sets the mode of the glyph
 	 */
 	void setMode(RoomGlyphMode mode) { _mode = mode; }
 
-	void changeLocation(int newClassNum);
+	/**
+	 * Change the current class
+	 */
+	void changeClass(PassengerClass newClassNum);
 
 	/**
 	 * Returns true if the room is either currently or previously assigned

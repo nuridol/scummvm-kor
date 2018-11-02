@@ -28,9 +28,9 @@
 namespace Titanic {
 
 CPetInventory::CPetInventory() : CPetSection(),
-		_movie(nullptr), _isLoading(false), _field298(0) {
+		_movie(nullptr), _isLoading(false), _titaniaBitFlags(0) {
 	for (int idx = 0; idx < TOTAL_ITEMS; ++idx) {
-		_itemBackgrounds[idx] = _itemGlyphs[idx] = nullptr;
+		_itemBackgrounds[idx] = nullptr;
 	}
 }
 
@@ -71,6 +71,14 @@ void CPetInventory::changed(int changeType) {
 	}
 }
 
+void CPetInventory::enterRoom(CRoomItem *room) {
+	int index = _items.getHighlightIndex();
+	if (index != -1) {
+		_items.resetHighlight();
+		_items.highlight(index);
+	}
+}
+
 bool CPetInventory::MouseButtonDownMsg(CMouseButtonDownMsg *msg) {
 	return _items.MouseButtonDownMsg(msg->_mousePos);
 }
@@ -94,6 +102,15 @@ bool CPetInventory::VirtualKeyCharMsg(CVirtualKeyCharMsg *msg) {
 	return _items.VirtualKeyCharMsg(msg);
 }
 
+bool CPetInventory::MouseWheelMsg(CMouseWheelMsg *msg) {
+	if (msg->_wheelUp)
+		_items.scrollLeft();
+	else
+		_items.scrollRight();
+
+	return true;
+}
+
 CGameObject *CPetInventory::dragEnd(const Point &pt) const {
 	return _items.getObjectAt(pt);
 }
@@ -104,7 +121,7 @@ bool CPetInventory::isValid(CPetControl *petControl) {
 }
 
 void CPetInventory::load(SimpleFile *file, int param) {
-	_field298 = file->readNumber();
+	_titaniaBitFlags = file->readNumber();
 }
 
 void CPetInventory::postLoad() {
@@ -115,7 +132,7 @@ void CPetInventory::postLoad() {
 }
 
 void CPetInventory::save(SimpleFile *file, int indent) {
-	file->writeNumberLine(_field298, indent);
+	file->writeNumberLine(_titaniaBitFlags, indent);
 }
 
 void CPetInventory::enter(PetArea oldArea) {
@@ -143,10 +160,6 @@ bool CPetInventory::setPetControl(CPetControl *petControl) {
 		if (!g_vm->_itemNames[idx].empty()) {
 			CString name = "3Pet" + g_vm->_itemNames[idx];
 			_itemBackgrounds[idx] = petControl->getHiddenObject(name);
-		}
-
-		if (!g_vm->_itemObjects[idx].empty()) {
-			_itemGlyphs[idx] = petControl->getHiddenObject(g_vm->_itemObjects[idx]);
 		}
 	}
 
@@ -200,49 +213,62 @@ int CPetInventory::getItemIndex(CGameObject *item) const {
 	return index;
 }
 
-CGameObject *CPetInventory::getImage(int index) {
+CGameObject *CPetInventory::getTransformAnimation(int index) {
 	if (index >= 0 && index < 46) {
+		// Certain items are pieces of Titania, and they only have the
+		// one-time initial transformation into Titania pieces
+		CString name;
 		int bits = 0;
+
 		switch (index) {
 		case 20:
+			name = "PetEarMorph";
 			bits = 4;
 			break;
 		case 21:
+			name = "PetEarMorph1";
 			bits = 8;
 			break;
 		case 22:
+			name = "PetEyeMorph";
 			bits = 1;
 			break;
 		case 23:
+			name = "PetEyeMorph";
 			bits = 2;
 			break;
 		case 36:
+			name = "PetMouthMorph";
 			bits = 32;
 			break;
 		case 39:
+			name = "PetNoseMorph";
 			bits = 16;
 			break;
 		default:
 			break;
 		}
 
-		if (!(bits & _field298)) {
-			_field298 = bits | _field298;
-			return _itemGlyphs[index];
+		if (!(bits & _titaniaBitFlags) && !name.empty()) {
+			CGameObject *obj = getPetControl()->getHiddenObject(name);
+			assert(obj);
+
+			_titaniaBitFlags = bits | _titaniaBitFlags;
+			return obj;
 		}
 	}
 
 	return nullptr;
 }
 
-void CPetInventory::playMovie(CGameObject *movie, int flag) {
+void CPetInventory::playMovie(CGameObject *movie, bool repeat) {
 	if (_movie)
 		_movie->stopMovie();
 	_movie = movie;
 
 	if (_movie) {
-		if (flag)
-			_movie->playMovie(0, 14, 1);
+		if (repeat)
+			_movie->playMovie(0, 14, MOVIE_REPEAT);
 		else
 			_movie->playMovie(0);
 	}

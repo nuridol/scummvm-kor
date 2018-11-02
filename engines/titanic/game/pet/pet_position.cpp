@@ -153,8 +153,9 @@ bool CPETPosition::EnterViewMsg(CEnterViewMsg *msg) {
 			roomNum = 6;
 
 		if (pet) {
-			pet->setRooms1CC(1);
+			pet->setRoomsSublevel(1);
 			pet->setRoomsRoomNum(roomNum);
+			pet->resetRoomsHighlight();
 
 			if (viewStr == "Node 1.S")
 				pet->setRoomsWellEntry(pet->getRoomsElevatorNum());
@@ -171,8 +172,8 @@ bool CPETPosition::EnterViewMsg(CEnterViewMsg *msg) {
 
 bool CPETPosition::LeaveViewMsg(CLeaveViewMsg *msg) {
 	CPetControl *pet = getPetControl();
-	CString oldView = msg->_oldView->getName();
-	CString newView = msg->_newView->getName();
+	CString oldView = msg->_oldView->getFullViewName();
+	CString newView = msg->_newView->getFullViewName();
 
 	if (pet && newView == "Lift.Node 1.N") {
 		int elevatorNum = pet->getRoomsElevatorNum();
@@ -196,9 +197,6 @@ bool CPETPosition::LeaveViewMsg(CLeaveViewMsg *msg) {
 		} else if (oldView == "1stClassLobby.Node 10.S") {
 			switch (elevatorNum) {
 			case 1:
-				pet->setRoomsFloorNum(1);
-				pet->setRoomsElevatorNum(1);
-				break;
 			case 2:
 				pet->setRoomsElevatorNum(1);
 				break;
@@ -242,7 +240,9 @@ bool CPETPosition::LeaveViewMsg(CLeaveViewMsg *msg) {
 			return true;
 		} else if (oldView == "SgtLobby.Node 1.S") {
 			return true;
-		} else if (oldView == "BottomOfWell.Node 10.E" || oldView == "BottomOfWell.Node 11.W") {
+		} else if (oldView == "BottomOfWell.Node 10.E") {
+			pet->setRoomsElevatorNum(3);
+		} else if (oldView == "BottomOfWell.Node 11.W") {
 			pet->setRoomsElevatorNum(1);
 			return true;
 		}

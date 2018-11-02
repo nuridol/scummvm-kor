@@ -53,13 +53,13 @@ int scene06_updateCursor() {
 
 			return PIC_CSR_ARCADE2_D;
 		}
-		if (g_fp->_aniMan == (StaticANIObject *)g_fp->_objectAtCursor) {
+		if (g_fp->_aniMan == g_fp->_objectAtCursor) {
 			if (g_fp->_aniMan->_statics->_staticsId == ST_MAN6_BALL && g_fp->_cursorId == PIC_CSR_DEFAULT) {
 				g_fp->_cursorId = PIC_CSR_ITN;
 
 				return PIC_CSR_ITN;
 			}
-		} else if (g_fp->_objectAtCursor && (StaticANIObject *)g_fp->_objectAtCursor == g_vars->scene06_currentBall
+		} else if (g_fp->_objectAtCursor && g_fp->_objectAtCursor == g_vars->scene06_currentBall
 					&& g_fp->_cursorId == PIC_CSR_DEFAULT) {
 			g_fp->_cursorId = PIC_CSR_ITN;
 		}
@@ -82,7 +82,7 @@ void sceneHandler06_winArcade() {
 		g_fp->setObjectState(sO_ClockAxis, g_fp->getObjectEnumState(sO_ClockAxis, sO_WithoutHandle));
 
 	if (g_vars->scene06_arcadeEnabled) {
-		g_fp->_aniMan->_callback2 = 0;
+		g_fp->_aniMan->_callback2 = 0; // Really NULL
 
 		g_fp->_aniMan->changeStatics2(ST_MAN_RIGHT | 0x4000);
 
@@ -261,8 +261,7 @@ void sceneHandler06_buttonPush() {
 
 void sceneHandler06_showNextBall() {
 	if (g_vars->scene06_balls.size()) {
-		g_vars->scene06_currentBall = new StaticANIObject(g_vars->scene06_balls.front());
-		g_vars->scene06_balls.remove_at(0);
+		g_vars->scene06_currentBall = g_vars->scene06_balls.remove_at(0);
 
 		MessageQueue *mq = new MessageQueue(g_fp->_currentScene->getMessageQueueById(QU_SC6_SHOWNEXTBALL), 0, 1);
 
@@ -383,7 +382,7 @@ void sceneHandler06_throwBall() {
 }
 
 void sceneHandler06_eggieWalk() {
-	if (15 - g_vars->scene06_numBallsGiven >= 4 && !g_fp->_rnd->getRandomNumber(9)) {
+	if (15 - g_vars->scene06_numBallsGiven >= 4 && !g_fp->_rnd.getRandomNumber(9)) {
 		StaticANIObject *ani = g_fp->_currentScene->getStaticANIObject1ById(ANI_EGGIE, -1);
 
 		if (!ani || !(ani->_flags & 4)) {
@@ -438,23 +437,23 @@ void sceneHandler06_catchBall() {
 
 			if (g_vars->scene06_mumsy->_movement->_id == MV_MOM_JUMPFW) {
 				if (g_vars->scene06_mumsy->_movement->_currDynamicPhaseIndex <= 5) {
-					g_vars->scene06_mumsy->_movement->calcSomeXY(point, 0, g_vars->scene06_mumsy->_movement->_currDynamicPhaseIndex);
+					point = g_vars->scene06_mumsy->_movement->calcSomeXY(0, g_vars->scene06_mumsy->_movement->_currDynamicPhaseIndex);
 
 					point.x = -point.x;
 					point.y = -point.y;
 				} else {
-					g_vars->scene06_mumsy->_movement->calcSomeXY(point, 1, -1);
+					point = g_vars->scene06_mumsy->_movement->calcSomeXY(1, -1);
 
 					g_vars->scene06_mumsyPos++;
 				}
 			} else if (g_vars->scene06_mumsy->_movement->_id == MV_MOM_JUMPBK) {
 				if (g_vars->scene06_mumsy->_movement->_currDynamicPhaseIndex <= 4) {
-					g_vars->scene06_mumsy->_movement->calcSomeXY(point, 0, g_vars->scene06_mumsy->_movement->_currDynamicPhaseIndex);
+					point = g_vars->scene06_mumsy->_movement->calcSomeXY(0, g_vars->scene06_mumsy->_movement->_currDynamicPhaseIndex);
 
 					point.x = -point.x;
 					point.y = -point.y;
 				} else {
-					g_vars->scene06_mumsy->_movement->calcSomeXY(point, 1, -1);
+					point = g_vars->scene06_mumsy->_movement->calcSomeXY(1, -1);
 
 					g_vars->scene06_mumsyPos--;
 				}
@@ -475,15 +474,11 @@ void sceneHandler06_catchBall() {
 }
 
 void sceneHandler06_checkBallTarget(int par) {
-	uint32 pixel;
-
 	if (g_vars->scene06_ballY <= 475) {
-		if (g_vars->scene06_mumsy->getPixelAtPos(g_vars->scene06_ballX, g_vars->scene06_ballY, &pixel)) {
-			if (pixel) {
-				chainObjQueue(g_vars->scene06_mumsy, QU_MOM_JUMPBK, 0);
+		if (g_vars->scene06_mumsy->isPixelHitAtPos(g_vars->scene06_ballX, g_vars->scene06_ballY)) {
+			chainObjQueue(g_vars->scene06_mumsy, QU_MOM_JUMPBK, 0);
 
-				sceneHandler06_catchBall();
-			}
+			sceneHandler06_catchBall();
 		}
 	} else {
 		sceneHandler06_fallBall();
@@ -712,6 +707,8 @@ int sceneHandler06(ExCommand *ex) {
 				}
 
 				res = 1;
+
+				g_fp->sceneAutoScrolling();
 			}
 			if (g_vars->scene06_arcadeEnabled) {
 				if (g_vars->scene06_mumsyPos > -3)

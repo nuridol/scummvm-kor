@@ -20,11 +20,13 @@
  *
  */
 
+#include "titanic/support/direct_draw.h"
+#include "titanic/debugger.h"
+#include "titanic/titanic.h"
 #include "common/debug.h"
 #include "engines/util.h"
 #include "graphics/pixelformat.h"
-#include "titanic/support/direct_draw.h"
-#include "titanic/titanic.h"
+#include "graphics/screen.h"
 
 namespace Titanic {
 
@@ -33,21 +35,21 @@ DirectDraw::DirectDraw() : _windowed(false), _width(0), _height(0),
 }
 
 void DirectDraw::setDisplayMode(int width, int height, int bpp, int refreshRate) {
-	debugC(ERROR_BASIC, kDebugGraphics, "DirectDraw::SetDisplayMode (%d x %d), %d bpp",
+	debugC(DEBUG_BASIC, kDebugGraphics, "DirectDraw::SetDisplayMode (%d x %d), %d bpp",
 		width, height, bpp);
 	assert(bpp == 16);
 
 	Graphics::PixelFormat pixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0);
-	initGraphics(width, height, true, &pixelFormat);
+	initGraphics(width, height, &pixelFormat);
 }
 
 void DirectDraw::diagnostics() {
-	debugC(ERROR_BASIC, kDebugGraphics, "Running DirectDraw Diagnostic...");
+	debugC(DEBUG_BASIC, kDebugGraphics, "Running DirectDraw Diagnostic...");
 }
 
 DirectDrawSurface *DirectDraw::createSurfaceFromDesc(const DDSurfaceDesc &desc) {
 	DirectDrawSurface *surface = new DirectDrawSurface();
-	surface->create(desc._w, desc._h);
+	surface->create(desc._w, desc._h, desc._bpp);
 
 	return surface;
 }
@@ -61,7 +63,9 @@ DirectDrawManager::DirectDrawManager(TitanicEngine *vm, bool windowed) {
 }
 
 void DirectDrawManager::initVideo(int width, int height, int bpp, int numBackSurfaces) {
-	debugC(ERROR_BASIC, kDebugGraphics, "Initialising video surfaces");
+	debugC(DEBUG_BASIC, kDebugGraphics, "Initialising video surfaces");
+	assert(numBackSurfaces == 0);
+
 	_directDraw._width = width;
 	_directDraw._numBackSurfaces = numBackSurfaces;
 	_directDraw._height = height;
@@ -75,22 +79,21 @@ void DirectDrawManager::initVideo(int width, int height, int bpp, int numBackSur
 }
 
 void DirectDrawManager::initFullScreen() {
-	debugC(ERROR_BASIC, kDebugGraphics, "Creating surfaces");
+	debugC(DEBUG_BASIC, kDebugGraphics, "Creating surfaces");
 	_directDraw.setDisplayMode(_directDraw._width, _directDraw._height,
 		_directDraw._bpp, 0);
 
+	// Set up the main surface to point to the screen
 	_mainSurface = new DirectDrawSurface();
 	_mainSurface->create(g_vm->_screen);
-	_backSurfaces[0] = new DirectDrawSurface();
-	_backSurfaces[0]->create(_directDraw._width, _directDraw._height);
 }
 
-DirectDrawSurface *DirectDrawManager::createSurface(int w, int h, int surfaceNum) {
+DirectDrawSurface *DirectDrawManager::createSurface(int w, int h, int bpp, int surfaceNum) {
 	if (surfaceNum)
 		return nullptr;
 
 	assert(_mainSurface);
-	return _directDraw.createSurfaceFromDesc(DDSurfaceDesc(w, h));
+	return _directDraw.createSurfaceFromDesc(DDSurfaceDesc(w, h, bpp));
 }
 
 } // End of namespace Titanic

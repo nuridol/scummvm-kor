@@ -65,7 +65,7 @@ public:
 	EditGameDialog(const String &domain, const String &desc);
 
 	void open();
-	void close();
+	virtual void apply();
 	virtual void handleCommand(CommandSender *sender, uint32 cmd, uint32 data);
 
 protected:
@@ -88,10 +88,6 @@ protected:
 	CheckboxWidget *_globalMIDIOverride;
 	CheckboxWidget *_globalMT32Override;
 	CheckboxWidget *_globalVolumeOverride;
-
-#ifdef SCUMMVMKOR
-	CheckboxWidget *_koreanModeCheckbox;
-#endif
 
 	ExtraGuiOptions _engineOptions;
 };

@@ -51,37 +51,27 @@
 
 namespace Wage {
 
-Common::String readPascalString(Common::SeekableReadStream *in) {
-	Common::String s;
-	char *buf;
-	int len;
-	int i;
-
-	len = in->readByte();
-	buf = (char *)malloc(len + 1);
-	for (i = 0; i < len; i++) {
-		buf[i] = in->readByte();
-		if (buf[i] == 0x0d)
-			buf[i] = '\n';
-	}
-
-	buf[i] = 0;
-
-	s = buf;
-	free(buf);
-
-	return s;
-}
-
 Common::Rect *readRect(Common::SeekableReadStream *in) {
 	int x1, y1, x2, y2;
 
-	y1 = in->readUint16BE();
-	x1 = in->readUint16BE();
-	y2 = in->readUint16BE() + 4;
-	x2 = in->readUint16BE() + 4;
+	y1 = in->readSint16BE();
+	x1 = in->readSint16BE();
+	y2 = in->readSint16BE() + 4;
+	x2 = in->readSint16BE() + 4;
 
-	debug(9, "readRect: %d, %d, %d, %d", x1, y1, x2, y2);
+	bool normalized = false;
+
+	if (x1 > x2) {
+		SWAP(x1, x2);
+		normalized = true;
+	}
+
+	if (y1 > y2) {
+		SWAP(y1, y2);
+		normalized = true;
+	}
+
+	debug(9, "readRect: %s%d, %d, %d, %d", normalized ? "norm " : "", x1, y1, x2, y2);
 
 	return new Common::Rect(x1, y1, x2, y2);
 }

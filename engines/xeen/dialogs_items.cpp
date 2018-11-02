@@ -62,11 +62,11 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 	screen._windows[30].open();
 
 	enum { REDRAW_NONE, REDRAW_TEXT, REDRAW_FULL } redrawFlag = REDRAW_FULL;
-	while (!_vm->shouldQuit()) {
+	for (;;) {
 		if (redrawFlag == REDRAW_FULL) {
 			if ((mode != ITEMMODE_CHAR_INFO || category != CATEGORY_MISC) && mode != ITEMMODE_ENCHANT
 					&& mode != ITEMMODE_RECHARGE && mode != ITEMMODE_TO_GOLD) {
-				_buttons[8]._bounds.moveTo(148, _buttons[8]._bounds.top);
+				_buttons[4]._bounds.moveTo(148, _buttons[4]._bounds.top);
 				_buttons[9]._draw = false;
 			} else if (mode == ITEMMODE_RECHARGE) {
 				_buttons[4]._value = Common::KEYCODE_r;
@@ -75,7 +75,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			} else if (mode == ITEMMODE_TO_GOLD) {
 				_buttons[4]._value = Common::KEYCODE_g;
 			} else {
-				_buttons[8]._bounds.moveTo(0, _buttons[8]._bounds.top);
+				_buttons[4]._bounds.moveTo(0, _buttons[4]._bounds.top);
 				_buttons[9]._draw = true;
 				_buttons[9]._value = Common::KEYCODE_u;
 			}
@@ -85,7 +85,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			if (mode != ITEMMODE_CHAR_INFO && mode != ITEMMODE_8 && mode != ITEMMODE_ENCHANT
 					&& mode != ITEMMODE_RECHARGE && mode != ITEMMODE_TO_GOLD) {
 				msg = Common::String::format(Res.ITEMS_DIALOG_TEXT1,
-					Res.BTN_SELL, Res.BTN_IDENTIFY, Res.BTN_FIX);
+					Res.BTN_BUY, Res.BTN_SELL, Res.BTN_IDENTIFY, Res.BTN_FIX);
 			} else if (mode != ITEMMODE_ENCHANT  && mode != ITEMMODE_RECHARGE && mode != ITEMMODE_TO_GOLD) {
 				msg = Common::String::format(Res.ITEMS_DIALOG_TEXT1,
 					category == 3 ? Res.BTN_USE : Res.BTN_EQUIP,
@@ -134,8 +134,11 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 				break;
 			}
 
-			for (int idx = 0; idx < 9; ++idx) {
-				_itemsDrawList[idx]._y = 10 + idx * 9;
+			for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
+				DrawStruct &ds = _itemsDrawList[idx];
+				ds._sprites = nullptr;
+				ds._x = 8;
+				ds._y = 18 + idx * 9;
 
 				switch (category) {
 				case CATEGORY_WEAPON:
@@ -160,13 +163,12 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 							));
 						}
 
-						DrawStruct &ds = _itemsDrawList[idx];
 						ds._sprites = &_equipSprites;
 						if (c->_weapons.passRestrictions(i._id, true))
 							ds._frame = i._frame;
 						else
 							ds._frame = 14;
-					} else if (_itemsDrawList[idx]._sprites == nullptr) {
+					} else if (ds._sprites == nullptr && idx == 0) {
 						lines.push_back(Res.NO_ITEMS_AVAILABLE);
 					}
 					break;
@@ -174,7 +176,6 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 
 				case CATEGORY_MISC: {
 					XeenItem &i = c->_misc[idx];
-					_itemsDrawList[idx]._sprites = nullptr;
 
 					if (i._material == 0) {
 						// No item
@@ -220,19 +221,16 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 					lines[4].c_str(), lines[5].c_str(), lines[6].c_str(), lines[7].c_str(),
 					lines[8].c_str()
 				));
+				break;
 
-			case ITEMMODE_BLACKSMITH: {
-				// Original uses var in this block that's never set?!
-				const int v1 = 0;
+			case ITEMMODE_BLACKSMITH:
 				screen._windows[30].writeString(Common::String::format(Res.AVAILABLE_GOLD_COST,
-					Res.CATEGORY_NAMES[category],
-					v1 ? "" : "s", party._gold,
+					Res.CATEGORY_NAMES[category], party._gold,
 					lines[0].c_str(), lines[1].c_str(), lines[2].c_str(), lines[3].c_str(),
 					lines[4].c_str(), lines[5].c_str(), lines[6].c_str(), lines[7].c_str(),
 					lines[8].c_str()
 				));
 				break;
-			}
 
 			case ITEMMODE_2:
 			case ITEMMODE_RECHARGE:
@@ -321,6 +319,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 		if (_buttonValue == Common::KEYCODE_ESCAPE) {
 			if (mode == ITEMMODE_8)
 				continue;
+			c = startingChar;
 			break;
 		}
 
@@ -464,13 +463,14 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			}
 			break;
 
-		case Common::KEYCODE_n:
-			// Misc category
+		case Common::KEYCODE_m:
+			// Misc
 			category = CATEGORY_MISC;
 			redrawFlag = REDRAW_TEXT;
 			break;
 
 		case Common::KEYCODE_q:
+			// Quests
 			if (mode == ITEMMODE_CHAR_INFO) {
 				Quests::show(_vm);
 				redrawFlag = REDRAW_TEXT;
@@ -523,7 +523,7 @@ void ItemsDialog::loadButtons(ItemsMode mode, Character *&c) {
 		addButton(Common::Rect(12, 109, 36, 129), Common::KEYCODE_w, &_iconSprites);
 		addButton(Common::Rect(46, 109, 70, 129), Common::KEYCODE_a, &_iconSprites);
 		addButton(Common::Rect(80, 109, 104, 129), Common::KEYCODE_c, &_iconSprites);
-		addButton(Common::Rect(114, 109, 138, 129), Common::KEYCODE_n, &_iconSprites);
+		addButton(Common::Rect(114, 109, 138, 129), Common::KEYCODE_m, &_iconSprites);
 		addButton(Common::Rect(148, 109, 172, 129), Common::KEYCODE_e, &_iconSprites);
 		addButton(Common::Rect(284, 109, 308, 129), Common::KEYCODE_ESCAPE, &_iconSprites);
 		addButton(Common::Rect(148, 109, 172, 129), Common::KEYCODE_u, &_iconSprites);
@@ -540,7 +540,7 @@ void ItemsDialog::loadButtons(ItemsMode mode, Character *&c) {
 		addButton(Common::Rect(12, 109, 36, 129), Common::KEYCODE_w, &_iconSprites);
 		addButton(Common::Rect(46, 109, 70, 129), Common::KEYCODE_a, &_iconSprites);
 		addButton(Common::Rect(80, 109, 104, 129), Common::KEYCODE_c, &_iconSprites);
-		addButton(Common::Rect(114, 109, 138, 129), Common::KEYCODE_n, &_iconSprites);
+		addButton(Common::Rect(114, 109, 138, 129), Common::KEYCODE_m, &_iconSprites);
 		addButton(Common::Rect(148, 109, 172, 129), Common::KEYCODE_e, &_iconSprites);
 		addButton(Common::Rect(182, 109, 206, 129), Common::KEYCODE_r, &_iconSprites);
 		addButton(Common::Rect(216, 109, 240, 129), Common::KEYCODE_d, &_iconSprites);
@@ -615,7 +615,7 @@ void ItemsDialog::setEquipmentIcons() {
 	for (int typeIndex = 0; typeIndex < 4; ++typeIndex) {
 		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
 			switch (typeIndex) {
-			case 0: {
+			case CATEGORY_WEAPON: {
 				XeenItem &i = _itemsCharacter._weapons[idx];
 				if (i._id <= 17)
 					i._frame = 1;
@@ -626,7 +626,7 @@ void ItemsDialog::setEquipmentIcons() {
 				break;
 			}
 
-			case 1: {
+			case CATEGORY_ARMOR: {
 				XeenItem &i = _itemsCharacter._armor[idx];
 				if (i._id <= 7)
 					i._frame = 3;
@@ -641,7 +641,7 @@ void ItemsDialog::setEquipmentIcons() {
 				break;
 			}
 
-			case 2: {
+			case CATEGORY_ACCESSORY: {
 				XeenItem &i = _itemsCharacter._accessories[idx];
 				if (i._id == 1)
 					i._id = 8;
@@ -667,6 +667,13 @@ int ItemsDialog::calcItemCost(Character *c, int itemIndex, ItemsMode mode,
 	int result = 0;
 	int level = skillLevel & 0x7f;
 
+	InventoryItems *invGroups[4] = {
+		&c->_weapons, &c->_armor, &c->_accessories, &c->_misc
+	};
+	const int *BASE_COSTS[4] = {
+		Res.WEAPON_BASE_COSTS, Res.ARMOR_BASE_COSTS, Res.ACCESSORY_BASE_COSTS, Res.MISC_BASE_COSTS
+	};
+
 	switch (mode) {
 	case ITEMMODE_BLACKSMITH:
 		level = 0;
@@ -689,11 +696,8 @@ int ItemsDialog::calcItemCost(Character *c, int itemIndex, ItemsMode mode,
 	case CATEGORY_WEAPON:
 	case CATEGORY_ARMOR:
 	case CATEGORY_ACCESSORY: {
-		// 0=Weapons, 1=Armor, 2=Accessories
-		XeenItem &i = (mode == 0) ? c->_weapons[itemIndex] :
-			(mode == 1 ? c->_armor[itemIndex] : c->_accessories[itemIndex]);
-		amount1 = (mode == 0) ? Res.WEAPON_BASE_COSTS[i._id] :
-			(mode == 1 ? Res.ARMOR_BASE_COSTS[i._id] : Res.ACCESSORY_BASE_COSTS[i._id]);
+		XeenItem &i = (*invGroups[category])[itemIndex];
+		amount1 = (BASE_COSTS[category])[i._id];
 
 		if (i._material > 36 && i._material < 59) {
 			switch (i._material) {
@@ -736,7 +740,7 @@ int ItemsDialog::calcItemCost(Character *c, int itemIndex, ItemsMode mode,
 		break;
 	}
 
-	case 3: {
+	case CATEGORY_MISC: {
 		// Misc
 		XeenItem &i = c->_misc[itemIndex];
 		amount1 = Res.MISC_MATERIAL_COSTS[i._material];

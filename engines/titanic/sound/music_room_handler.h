@@ -23,7 +23,9 @@
 #ifndef TITANIC_MUSIC_ROOM_HANDLER_H
 #define TITANIC_MUSIC_ROOM_HANDLER_H
 
-#include "titanic/sound/music_wave.h"
+#include "titanic/sound/audio_buffer.h"
+#include "titanic/sound/music_room_instrument.h"
+#include "titanic/sound/music_song.h"
 #include "titanic/sound/wave_file.h"
 
 namespace Titanic {
@@ -31,93 +33,156 @@ namespace Titanic {
 class CProjectItem;
 class CSoundManager;
 
-enum MusicControlArea { BELLS = 0, SNAKE = 1, PIANO = 2, BASS = 3 };
+enum MusicInstrument { BELLS = 0, SNAKE = 1, PIANO = 2, BASS = 3 };
+
+struct MusicRoomInstrument {
+	int _pitchControl;
+	int _speedControl;
+	bool _directionControl;
+	bool _inversionControl;
+	bool _muteControl;
+	MusicRoomInstrument() : _pitchControl(0), _speedControl(0), _directionControl(false),
+		_inversionControl(false), _muteControl(false) {}
+};
 
 class CMusicRoomHandler {
-	struct Controls {
-		int _pitchControl;
-		int _speedControl;
-		int _directionControl;
-		int _inversionControl;
-		int _muteControl;
-		Controls() : _pitchControl(0), _speedControl(0), _directionControl(0),
-			_inversionControl(0), _muteControl(0) {}
-	};
-	struct Array5Entry {
-		int _v1;
-		int _v2;
-		Array5Entry() : _v1(0), _v2(0) {}
-	};
 private:
 	CProjectItem *_project;
 	CSoundManager *_soundManager;
-	CMusicWave *_musicWaves[4];
-	Controls _array1[4];
-	Controls _array2[4];
-	Array5Entry _array5[4];
-	bool _stopWaves;
+	CMusicRoomInstrument *_instruments[4];
+	MusicRoomInstrument _array1[4];
+	MusicRoomInstrument _array2[4];
+	CMusicSong *_songs[4];
+	int _startPos[4];
+	int _position[4];
+	double _animExpiryTime[4];
+
+	bool _active;
 	CWaveFile *_waveFile;
 	int _soundHandle;
-	int _soundVolume;
-	uint _ticks;
-	int _field108;
+	int _instrumentsActive;
+	CAudioBuffer *_audioBuffer;
+	bool _isPlaying;
+	uint _soundStartTicks;
+	uint _startTicks;
+	int _volume;
+private:
+	/**
+	 * Starts music room instruments animation
+	 */
+	void start();
+
+	/**
+	 * Handles updating the raw audio being played for all the instruments
+	 */
+	void updateAudio();
+
+	/**
+	 * Handles updating the instruments themselves, and keeping them animating
+	 */
+	void updateInstruments();
+
+	/**
+	 * Polls a specified instrument for any updates to see if it's still active.
+	 * @returns Returns true if a given instrument is still active..
+	 * that is, that there is still more data that can be read from it to play
+	 */
+	bool pollInstrument(MusicInstrument instrument);
+
+	/**
+	 * Gets the duration for a given fragment of an instrument to play
+	 * out, so that animations of the instruments can be synchronized
+	 * to the actual music
+	 */
+	double getAnimDuration(MusicInstrument instrument, int arrIndex);
+
+	/**
+	 * Figures out a pitch value (of some sort) for use in determining
+	 * which wave file the music instruments will use.
+	 */
+	int getPitch(MusicInstrument instrument, int arrIndex);
 public:
 	CMusicRoomHandler(CProjectItem *project, CSoundManager *soundManager);
 	~CMusicRoomHandler();
 
 	/**
-	 * Creates a new music wave class instance, and assigns it to a slot
-	 * in the music handler
-	 * @param waveIndex		Slot to save new instance in
-	 * @param count			Number of files the new instance will contain
+	 * Creates a new music room instrument class to handle the operation of one
+	 * of the instruments in the music room.
+	 * @param instrument	Which instrument to create for
+	 * @param count			Number of Wave files the new instance will contain
 	 */
-	CMusicWave *createMusicWave(int waveIndex, int count);
-
-	void createWaveFile(int musicVolume);
+	CMusicRoomInstrument *createInstrument(MusicInstrument instrument, int count);
 
 	/**
-	 * Handles regular polling the music handler
+	 * Main setup for the music room handler
 	 */
-	bool poll();
+	void setup(int volume);
 
 	/**
-	 * Flags whether the loaded music waves will be stopped when the
-	 * music handler is stopped
+	 * Flags whether the music handler is active
 	 */
-	void setStopWaves(bool flag) { _stopWaves = flag; }
+	void setActive(bool flag) { _active = flag; }
 
 	/**
 	 * Stop playing the music
 	 */
 	void stop();
 
-	bool checkSound(int index) const;
+	/**
+	 * Checks the specified instrument to see if it's settings are "correct"
+	 */
+	bool checkInstrument(MusicInstrument instrument) const;
 
 	/**
-	 * Set a setting
+	 * Sets the speed control value
 	 */
-	void setSpeedControl2(MusicControlArea area, int value);
+	void setSpeedControl2(MusicInstrument instrument, int value);
 
 	/**
-	 * Set a setting
+	 * Sets the pitch control value
 	 */
-	void setPitchControl2(MusicControlArea area, int value);
+	void setPitchControl2(MusicInstrument instrument, int value);
 
 	/**
-	 * Set a setting
+	 * Sets the inversion control value
 	 */
-	void setInversionControl2(MusicControlArea area, int value);
+	void setInversionControl2(MusicInstrument instrument, bool value);
 
 	/**
-	 * Set a setting
+	 * Sets the direction control value
 	 */
-	void setDirectionControl2(MusicControlArea area, int value);
+	void setDirectionControl2(MusicInstrument instrument, bool value);
 
-	void setPitchControl(MusicControlArea area, int value);
-	void setSpeedControl(MusicControlArea area, int value);
-	void setDirectionControl(MusicControlArea area, int value);
-	void setInversionControl(MusicControlArea area, int value);
-	void setMuteControl(MusicControlArea area, int value);
+	/**
+	 * Sets the pitch control value
+	 */
+	void setPitchControl(MusicInstrument instrument, int value);
+
+	/**
+	 * Sets the speed control value
+	 */
+	void setSpeedControl(MusicInstrument instrument, int value);
+
+	/**
+	 * Sets the direction control value
+	 */
+	void setDirectionControl(MusicInstrument instrument, bool value);
+
+	/**
+	 * Sets the inversion control value
+	 */
+	void setInversionControl(MusicInstrument instrument, bool value);
+
+	/**
+	 * Sets the mute control value
+	 */
+	void setMuteControl(MusicInstrument instrument, bool value);
+
+	/**
+	 * Handles regular updates
+	 * @returns		True if the music is still playing
+	 */
+	bool update();
 };
 
 } // End of namespace Titanic

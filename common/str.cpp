@@ -444,6 +444,44 @@ void String::trim() {
 	}
 }
 
+void String::wordWrap(const uint32 maxLength) {
+	if (_size < maxLength) {
+		return;
+	}
+
+	makeUnique();
+
+	enum { kNoSpace = 0xFFFFFFFF };
+
+	uint32 i = 0;
+	while (i < _size) {
+		uint32 lastSpace = kNoSpace;
+		uint32 x = 0;
+		while (i < _size && x <= maxLength) {
+			const char c = _str[i];
+			if (c == '\n') {
+				lastSpace = kNoSpace;
+				x = 0;
+			} else {
+				if (Common::isSpace(c)) {
+					lastSpace = i;
+				}
+				++x;
+			}
+			++i;
+		}
+
+		if (x > maxLength) {
+			if (lastSpace == kNoSpace) {
+				insertChar('\n', i - 1);
+			} else {
+				setChar('\n', lastSpace);
+				i = lastSpace + 1;
+			}
+		}
+	}
+}
+
 uint String::hash() const {
 	return hashit(c_str());
 }
@@ -682,28 +720,16 @@ String operator+(const String &x, char y) {
 }
 
 char *ltrim(char *t) {
-#ifdef SCUMMVMKOR
-	while (isSpace(*t) && !(*t & 0x80))
-		t++;
-	return t;
-#else
 	while (isSpace(*t))
 		t++;
 	return t;
-#endif
 }
 
 char *rtrim(char *t) {
 	int l = strlen(t) - 1;
-#ifdef SCUMMVMKOR
-	while (l >= 0 && isSpace(t[l]) && !(t[l] & 0x80))
-		t[l--] = 0;
-	return t;
-#else
 	while (l >= 0 && isSpace(t[l]))
 		t[l--] = 0;
 	return t;
-#endif
 }
 
 char *trim(char *t) {
@@ -952,6 +978,13 @@ size_t strlcat(char *dst, const char *src, size_t size) {
 
 	// Return the total length of the result string
 	return dstLength + (src - srcStart);
+}
+
+size_t strnlen(const char *src, size_t maxSize) {
+	size_t counter = 0;
+	while (counter != maxSize && *src++)
+		++counter;
+	return counter;
 }
 
 } // End of namespace Common

@@ -21,6 +21,9 @@
  */
 
 #include "base/plugins.h"
+#include "common/savefile.h"
+#include "common/serializer.h"
+#include "common/str-array.h"
 #include "engines/advancedDetector.h"
 
 #include "composer/composer.h"
@@ -59,8 +62,8 @@ static const PlainGameDescriptor composerGames[] = {
 	{"imoking", "Magic Tales: Imo and the King"},
 	{"liam", "Magic Tales: Liam Finds a Story"},
 	{"littlesamurai", "Magic Tales: The Little Samurai"},
-	{"princess", "The Princess and the Crab"},
-	{"sleepingcub", "Sleeping Cub's Test of Courage"},
+	{"princess", "Magic Tales: The Princess and the Crab"},
+	{"sleepingcub", "Magic Tales: Sleeping Cub's Test of Courage"},
 	{0, 0}
 };
 
@@ -89,6 +92,20 @@ static const ComposerGameDescription gameDescriptions[] = {
 			AD_ENTRY1s("Baba Yaga", "ae3a4445f42fe10253da7ee4ea0d37d6", 44321),
 			Common::EN_ANY,
 			Common::kPlatformMacintosh,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GType_ComposerV1
+	},
+
+	// Magic Tales: Baba Yaga and the Magic Geese German- from bug #10171
+	{
+		{
+			"babayaga",
+			"",
+			AD_ENTRY1s("book.ini", "2a20e73d33ecd0f2fa8123d4f9862f90", 3814),
+			Common::DE_DEU,
+			Common::kPlatformWindows,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOASPECT)
 		},
@@ -318,7 +335,7 @@ static const ComposerGameDescription gameDescriptions[] = {
 			"gregory",
 			0,
 			AD_ENTRY1("book.ini", "e54fc5c00de5f94e908a969e445af5d0"),
-			Common::EN_ANY,
+			Common::FR_FRA,
 			Common::kPlatformWindows,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOASPECT)
@@ -448,6 +465,8 @@ public:
 
 	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
 	virtual bool hasFeature(MetaEngineFeature f) const;
+	virtual int getMaximumSaveSlot() const;
+	virtual SaveStateList listSaves(const char* target) const;
 };
 
 bool ComposerMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
@@ -459,11 +478,52 @@ bool ComposerMetaEngine::createInstance(OSystem *syst, Engine **engine, const AD
 }
 
 bool ComposerMetaEngine::hasFeature(MetaEngineFeature f) const {
-	return false;
+	return ((f == kSupportsListSaves) || (f == kSupportsLoadingDuringStartup));
+}
+
+Common::String getSaveName(Common::InSaveFile *in) {
+	Common::Serializer ser(in, NULL);
+	Common::String name;
+	uint32 tmp;
+	ser.syncAsUint32LE(tmp);
+	ser.syncAsUint32LE(tmp);
+	ser.syncString(name);
+	return name;
+}
+int ComposerMetaEngine::getMaximumSaveSlot() const {
+	return 99;
+}
+SaveStateList ComposerMetaEngine::listSaves(const char *target) const {
+	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
+	Common::StringArray filenames;
+	Common::String saveDesc;
+	Common::String pattern = Common::String::format("%s.??", target);
+
+	filenames = saveFileMan->listSavefiles(pattern);
+	sort(filenames.begin(), filenames.end());	// Sort (hopefully ensuring we are sorted numerically..)
+
+	SaveStateList saveList;
+	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
+		// Obtain the last 3 digits of the filename, since they correspond to the save slot
+		int slotNum = atoi(file->c_str() + file->size() - 2);
+
+		if (slotNum >= 0 && slotNum <= 99) {
+			Common::InSaveFile *in = saveFileMan->openForLoading(*file);
+			if (in) {
+				saveDesc = getSaveName(in);
+				saveList.push_back(SaveStateDescriptor(slotNum, saveDesc));
+				delete in;
+			}
+		}
+	}
+
+	return saveList;
 }
 
 bool Composer::ComposerEngine::hasFeature(EngineFeature f) const {
-	return (f == kSupportsRTL);
+	return (f == kSupportsRTL
+		|| f == kSupportsSavingDuringRuntime
+		|| f == kSupportsLoadingDuringRuntime);
 }
 
 #if PLUGIN_ENABLED_DYNAMIC(COMPOSER)

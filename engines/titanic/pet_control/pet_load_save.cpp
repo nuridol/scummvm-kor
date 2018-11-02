@@ -117,7 +117,7 @@ Rect CPetLoadSave::getSlotBounds(int index) {
 
 void CPetLoadSave::resetSlots() {
 	for (int idx = 0; idx < SAVEGAME_SLOTS_COUNT; ++idx) {
-		_slotNames[idx].setText("Empty");
+		_slotNames[idx].setText(EMPTY);
 		_slotInUse[idx] = false;
 
 		// Try and open up the savegame for access
@@ -159,7 +159,7 @@ void CPetLoadSave::highlightChange() {
 
 	uint col = section ? section->getColor(3) : 0;
 	for (int idx = 0; idx < SAVEGAME_SLOTS_COUNT; ++idx)
-		_slotNames[idx].setColor(col);
+		_slotNames[idx].setLineColor(0, col);
 
 	if (_savegameSlotNum != -1) {
 		col = section ? section->getColor(4) : 0;

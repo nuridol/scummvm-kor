@@ -21,6 +21,7 @@
  */
 
 #include "titanic/game/sgt/bedfoot.h"
+#include "titanic/translation.h"
 
 namespace Titanic {
 
@@ -40,88 +41,88 @@ void CBedfoot::load(SimpleFile *file) {
 }
 
 bool CBedfoot::TurnOn(CTurnOn *msg) {
-	if (_statics->_v2 == "Closed" && _statics->_v11 == "Closed") {
-		_fieldE0 = 0;
+	if (_statics->_bedfoot == "Closed" && _statics->_basin == "Closed") {
+		_isClosed = false;
 		_startFrame = 0;
-		if (_statics->_v10 == "Open") {
+		if (_statics->_washstand == "Open") {
 			_endFrame = 13;
-			_statics->_v2 = "Open";
-			playSound("b#7.wav");
+			_statics->_bedfoot = "Open";
+			playSound(TRANSLATE("b#7.wav", "b#92.wav"));
 		} else {
 			_endFrame = 17;
-			_statics->_v2 = "NotOnWashstand";
-			playSound("b#4.wav");
+			_statics->_bedfoot = "NotOnWashstand";
+			playSound(TRANSLATE("b#4.wav", "b#89.wav"));
 		}
 
-		playMovie(_startFrame, _endFrame, MOVIE_GAMESTATE);
-	} else if (_statics->_v2 == "RestingUnderTV") {
-		_fieldE0 = 0;
+		playMovie(_startFrame, _endFrame, MOVIE_WAIT_FOR_FINISH);
+	} else if (_statics->_bedfoot == "RestingUnderTV") {
+		_isClosed = false;
 		_startFrame = 8;
-		if (_statics->_v10 == "Open") {
-			_statics->_v2 = "Open";
+		if (_statics->_washstand == "Open") {
+			_statics->_bedfoot = "Open";
 			playSound("189_436_bed down 1.wav");
 		} else {
-			_statics->_v2 = "NotOnWashstand";
+			_statics->_bedfoot = "NotOnWashstand";
 			playSound("192_436_bed hits floor.wav");
 		}
 
-		playMovie(_startFrame, _endFrame, MOVIE_GAMESTATE);
+		playMovie(_startFrame, _endFrame, MOVIE_WAIT_FOR_FINISH);
 	}
 
-	if (_statics->_v2 == "Open")
-		_statics->_v1 = "Closed";
-	else if (_statics->_v2 == "NotOnWashstand")
-		_statics->_v1 = "ClosedWrong";
+	if (_statics->_bedfoot == "Open")
+		_statics->_bedhead = "Closed";
+	else if (_statics->_bedfoot == "NotOnWashstand")
+		_statics->_bedhead = "ClosedWrong";
 
 	return true;
 }
 
 bool CBedfoot::TurnOff(CTurnOff *msg) {
-	if (_statics->_v1 == "Closed" || _statics->_v1 == "ClosedWrong") {
+	if (_statics->_bedhead == "Closed" || _statics->_bedhead == "ClosedWrong") {
 		setVisible(true);
 		CVisibleMsg visibleMsg(false);
 		visibleMsg.execute("Bedhead");
 	}
 
-	if (_statics->_v2 == "Open" && _statics->_v1 == "Closed") {
-		_fieldE0 = 0;
+	if (_statics->_bedfoot == "Open" && _statics->_bedhead == "Closed") {
+		_isClosed = true;
 		_startFrame = 20;
-		if (_statics->_v4 == "Closed") {
-			_statics->_v2 = "Closed";
+		if (_statics->_tv == "Closed") {
+			_statics->_bedfoot = "Closed";
 			_endFrame = 30;
 		} else {
-			_statics->_v2 = "RestingUnderTV";
+			_statics->_bedfoot = "RestingUnderTV";
 			_endFrame = 25;
 		}
 
-		playMovie(_startFrame, _endFrame, MOVIE_GAMESTATE);
-		playSound("b#7.wav");
+		playMovie(_startFrame, _endFrame, MOVIE_WAIT_FOR_FINISH);
+		playSound(TRANSLATE("b#7.wav", "b#92.wav"));
 
-	} else if (_statics->_v2 == "NotOnWashstand" && _statics->_v1 == "ClosedWrong") {
-		_fieldE0 = 0;
+	} else if (_statics->_bedfoot == "NotOnWashstand" && _statics->_bedhead == "ClosedWrong") {
+		_isClosed = true;
 		_startFrame = 17;
 
-		if (_statics->_v4 == "Closed") {
-			_statics->_v2 = "Closed";
+		if (_statics->_tv == "Closed") {
+			_statics->_bedfoot = "Closed";
 			_endFrame = 30;
 		} else {
-			_statics->_v2 = "RestingUnderTV";
+			_statics->_bedfoot = "RestingUnderTV";
 			_endFrame = 25;
 		}
 
-		playMovie(_startFrame, _endFrame, MOVIE_GAMESTATE);
-		playSound("b#7.wav");
+		playMovie(_startFrame, _endFrame, MOVIE_WAIT_FOR_FINISH);
+		playSound(TRANSLATE("b#7.wav", "b#92.wav"));
 
-	} else if (_statics->_v2 == "RestingUTV" && _statics->_v4 == "Closed") {
-		_statics->_v2 = "Closed";
+	} else if (_statics->_bedfoot == "RestingUTV" && _statics->_tv == "Closed") {
+		_statics->_bedfoot = "Closed";
 		_startFrame = 25;
 		_endFrame = 30;
-		playMovie(25, 30, MOVIE_GAMESTATE);
-		playSound("b#7.wav");
+		playMovie(25, 30, MOVIE_WAIT_FOR_FINISH);
+		playSound(TRANSLATE("b#7.wav", "b#92.wav"));
 	}
 
-	if (_statics->_v2 == "Closed")
-		_statics->_v1 = "Closed";
+	if (_statics->_bedfoot == "Closed")
+		_statics->_bedhead = "Closed";
 
 	return true;
 }

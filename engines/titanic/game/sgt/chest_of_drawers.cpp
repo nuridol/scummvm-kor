@@ -21,6 +21,7 @@
  */
 
 #include "titanic/game/sgt/chest_of_drawers.h"
+#include "titanic/translation.h"
 
 namespace Titanic {
 
@@ -41,35 +42,36 @@ void CChestOfDrawers::load(SimpleFile *file) {
 }
 
 bool CChestOfDrawers::TurnOn(CTurnOn *msg) {
-	if (_statics->_v6 == "Closed" && _statics->_v5 == "Open") {
-		_fieldE0 = false;
-		_statics->_v6 = "Open";
+	if (_statics->_chestOfDrawers == "Closed" && _statics->_desk == "Open") {
+		_isClosed = false;
+		_statics->_chestOfDrawers = "Open";
 		_startFrame = 1;
 		_endFrame = 14;
-		playSound("b#11.wav");
+		playMovie(1, 14, MOVIE_NOTIFY_OBJECT | MOVIE_WAIT_FOR_FINISH);
+		playSound(TRANSLATE("b#11.wav", "b#96.wav"));
 	}
 
 	return true;
 }
 
 bool CChestOfDrawers::TurnOff(CTurnOff *msg) {
-	if (_statics->_v6 == "Open" && _statics->_v5 == "Closed") {
-		CVisibleMsg visibleMsg;
+	if (_statics->_chestOfDrawers == "Open" && _statics->_drawer == "Closed") {
+		CVisibleMsg visibleMsg(false);
 		visibleMsg.execute("Drawer");
-		_statics->_v6 = "Closed";
-		_fieldE0 = true;
+		_statics->_chestOfDrawers = "Closed";
+		_isClosed = true;
 
 		_startFrame = 14;
 		_endFrame = 27;
-		playMovie(14, 27, MOVIE_NOTIFY_OBJECT | MOVIE_GAMESTATE);
-		playSound("b#11.wav");
+		playMovie(14, 27, MOVIE_NOTIFY_OBJECT | MOVIE_WAIT_FOR_FINISH);
+		playSound(TRANSLATE("b#11.wav", "b#96.wav"));
 	}
 
 	return true;
 }
 
 bool CChestOfDrawers::MovieEndMsg(CMovieEndMsg *msg) {
-	if (_statics->_v6 == "Open") {
+	if (_statics->_chestOfDrawers == "Open") {
 		CVisibleMsg visibleMsg;
 		visibleMsg.execute("Drawer");
 	}
