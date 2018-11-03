@@ -55,6 +55,13 @@ GfxText32::GfxText32(SegManager *segMan, GfxCache *fonts) :
 void GfxText32::init() {
 	_xResolution = g_sci->_gfxFrameout->getScriptWidth();
 	_yResolution = g_sci->_gfxFrameout->getScriptHeight();
+#ifdef SCUMMVMKOR
+    // GK1 Korean pathed version use doubled resolution for font
+	if (g_sci->getGameId() == GID_GK1 && g_sci->getLanguage() == Common::KO_KOR) {
+		_xResolution = _xResolution * 2;
+		_yResolution = _yResolution * 2;
+	}
+#endif
 }
 
 reg_t GfxText32::createFontBitmap(int16 width, int16 height, const Common::Rect &rect, const Common::String &text, const uint8 foreColor, const uint8 backColor, const uint8 skipColor, const GuiResourceId fontId, const TextAlign alignment, const int16 borderColor, const bool dimmed, const bool doScaling, const bool gc) {
