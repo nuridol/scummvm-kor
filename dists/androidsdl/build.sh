@@ -18,7 +18,7 @@ if [ \! -d ../../../androidsdl ] ; then
 fi
 
 if [ \! -d scummvm/scummvm ] ; then
-   ln -s ../../../../scummvm-kor scummvm
+   ln -s ../../../../scummvm-kor scummvm/scummvm
 fi
 
 if [ \! -d ../../../androidsdl/project/jni/application/scummvm ] ; then
