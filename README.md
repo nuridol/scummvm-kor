@@ -81,7 +81,7 @@ open scummvm.xcodeproj
 | 스페이스퀘스트 4 | Korean | CD | DOS/Windows |
 | 로라 보우 2 태양신의 단도 | Korean | CD | DOS/Windows |
 
-*시에라 엔터테이먼트 게임은 게임 폴더 밑에 ``korean.fnt``(한글 폰트), ``message.map``(메시지 매핑), ``resource.msg``(메시지) 파일이 필요합니다.*  
+*시에라 엔터테인먼트 게임은 게임 폴더 밑에 ``korean.fnt``(한글 폰트), ``message.map``(메시지 매핑), ``resource.msg``(메시지) 파일이 필요합니다.*  
 *[ScummVM-kor with libretro core](https://github.com/swkim01/scummvm-kor) 참조*  
 
 
