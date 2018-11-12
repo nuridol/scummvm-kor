@@ -341,7 +341,7 @@ namespace Scumm {
 			if (i > 0)
 				_KBuffer[i] = _KBuffer[i-1] + strlen(_KBuffer[i-1])+1;
 			if (len > 1000)
-				warning("_KBuffer[%d]:%lx, len=%d\n", i, (long)_KBuffer[i], len);
+				warning("_KBuffer[%d]:%lx, len=%d\n", i, _KBuffer[i], len);
 			if(strlen(buf)) {
 				strcpy(_KBuffer[i], buf);
 				char *b = _KBuffer[i];
