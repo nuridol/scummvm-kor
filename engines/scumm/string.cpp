@@ -40,6 +40,11 @@
 #include "scumm/verbs.h"
 #include "scumm/he/sound_he.h"
 
+#ifdef SCUMMVMKOR
+#include "scumm/ks_check.h"
+#include "scumm/korean.h"
+#endif
+
 namespace Scumm {
 
 
@@ -117,6 +122,21 @@ void ScummEngine::showMessageDialog(const byte *msg) {
 	VAR(VAR_KEYPRESS) = runDialog(dialog);
 }
 
+#ifdef SCUMMVMKOR
+static int _krStrPost = 0;	// 0: 받침 없음, 1: 'ㄹ'외 받침 있음, 3: 'ㄹ' 받침 있음
+static char _c1KorBufferStr[1024];
+static char *_c1KorBuffer = _c1KorBufferStr;
+static char *addKoreanBuffer(char *buffer, int c) {
+	switch(c) {
+		case '^': *buffer++='.';*buffer++='.';*buffer++='.'; break;
+		case '`': *buffer++='\"'; break;
+		case 0x07: case 0x7f: break;
+		case 0xfa: case 0x10: *buffer++=' '; break;
+		default: *buffer++=c; break;
+	}
+	return buffer;
+}
+#endif
 
 #pragma mark -
 #pragma mark --- V6 blast text queue code ---
@@ -140,6 +160,12 @@ void ScummEngine_v6::drawBlastTexts() {
 	int c;
 	int i;
 
+#ifdef SCUMMVMKOR
+	bool cmi_pos_hack = false;
+	char kr_buffs[1024];
+	char *kr_buffer=kr_buffs;
+#endif
+
 	for (i = 0; i < _blastTextQueuePos; i++) {
 
 		buf = _blastTextQueue[i].text;
@@ -150,6 +176,12 @@ void ScummEngine_v6::drawBlastTexts() {
 		_charset->setColor(_blastTextQueue[i].color);
 		_charset->_disableOffsX = _charset->_firstChar = true;
 		_charset->setCurID(_blastTextQueue[i].charset);
+
+#ifdef SCUMMVMKOR
+		int kr_xpos = _blastTextQueue[i].xpos;
+		int kr_ypos = _charset->_top;
+		int kr_color = _charset->getColor();
+#endif
 
 		do {
 			_charset->_left = _blastTextQueue[i].xpos;
@@ -175,7 +207,7 @@ void ScummEngine_v6::drawBlastTexts() {
 				// Some localizations may override colors
 				// See credits in Chinese COMI
 				if (_game.id == GID_CMI &&	_language == Common::ZH_TWN &&
-				      c == '^' && (buf == _blastTextQueue[i].text + 1)) {
+					  c == '^' && (buf == _blastTextQueue[i].text + 1)) {
 					if (*buf == 'c') {
 						int color = buf[3] - '0' + 10 *(buf[2] - '0');
 						_charset->setColor(color);
@@ -191,15 +223,53 @@ void ScummEngine_v6::drawBlastTexts() {
 							c = 0x20; //not in S-JIS
 						} else {
 							c += *buf++ * 256;
+#ifdef SCUMMVMKOR
+							// HACK to put Korean subtitles in place.
+							if (_game.id == GID_CMI && _charset->getCurID() == 0) {
+								cmi_pos_hack = true;
+								_charset->_top += 6;
+							}
+#endif
 						}
 					}
+#ifdef SCUMMVMKOR
+					if (!_koreanMode)
+						_charset->printChar(c, true);
+					else
+						kr_buffer = addKoreanBuffer(kr_buffer, c);
+					if(cmi_pos_hack) {
+						cmi_pos_hack = false;
+						_charset->_top -= 6;
+					}
+#else
 					_charset->printChar(c, true);
+#endif
 				}
 			} while (c && c != '\n');
 
+#ifdef SCUMMVMKOR
+			if (!_koreanMode)
+#endif
 			_charset->_top += _charset->getFontHeight();
 		} while (c);
 
+#ifdef SCUMMVMKOR
+		*kr_buffer++=0;
+		if(_koreanMode && strlen(kr_buffs)) {
+			kr_buffer=kr_buffs;
+			if(kr_buffer[0] == 0x7f)
+				*kr_buffer++;
+			
+			drawKorean((const byte *)convertToKorean(kr_buffer,0), kr_xpos, kr_ypos, kr_color, 2);
+			_charset->_top += _charset->getFontHeight();
+			
+			_blastTextQueue[i].rect = _charset->_str;
+			
+			// Korean 1pt shadow remaining error fix ("ft")
+			if (_blastTextQueue[i].rect.left > 0) _blastTextQueue[i].rect.left--;
+			if (_blastTextQueue[i].rect.top > 0) _blastTextQueue[i].rect.top--;
+		} else
+#endif
 		_blastTextQueue[i].rect = _charset->_str;
 	}
 }
@@ -283,6 +353,11 @@ bool ScummEngine::handleNextCharsetCode(Actor *a, int *code) {
 
 		switch (c) {
 		case 1:
+#ifdef SCUMMVMKOR
+			*_c1KorBuffer++='<';
+			*_c1KorBuffer++='1';
+			*_c1KorBuffer++='>';
+#endif
 			c = 13; // new line
 			_msgCount = _screenWidth;
 			endLoop = true;
@@ -330,6 +405,12 @@ bool ScummEngine::handleNextCharsetCode(Actor *a, int *code) {
 				_charset->setColor(_charsetColor);
 			else
 				_charset->setColor(color);
+#ifdef SCUMMVMKOR
+				*_c1KorBuffer++='<';
+				*_c1KorBuffer++='c';
+				*_c1KorBuffer++='>';
+				*_c1KorBuffer++=_charset->getColor();
+#endif
 			break;
 		case 13:
 			debug(0, "handleNextCharsetCode: Unknown opcode 13 %d", READ_LE_UINT16(buffer));
@@ -342,8 +423,10 @@ bool ScummEngine::handleNextCharsetCode(Actor *a, int *code) {
 			memcpy(_charsetColorMap, _charsetData[_charset->getCurID()], 4);
 			_nextTop -= _charset->getFontHeight() - oldy;
 			break;
+#ifndef SCUMMVMKOR
 		default:
 			error("handleNextCharsetCode: invalid code %d", c);
+#endif
 		}
 	}
 	_charsetBufPos = buffer - _charsetBuffer;
@@ -417,8 +500,10 @@ bool ScummEngine_v72he::handleNextCharsetCode(Actor *a, int *code) {
 			_keepText = false;
 			endLoop = endText = true;
 			break;
+#ifndef SCUMMVMKOR
 		default:
 			error("handleNextCharsetCode: invalid code %d", c);
+#endif
 		}
 	}
 	_charsetBufPos = buffer - _charsetBuffer;
@@ -464,6 +549,10 @@ void ScummEngine::CHARSET_1() {
 	if (_game.version >= 7) {
 		((ScummEngine_v7 *)this)->processSubtitleQueue();
 	}
+#endif
+
+#ifdef SCUMMVMKOR
+	_c1KorBuffer = _c1KorBufferStr;
 #endif
 
 	if (_game.heversion >= 70 && _haveMsg == 3) {
@@ -530,6 +619,11 @@ void ScummEngine::CHARSET_1() {
 	else
 		_charset->setCurID(_string[0].charset);
 
+#ifdef SCUMMVMKOR
+	if(_game.id == GID_INDY3 && _useCJKMode && _language == Common::KO_KOR && !_koreanMode)
+		_charset->setCurID(1); // HACK: Make "Indy3" use big font
+#endif
+
 	if (_game.version >= 5)
 		memcpy(_charsetColorMap, _charsetData[_charset->getCurID()], 4);
 
@@ -542,7 +636,7 @@ void ScummEngine::CHARSET_1() {
 		return;
 
 	if ((_game.version <= 6 && _haveMsg == 1) ||
-	    (_game.version == 7 && _haveMsg != 1)) {
+		(_game.version == 7 && _haveMsg != 1)) {
 
 		if (_game.heversion >= 60) {
 			if (_sound->isSoundRunning(1) == 0)
@@ -600,6 +694,12 @@ void ScummEngine::CHARSET_1() {
 
 	_charset->_disableOffsX = _charset->_firstChar = !_keepText;
 
+#ifdef SCUMMVMKOR
+	int kr_xpos = _nextLeft;
+	int kr_ypos = _nextTop;
+	int kr_color = _charset->getColor();
+#endif
+
 	int c = 0;
 	while (handleNextCharsetCode(a, &c)) {
 		if (c == 0) {
@@ -611,10 +711,23 @@ void ScummEngine::CHARSET_1() {
 		}
 
 		if (c == 13) {
+#ifdef SCUMMVMKOR
+			*_c1KorBuffer++=' ';
+#endif
+
 #ifdef ENABLE_SCUMM_7_8
 			if (_game.version >= 7 && subtitleLine != subtitleBuffer) {
+#ifdef SCUMMVMKOR
+				if (_koreanMode) {	// korean v1 mode compaitbility hack: do not broke the line
+					*subtitleLine++ = ' ';
+					*subtitleLine = '\0';
+				} else {
+#endif
 				((ScummEngine_v7 *)this)->addSubtitleToQueue(subtitleBuffer, subtitlePos, _charsetColor, _charset->getCurID());
 				subtitleLine = subtitleBuffer;
+#ifdef SCUMMVMKOR
+				}
+#endif
 			}
 #endif
 			if (!newLine())
@@ -646,6 +759,15 @@ void ScummEngine::CHARSET_1() {
 			*subtitleLine = '\0';
 #endif
 		} else {
+#ifdef SCUMMVMKOR
+			if (c & 0x80 && _useCJKMode && !_koreanMode) {
+					byte *buffer = _charsetBuffer + _charsetBufPos;
+					if (checkHangul(c, *buffer) || checkSJISCode(c)) {
+						c += *buffer++ * 256; // LE
+						_charsetBufPos = buffer - _charsetBuffer;
+					}
+			}
+#else
 			if (c & 0x80 && _useCJKMode) {
 				if (checkSJISCode(c)) {
 					byte *buffer = _charsetBuffer + _charsetBufPos;
@@ -653,8 +775,16 @@ void ScummEngine::CHARSET_1() {
 					_charsetBufPos = buffer - _charsetBuffer;
 				}
 			}
+#endif
 			if (_game.version <= 3) {
+#ifdef SCUMMVMKOR
+				if(!_koreanOnly)
+					_charset->printChar(c, false);
+				else
+					_c1KorBuffer = addKoreanBuffer(_c1KorBuffer, c);
+#else
 				_charset->printChar(c, false);
+#endif
 				_msgCount += 1;
 			} else {
 				if (_game.features & GF_16BIT_COLOR) {
@@ -667,7 +797,14 @@ void ScummEngine::CHARSET_1() {
 					// Subtitles are turned off, and there is a voice version
 					// of this message -> don't print it.
 				} else {
+#ifdef SCUMMVMKOR
+					if(!_koreanOnly)
+						_charset->printChar(c, false);
+					else
+						_c1KorBuffer = addKoreanBuffer(_c1KorBuffer, c);
+#else
 					_charset->printChar(c, false);
+#endif
 				}
 			}
 			_nextLeft = _charset->_left;
@@ -685,6 +822,21 @@ void ScummEngine::CHARSET_1() {
 #ifndef DISABLE_TOWNS_DUAL_LAYER_MODE
 	if (_game.platform == Common::kPlatformFMTowns && (c == 0 || c == 2 || c == 3))
 		memcpy(&_curStringRect, &_charset->_str, sizeof(Common::Rect));
+#endif
+
+#ifdef SCUMMVMKOR
+	*_c1KorBuffer = 0;
+	if (_koreanMode && strlen(_c1KorBufferStr) > 1) {
+		_charset->_left = kr_xpos;
+		_charset->_top = kr_ypos;
+		_charset->setColor(kr_color);
+		const byte *buffer = (const byte *)convertToKoreanValid(_c1KorBufferStr, 0);
+		if (buffer == 0)
+			buffer = (const byte *)_c1KorBufferStr;
+		drawKorean(buffer, kr_xpos, kr_ypos, kr_color, 0);
+		_nextLeft = _charset->_left;
+		_nextTop = _charset->_top;
+	}
 #endif
 
 #ifdef ENABLE_SCUMM_7_8
@@ -857,7 +1009,11 @@ void ScummEngine_v7::CHARSET_1() {
 }
 #endif
 
+#ifdef SCUMMVMKOR
+void ScummEngine::drawEnglish(int a, const byte *msg) {
+#else
 void ScummEngine::drawString(int a, const byte *msg) {
+#endif
 	byte buf[270];
 	byte *space;
 	int i, c;
@@ -1025,6 +1181,313 @@ void ScummEngine::drawString(int a, const byte *msg) {
 		_string[a]._default.ypos = _string[a].ypos;
 	}
 }
+
+#ifdef SCUMMVMKOR
+void ScummEngine::drawString(int a, const byte *msg) {
+	byte buf[270];
+	byte *space;
+	int i, c;
+	byte fontHeight = 0;
+	uint color;
+	int code = (_game.heversion >= 80) ? 127 : 64;
+	
+	char kr_buffs[1024];
+	char *kr_buffer=kr_buffs;
+	
+	// drawString is not used in SCUMM v7 and v8
+	assert(_game.version < 7);
+	
+	convertMessageToString(msg, buf, sizeof(buf));
+	
+	_charset->_top = _string[a].ypos + _screenTop;
+	_charset->_startLeft = _charset->_left = _string[a].xpos;
+	_charset->_right = _string[a].right;
+	_charset->_center = _string[a].center;
+	_charset->setColor(_string[a].color);
+	_charset->_disableOffsX = _charset->_firstChar = true;
+	_charset->setCurID(_string[a].charset);
+	
+	// HACK: Correct positions of text in books in Indy3 Mac.
+	// See also patch #1851568.
+	if (_game.id == GID_INDY3 && _game.platform == Common::kPlatformMacintosh && a == 1) {
+		if (_currentRoom == 75) {
+			// Grail Diary Page 1 (Library)
+			if (_charset->_startLeft < 160)
+				_charset->_startLeft = _charset->_left = _string[a].xpos - 22;
+			else if (_charset->_startLeft < 200)
+				_charset->_startLeft = _charset->_left = _string[a].xpos - 10;
+		} else if (_currentRoom == 90) {
+			// Grail Diary Page 2 (Catacombs - Engravings)
+			if (_charset->_startLeft < 160)
+				_charset->_startLeft = _charset->_left = _string[a].xpos - 21;
+			else if (_charset->_startLeft < 200)
+				_charset->_startLeft = _charset->_left = _string[a].xpos - 15;
+		} else if (_currentRoom == 69) {
+			// Grail Diary Page 3 (Catacombs - Music)
+			if (_charset->_startLeft < 160)
+				_charset->_startLeft = _charset->_left = _string[a].xpos - 15;
+			else if (_charset->_startLeft < 200)
+				_charset->_startLeft = _charset->_left = _string[a].xpos - 10;
+		} else if (_currentRoom == 74) {
+			// Biplane Manual
+			_charset->_startLeft = _charset->_left = _string[a].xpos - 35;
+		}
+	}
+	
+	if (_game.version >= 5)
+		memcpy(_charsetColorMap, _charsetData[_charset->getCurID()], 4);
+	
+	fontHeight = _charset->getFontHeight();
+	
+	if (_game.version >= 4) {
+		// trim from the right
+		byte *tmp = buf;
+		space = NULL;
+		while (*tmp) {
+			if (*tmp == ' ') {
+				if (!space)
+					space = tmp;
+			} else {
+				space = NULL;
+			}
+			tmp++;
+		}
+		if (space)
+			*space = '\0';
+	}
+	
+	if (_charset->_center) {
+		// Set left print position to English mode ("tentacle" command text position)
+		if (_koreanMode) {
+			bool tmpCJKMode = _useCJKMode;
+			_useCJKMode = 0;
+			_charset->_left -= _charset->getStringWidth(a, buf) / 2;
+			_useCJKMode = tmpCJKMode;
+		}
+		else
+			_charset->_left -= _charset->getStringWidth(a, buf) / 2;
+	}
+	
+	int kr_xpos = _charset->_left;
+	int kr_ypos = _charset->_top;
+	int kr_color = _charset->getColor();
+	
+	if (!buf[0]) {
+		if (_game.version >= 5) {
+			buf[0] = ' ';
+			buf[1] = 0;
+		} else {
+			_charset->_str.left = _charset->_left;
+			_charset->_str.top = _charset->_top;
+			_charset->_str.right = _charset->_left;
+			_charset->_str.bottom = _charset->_top;
+		}
+	}
+	
+	for (i = 0; (c = buf[i++]) != 0;) {
+		if (_game.heversion >= 72 && c == code) {
+			c = buf[i++];
+			switch (c) {
+				case 110:
+					if (_charset->_center) {
+						_charset->_left = _charset->_startLeft - _charset->getStringWidth(a, buf + i);
+					} else {
+						_charset->_left = _charset->_startLeft;
+					}
+					_charset->_top += fontHeight;
+					break;
+			}
+		} else if ((c == 0xFF || (_game.version <= 6 && c == 0xFE)) && (_game.heversion <= 71)) {
+			c = buf[i++];
+			switch (c) {
+				case 9:
+				case 10:
+				case 13:
+				case 14:
+					i += 2;
+					break;
+				case 1:
+				case 8:
+					if (_charset->_center) {
+						_charset->_left = _charset->_startLeft - _charset->getStringWidth(a, buf + i);
+					} else {
+						_charset->_left = _charset->_startLeft;
+					}
+					if (!(_game.platform == Common::kPlatformFMTowns) && _string[0].height) {
+						_nextTop += _string[0].height;
+					} else {
+						_charset->_top += fontHeight;
+					}
+					break;
+				case 12:
+					color = buf[i] + (buf[i + 1] << 8);
+					i += 2;
+					if (color == 0xFF)
+						_charset->setColor(_string[a].color);
+					else
+						_charset->setColor(color);
+					break;
+			}
+		} else {
+			if (a == 1 && _game.version >= 6) {
+				// FIXME: The following code is a bit nasty. It is used for the
+				// Highway surfing game in Sam&Max; there, _blitAlso is set to
+				// true when writing the highscore numbers. It is also in DOTT
+				// for parts the intro and for drawing newspaper headlines. It
+				// is also used for scores in bowling mini game in fbear and
+				// for names in load/save screen of all HE games. Maybe it is
+				// also being used in other places.
+				//
+				// A better name for _blitAlso might be _imprintOnBackground
+				
+				if (_string[a].no_talk_anim == false) {
+					//debug(0, "Would have set _charset->_blitAlso = true (wanted to print '%c' = %d)", c, c);
+					_charset->_blitAlso = true;
+				}
+			}
+			if (c & 0x80 && _useCJKMode && !_koreanOnly) {
+				if (checkHangul(c, buf[i]) || checkSJISCode(c))
+					c += buf[i++] * 256;
+			}
+			if (_koreanOnly)
+				kr_buffer = addKoreanBuffer(kr_buffer, c);
+			else {
+				_charset->printChar(c, true);
+				_charset->_blitAlso = false;
+			}
+		}
+	}
+	
+	*kr_buffer++=0;
+	if (_koreanMode && strlen(kr_buffs)) {
+		kr_buffer=kr_buffs;
+		if(kr_buffer[0] == 0x7f)
+			*kr_buffer++;
+		const byte *buffer = (const byte *)convertToKoreanValid(kr_buffer, 0);
+		if (buffer == 0) {
+			// printf("No Translation at drawString: |%s|\n", buf);
+			bool tmpCJKMode = _useCJKMode;
+			_useCJKMode = 0;
+			drawEnglish(a, msg);
+			_useCJKMode = tmpCJKMode;
+		} else {
+			drawKorean(buffer, kr_xpos, kr_ypos, kr_color, 1);
+			if (a == 0) {
+				_nextLeft = _charset->_left;
+				_nextTop = _charset->_top;
+			}
+			_string[a].xpos = _charset->_str.right;
+		}
+	} else {
+		if (a == 0) {
+			_nextLeft = _charset->_left;
+			_nextTop = _charset->_top;
+		}
+		_string[a].xpos = _charset->_str.right;
+	}
+	
+	if (_game.heversion >= 60) {
+		_string[a]._default.xpos = _string[a].xpos;
+		_string[a]._default.ypos = _string[a].ypos;
+	}
+}
+
+void ScummEngine::drawKorean(const byte *buffer, uint16 kr_xpos, uint16 kr_ypos, uint8 kr_color, int option) {
+	int c;
+	const bool ignoreCharsetMask = (_game.version < 7);
+	int isHangul = 0;
+	
+	_charset->setColor(kr_color);
+	if (option == 2) {
+		_charset->_left = kr_xpos;
+		// Center text if necessary
+		if (_charset->_center) {
+			_charset->_left -= _charset->getStringWidth(0, buffer) / 2;
+			if (_charset->_left < 0)
+				_charset->_left = 0;
+		}
+	}
+	do {
+		c = *buffer++;
+		if (c == 0)
+			break;
+		if (c == 0x0B)
+			continue;
+		if (c == '<' && *(buffer+1) == '>') {
+			if ( *buffer == '1' || *buffer == '3' ) {
+				buffer += 2;
+				_charset->_left = kr_xpos;
+				_charset->_top += _charset->getFontHeight();
+				continue;
+			} else if ( *buffer == 'c' || *buffer == 'C' ) {
+				buffer += 2;
+				byte color = *buffer++;
+				_charset->setColor(color);
+				continue;
+			}
+		}
+		if (c == '\\') {
+			if ( *buffer == 'n' || *buffer == 'N' ) {
+				buffer++;
+				_charset->_left = kr_xpos;
+				_charset->_top += _charset->getFontHeight();
+			} else if ( *buffer == 'c' || *buffer == 'C' ) {
+				buffer++;
+				byte color = *buffer++;
+				_charset->setColor(color);
+			}
+			continue;
+		} else if ( c == 13 ) {
+			if ( *buffer == 10) {
+				_charset->_left = kr_xpos;
+				_charset->_top += _charset->getFontHeight();
+			}
+			continue;
+		}
+		
+		if (checkHangul(c, *buffer)) {
+			c += (*buffer++) * 256;
+			isHangul = 1;
+		}
+		int textRight = _screenWidth;
+		//if (option == 0)
+		textRight = _charset->_right;
+		if (isHangul) {
+			if (_charset->_left + _charset->getCharWidth(c)*2 >= textRight) {
+				_charset->_left = kr_xpos;
+				_charset->_top += _charset->getFontHeight();
+				if (option == 2 && _charset->_center) {
+					_charset->_left -= _charset->getStringWidth(0, buffer) / 2;
+					if (_charset->_left < 0)
+						_charset->_left = 0;
+				}
+			}
+		} else {
+			if (_charset->_left + _charset->getCharWidth(c) >= textRight) {
+				_charset->_left = kr_xpos;
+				_charset->_top += _charset->getFontHeight();
+				if (option == 2 && _charset->_center) {
+					_charset->_left -= _charset->getStringWidth(0, buffer) / 2;
+					if (_charset->_left < 0)
+						_charset->_left = 0;
+				}
+			}
+		}
+		switch (option) {
+			default:
+				_charset->printChar(c, false);
+				break;
+			case 1:
+				_charset->printChar(c, ignoreCharsetMask);
+				_charset->_blitAlso = false;
+				break;
+			case 2:
+				_charset->printChar(c, true);
+				break;
+		}
+	} while (c != 0);
+}
+#endif
 
 int ScummEngine::convertMessageToString(const byte *msg, byte *dst, int dstSize) {
 	uint num = 0;
@@ -1221,13 +1684,91 @@ int ScummEngine::convertIntMessage(byte *dst, int dstSize, int var) {
 int ScummEngine::convertVerbMessage(byte *dst, int dstSize, int var) {
 	int num, k;
 
+#ifdef SCUMMVMKOR
+	bool isKorVerbGlue;
+	
+	if (_useCJKMode && var & (1 << 15)) {
+		isKorVerbGlue = true;
+		var &= ~(1 << 15);
+	} else
+		isKorVerbGlue = false;
+#endif
+
 	num = readVar(var);
 	if (num) {
 		for (k = 1; k < _numVerbs; k++) {
 			// Fix ZAK FM-TOWNS bug #1013617 by emulating exact (inconsistant?) behavior of the original code
 			if (num == _verbs[k].verbid && !_verbs[k].type && (!_verbs[k].saveid || (_game.version == 3 && _game.platform == Common::kPlatformFMTowns))) {
+#ifdef SCUMMVMKOR
+				if (isKorVerbGlue) {
+					// WORKAROUND: MI Korean verb parser
+					if (_game.id == GID_MONKEY_VGA) {
+						const byte code0380[] = {0xFF, 0x07, 0x03, 0x80};	// "을/를"
+						const byte code0480[] = {0xFF, 0x07, 0x04, 0x80};	// "와/과"
+						const byte codeWalkTo[] = {0xFF, 0x07, 0x03, 0x80, 0x20, 0xC7, 0xE2, 0xC7, 0xD8};	// "을/를 향해"
+						static byte _transText[8];
+						memset(_transText, 0, sizeof(_transText));
+						switch (_verbs[k].verbid) {
+							case 1:		// Open
+							case 2:		// Close
+							case 3:		// Give
+							case 4:		// Turn on
+							case 5:		// Turn off
+							case 6:		// Push
+							case 7:		// Pull
+							case 8:		// Use
+							case 9:		// Look at
+							case 10:	// Walk to
+								memcpy(_transText, codeWalkTo, 9);
+								break;
+							case 11:	// Pick up
+								memcpy(_transText, code0380, 4);
+								break;
+							case 13:	// Talk to
+								memcpy(_transText, code0480, 4);
+								break;
+						}
+						return convertMessageToString(_transText, dst, dstSize);
+					}
+					// WORKAROUND: MI2 Korean verb parser
+					if (_game.id == GID_MONKEY2) {
+						if (_verbs[k].verbid <= 11) {
+							const byte code0380[] = {0xFF, 0x07, 0x03, 0x80};	// "을/를"
+							const byte code0480[] = {0xFF, 0x07, 0x04, 0x80};	// "와/과"
+							const byte codeWalkTo[] = {0xFF, 0x07, 0x03, 0x80, 0x20, 0xC7, 0xE2, 0xC7, 0xD8};	// "을/를 향해"
+							static byte _transText[8];
+							memset(_transText, 0, sizeof(_transText));
+							_transText[0] = _verbs[k].verbid / 10 + '0';
+							_transText[1] = _verbs[k].verbid % 10 + '0';
+							switch (_verbs[k].verbid) {
+								case 2:		// Open
+								case 3:		// Close
+								case 4:		// Give
+								case 5:		// Push
+								case 6:		// Pull
+								case 7:		// Use
+								case 8:		// Look at
+								case 9:		// Pick up
+									memcpy(_transText, code0380, 4);
+									break;
+								case 10:	// Talk to
+									memcpy(_transText, code0480, 4);
+									break;
+								case 11:	// Walk to
+									memcpy(_transText, codeWalkTo, 9);
+									break;
+							}
+							return convertMessageToString(_transText, dst, dstSize);
+						}
+					}
+				} else {
+					const byte *ptr = getResourceAddress(rtVerb, k);
+					return convertMessageToString(ptr, dst, dstSize);
+				}
+#else
 				const byte *ptr = getResourceAddress(rtVerb, k);
 				return convertMessageToString(ptr, dst, dstSize);
+#endif
 			}
 		}
 	}
@@ -1241,7 +1782,28 @@ int ScummEngine::convertNameMessage(byte *dst, int dstSize, int var) {
 	if (num) {
 		const byte *ptr = getObjOrActorName(num);
 		if (ptr) {
+#ifdef SCUMMVMKOR
+			int increment = convertMessageToString(ptr, dst, dstSize);
+			if(_useCJKMode) {	// FIXME: valid statement for determining hangul mode?
+				_krStrPost = 0;
+				byte k1, k2;
+				for (int i = resStrLen(ptr); i > 1; i--) {
+					k1 = ptr[i - 2];
+					k2 = ptr[i - 1];
+					if(checkHangul(k1, k2)) {
+						int jongsung = checkJongsung(k1, k2);
+						if (jongsung)
+							_krStrPost |= 1;
+						if (jongsung == 8)	// 'ㄹ' 받침
+							_krStrPost |= (1 << 1);
+						break;
+					}
+				}
+			}
+			return increment;
+#else
 			return convertMessageToString(ptr, dst, dstSize);
+#endif
 		}
 	}
 	return 0;
@@ -1266,12 +1828,54 @@ int ScummEngine::convertStringMessage(byte *dst, int dstSize, int var) {
 	if (_game.version == 3 || (_game.version >= 6 && _game.heversion < 72))
 		var = readVar(var);
 
+#ifdef SCUMMVMKOR
+	if (_useCJKMode && var & (1 << 15)) {
+		int idx;
+		static unsigned char codeIdx[] = {0x00, 0x00, 0xC0, 0xB8, 0x00, 0x00, 0xC0, 0xCC, 0xB0, 0xA1, 0xC0, 0xCC, 0xB8, 0xA6, 0xC0, 0xBB, 0xBF, 0xCD, 0xB0, 0xFA, 0xB4, 0xC2, 0xC0, 0xBA};
+		
+		if ((var & ~(1 << 15)) == 0)
+			idx = (2 * (var & ~(1 << 15)) + (_krStrPost & 1) - bool(_krStrPost & 2)) * 2;
+		else
+			idx = (2 * (var & ~(1 << 15)) + (_krStrPost & 1)) * 2;
+		
+		static byte _transText[8];
+		const byte byteIdx[] = {codeIdx[idx], codeIdx[idx+1]};
+		
+		memset(_transText, 0, sizeof(_transText));
+		memcpy(_transText, byteIdx, 2);
+		
+		return convertMessageToString(_transText, dst, dstSize);
+	} else if (var) {
+		ptr = getStringAddress(var);
+		if (ptr) {
+			int increment = convertMessageToString(ptr, dst, dstSize);
+			if(_useCJKMode) {	// FIXME: valid statement for determining hangul mode?
+				_krStrPost = 0;
+				byte k1, k2;
+				for (int i = resStrLen(ptr); i > 1; i--) {
+					k1 = ptr[i - 2];
+					k2 = ptr[i - 1];
+					if(checkHangul(k1, k2)) {
+						int jongsung = checkJongsung(k1, k2);
+						if (jongsung)
+							_krStrPost |= 1;
+						if (jongsung == 8)	// 'ㄹ' 받침
+							_krStrPost |= (1 << 1);
+						break;
+					}
+				}
+			}
+			return increment;
+		}
+	}
+#else
 	if (var) {
 		ptr = getStringAddress(var);
 		if (ptr) {
 			return convertMessageToString(ptr, dst, dstSize);
 		}
 	}
+#endif
 	return 0;
 }
 

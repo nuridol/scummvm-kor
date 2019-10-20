@@ -35,6 +35,8 @@ MODULE_OBJS := \
 	imuse/drivers/mac_m68k.o \
 	imuse/drivers/pcspk.o \
 	input.o \
+	korean.o \
+	ks_check.o \
 	midiparser_ro.o \
 	object.o \
 	palette.o \

@@ -84,12 +84,34 @@ template<class StringType>
 int getStringWidthImpl(const Font &font, const StringType &str) {
 	int space = 0;
 	typename StringType::unsigned_type last = 0;
-
+#ifdef SCUMMVMKOR
+	bool isKorean = 1;
+	//const char *s = str.c_str();
+	uint len = str.size();
+	
+	for (uint i = 0; i < len; ++i) {
+		typename StringType::unsigned_type c;
+		c = str[i];
+		if (c >= 0x80 && isKorean && i+1 < len) {
+			if (checkKorCode(c, str[i + 1])) {
+				c += str[i + 1] * 256;	// LE
+				i++;
+			} else {
+				// 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
+				isKorean = 0;
+			}
+		}
+		const typename StringType::unsigned_type cur = str[i];
+		space += font.getCharWidth(c) + font.getKerningOffset(last, cur);
+		last = cur;
+	}
+#else
 	for (uint i = 0; i < str.size(); ++i) {
 		const typename StringType::unsigned_type cur = str[i];
 		space += font.getCharWidth(cur) + font.getKerningOffset(last, cur);
 		last = cur;
 	}
+#endif
 
 	return space;
 }
@@ -111,6 +133,31 @@ void drawStringImpl(const Font &font, Surface *dst, const StringType &str, int x
 
 	typename StringType::unsigned_type last = 0;
 	for (typename StringType::const_iterator i = str.begin(), end = str.end(); i != end; ++i) {
+#ifdef SCUMMVMKOR
+		bool isKorean = 1;
+		typename StringType::unsigned_type c;
+		c = *i;
+		if (c >= 0x80 && isKorean && i+1 < end) {
+			if (checkKorCode(c, *(i+1))) {
+				c += *(i+1) * 256;	//LE
+				i++;
+			} else {
+				// 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
+				isKorean = 0;
+			}
+		}
+		const typename StringType::unsigned_type cur = *i;
+		x += font.getKerningOffset(last, cur);
+		last = cur;
+
+		Common::Rect charBox = font.getBoundingBox(c);
+		if (x + charBox.right > rightX)
+			break;
+		if (x + charBox.right >= leftX)
+			font.drawChar(dst, c, x, y, color);
+
+		x += font.getCharWidth(c);
+#else
 		const typename StringType::unsigned_type cur = *i;
 		x += font.getKerningOffset(last, cur);
 		last = cur;
@@ -122,6 +169,7 @@ void drawStringImpl(const Font &font, Surface *dst, const StringType &str, int x
 			font.drawChar(dst, cur, x, y, color);
 
 		x += font.getCharWidth(cur);
+#endif
 	}
 }
 
@@ -399,6 +447,10 @@ Common::String Font::handleEllipsis(const Common::String &input, int w) const {
 	Common::String s = input;
 	int width = getStringWidth(s);
 
+#ifdef SCUMMVMKOR
+	bool isKorean = 1;
+#endif
+
 	if (width > w && s.hasSuffix("...")) {
 		// String is too wide. Check whether it ends in an ellipsis
 		// ("..."). If so, remove that and try again!
@@ -428,10 +480,34 @@ Common::String Font::handleEllipsis(const Common::String &input, int w) const {
 		uint i = 0;
 
 		for (; i < s.size(); ++i) {
+#ifdef SCUMMVMKOR
+			int charWidth = 0;
+			Common::String::unsigned_type c;
+			c = s[i];
+			if (c >= 0x80 && isKorean && i+1 < s.size()) {
+				if (checkKorCode(c, s[i + 1])) {
+					c += s[i + 1] * 256;	// LE
+					str += s[i];	// 한글을 한 글자씩 넣어준다
+					i++;
+				} else {
+					// 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
+					isKorean = 0;
+				}
+			}
+			//uint16 cur = s[i];
+			const Common::String::unsigned_type cur = s[i];
+			charWidth = getCharWidth(c) + getKerningOffset(last, cur);
+			if (w2 + charWidth > halfWidth) {
+				if (c > 0xff)
+					str += s[i];
+				break;
+			}
+#else
 			const Common::String::unsigned_type cur = s[i];
 			int charWidth = getCharWidth(cur) + getKerningOffset(last, cur);
 			if (w2 + charWidth > halfWidth)
 				break;
+#endif
 			last = cur;
 			w2 += charWidth;
 			str += cur;
@@ -450,8 +526,24 @@ Common::String Font::handleEllipsis(const Common::String &input, int w) const {
 		// (width + ellipsisWidth - w)
 		int skip = width + ellipsisWidth - w;
 		for (; i < s.size() && skip > 0; ++i) {
+#ifdef SCUMMVMKOR
+			Common::String::unsigned_type c;
+			c = s[i];
+			if (c >= 0x80 && isKorean && i+1 < s.size()) {
+				if (checkKorCode(c, s[i + 1])) {
+					c += s[i + 1] * 256;	//LE
+					i++;
+				} else {
+					// 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
+					isKorean = 0;
+				}
+			}
+			const Common::String::unsigned_type cur = s[i];
+			skip -= getCharWidth(c) + getKerningOffset(last, cur);
+#else
 			const Common::String::unsigned_type cur = s[i];
 			skip -= getCharWidth(cur) + getKerningOffset(last, cur);
+#endif
 			last = cur;
 		}
 

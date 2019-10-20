@@ -78,6 +78,9 @@ public:
 
 private:
 	void init();
+#ifdef SCUMMVMKOR
+	bool SwitchToFont1001OnKorean(const char *text, uint16 languageSplitter);
+#endif
 	bool SwitchToFont900OnSjis(const char *text, uint16 languageSplitter);
 
 	GfxCache *_cache;
