@@ -3787,6 +3787,8 @@ EOF
 	echo "$_sdlnet"
 fi
 
+#scummvmkor
+	append_var DEFINES "-DSCUMMVMKOR"
 
 #
 # Enable 16bit support only for backends which support it

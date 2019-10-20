@@ -119,7 +119,11 @@ private:
 
 	void drawFrame(const Common::Rect &rect, const int16 size, const uint8 color, const bool doScaling);
 
+#ifdef SCUMMVMKOR
+	void drawChar(uint16 charIndex);
+#else
 	void drawChar(const char charIndex);
+#endif
 	void drawText(const uint index, uint length);
 
 	/**
@@ -235,7 +239,11 @@ public:
 	/**
 	 * Gets the width of a character.
 	 */
+#ifdef SCUMMVMKOR
+	uint16 getCharWidth(uint16 charIndex, const bool doScaling) const;
+#else
 	uint16 getCharWidth(const char charIndex, const bool doScaling) const;
+#endif
 
 	/**
 	 * Retrieves the width and height of a block of text.
@@ -271,6 +279,11 @@ public:
 	 * line. Originally FontMgr::DrawOneLine and FontMgr::UpOneLine.
 	 */
 	void scrollLine(const Common::String &textLine, int numLines, uint8 color, TextAlign align, GuiResourceId fontId, ScrollDirection dir);
+
+#ifdef SCUMMVMKOR
+	bool SwitchToFont1001OnKorean(const char *text);
+#endif
+
 };
 
 } // End of namespace Sci

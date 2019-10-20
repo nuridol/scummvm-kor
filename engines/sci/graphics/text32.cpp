@@ -55,6 +55,13 @@ GfxText32::GfxText32(SegManager *segMan, GfxCache *fonts) :
 void GfxText32::init() {
 	_xResolution = g_sci->_gfxFrameout->getScriptWidth();
 	_yResolution = g_sci->_gfxFrameout->getScriptHeight();
+#ifdef SCUMMVMKOR
+    // GK1 Korean pathed version use doubled resolution for font
+	if (g_sci->getGameId() == GID_GK1 && g_sci->getLanguage() == Common::KO_KOR) {
+		_xResolution = _xResolution * 2;
+		_yResolution = _yResolution * 2;
+	}
+#endif
 }
 
 reg_t GfxText32::createFontBitmap(int16 width, int16 height, const Common::Rect &rect, const Common::String &text, const uint8 foreColor, const uint8 backColor, const uint8 skipColor, const GuiResourceId fontId, const TextAlign alignment, const int16 borderColor, const bool dimmed, const bool doScaling, const bool gc) {
@@ -209,6 +216,15 @@ void GfxText32::drawFrame(const Common::Rect &rect, const int16 size, const uint
 	}
 }
 
+#ifdef SCUMMVMKOR
+void GfxText32::drawChar(uint16 charIndex) {
+	SciBitmap &bitmap = *_segMan->lookupBitmap(_bitmap);
+	byte *pixels = bitmap.getPixels();
+
+	_font->drawToBuffer(charIndex, _drawPosition.y, _drawPosition.x, _foreColor, _dimmed, pixels, _width, _height);
+	_drawPosition.x += _font->getCharWidth(charIndex);
+}
+#else
 void GfxText32::drawChar(const char charIndex) {
 	SciBitmap &bitmap = *_segMan->lookupBitmap(_bitmap);
 	byte *pixels = bitmap.getPixels();
@@ -216,12 +232,22 @@ void GfxText32::drawChar(const char charIndex) {
 	_font->drawToBuffer((unsigned char)charIndex, _drawPosition.y, _drawPosition.x, _foreColor, _dimmed, pixels, _width, _height);
 	_drawPosition.x += _font->getCharWidth((unsigned char)charIndex);
 }
+#endif
 
 int16 GfxText32::getScaledFontHeight() const {
 	const int16 scriptHeight = g_sci->_gfxFrameout->getScriptHeight();
 	return (_font->getHeight() * scriptHeight + _yResolution - 1) / _yResolution;
 }
 
+#ifdef SCUMMVMKOR
+uint16 GfxText32::getCharWidth(uint16 charIndex, const bool doScaling) const {
+	uint16 width = _font->getCharWidth(charIndex);
+	if (doScaling) {
+		width = scaleUpWidth(width);
+	}
+	return width;
+}
+#else
 uint16 GfxText32::getCharWidth(const char charIndex, const bool doScaling) const {
 	uint16 width = _font->getCharWidth((unsigned char)charIndex);
 	if (doScaling) {
@@ -229,6 +255,7 @@ uint16 GfxText32::getCharWidth(const char charIndex, const bool doScaling) const
 	}
 	return width;
 }
+#endif
 
 void GfxText32::drawTextBox() {
 	if (_text.size() == 0) {
@@ -250,6 +277,11 @@ void GfxText32::drawTextBox() {
 	charIndex = 0;
 	uint nextCharIndex = 0;
 	while (*text != '\0') {
+#ifdef SCUMMVMKOR
+		// We need to check for Korean-EUCKR every line
+		if (g_sci->getLanguage() == Common::KO_KOR)
+			SwitchToFont1001OnKorean(text);
+#endif
 		_drawPosition.x = _textRect.left;
 
 		uint length = getLongest(&nextCharIndex, textRectWidth);
@@ -281,7 +313,14 @@ void GfxText32::drawText(const uint index, uint length) {
 	// around eliminating some extra temporaries and fixing the logic to match.
 	const char *text = _text.c_str() + index;
 	while (length-- > 0) {
+#ifdef SCUMMVMKOR
+		uint16 currentChar = *(const byte *)text++;
+		if (_font->isDoubleByte(currentChar)) {
+			currentChar |= *text++ << 8;
+		}
+#else
 		char currentChar = *text++;
+#endif
 
 		if (currentChar == '|') {
 			const char controlChar = *text++;
@@ -390,8 +429,16 @@ uint GfxText32::getLongest(uint *charIndex, const int16 width) {
 
 	const char *text = _text.c_str() + *charIndex;
 
+#ifdef SCUMMVMKOR
+	uint16 currentChar = 0;
+	while ((currentChar = *(const byte *)text++) != '\0') {
+		if (_font->isDoubleByte(currentChar)) {
+			currentChar |= (*text++) << 8;
+		}
+#else
 	char currentChar;
 	while ((currentChar = *text++) != '\0') {
+#endif
 		// In SSCI, the font, color, and alignment were reset here to their
 		// initial values; this does not seem to be necessary and really
 		// complicates the font system, so we do not do it
@@ -463,6 +510,11 @@ uint GfxText32::getLongest(uint *charIndex, const int16 width) {
 		// In the middle of a line, keep processing
 		++*charIndex;
 		++testLength;
+#ifdef SCUMMVMKOR
+		if (_font->isDoubleByte(currentChar)) {
+			++*charIndex;
+		}
+#endif
 
 		// In SSCI, the font, color, and alignment were reset here to their
 		// initial values, but we do not need to do this because we do not cause
@@ -501,8 +553,16 @@ int16 GfxText32::getTextWidth(const uint index, uint length) const {
 
 	GfxFont *font = _font;
 
+#ifdef SCUMMVMKOR
+	uint16 currentChar = *(const byte *)text++;
+	while (length > 0 && currentChar != '\0') {
+		if (_font->isDoubleByte(currentChar)) {
+			currentChar |= (*text++) << 8;
+		}
+#else
 	char currentChar = *text++;
 	while (length > 0 && currentChar != '\0') {
+#endif
 		// Control codes are in the format `|<code><value>|`
 		if (currentChar == '|') {
 			// SSCI changed the global state of the FontMgr here upon
@@ -587,6 +647,11 @@ Common::Rect GfxText32::getTextSize(const Common::String &text, int16 maxWidth, 
 			uint charIndex = 0;
 			uint nextCharIndex = 0;
 			while (*rawText != '\0') {
+#ifdef SCUMMVMKOR
+				// We need to check for Korean-EUCKR every line
+				if (g_sci->getLanguage() == Common::KO_KOR)
+					SwitchToFont1001OnKorean(rawText);
+#endif
 				uint length = getLongest(&nextCharIndex, result.width());
 				textWidth = MAX(textWidth, getTextWidth(charIndex, length));
 				charIndex = nextCharIndex;
@@ -732,5 +797,16 @@ void GfxText32::scrollLine(const Common::String &lineText, int numLines, uint8 c
 	drawText(0, lineText.size());
 }
 
+#ifdef SCUMMVMKOR
+// korean and then switch to font 1001
+bool GfxText32::SwitchToFont1001OnKorean(const char *text) {
+	//byte firstChar = (*(const byte *)text++);
+	if (1/*(firstChar >= 0xA1) && (firstChar <= 0xFE)*/) {
+		setFont(1001);
+		return true;
+	}
+	return false;
+}
+#endif
 
 } // End of namespace Sci
