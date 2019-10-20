@@ -29,6 +29,8 @@
 #define FORBIDDEN_SYMBOL_EXCEPTION_mkdir
 #define FORBIDDEN_SYMBOL_EXCEPTION_getenv
 #define FORBIDDEN_SYMBOL_EXCEPTION_exit		//Needed for IRIX's unistd.h
+#define FORBIDDEN_SYMBOL_EXCEPTION_random
+#define FORBIDDEN_SYMBOL_EXCEPTION_srandom
 
 #include "backends/fs/posix/posix-fs.h"
 #include "backends/fs/stdiostream.h"
@@ -36,6 +38,9 @@
 
 #include <sys/param.h>
 #include <sys/stat.h>
+#ifdef MACOSX
+#include <sys/types.h>
+#endif
 #ifdef PSP2
 #include "backends/fs/psp2/psp2-dirent.h"
 #define mkdir sceIoMkdir
@@ -45,12 +50,28 @@
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #ifdef __OS2__
 #define INCL_DOS
 #include <os2.h>
 #endif
 
+#if defined(__ANDROID__) && !defined(ANDROIDSDL)
+#include "backends/platform/android/jni.h"
+#endif
+
+bool POSIXFilesystemNode::exists() const {
+	return access(_path.c_str(), F_OK) == 0;
+}
+
+bool POSIXFilesystemNode::isReadable() const {
+	return access(_path.c_str(), R_OK) == 0;
+}
+
+bool POSIXFilesystemNode::isWritable() const {
+	return access(_path.c_str(), W_OK) == 0;
+}
 
 void POSIXFilesystemNode::setFlags() {
 	struct stat st;
@@ -62,14 +83,24 @@ void POSIXFilesystemNode::setFlags() {
 POSIXFilesystemNode::POSIXFilesystemNode(const Common::String &p) {
 	assert(p.size() > 0);
 
+#ifdef PSP2
+	if (p == "/") {
+		_isDirectory = true;
+		_isValid = false;
+		_path = p;
+		_displayName = p;
+		return;
+	}
+#endif
+
 	// Expand "~/" to the value of the HOME env variable
-	if (p.hasPrefix("~/")) {
+	if (p.hasPrefix("~/") || p == "~") {
 		const char *home = getenv("HOME");
 		if (home != NULL && strlen(home) < MAXPATHLEN) {
 			_path = home;
-			// Skip over the tilda.  We know that p contains at least
-			// two chars, so this is safe:
-			_path += p.c_str() + 1;
+			// Skip over the tilda.
+			if (p.size() > 1)
+				_path += p.c_str() + 1;
 		}
 	} else {
 		_path = p;
@@ -152,6 +183,32 @@ bool POSIXFilesystemNode::getChildren(AbstractFSList &myList, ListMode mode, boo
 		return true;
 	}
 #endif
+#ifdef PSP2
+	if (_path == "/") {
+		POSIXFilesystemNode *entry1 = new POSIXFilesystemNode("ux0:");
+		myList.push_back(entry1);
+		POSIXFilesystemNode *entry2 = new POSIXFilesystemNode("uma0:");
+		myList.push_back(entry2);
+		return true;
+	}
+#endif
+
+#if defined(__ANDROID__) && !defined(ANDROIDSDL)
+	if (_path == "/") {
+		Common::Array<Common::String> list = JNI::getAllStorageLocations();
+		for (Common::Array<Common::String>::const_iterator it = list.begin(), end = list.end(); it != end; ++it) {
+			POSIXFilesystemNode *entry = new POSIXFilesystemNode();
+
+			entry->_isDirectory = true;
+			entry->_isValid = true;
+			entry->_displayName = *it;
+			++it;
+			entry->_path = *it;
+			myList.push_back(entry);
+		}
+		return true;
+	}
+#endif
 
 	DIR *dirp = opendir(_path.c_str());
 	struct dirent *dp;
@@ -226,9 +283,13 @@ AbstractFSNode *POSIXFilesystemNode::getParent() const {
 		return 0;	// The filesystem root has no parent
 
 #ifdef __OS2__
-    if (_path.size() == 3 && _path.hasSuffix(":/"))
-        // This is a root directory of a drive
-        return makeNode("/");   // return a virtual root for a list of drives
+	if (_path.size() == 3 && _path.hasSuffix(":/"))
+		// This is a root directory of a drive
+		return makeNode("/");   // return a virtual root for a list of drives
+#endif
+#ifdef PSP2
+	if (_path.hasSuffix(":"))
+		return makeNode("/");
 #endif
 
 	const char *start = _path.c_str();
@@ -258,33 +319,11 @@ Common::WriteStream *POSIXFilesystemNode::createWriteStream() {
 	return StdioStream::makeFromPath(getPath(), true);
 }
 
-bool POSIXFilesystemNode::create(bool isDirectoryFlag) {
-	bool success;
-
-	if (isDirectoryFlag) {
-		success = mkdir(_path.c_str(), 0755) == 0;
-	} else {
-		int fd = open(_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0755);
-		success = fd >= 0;
-
-		if (fd >= 0) {
-			close(fd);
-		}
-	}
-
-	if (success) {
+bool POSIXFilesystemNode::createDirectory() {
+	if (mkdir(_path.c_str(), 0755) == 0)
 		setFlags();
-		if (_isValid) {
-			if (_isDirectory != isDirectoryFlag) warning("failed to create %s: got %s", isDirectoryFlag ? "directory" : "file", _isDirectory ? "directory" : "file");
-			return _isDirectory == isDirectoryFlag;
-		}
 
-		warning("POSIXFilesystemNode: %s() was a success, but stat indicates there is no such %s",
-			isDirectoryFlag ? "mkdir" : "creat", isDirectoryFlag ? "directory" : "file");
-		return false;
-	}
-
-	return false;
+	return _isValid && _isDirectory;
 }
 
 namespace Posix {

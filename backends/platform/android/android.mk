@@ -21,7 +21,11 @@ RESOURCES = \
 	$(PATH_BUILD_RES)/drawable/scummvm.png \
 	$(PATH_BUILD_RES)/drawable/scummvm_big.png \
 	$(PATH_BUILD_RES)/drawable-xhdpi/leanback_icon.png \
-	$(PATH_BUILD_RES)/drawable-xhdpi/ouya_icon.png
+	$(PATH_BUILD_RES)/drawable-xhdpi/ouya_icon.png \
+	$(PATH_BUILD_RES)/drawable-hdpi/ic_action_keyboard.png \
+	$(PATH_BUILD_RES)/drawable-mdpi/ic_action_keyboard.png \
+	$(PATH_BUILD_RES)/drawable-xhdpi/ic_action_keyboard.png \
+	$(PATH_BUILD_RES)/drawable-xxhdpi/ic_action_keyboard.png
 
 DIST_ANDROID_MK = $(PATH_DIST)/jni/Android.mk
 DIST_BUILD_XML = $(PATH_DIST)/custom_rules.xml
@@ -49,9 +53,9 @@ $(PATH_BUILD)/libs/%: $(PATH_DIST)/libs/% | $(PATH_BUILD)
 	@$(MKDIR) -p $(@D)
 	$(CP) $< $@
 
-$(PATH_BUILD_ASSETS): $(DIST_FILES_THEMES) $(DIST_FILES_ENGINEDATA) $(DIST_FILES_SHADERS) $(DIST_BUILD_XML) | $(PATH_BUILD)
+$(PATH_BUILD_ASSETS): $(DIST_FILES_THEMES) $(DIST_FILES_ENGINEDATA) $(DIST_FILES_NETWORKING) $(DIST_FILES_VKEYBD) $(DIST_BUILD_XML) | $(PATH_BUILD)
 	$(INSTALL) -d $(PATH_BUILD_ASSETS)
-	$(INSTALL) -c -m 644 $(DIST_FILES_THEMES) $(DIST_FILES_ENGINEDATA) $(PATH_BUILD_ASSETS)/
+	$(INSTALL) -c -m 644 $(DIST_FILES_THEMES) $(DIST_FILES_ENGINEDATA) $(DIST_FILES_NETWORKING) $(DIST_FILES_VKEYBD) $(PATH_BUILD_ASSETS)/
 	$(INSTALL) -d $(PATH_BUILD)/jni
 	$(INSTALL) -c -m 644 $(DIST_ANDROID_MK) $(PATH_BUILD)/jni
 	$(INSTALL) -c -m 644 $(DIST_BUILD_XML) $(PATH_BUILD)

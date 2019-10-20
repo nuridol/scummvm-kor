@@ -67,10 +67,6 @@ int BdfFont::getMaxCharWidth() const {
 }
 
 int BdfFont::getCharWidth(uint32 chr) const {
-#ifdef SCUMMVMKOR
-	if (chr > 0xff)
-		return getKorFontWidth();
-#endif
 	// In case all font have the same advance value, we use the maximum.
 	if (!_data.advances)
 		return _data.maxAdvance;
@@ -115,12 +111,6 @@ int BdfFont::mapToIndex(uint32 ch) const {
 }
 
 void BdfFont::drawChar(Surface *dst, uint32 chr, const int tx, const int ty, const uint32 color) const {
-#ifdef SCUMMVMKOR
-	if (chr > 0xff) {
-		drawKorChar(dst, chr, tx, ty, color);
-		return;
-	}
-#endif
 	assert(dst != 0);
 
 	// TODO: Where is the relation between the max advance being smaller or
@@ -213,6 +203,9 @@ byte *loadCharacter(Common::SeekableReadStream &stream, int &encoding, int &adva
 
 	while (true) {
 		line = stream.readLine();
+		line.trim(); 	// BDF files created from unifont tools (make hex)
+						// have a rogue space character after the "BITMAP" label
+
 		if (stream.err() || stream.eos()) {
 			warning("BdfFont::loadCharacter: Premature end of file");
 			delete[] bitmap;
@@ -247,7 +240,7 @@ byte *loadCharacter(Common::SeekableReadStream &stream, int &encoding, int &adva
 		} else if (line.hasPrefix("BBX ")) {
 			int width, height, xOffset, yOffset;
 			if (sscanf(line.c_str(), "BBX %d %d %d %d",
-					   &width, &height, &xOffset, &yOffset) != 4) {
+			           &width, &height, &xOffset, &yOffset) != 4) {
 				warning("BdfFont::loadCharacter: Invalid BBX");
 				delete[] bitmap;
 				return 0;
@@ -329,7 +322,7 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 		if (line.hasPrefix("FONTBOUNDINGBOX ")) {
 			int width, height, xOffset, yOffset;
 			if (sscanf(line.c_str(), "FONTBOUNDINGBOX %d %d %d %d",
-					   &width, &height, &xOffset, &yOffset) != 4) {
+			           &width, &height, &xOffset, &yOffset) != 4) {
 				warning("BdfFont::loadFont: Invalid FONTBOUNDINGBOX");
 				freeBitmaps(bitmaps, font.numCharacters);
 				delete[] bitmaps;
@@ -421,8 +414,8 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 				boxes[encoding] = box;
 			}
 		} else if (line.hasPrefix("FAMILY_NAME \"")) {
-			familyName = new char[line.size()]; // We will definitely fit here
-			Common::strlcpy(familyName, &line.c_str()[13], line.size());
+			familyName = new char[line.size()];
+			Common::strlcpy(familyName, line.c_str() + 13, line.size() - 12);	// strlcpy() copies at most size-1 characters and then add a '\0'
 			char *p = &familyName[strlen(familyName)];
 			while (p != familyName && *p != '"')
 				p--;
@@ -438,8 +431,8 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 			}
 			*p = '\0'; // Remove last quote
 		} else if (line.hasPrefix("SLANT \"")) {
-			slant = new char[line.size()]; // We will definitely fit here
-			Common::strlcpy(slant, &line.c_str()[7], line.size());
+			slant = new char[line.size()];
+			Common::strlcpy(slant, line.c_str() + 7, line.size() - 6);  // strlcpy() copies at most size-1 characters and then add a '\0'
 			char *p = &slant[strlen(slant)];
 			while (p != slant && *p != '"')
 				p--;
@@ -498,9 +491,9 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 
 		const BdfBoundingBox &bbox = font.boxes[i];
 		if (bbox.width != font.defaultBox.width
-			|| bbox.height != font.defaultBox.height
-			|| bbox.xOffset != font.defaultBox.xOffset
-			|| bbox.yOffset != font.defaultBox.yOffset)
+		    || bbox.height != font.defaultBox.height
+		    || bbox.xOffset != font.defaultBox.xOffset
+		    || bbox.yOffset != font.defaultBox.yOffset)
 			hasFixedBBox = false;
 	}
 
@@ -528,7 +521,7 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 
 	// Adapt for the fact that we never use encoding 0.
 	if (font.defaultCharacter < firstCharacter
-		|| font.defaultCharacter > lastCharacter)
+	    || font.defaultCharacter > lastCharacter)
 		font.defaultCharacter = -1;
 
 	font.firstCharacter = firstCharacter;
@@ -735,8 +728,8 @@ BdfFont *BdfFont::scaleFont(BdfFont *src, int newSize) {
 	data.firstCharacter = src->_data.firstCharacter;
 	data.defaultCharacter = src->_data.defaultCharacter;
 	data.numCharacters = src->_data.numCharacters;
-	data.familyName = strdup(src->_data.familyName);
-	data.slant = strdup(src->_data.slant);
+	data.familyName = scumm_strdup(src->_data.familyName);
+	data.slant = scumm_strdup(src->_data.slant);
 
 	BdfBoundingBox *boxes = new BdfBoundingBox[data.numCharacters];
 	for (int i = 0; i < data.numCharacters; ++i) {

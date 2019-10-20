@@ -24,9 +24,9 @@
 #define SCUMM_IMUSE_INTERNAL
 
 #include "common/scummsys.h"
+#include "common/serializer.h"
 #include "scumm/imuse/imuse.h"
 #include "scumm/imuse/instrument.h"
-#include "scumm/saveload.h"
 #include "audio/mididrv.h"
 
 class MidiParser;
@@ -106,7 +106,15 @@ struct HookDatas {
 
 	int query_param(int param, byte chan);
 	int set(byte cls, byte value, byte chan);
-	HookDatas() { memset(this, 0, sizeof(HookDatas)); }
+	HookDatas() { reset(); }
+	void reset() {
+		_transpose = 0;
+		memset(_jump, 0, sizeof(_jump));
+		memset(_part_onoff, 0, sizeof(_part_onoff));
+		memset(_part_volume, 0, sizeof(_part_volume));
+		memset(_part_program, 0, sizeof(_part_program));
+		memset(_part_transpose, 0, sizeof(_part_transpose));
+	}
 };
 
 struct ParameterFader {
@@ -153,7 +161,7 @@ struct CommandQueue {
 //
 //////////////////////////////////////////////////
 
-class Player : public MidiDriver_BASE {
+class Player : public MidiDriver_BASE, public Common::Serializable {
 	/*
 	 * External SysEx handler functions shall each be defined in
 	 * a separate file. This header file shall be included at the
@@ -211,9 +219,7 @@ protected:
 	// Player part
 	void hook_clear();
 	void uninit_parts();
-	byte *parse_midi(byte *s);
 	void part_set_transpose(uint8 chan, byte relative, int8 b);
-	void parse_sysex(byte *p, uint len);
 	void maybe_jump(byte cmd, uint track, uint beat, uint tick);
 	void maybe_set_transpose(byte *data);
 	void maybe_part_onoff(byte *data);
@@ -232,7 +238,6 @@ protected:
 	// Sequencer part
 	int start_seq_sound(int sound, bool reset_vars = true);
 	void loadStartParameters(int sound);
-	int query_param(int param);
 
 public:
 	IMuseInternal *_se;
@@ -267,7 +272,7 @@ public:
 	void onTimer();
 	void removePart(Part *part);
 	int scan(uint totrack, uint tobeat, uint totick);
-	void saveLoadWithSerializer(Serializer *ser);
+	void saveLoadWithSerializer(Common::Serializer &ser);
 	int setHook(byte cls, byte value, byte chan) { return _hook.set(cls, value, chan); }
 	void setDetune(int detune);
 	void setOffsetNote(int offset);
@@ -295,7 +300,7 @@ public:
 //
 //////////////////////////////////////////////////
 
-struct Part : public Serializable {
+struct Part : public Common::Serializable {
 	IMuseInternal *_se;
 	int _slot;
 	Part *_next, *_prev;
@@ -344,7 +349,6 @@ struct Part : public Serializable {
 	void off();
 	void set_instrument(uint b);
 	void set_instrument(byte *data);
-	void set_instrument_pcspk(byte *data);
 	void load_global_instrument(byte b);
 
 	void set_transpose(int8 transpose);
@@ -360,10 +364,11 @@ struct Part : public Serializable {
 
 	Part();
 
-	void saveLoadWithSerializer(Serializer *ser);
+	void saveLoadWithSerializer(Common::Serializer &ser);
 
 private:
 	void sendPitchBend();
+	void sendTranspose();
 	void sendPanPosition(uint8 value);
 	void sendEffectLevel(uint8 value);
 };
@@ -391,6 +396,7 @@ class IMuseInternal : public IMuse {
 protected:
 	bool _native_mt32;
 	bool _enable_gs;
+	bool _isAmiga;
 	MidiDriver *_midi_adlib;
 	MidiDriver *_midi_native;
 	TimerCallbackInfo _timer_info_adlib;
@@ -493,7 +499,6 @@ protected:
 	int set_volchan_entry(uint a, uint b);
 	int set_channel_volume(uint chan, uint vol);
 	void update_volumes();
-	void reset_tick();
 
 	int set_volchan(int sound, int volchan);
 
@@ -518,7 +523,7 @@ protected:
 public:
 	// IMuse interface
 	void pause(bool paused);
-	int save_or_load(Serializer *ser, ScummEngine *scumm, bool fixAfterLoad = true);
+	void saveLoadIMuse(Common::Serializer &ser, ScummEngine *scumm, bool fixAfterLoad = true);
 	bool get_sound_active(int sound) const;
 	int32 doCommand(int numargs, int args[]);
 	uint32 property(int prop, uint32 value);

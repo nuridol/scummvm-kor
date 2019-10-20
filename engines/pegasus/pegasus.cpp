@@ -356,7 +356,7 @@ Common::Error PegasusEngine::showLoadDialog() {
 
 	Common::String gameId = ConfMan.get("gameid");
 
-	const EnginePlugin *plugin = 0;
+	const Plugin *plugin = nullptr;
 	EngineMan.findGame(gameId, &plugin);
 
 	int slot = slc.runModalWithPluginAndTarget(plugin, ConfMan.getActiveDomainName());
@@ -380,7 +380,7 @@ Common::Error PegasusEngine::showSaveDialog() {
 
 	Common::String gameId = ConfMan.get("gameid");
 
-	const EnginePlugin *plugin = 0;
+	const Plugin *plugin = nullptr;
 	EngineMan.findGame(gameId, &plugin);
 
 	int slot = slc.runModalWithPluginAndTarget(plugin, ConfMan.getActiveDomainName());
@@ -1279,6 +1279,7 @@ void PegasusEngine::showTempScreen(const Common::String &fileName) {
 			case Common::EVENT_LBUTTONUP:
 			case Common::EVENT_RBUTTONUP:
 			case Common::EVENT_KEYDOWN:
+			case Common::EVENT_JOYBUTTON_DOWN:
 				done = true;
 				break;
 			default:

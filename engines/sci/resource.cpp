@@ -31,6 +31,7 @@
 #include "common/memstream.h"
 #endif
 
+#include "sci/engine/workarounds.h"
 #include "sci/parser/vocabulary.h"
 #include "sci/resource.h"
 #include "sci/resource_intern.h"
@@ -224,10 +225,14 @@ void Resource::unalloc() {
 }
 
 void Resource::writeToStream(Common::WriteStream *stream) const {
-	stream->writeByte(getType() | 0x80); // 0x80 is required by old Sierra SCI, otherwise it wont accept the patch file
-	stream->writeByte(_headerSize);
-	if (_headerSize > 0)
+	if (_headerSize == 0) {
+		// create patch file header
+		stream->writeByte(getType() | 0x80); // 0x80 is required by old Sierra SCI, otherwise it wont accept the patch file
+		stream->writeByte(_headerSize);
+	} else {
+		// use existing patch file header
 		stream->write(_header, _headerSize);
+	}
 	stream->write(_data, _size);
 }
 
@@ -592,22 +597,9 @@ void ResourceSource::loadResource(ResourceManager *resMan, Resource *res) {
 	if (!fileStream)
 		return;
 
-#ifdef SCUMMVMKOR
-	fileStream->seek(0, SEEK_SET);
-	ResourceType type = resMan->convertResType(fileStream->readByte());
-	ResVersion volVersion = resMan->getVolVersion();
-
-	// FIXME: if resource.msg has different version from SCIII, this has to be modified.
-	if (((type == kResourceTypeMessage && res->getType() == kResourceTypeMessage) || (type == kResourceTypeText && res->getType() == kResourceTypeText)) && g_sci->getLanguage() == Common::KO_KOR)
-		volVersion = kResVersionSci11;
-	fileStream->seek(res->_fileOffset, SEEK_SET);
-	
-	int error = res->decompress(volVersion, fileStream);
-#else
 	fileStream->seek(res->_fileOffset, SEEK_SET);
 
 	int error = res->decompress(resMan->getVolVersion(), fileStream);
-#endif
 	if (error) {
 		warning("Error %d occurred while reading %s from resource file %s: %s",
 				error, res->_id.toString().c_str(), res->getResourceLocation().c_str(),
@@ -850,12 +842,7 @@ void DirectoryResourceSource::scanSource(ResourceManager *resMan) {
 }
 
 void ExtMapResourceSource::scanSource(ResourceManager *resMan) {
-#ifdef SCUMMVMKOR
-	if (resMan->_mapVersion < kResVersionSci1Late &&
-	    !(getLocationName() == "message.map" && g_sci->getLanguage() == Common::KO_KOR)) {
-#else
 	if (resMan->_mapVersion < kResVersionSci1Late) {
-#endif
 		if (resMan->readResourceMapSCI0(this) != SCI_ERROR_NONE) {
 			resMan->_hasBadResources = true;
 		}
@@ -1148,6 +1135,12 @@ Common::List<ResourceId> ResourceManager::listResources(ResourceType type, int m
 }
 
 Resource *ResourceManager::findResource(ResourceId id, bool lock) {
+	// remap known incorrect audio36 and sync36 resource ids
+	if (id.getType() == kResourceTypeAudio36) {
+		id = remapAudio36ResourceId(id);
+	} else if (id.getType() == kResourceTypeSync36) {
+		id = remapSync36ResourceId(id);
+	}
 	Resource *retval = testResource(id);
 
 	if (!retval)
@@ -1631,7 +1624,7 @@ void ResourceManager::readResourcePatchesBase36() {
 			SearchMan.listMatchingMembers(files, "A???????.???");
 			SearchMan.listMatchingMembers(files, "B???????.???");
 		} else {
-			SearchMan.listMatchingMembers(files, "#???????.???");
+			SearchMan.listMatchingMembers(files, "\\#???????.???");
 #ifdef ENABLE_SCI32
 			SearchMan.listMatchingMembers(files, "S???????.???");
 			SearchMan.listMatchingMembers(files, "T???????.???");
@@ -1644,7 +1637,8 @@ void ResourceManager::readResourcePatchesBase36() {
 
 			// The S/T prefixes often conflict with non-patch files and generate
 			// spurious warnings about invalid patches
-			if (name.hasSuffix(".DLL") || name.hasSuffix(".EXE") || name.hasSuffix(".TXT") || name.hasSuffix(".OLD") || name.hasSuffix(".WIN") || name.hasSuffix(".DOS")) {
+			if (name.hasSuffix(".DLL") || name.hasSuffix(".EXE") || name.hasSuffix(".TXT") || name.hasSuffix(".OLD") || name.hasSuffix(".WIN") || name.hasSuffix(".DOS") ||
+				name.hasSuffix(".HLP") || name.hasSuffix(".DRV")) {
 				continue;
 			}
 
@@ -1849,10 +1843,6 @@ int ResourceManager::readResourceMapSCI1(ResourceSource *map) {
 	memset(resMap, 0, sizeof(resource_index_t) * 32);
 	byte type = 0, prevtype = 0;
 	byte nEntrySize = _mapVersion == kResVersionSci11 ? SCI11_RESMAP_ENTRIES_SIZE : SCI1_RESMAP_ENTRIES_SIZE;
-#ifdef SCUMMVMKOR
-	if (map->getLocationName() == "message.map" && g_sci->getLanguage() == Common::KO_KOR)
-		nEntrySize = SCI1_RESMAP_ENTRIES_SIZE;
-#endif
 	ResourceId resId;
 
 	// Read resource type and offsets to resource offsets block from .MAP file
@@ -1880,11 +1870,7 @@ int ResourceManager::readResourceMapSCI1(ResourceSource *map) {
 		for (int i = 0; i < resMap[type].wSize; i++) {
 			uint16 number = fileStream->readUint16LE();
 			int volume_nr = 0;
-#ifdef SCUMMVMKOR
-			if (_mapVersion == kResVersionSci11 && !(map->getLocationName() == "message.map" && g_sci->getLanguage() == Common::KO_KOR)) {
-#else
 			if (_mapVersion == kResVersionSci11) {
-#endif
 				// offset stored in 3 bytes
 				fileOffset = fileStream->readUint16LE();
 				fileOffset |= fileStream->readByte() << 16;
@@ -1892,11 +1878,7 @@ int ResourceManager::readResourceMapSCI1(ResourceSource *map) {
 			} else {
 				// offset/volume stored in 4 bytes
 				fileOffset = fileStream->readUint32LE();
-#ifdef SCUMMVMKOR
-				if (_mapVersion < kResVersionSci11 && !(map->getLocationName() == "message.map" && g_sci->getLanguage() == Common::KO_KOR)) {
-#else
 				if (_mapVersion < kResVersionSci11) {
-#endif
 					volume_nr = fileOffset >> 28; // most significant 4 bits
 					fileOffset &= 0x0FFFFFFF;     // least significant 28 bits
 				} else {
@@ -2095,7 +2077,11 @@ bool ResourceManager::validateResource(const ResourceId &resourceId, const Commo
 
 Resource *ResourceManager::addResource(ResourceId resId, ResourceSource *src, uint32 offset, uint32 size, const Common::String &sourceMapLocation) {
 	// Adding new resource only if it does not exist
-	if (_resMap.contains(resId) == false) {
+	// Hoyle 4 contains each audio resource twice. The first file is in an unknown
+	// format and only static sounds are heard when it's played. The second file
+	// is a typical SOL audio file. We therefore skip the first audio file and add
+	// second one for this game.
+	if (_resMap.contains(resId) == false || (resId.getType() == kResourceTypeAudio && g_sci && g_sci->getGameId() == GID_HOYLE4)) {
 		return updateResource(resId, src, offset, size, sourceMapLocation);
 	} else {
 		return _resMap.getVal(resId);
@@ -2128,7 +2114,12 @@ Resource *ResourceManager::updateResource(ResourceId resId, ResourceSource *src,
 		return res;
 	}
 
-	if (validateResource(resId, sourceMapLocation, src->getLocationName(), offset, size, volumeFile->size())) {
+	// Resources from MacResourceForkResourceSource do not have a source size
+	// since the source "volume file" is the empty data fork, and they don't
+	// have an offset either since the MacResManager handles this, so trying to
+	// validate these resources using the normal validation would always fail
+	if (src->getSourceType() == kSourceMacResourceFork ||
+		validateResource(resId, sourceMapLocation, src->getLocationName(), offset, size, volumeFile->size())) {
 		if (res == nullptr) {
 			res = new Resource(this, resId);
 			_resMap.setVal(resId, res);
@@ -2948,6 +2939,9 @@ Common::String ResourceManager::findSierraGameId(const bool isBE) {
 		heap = findResource(ResourceId(kResourceTypeScript, 0), false);
 
 		Resource *vocab = findResource(ResourceId(kResourceTypeVocab, VOCAB_RESOURCE_SELECTORS), false);
+		if (!vocab)
+			return "";
+
 		const uint16 numSelectors = isBE ? vocab->getUint16BEAt(0) : vocab->getUint16LEAt(0);
 		for (uint16 i = 0; i < numSelectors; ++i) {
 			uint16 selectorOffset;

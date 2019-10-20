@@ -39,206 +39,10 @@
 // for the Android port
 #define FORBIDDEN_SYMBOL_EXCEPTION_printf
 
-#include "common/events.h"
-
 #include "backends/platform/android/android.h"
+#include "backends/platform/android/graphics.h"
+#include "backends/platform/android/events.h"
 #include "backends/platform/android/jni.h"
-
-// $ANDROID_NDK/platforms/android-9/arch-arm/usr/include/android/keycodes.h
-// http://android.git.kernel.org/?p=platform/frameworks/base.git;a=blob;f=libs/ui/Input.cpp
-// http://android.git.kernel.org/?p=platform/frameworks/base.git;a=blob;f=core/java/android/view/KeyEvent.java
-
-// event type
-enum {
-	JE_SYS_KEY = 0,
-	JE_KEY = 1,
-	JE_DPAD = 2,
-	JE_DOWN = 3,
-	JE_SCROLL = 4,
-	JE_TAP = 5,
-	JE_DOUBLE_TAP = 6,
-	JE_MULTI = 7,
-	JE_BALL = 8,
-	JE_LMB_DOWN = 9,
-	JE_LMB_UP = 10,
-	JE_RMB_DOWN = 11,
-	JE_RMB_UP = 12,
-	JE_MOUSE_MOVE = 13,
-	JE_GAMEPAD = 14,
-	JE_JOYSTICK = 15,
-	JE_MMB_DOWN = 16,
-	JE_MMB_UP = 17,
-	JE_QUIT = 0x1000
-};
-
-// action type
-enum {
-	JACTION_DOWN = 0,
-	JACTION_UP = 1,
-	JACTION_MULTIPLE = 2,
-	JACTION_POINTER_DOWN = 5,
-	JACTION_POINTER_UP = 6
-};
-
-// system keys
-enum {
-	JKEYCODE_SOFT_RIGHT = 2,
-	JKEYCODE_HOME = 3,
-	JKEYCODE_BACK = 4,
-	JKEYCODE_CALL = 5,
-	JKEYCODE_ENDCALL = 6,
-	JKEYCODE_VOLUME_UP = 24,
-	JKEYCODE_VOLUME_DOWN = 25,
-	JKEYCODE_POWER = 26,
-	JKEYCODE_CAMERA = 27,
-	JKEYCODE_HEADSETHOOK = 79,
-	JKEYCODE_FOCUS = 80,
-	JKEYCODE_MENU = 82,
-	JKEYCODE_SEARCH = 84,
-	JKEYCODE_MUTE = 91,
-	JKEYCODE_MEDIA_PLAY_PAUSE = 85,
-	JKEYCODE_MEDIA_STOP = 86,
-	JKEYCODE_MEDIA_NEXT = 87,
-	JKEYCODE_MEDIA_PREVIOUS = 88,
-	JKEYCODE_MEDIA_REWIND = 89,
-	JKEYCODE_MEDIA_FAST_FORWARD = 90,
-	JKEYCODE_MEDIA_PLAY = 126,
-	JKEYCODE_MEDIA_PAUSE = 127
-};
-
-// five-way navigation control
-enum {
-	JKEYCODE_DPAD_UP = 19,
-	JKEYCODE_DPAD_DOWN = 20,
-	JKEYCODE_DPAD_LEFT = 21,
-	JKEYCODE_DPAD_RIGHT = 22,
-	JKEYCODE_DPAD_CENTER = 23
-};
-
-// gamepad
-enum {
-	JKEYCODE_BUTTON_A = 96,
-	JKEYCODE_BUTTON_B = 97,
-	JKEYCODE_BUTTON_C = 98,
-	JKEYCODE_BUTTON_X = 99,
-	JKEYCODE_BUTTON_Y = 100,
-	JKEYCODE_BUTTON_Z = 101,
-	JKEYCODE_BUTTON_L1 = 102,
-	JKEYCODE_BUTTON_R1 = 103,
-	JKEYCODE_BUTTON_L2 = 104,
-	JKEYCODE_BUTTON_R2 = 105,
-	JKEYCODE_BUTTON_THUMBL = 106,
-	JKEYCODE_BUTTON_THUMBR = 107,
-	JKEYCODE_BUTTON_START = 108,
-	JKEYCODE_BUTTON_SELECT = 109,
-	JKEYCODE_BUTTON_MODE = 110,
-};
-
-// meta modifier
-enum {
-	JMETA_SHIFT = 0x01,
-	JMETA_ALT = 0x02,
-	JMETA_SYM = 0x04,
-	JMETA_CTRL = 0x1000
-};
-
-// map android key codes to our kbd codes
-static const Common::KeyCode jkeymap[] = {
-	Common::KEYCODE_INVALID, // KEYCODE_UNKNOWN
-	Common::KEYCODE_INVALID, // KEYCODE_SOFT_LEFT
-	Common::KEYCODE_INVALID, // KEYCODE_SOFT_RIGHT
-	Common::KEYCODE_INVALID, // KEYCODE_HOME
-	Common::KEYCODE_INVALID, // KEYCODE_BACK
-	Common::KEYCODE_INVALID, // KEYCODE_CALL
-	Common::KEYCODE_INVALID, // KEYCODE_ENDCALL
-	Common::KEYCODE_0, // KEYCODE_0
-	Common::KEYCODE_1, // KEYCODE_1
-	Common::KEYCODE_2, // KEYCODE_2
-	Common::KEYCODE_3, // KEYCODE_3
-	Common::KEYCODE_4, // KEYCODE_4
-	Common::KEYCODE_5, // KEYCODE_5
-	Common::KEYCODE_6, // KEYCODE_6
-	Common::KEYCODE_7, // KEYCODE_7
-	Common::KEYCODE_8, // KEYCODE_8
-	Common::KEYCODE_9, // KEYCODE_9
-	Common::KEYCODE_ASTERISK, // KEYCODE_STAR
-	Common::KEYCODE_HASH, // KEYCODE_POUND
-	Common::KEYCODE_INVALID, // KEYCODE_DPAD_UP
-	Common::KEYCODE_INVALID, // KEYCODE_DPAD_DOWN
-	Common::KEYCODE_INVALID, // KEYCODE_DPAD_LEFT
-	Common::KEYCODE_INVALID, // KEYCODE_DPAD_RIGHT
-	Common::KEYCODE_INVALID, // KEYCODE_DPAD_CENTER
-	Common::KEYCODE_INVALID, // KEYCODE_VOLUME_UP
-	Common::KEYCODE_INVALID, // KEYCODE_VOLUME_DOWN
-	Common::KEYCODE_INVALID, // KEYCODE_POWER
-	Common::KEYCODE_INVALID, // KEYCODE_CAMERA
-	Common::KEYCODE_INVALID, // KEYCODE_CLEAR
-	Common::KEYCODE_a, // KEYCODE_A
-	Common::KEYCODE_b, // KEYCODE_B
-	Common::KEYCODE_c, // KEYCODE_C
-	Common::KEYCODE_d, // KEYCODE_D
-	Common::KEYCODE_e, // KEYCODE_E
-	Common::KEYCODE_f, // KEYCODE_F
-	Common::KEYCODE_g, // KEYCODE_G
-	Common::KEYCODE_h, // KEYCODE_H
-	Common::KEYCODE_i, // KEYCODE_I
-	Common::KEYCODE_j, // KEYCODE_J
-	Common::KEYCODE_k, // KEYCODE_K
-	Common::KEYCODE_l, // KEYCODE_L
-	Common::KEYCODE_m, // KEYCODE_M
-	Common::KEYCODE_n, // KEYCODE_N
-	Common::KEYCODE_o, // KEYCODE_O
-	Common::KEYCODE_p, // KEYCODE_P
-	Common::KEYCODE_q, // KEYCODE_Q
-	Common::KEYCODE_r, // KEYCODE_R
-	Common::KEYCODE_s, // KEYCODE_S
-	Common::KEYCODE_t, // KEYCODE_T
-	Common::KEYCODE_u, // KEYCODE_U
-	Common::KEYCODE_v, // KEYCODE_V
-	Common::KEYCODE_w, // KEYCODE_W
-	Common::KEYCODE_x, // KEYCODE_X
-	Common::KEYCODE_y, // KEYCODE_Y
-	Common::KEYCODE_z, // KEYCODE_Z
-	Common::KEYCODE_COMMA, // KEYCODE_COMMA
-	Common::KEYCODE_PERIOD, // KEYCODE_PERIOD
-	Common::KEYCODE_LALT, // KEYCODE_ALT_LEFT
-	Common::KEYCODE_RALT, // KEYCODE_ALT_RIGHT
-	Common::KEYCODE_LSHIFT, // KEYCODE_SHIFT_LEFT
-	Common::KEYCODE_RSHIFT, // KEYCODE_SHIFT_RIGHT
-	Common::KEYCODE_TAB, // KEYCODE_TAB
-	Common::KEYCODE_SPACE, // KEYCODE_SPACE
-	Common::KEYCODE_LCTRL, // KEYCODE_SYM
-	Common::KEYCODE_INVALID, // KEYCODE_EXPLORER
-	Common::KEYCODE_INVALID, // KEYCODE_ENVELOPE
-	Common::KEYCODE_RETURN, // KEYCODE_ENTER
-	Common::KEYCODE_BACKSPACE, // KEYCODE_DEL
-	Common::KEYCODE_BACKQUOTE, // KEYCODE_GRAVE
-	Common::KEYCODE_MINUS, // KEYCODE_MINUS
-	Common::KEYCODE_EQUALS, // KEYCODE_EQUALS
-	Common::KEYCODE_LEFTPAREN, // KEYCODE_LEFT_BRACKET
-	Common::KEYCODE_RIGHTPAREN, // KEYCODE_RIGHT_BRACKET
-	Common::KEYCODE_BACKSLASH, // KEYCODE_BACKSLASH
-	Common::KEYCODE_SEMICOLON, // KEYCODE_SEMICOLON
-	Common::KEYCODE_QUOTE, // KEYCODE_APOSTROPHE
-	Common::KEYCODE_SLASH, // KEYCODE_SLASH
-	Common::KEYCODE_AT, // KEYCODE_AT
-	Common::KEYCODE_INVALID, // KEYCODE_NUM
-	Common::KEYCODE_INVALID, // KEYCODE_HEADSETHOOK
-	Common::KEYCODE_INVALID, // KEYCODE_FOCUS
-	Common::KEYCODE_PLUS, // KEYCODE_PLUS
-	Common::KEYCODE_INVALID, // KEYCODE_MENU
-	Common::KEYCODE_INVALID, // KEYCODE_NOTIFICATION
-	Common::KEYCODE_INVALID, // KEYCODE_SEARCH
-	Common::KEYCODE_INVALID, // KEYCODE_MEDIA_PLAY_PAUSE
-	Common::KEYCODE_INVALID, // KEYCODE_MEDIA_STOP
-	Common::KEYCODE_INVALID, // KEYCODE_MEDIA_NEXT
-	Common::KEYCODE_INVALID, // KEYCODE_MEDIA_PREVIOUS
-	Common::KEYCODE_INVALID, // KEYCODE_MEDIA_REWIND
-	Common::KEYCODE_INVALID, // KEYCODE_MEDIA_FAST_FORWARD
-	Common::KEYCODE_INVALID, // KEYCODE_MUTE
-	Common::KEYCODE_PAGEUP, // KEYCODE_PAGE_UP
-	Common::KEYCODE_PAGEDOWN // KEYCODE_PAGE_DOWN
-};
 
 // floating point. use sparingly
 template<class T>
@@ -273,73 +77,8 @@ void OSystem_Android::setupKeymapper() {
 #endif
 }
 
-void OSystem_Android::warpMouse(int x, int y) {
-	ENTER("%d, %d", x, y);
-
-	Common::Event e;
-
-	e.type = Common::EVENT_MOUSEMOVE;
-	e.mouse.x = x;
-	e.mouse.y = y;
-
-	clipMouse(e.mouse);
-
-	lockMutex(_event_queue_lock);
-	_event_queue.push(e);
-	unlockMutex(_event_queue_lock);
-}
-
-void OSystem_Android::clipMouse(Common::Point &p) {
-	const GLESBaseTexture *tex;
-
-	if (_show_overlay)
-		tex = _overlay_texture;
-	else
-		tex = _game_texture;
-
-	p.x = CLIP(p.x, int16(0), int16(tex->width() - 1));
-	p.y = CLIP(p.y, int16(0), int16(tex->height() - 1));
-}
-
-void OSystem_Android::scaleMouse(Common::Point &p, int x, int y,
-									bool deductDrawRect, bool touchpadMode) {
-	const GLESBaseTexture *tex;
-
-	if (_show_overlay)
-		tex = _overlay_texture;
-	else
-		tex = _game_texture;
-
-	const Common::Rect &r = tex->getDrawRect();
-
-	if (touchpadMode) {
-		x = x * 100 / _touchpad_scale;
-		y = y * 100 / _touchpad_scale;
-	}
-
-	if (deductDrawRect) {
-		x -= r.left;
-		y -= r.top;
-	}
-
-	p.x = scalef(x, tex->width(), r.width());
-	p.y = scalef(y, tex->height(), r.height());
-}
-
-void OSystem_Android::updateEventScale() {
-	const GLESBaseTexture *tex;
-
-	if (_show_overlay)
-		tex = _overlay_texture;
-	else
-		tex = _game_texture;
-
-	_eventScaleY = 100 * 480 / tex->height();
-	_eventScaleX = 100 * 640 / tex->width();
-}
-
 void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
-								int arg4, int arg5) {
+								int arg4, int arg5, int arg6) {
 	Common::Event e;
 
 	switch (type) {
@@ -376,9 +115,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		case JKEYCODE_MENU:
 			e.type = Common::EVENT_MAINMENU;
 
-			lockMutex(_event_queue_lock);
-			_event_queue.push(e);
-			unlockMutex(_event_queue_lock);
+			pushEvent(e);
 
 			return;
 
@@ -388,9 +125,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 			if (arg1 == JACTION_DOWN) {
 				e.type = Common::EVENT_MAINMENU;
 
-				lockMutex(_event_queue_lock);
-				_event_queue.push(e);
-				unlockMutex(_event_queue_lock);
+				pushEvent(e);
 			}
 
 			return;
@@ -402,11 +137,9 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 			else
 				e.type = Common::EVENT_RBUTTONUP;
 
-			e.mouse = getEventManager()->getMousePos();
+			e.mouse = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
 
-			lockMutex(_event_queue_lock);
-			_event_queue.push(e);
-			unlockMutex(_event_queue_lock);
+			pushEvent(e);
 
 			return;
 
@@ -514,9 +247,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		if (arg4 & (JMETA_SYM | JMETA_CTRL))
 			e.kbd.flags |= Common::KBD_CTRL;
 
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
@@ -531,7 +262,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 
 			e.type = Common::EVENT_MOUSEMOVE;
 
-			e.mouse = getEventManager()->getMousePos();
+			e.mouse = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
 
 			{
 				int16 *c;
@@ -555,11 +286,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 					*c += f;
 			}
 
-			clipMouse(e.mouse);
-
-			lockMutex(_event_queue_lock);
-			_event_queue.push(e);
-			unlockMutex(_event_queue_lock);
+			pushEvent(e);
 
 			return;
 
@@ -576,17 +303,15 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 				return;
 			}
 
-			e.mouse = getEventManager()->getMousePos();
+			e.mouse = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
 
-			lockMutex(_event_queue_lock);
-			_event_queue.push(e);
-			unlockMutex(_event_queue_lock);
+			pushEvent(e);
 
 			return;
 		}
 
 	case JE_DOWN:
-		_touch_pt_down = getEventManager()->getMousePos();
+		_touch_pt_down = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
 		_touch_pt_scroll.x = -1;
 		_touch_pt_scroll.y = -1;
 		break;
@@ -601,18 +326,16 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 				return;
 			}
 
-			scaleMouse(e.mouse, arg3 - _touch_pt_scroll.x,
-						arg4 - _touch_pt_scroll.y, false, true);
+			e.mouse.x = (arg3 - _touch_pt_scroll.x) * 100 / _touchpad_scale;
+			e.mouse.y = (arg4 - _touch_pt_scroll.y) * 100 / _touchpad_scale;
 			e.mouse += _touch_pt_down;
-			clipMouse(e.mouse);
+
 		} else {
-			scaleMouse(e.mouse, arg3, arg4);
-			clipMouse(e.mouse);
+			e.mouse.x = arg3;
+			e.mouse.y = arg4;
 		}
 
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
@@ -625,10 +348,10 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		e.type = Common::EVENT_MOUSEMOVE;
 
 		if (_touchpad_mode) {
-			e.mouse = getEventManager()->getMousePos();
+			e.mouse = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
 		} else {
-			scaleMouse(e.mouse, arg1, arg2);
-			clipMouse(e.mouse);
+			e.mouse.x = arg1;
+			e.mouse.y = arg2;
 		}
 
 		{
@@ -670,10 +393,10 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		e.type = Common::EVENT_MOUSEMOVE;
 
 		if (_touchpad_mode) {
-			e.mouse = getEventManager()->getMousePos();
+			e.mouse = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
 		} else {
-			scaleMouse(e.mouse, arg1, arg2);
-			clipMouse(e.mouse);
+			e.mouse.x = arg1;
+			e.mouse.y = arg2;
 		}
 
 		{
@@ -699,11 +422,9 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 				dptype = Common::EVENT_MOUSEMOVE;
 
 				if (_touchpad_mode) {
-					scaleMouse(e.mouse, arg1 - _touch_pt_dt.x,
-								arg2 - _touch_pt_dt.y, false, true);
+					e.mouse.x = (arg1 - _touch_pt_dt.x) * 100 / _touchpad_scale;
+					e.mouse.y = (arg2 - _touch_pt_dt.y) * 100 / _touchpad_scale;
 					e.mouse += _touch_pt_down;
-
-					clipMouse(e.mouse);
 				}
 
 				break;
@@ -750,7 +471,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 					return;
 				}
 
-				e.mouse = getEventManager()->getMousePos();
+				e.mouse = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
 
 				lockMutex(_event_queue_lock);
 
@@ -775,7 +496,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		return;
 
 	case JE_BALL:
-		e.mouse = getEventManager()->getMousePos();
+		e.mouse = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
 
 		switch (arg1) {
 		case JACTION_DOWN:
@@ -791,77 +512,58 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 			e.mouse.x += arg2 * _trackball_scale / _eventScaleX;
 			e.mouse.y += arg3 * _trackball_scale / _eventScaleY;
 
-			clipMouse(e.mouse);
-
 			break;
 		default:
 			LOGE("unhandled jaction on system key: %d", arg1);
 			return;
 		}
 
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
 	case JE_MOUSE_MOVE:
 		e.type = Common::EVENT_MOUSEMOVE;
+		e.mouse.x = arg1;
+		e.mouse.y = arg2;
 
-		scaleMouse(e.mouse, arg1, arg2);
-		clipMouse(e.mouse);
-
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
 	case JE_LMB_DOWN:
 		e.type = Common::EVENT_LBUTTONDOWN;
+		e.mouse.x = arg1;
+		e.mouse.y = arg2;
 
-		scaleMouse(e.mouse, arg1, arg2);
-		clipMouse(e.mouse);
-
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
 	case JE_LMB_UP:
 		e.type = Common::EVENT_LBUTTONUP;
+		e.mouse.x = arg1;
+		e.mouse.y = arg2;
 
-		scaleMouse(e.mouse, arg1, arg2);
-		clipMouse(e.mouse);
-
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
 	case JE_RMB_DOWN:
 		e.type = Common::EVENT_RBUTTONDOWN;
+		e.mouse.x = arg1;
+		e.mouse.y = arg2;
 
-		scaleMouse(e.mouse, arg1, arg2);
-		clipMouse(e.mouse);
-
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
 	case JE_RMB_UP:
 		e.type = Common::EVENT_RBUTTONUP;
+		e.mouse.x = arg1;
+		e.mouse.y = arg2;
 
-		scaleMouse(e.mouse, arg1, arg2);
-		clipMouse(e.mouse);
-
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
@@ -894,7 +596,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 				break;
 			}
 
-			e.mouse = getEventManager()->getMousePos();
+			e.mouse = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
 
 			break;
 
@@ -912,14 +614,12 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 			return;
 		}
 
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		break;
 
 	case JE_JOYSTICK:
-		e.mouse = getEventManager()->getMousePos();
+		e.mouse = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
 
 		switch (arg1) {
 		case JACTION_MULTIPLE:
@@ -929,26 +629,20 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 			e.mouse.x += arg2 * _joystick_scale / _eventScaleX;
 			e.mouse.y += arg3 * _joystick_scale / _eventScaleY;
 
-			clipMouse(e.mouse);
-
 			break;
 		default:
 			LOGE("unhandled jaction on joystick: %d", arg1);
 			return;
 		}
 
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
 	case JE_MMB_DOWN:
 		e.type = Common::EVENT_MAINMENU;
 
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
@@ -960,9 +654,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 	case JE_QUIT:
 		e.type = Common::EVENT_QUIT;
 
-		lockMutex(_event_queue_lock);
-		_event_queue.push(e);
-		unlockMutex(_event_queue_lock);
+		pushEvent(e);
 
 		return;
 
@@ -978,29 +670,23 @@ bool OSystem_Android::pollEvent(Common::Event &event) {
 
 	if (pthread_self() == _main_thread) {
 		if (_screen_changeid != JNI::surface_changeid) {
+			_screen_changeid = JNI::surface_changeid;
+
 			if (JNI::egl_surface_width > 0 && JNI::egl_surface_height > 0) {
 				// surface changed
-				JNI::deinitSurface();
-				initSurface();
-				initViewport();
-				updateScreenRect();
-				updateEventScale();
-
-				// double buffered, flip twice
-				clearScreen(kClearUpdate, 2);
+				dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->deinitSurface();
+				dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->initSurface();
 
 				event.type = Common::EVENT_SCREEN_CHANGED;
 
 				return true;
 			} else {
 				// surface lost
-				deinitSurface();
+				dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->deinitSurface();
 			}
 		}
 
 		if (JNI::pause) {
-			deinitSurface();
-
 			LOGD("main thread going to sleep");
 			sem_wait(&JNI::pause_sem);
 			LOGD("main thread woke up");
@@ -1012,27 +698,37 @@ bool OSystem_Android::pollEvent(Common::Event &event) {
 	if (_queuedEventTime && (getMillis() > _queuedEventTime)) {
 		event = _queuedEvent;
 		_queuedEventTime = 0;
-		unlockMutex(_event_queue_lock);
-		return true;
-	}
-
-	if (_event_queue.empty()) {
+		// unlockMutex(_event_queue_lock);
+		// return true;
+	} else if (_event_queue.empty()) {
 		unlockMutex(_event_queue_lock);
 		return false;
+	} else {
+		event = _event_queue.pop();
 	}
-
-	event = _event_queue.pop();
 
 	unlockMutex(_event_queue_lock);
 
-	if (event.type == Common::EVENT_MOUSEMOVE) {
-		const Common::Point &m = getEventManager()->getMousePos();
-
-		if (m != event.mouse)
-			_force_redraw = true;
+	switch (event.type) {
+	case Common::EVENT_MOUSEMOVE:
+	case Common::EVENT_LBUTTONDOWN:
+	case Common::EVENT_LBUTTONUP:
+	case Common::EVENT_RBUTTONDOWN:
+	case Common::EVENT_RBUTTONUP:
+		if (_graphicsManager)
+			return dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->notifyMousePosition(event.mouse);
+		break;
+	default:
+		break;
 	}
 
 	return true;
+}
+
+void OSystem_Android::pushEvent(const Common::Event &event) {
+	lockMutex(_event_queue_lock);
+	_event_queue.push(event);
+	unlockMutex(_event_queue_lock);
 }
 
 #endif

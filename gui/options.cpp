@@ -38,6 +38,8 @@
 #include "common/textconsole.h"
 #include "common/translation.h"
 #include "common/updates.h"
+#include "common/util.h"
+#include "common/text-to-speech.h"
 
 #include "audio/mididrv.h"
 #include "audio/musicplugin.h"
@@ -50,7 +52,6 @@
 #ifdef USE_LIBCURL
 #include "backends/cloud/cloudmanager.h"
 #include "gui/downloaddialog.h"
-#include "gui/storagewizarddialog.h"
 #endif
 
 #ifdef USE_SDL_NET
@@ -80,7 +81,8 @@ enum {
 	kChooseThemeCmd			= 'chtf',
 	kUpdatesCheckCmd		= 'updc',
 	kKbdMouseSpeedChanged	= 'kmsc',
-	kJoystickDeadzoneChanged= 'jodc'
+	kJoystickDeadzoneChanged= 'jodc',
+	kGraphicsTabContainerReflowCmd = 'gtcr'
 };
 
 enum {
@@ -103,14 +105,18 @@ enum {
 
 #ifdef USE_CLOUD
 enum {
-	kConfigureStorageCmd = 'cfst',
-	kRefreshStorageCmd = 'rfst',
+	kSyncSavesStorageCmd = 'ssst',
 	kDownloadStorageCmd = 'dlst',
 	kRunServerCmd = 'rnsv',
 	kCloudTabContainerReflowCmd = 'ctcr',
 	kServerPortClearCmd = 'spcl',
 	kChooseRootDirCmd = 'chrp',
-	kRootPathClearCmd = 'clrp'
+	kRootPathClearCmd = 'clrp',
+	kConnectStorageCmd = 'Cnnt',
+	kOpenUrlStorageCmd = 'OpUr',
+	kPasteCodeStorageCmd = 'PsCd',
+	kDisconnectStorageCmd = 'DcSt',
+	kEnableStorageCmd = 'EnSt'
 };
 #endif
 
@@ -118,7 +124,7 @@ enum {
 	kApplyCmd = 'appl'
 };
 
-static const char *savePeriodLabels[] = { _s("Never"), _s("every 5 mins"), _s("every 10 mins"), _s("every 15 mins"), _s("every 30 mins"), 0 };
+static const char *savePeriodLabels[] = { _s("Never"), _s("Every 5 mins"), _s("Every 10 mins"), _s("Every 15 mins"), _s("Every 30 mins"), 0 };
 static const int savePeriodValues[] = { 0, 5 * 60, 10 * 60, 15 * 60, 30 * 60, -1 };
 // The keyboard mouse speed values range from 0 to 7 and correspond to speeds shown in the label
 // "10" (value 3) is the default speed corresponding to the speed before introduction of this control
@@ -154,6 +160,8 @@ void OptionsDialog::init() {
 	_gfxPopUpDesc = 0;
 	_renderModePopUp = 0;
 	_renderModePopUpDesc = 0;
+	_stretchPopUp = 0;
+	_stretchPopUpDesc = 0;
 	_fullscreenCheckbox = 0;
 	_filteringCheckbox = 0;
 	_aspectCheckbox = 0;
@@ -240,21 +248,17 @@ void OptionsDialog::build() {
 		}
 	}
 	if (g_system->hasFeature(OSystem::kFeatureKbdMouseSpeed)) {
-		if (ConfMan.hasKey("kbdmouse_speed", _domain)) {
-			int value =  ConfMan.getInt("kbdmouse_speed", _domain);
-			if (_kbdMouseSpeedSlider && value < ARRAYSIZE(kbdMouseSpeedLabels) - 1 && value >= 0) {
-				_kbdMouseSpeedSlider->setValue(value);
-				_kbdMouseSpeedLabel->setLabel(_(kbdMouseSpeedLabels[value]));
-			}
+		int value = ConfMan.getInt("kbdmouse_speed", _domain);
+		if (_kbdMouseSpeedSlider && value < ARRAYSIZE(kbdMouseSpeedLabels) - 1 && value >= 0) {
+			_kbdMouseSpeedSlider->setValue(value);
+			_kbdMouseSpeedLabel->setLabel(_(kbdMouseSpeedLabels[value]));
 		}
 	}
 	if (g_system->hasFeature(OSystem::kFeatureJoystickDeadzone)) {
-		if (ConfMan.hasKey("joystick_deadzone", _domain)) {
-			int value =  ConfMan.getInt("joystick_deadzone", _domain);
-			if (_joystickDeadzoneSlider != 0) {
-				_joystickDeadzoneSlider->setValue(value);
-				_joystickDeadzoneLabel->setValue(value);
-			}
+		int value = ConfMan.getInt("joystick_deadzone", _domain);
+		if (_joystickDeadzoneSlider != 0) {
+			_joystickDeadzoneSlider->setValue(value);
+			_joystickDeadzoneLabel->setValue(value);
 		}
 	}
 
@@ -289,13 +293,32 @@ void OptionsDialog::build() {
 			_renderModePopUp->setSelectedTag(sel);
 		}
 
-#ifdef GUI_ONLY_FULLSCREEN
-		_fullscreenCheckbox->setState(true);
-		_fullscreenCheckbox->setEnabled(false);
-#else // !GUI_ONLY_FULLSCREEN
+		_stretchPopUp->setSelected(0);
+
+		if (g_system->hasFeature(OSystem::kFeatureStretchMode)) {
+			if (ConfMan.hasKey("stretch_mode", _domain)) {
+				const OSystem::GraphicsMode *sm = g_system->getSupportedStretchModes();
+				Common::String stretchMode(ConfMan.get("stretch_mode", _domain));
+				int stretchCount = 1;
+				while (sm->name) {
+					stretchCount++;
+					if (scumm_stricmp(sm->name, stretchMode.c_str()) == 0)
+						_stretchPopUp->setSelected(stretchCount);
+					sm++;
+				}
+			}
+		} else {
+			_stretchPopUpDesc->setVisible(false);
+			_stretchPopUp->setVisible(false);
+		}
+
 		// Fullscreen setting
-		_fullscreenCheckbox->setState(ConfMan.getBool("fullscreen", _domain));
-#endif // GUI_ONLY_FULLSCREEN
+		if (g_system->hasFeature(OSystem::kFeatureFullscreenMode)) {
+			_fullscreenCheckbox->setState(ConfMan.getBool("fullscreen", _domain));
+		} else {
+			_fullscreenCheckbox->setState(true);
+			_fullscreenCheckbox->setEnabled(false);
+		}
 
 		// Filtering setting
 		if (g_system->hasFeature(OSystem::kFeatureFilteringMode))
@@ -474,11 +497,29 @@ void OptionsDialog::apply() {
 
 			if ((int32)_renderModePopUp->getSelectedTag() >= 0)
 				ConfMan.set("render_mode", Common::getRenderModeCode((Common::RenderMode)_renderModePopUp->getSelectedTag()), _domain);
+
+			isSet = false;
+			if ((int32)_stretchPopUp->getSelectedTag() >= 0) {
+				const OSystem::GraphicsMode *sm = g_system->getSupportedStretchModes();
+				while (sm->name) {
+					if (sm->id == (int)_stretchPopUp->getSelectedTag()) {
+						if (ConfMan.get("stretch_mode", _domain) != sm->name)
+							graphicsModeChanged = true;
+						ConfMan.set("stretch_mode", sm->name, _domain);
+						isSet = true;
+						break;
+					}
+					sm++;
+				}
+			}
+			if (!isSet)
+				ConfMan.removeKey("stretch_mode", _domain);
 		} else {
 			ConfMan.removeKey("fullscreen", _domain);
 			ConfMan.removeKey("filtering", _domain);
 			ConfMan.removeKey("aspect_ratio", _domain);
 			ConfMan.removeKey("gfx_mode", _domain);
+			ConfMan.removeKey("stretch_mode", _domain);
 			ConfMan.removeKey("render_mode", _domain);
 		}
 	}
@@ -488,6 +529,8 @@ void OptionsDialog::apply() {
 		g_system->beginGFXTransaction();
 		g_system->setGraphicsMode(ConfMan.get("gfx_mode", _domain).c_str());
 
+		if (ConfMan.hasKey("stretch_mode"))
+			g_system->setStretchMode(ConfMan.get("stretch_mode", _domain).c_str());
 		if (ConfMan.hasKey("aspect_ratio"))
 			g_system->setFeatureState(OSystem::kFeatureAspectRatioCorrection, ConfMan.getBool("aspect_ratio", _domain));
 		if (ConfMan.hasKey("fullscreen"))
@@ -523,7 +566,20 @@ void OptionsDialog::apply() {
 					gm++;
 				}
 				message += "\n";
-				message += _("the video mode could not be changed.");
+				message += _("the video mode could not be changed");
+			}
+
+			if (gfxError & OSystem::kTransactionStretchModeSwitchFailed) {
+				const OSystem::GraphicsMode *sm = g_system->getSupportedStretchModes();
+				while (sm->name) {
+					if (sm->id == g_system->getStretchMode()) {
+						ConfMan.set("stretch_mode", sm->name, _domain);
+						break;
+					}
+					sm++;
+				}
+				message += "\n";
+				message += _("the stretch mode could not be changed");
 			}
 
 			if (gfxError & OSystem::kTransactionAspectRatioFailed) {
@@ -713,12 +769,12 @@ void OptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data
 	switch (cmd) {
 	case kMidiGainChanged:
 		_midiGainLabel->setLabel(Common::String::format("%.2f", (double)_midiGainSlider->getValue() / 100.0));
-		_midiGainLabel->draw();
+		_midiGainLabel->markAsDirty();
 		break;
 	case kMusicVolumeChanged: {
 		const int newValue = _musicVolumeSlider->getValue();
 		_musicVolumeLabel->setValue(newValue);
-		_musicVolumeLabel->draw();
+		_musicVolumeLabel->markAsDirty();
 
 		if (_guioptions.contains(GUIO_LINKMUSICTOSFX)) {
 			updateSfxVolume(newValue);
@@ -733,7 +789,7 @@ void OptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data
 	case kSfxVolumeChanged: {
 		const int newValue = _sfxVolumeSlider->getValue();
 		_sfxVolumeLabel->setValue(_sfxVolumeSlider->getValue());
-		_sfxVolumeLabel->draw();
+		_sfxVolumeLabel->markAsDirty();
 
 		if (_guioptions.contains(GUIO_LINKMUSICTOSFX)) {
 			updateMusicVolume(newValue);
@@ -748,7 +804,7 @@ void OptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data
 	case kSpeechVolumeChanged: {
 		const int newValue = _speechVolumeSlider->getValue();
 		_speechVolumeLabel->setValue(newValue);
-		_speechVolumeLabel->draw();
+		_speechVolumeLabel->markAsDirty();
 
 		if (_guioptions.contains(GUIO_LINKSPEECHTOSFX)) {
 			updateSfxVolume(newValue);
@@ -772,20 +828,23 @@ void OptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data
 		break;
 	case kSubtitleSpeedChanged:
 		_subSpeedLabel->setValue(_subSpeedSlider->getValue());
-		_subSpeedLabel->draw();
+		_subSpeedLabel->markAsDirty();
 		break;
 	case kClearSoundFontCmd:
 		_soundFont->setLabel(_c("None", "soundfont"));
 		_soundFontClearButton->setEnabled(false);
-		draw();
+		g_gui.scheduleTopDialogRedraw();
 		break;
 	case kKbdMouseSpeedChanged:
 		_kbdMouseSpeedLabel->setLabel(_(kbdMouseSpeedLabels[_kbdMouseSpeedSlider->getValue()]));
-		_kbdMouseSpeedLabel->draw();
+		_kbdMouseSpeedLabel->markAsDirty();
 		break;
 	case kJoystickDeadzoneChanged:
 		_joystickDeadzoneLabel->setValue(_joystickDeadzoneSlider->getValue());
-		_joystickDeadzoneLabel->draw();
+		_joystickDeadzoneLabel->markAsDirty();
+		break;
+	case kGraphicsTabContainerReflowCmd:
+		setupGraphicsTab();
 		break;
 	case kApplyCmd:
 		apply();
@@ -809,14 +868,19 @@ void OptionsDialog::setGraphicSettingsState(bool enabled) {
 	_gfxPopUp->setEnabled(enabled);
 	_renderModePopUpDesc->setEnabled(enabled);
 	_renderModePopUp->setEnabled(enabled);
+	_stretchPopUpDesc->setEnabled(enabled);
+	_stretchPopUp->setEnabled(enabled);
 	_filteringCheckbox->setEnabled(enabled);
-#ifndef GUI_ENABLE_KEYSDIALOG
-	_fullscreenCheckbox->setEnabled(enabled);
+
+	if (g_system->hasFeature(OSystem::kFeatureFullscreenMode))
+		_fullscreenCheckbox->setEnabled(enabled);
+	else
+		_fullscreenCheckbox->setEnabled(false);
+
 	if (_guioptions.contains(GUIO_NOASPECT))
 		_aspectCheckbox->setEnabled(false);
 	else
 		_aspectCheckbox->setEnabled(enabled);
-#endif
 }
 
 void OptionsDialog::setAudioSettingsState(bool enabled) {
@@ -1016,6 +1080,18 @@ void OptionsDialog::addGraphicControls(GuiObject *boss, const Common::String &pr
 			_renderModePopUp->appendEntry(_c(rm->description, context), rm->id);
 	}
 
+	// The Stretch mode popup
+	const OSystem::GraphicsMode *sm = g_system->getSupportedStretchModes();
+	_stretchPopUpDesc = new StaticTextWidget(boss, prefix + "grStretchModePopupDesc", _("Stretch mode:"));
+	_stretchPopUp = new PopUpWidget(boss, prefix + "grStretchModePopup");
+
+	_stretchPopUp->appendEntry(_("<default>"));
+	_stretchPopUp->appendEntry("");
+	while (sm->name) {
+		_stretchPopUp->appendEntry(_c(sm->description, context), sm->id);
+		sm++;
+	}
+
 	// Fullscreen checkbox
 	_fullscreenCheckbox = new CheckboxWidget(boss, prefix + "grFullscreenCheckbox", _("Fullscreen mode"));
 
@@ -1031,18 +1107,18 @@ void OptionsDialog::addGraphicControls(GuiObject *boss, const Common::String &pr
 void OptionsDialog::addAudioControls(GuiObject *boss, const Common::String &prefix) {
 	// The MIDI mode popup & a label
 	if (g_system->getOverlayWidth() > 320)
-		_midiPopUpDesc = new StaticTextWidget(boss, prefix + "auMidiPopupDesc", _domain == Common::ConfigManager::kApplicationDomain ? _("Preferred Device:") : _("Music Device:"), _domain == Common::ConfigManager::kApplicationDomain ? _("Specifies preferred sound device or sound card emulator") : _("Specifies output sound device or sound card emulator"));
+		_midiPopUpDesc = new StaticTextWidget(boss, prefix + "auMidiPopupDesc", _domain == Common::ConfigManager::kApplicationDomain ? _("Preferred device:") : _("Music device:"), _domain == Common::ConfigManager::kApplicationDomain ? _("Specifies preferred sound device or sound card emulator") : _("Specifies output sound device or sound card emulator"));
 	else
-		_midiPopUpDesc = new StaticTextWidget(boss, prefix + "auMidiPopupDesc", _domain == Common::ConfigManager::kApplicationDomain ? _c("Preferred Dev.:", "lowres") : _c("Music Device:", "lowres"), _domain == Common::ConfigManager::kApplicationDomain ? _("Specifies preferred sound device or sound card emulator") : _("Specifies output sound device or sound card emulator"));
+		_midiPopUpDesc = new StaticTextWidget(boss, prefix + "auMidiPopupDesc", _domain == Common::ConfigManager::kApplicationDomain ? _c("Preferred dev.:", "lowres") : _c("Music device:", "lowres"), _domain == Common::ConfigManager::kApplicationDomain ? _("Specifies preferred sound device or sound card emulator") : _("Specifies output sound device or sound card emulator"));
 	_midiPopUp = new PopUpWidget(boss, prefix + "auMidiPopup", _("Specifies output sound device or sound card emulator"));
 
 	// Populate it
 	const Common::String allFlags = MidiDriver::musicType2GUIO((uint32)-1);
 	bool hasMidiDefined = (strpbrk(_guioptions.c_str(), allFlags.c_str()) != NULL);
 
-	const MusicPlugin::List p = MusicMan.getPlugins();
-	for (MusicPlugin::List::const_iterator m = p.begin(); m != p.end(); ++m) {
-		MusicDevices i = (**m)->getDevices();
+	const PluginList p = MusicMan.getPlugins();
+	for (PluginList::const_iterator m = p.begin(); m != p.end(); ++m) {
+		MusicDevices i = (*m)->get<MusicPluginObject>().getDevices();
 		for (MusicDevices::iterator d = i.begin(); d != i.end(); ++d) {
 			Common::String deviceGuiOption = MidiDriver::musicType2GUIO(d->getMusicType());
 
@@ -1074,23 +1150,23 @@ void OptionsDialog::addAudioControls(GuiObject *boss, const Common::String &pref
 }
 
 void OptionsDialog::addMIDIControls(GuiObject *boss, const Common::String &prefix) {
-	_gmDevicePopUpDesc = new StaticTextWidget(boss, prefix + "auPrefGmPopupDesc", _("GM Device:"), _("Specifies default sound device for General MIDI output"));
+	_gmDevicePopUpDesc = new StaticTextWidget(boss, prefix + "auPrefGmPopupDesc", _("GM device:"), _("Specifies default sound device for General MIDI output"));
 	_gmDevicePopUp = new PopUpWidget(boss, prefix + "auPrefGmPopup");
 
 	// Populate
-	const MusicPlugin::List p = MusicMan.getPlugins();
+	const PluginList p = MusicMan.getPlugins();
 	// Make sure the null device is the first one in the list to avoid undesired
 	// auto detection for users who don't have a saved setting yet.
-	for (MusicPlugin::List::const_iterator m = p.begin(); m != p.end(); ++m) {
-		MusicDevices i = (**m)->getDevices();
+	for (PluginList::const_iterator m = p.begin(); m != p.end(); ++m) {
+		MusicDevices i = (*m)->get<MusicPluginObject>().getDevices();
 		for (MusicDevices::iterator d = i.begin(); d != i.end(); ++d) {
 			if (d->getMusicDriverId() == "null")
 				_gmDevicePopUp->appendEntry(_("Don't use General MIDI music"), d->getHandle());
 		}
 	}
 	// Now we add the other devices.
-	for (MusicPlugin::List::const_iterator m = p.begin(); m != p.end(); ++m) {
-		MusicDevices i = (**m)->getDevices();
+	for (PluginList::const_iterator m = p.begin(); m != p.end(); ++m) {
+		MusicDevices i = (*m)->get<MusicPluginObject>().getDevices();
 		for (MusicDevices::iterator d = i.begin(); d != i.end(); ++d) {
 			if (d->getMusicType() >= MT_GM) {
 				if (d->getMusicType() != MT_MT32)
@@ -1139,21 +1215,21 @@ void OptionsDialog::addMT32Controls(GuiObject *boss, const Common::String &prefi
 		_mt32Checkbox = new CheckboxWidget(boss, prefix + "mcMt32Checkbox", _c("True Roland MT-32 (no GM emulation)", "lowres"), _("Check if you want to use your real hardware Roland-compatible sound device connected to your computer"));
 
 	// GS Extensions setting
-	_enableGSCheckbox = new CheckboxWidget(boss, prefix + "mcGSCheckbox", _("Roland GS Device (enable MT-32 mappings)"), _("Check if you want to enable patch mappings to emulate an MT-32 on a Roland GS device"));
+	_enableGSCheckbox = new CheckboxWidget(boss, prefix + "mcGSCheckbox", _("Roland GS device (enable MT-32 mappings)"), _("Check if you want to enable patch mappings to emulate an MT-32 on a Roland GS device"));
 
-	const MusicPlugin::List p = MusicMan.getPlugins();
+	const PluginList p = MusicMan.getPlugins();
 	// Make sure the null device is the first one in the list to avoid undesired
 	// auto detection for users who don't have a saved setting yet.
-	for (MusicPlugin::List::const_iterator m = p.begin(); m != p.end(); ++m) {
-		MusicDevices i = (**m)->getDevices();
+	for (PluginList::const_iterator m = p.begin(); m != p.end(); ++m) {
+		MusicDevices i = (*m)->get<MusicPluginObject>().getDevices();
 		for (MusicDevices::iterator d = i.begin(); d != i.end(); ++d) {
 			if (d->getMusicDriverId() == "null")
 				_mt32DevicePopUp->appendEntry(_("Don't use Roland MT-32 music"), d->getHandle());
 		}
 	}
 	// Now we add the other devices.
-	for (MusicPlugin::List::const_iterator m = p.begin(); m != p.end(); ++m) {
-		MusicDevices i = (**m)->getDevices();
+	for (PluginList::const_iterator m = p.begin(); m != p.end(); ++m) {
+		MusicDevices i = (*m)->get<MusicPluginObject>().getDevices();
 		for (MusicDevices::iterator d = i.begin(); d != i.end(); ++d) {
 			if (d->getMusicType() >= MT_GM)
 				_mt32DevicePopUp->appendEntry(d->getCompleteName(), d->getHandle());
@@ -1175,7 +1251,7 @@ void OptionsDialog::addMT32Controls(GuiObject *boss, const Common::String &prefi
 void OptionsDialog::addSubtitleControls(GuiObject *boss, const Common::String &prefix, int maxSliderVal) {
 
 	if (g_system->getOverlayWidth() > 320) {
-		_subToggleDesc = new StaticTextWidget(boss, prefix + "subToggleDesc", _("Text and Speech:"));
+		_subToggleDesc = new StaticTextWidget(boss, prefix + "subToggleDesc", _("Text and speech:"));
 
 		_subToggleGroup = new RadiobuttonGroup(boss, kSubtitleToggle);
 
@@ -1185,7 +1261,7 @@ void OptionsDialog::addSubtitleControls(GuiObject *boss, const Common::String &p
 
 		_subSpeedDesc = new StaticTextWidget(boss, prefix + "subSubtitleSpeedDesc", _("Subtitle speed:"));
 	} else {
-		_subToggleDesc = new StaticTextWidget(boss, prefix + "subToggleDesc", _c("Text and Speech:", "lowres"));
+		_subToggleDesc = new StaticTextWidget(boss, prefix + "subToggleDesc", _c("Text and speech:", "lowres"));
 
 		_subToggleGroup = new RadiobuttonGroup(boss, kSubtitleToggle);
 
@@ -1218,7 +1294,7 @@ void OptionsDialog::addVolumeControls(GuiObject *boss, const Common::String &pre
 	_musicVolumeSlider->setMaxValue(Audio::Mixer::kMaxMixerVolume);
 	_musicVolumeLabel->setFlags(WIDGET_CLEARBG);
 
-	_muteCheckbox = new CheckboxWidget(boss, prefix + "vcMuteCheckbox", _("Mute All"), 0, kMuteAllChanged);
+	_muteCheckbox = new CheckboxWidget(boss, prefix + "vcMuteCheckbox", _("Mute all"), 0, kMuteAllChanged);
 
 	if (g_system->getOverlayWidth() > 320)
 		_sfxVolumeDesc = new StaticTextWidget(boss, prefix + "vcSfxText", _("SFX volume:"), _("Special sound effects volume"));
@@ -1265,10 +1341,10 @@ bool OptionsDialog::loadMusicDeviceSetting(PopUpWidget *popup, Common::String se
 
 	if (_domain != Common::ConfigManager::kApplicationDomain || ConfMan.hasKey(setting, _domain) || preferredType) {
 		const Common::String drv = ConfMan.get(setting, (_domain != Common::ConfigManager::kApplicationDomain && !ConfMan.hasKey(setting, _domain)) ? Common::ConfigManager::kApplicationDomain : _domain);
-		const MusicPlugin::List p = MusicMan.getPlugins();
+		const PluginList p = MusicMan.getPlugins();
 
-		for (MusicPlugin::List::const_iterator m = p.begin(); m != p.end(); ++m) {
-			MusicDevices i = (**m)->getDevices();
+		for (PluginList::const_iterator m = p.begin(); m != p.end(); ++m) {
+			MusicDevices i = (*m)->get<MusicPluginObject>().getDevices();
 			for (MusicDevices::iterator d = i.begin(); d != i.end(); ++d) {
 				if (setting.empty() ? (preferredType == d->getMusicType()) : (drv == d->getCompleteId())) {
 					popup->setSelectedTag(d->getHandle());
@@ -1285,10 +1361,10 @@ void OptionsDialog::saveMusicDeviceSetting(PopUpWidget *popup, Common::String se
 	if (!popup || !_enableAudioSettings)
 		return;
 
-	const MusicPlugin::List p = MusicMan.getPlugins();
+	const PluginList p = MusicMan.getPlugins();
 	bool found = false;
-	for (MusicPlugin::List::const_iterator m = p.begin(); m != p.end() && !found; ++m) {
-		MusicDevices i = (**m)->getDevices();
+	for (PluginList::const_iterator m = p.begin(); m != p.end() && !found; ++m) {
+		MusicDevices i = (*m)->get<MusicPluginObject>().getDevices();
 		for (MusicDevices::iterator d = i.begin(); d != i.end(); ++d) {
 			if (d->getHandle() == popup->getSelectedTag()) {
 				ConfMan.set(setting, d->getCompleteId(), _domain);
@@ -1322,22 +1398,22 @@ int OptionsDialog::getSubtitleMode(bool subtitles, bool speech_mute) {
 void OptionsDialog::updateMusicVolume(const int newValue) const {
 	_musicVolumeLabel->setValue(newValue);
 	_musicVolumeSlider->setValue(newValue);
-	_musicVolumeLabel->draw();
-	_musicVolumeSlider->draw();
+	_musicVolumeLabel->markAsDirty();
+	_musicVolumeSlider->markAsDirty();
 }
 
 void OptionsDialog::updateSfxVolume(const int newValue) const {
 	_sfxVolumeLabel->setValue(newValue);
 	_sfxVolumeSlider->setValue(newValue);
-	_sfxVolumeLabel->draw();
-	_sfxVolumeSlider->draw();
+	_sfxVolumeLabel->markAsDirty();
+	_sfxVolumeSlider->markAsDirty();
 }
 
 void OptionsDialog::updateSpeechVolume(const int newValue) const {
 	_speechVolumeLabel->setValue(newValue);
 	_speechVolumeSlider->setValue(newValue);
-	_speechVolumeLabel->draw();
-	_speechVolumeSlider->draw();
+	_speechVolumeLabel->markAsDirty();
+	_speechVolumeSlider->markAsDirty();
 }
 
 void OptionsDialog::reflowLayout() {
@@ -1345,13 +1421,36 @@ void OptionsDialog::reflowLayout() {
 		_tabWidget->setTabTitle(_graphicsTabId, g_system->getOverlayWidth() > 320 ? _("Graphics") : _("GFX"));
 
 	Dialog::reflowLayout();
+	setupGraphicsTab();
+}
+
+void OptionsDialog::setupGraphicsTab() {
+	if (!_fullscreenCheckbox)
+		return;
+	_gfxPopUpDesc->setVisible(true);
+	_gfxPopUp->setVisible(true);
+	if (g_system->hasFeature(OSystem::kFeatureStretchMode)) {
+		_stretchPopUpDesc->setVisible(true);
+		_stretchPopUp->setVisible(true);
+	} else {
+		_stretchPopUpDesc->setVisible(false);
+		_stretchPopUp->setVisible(false);
+	}
+	_fullscreenCheckbox->setVisible(true);
+	if (g_system->hasFeature(OSystem::kFeatureFilteringMode))
+		_filteringCheckbox->setVisible(true);
+	else
+		_filteringCheckbox->setVisible(false);
+	_aspectCheckbox->setVisible(true);
+	_renderModePopUpDesc->setVisible(true);
+	_renderModePopUp->setVisible(true);
 }
 
 #pragma mark -
 
 
 GlobalOptionsDialog::GlobalOptionsDialog(LauncherDialog *launcher)
-	: OptionsDialog(Common::ConfigManager::kApplicationDomain, "GlobalOptions"), _launcher(launcher) {
+	: OptionsDialog(Common::ConfigManager::kApplicationDomain, "GlobalOptions"), CommandSender(nullptr), _launcher(launcher) {
 #ifdef GUI_ENABLE_KEYSDIALOG
 	_keysDialog = 0;
 #endif
@@ -1374,6 +1473,8 @@ GlobalOptionsDialog::GlobalOptionsDialog(LauncherDialog *launcher)
 	_autosavePeriodPopUp = 0;
 	_guiLanguagePopUpDesc = 0;
 	_guiLanguagePopUp = 0;
+	_guiLanguageUseGameLanguageCheckbox = nullptr;
+	_useSystemDialogsCheckbox = 0;
 #ifdef USE_UPDATES
 	_updatesPopUpDesc = 0;
 	_updatesPopUp = 0;
@@ -1381,20 +1482,35 @@ GlobalOptionsDialog::GlobalOptionsDialog(LauncherDialog *launcher)
 #ifdef USE_CLOUD
 #ifdef USE_LIBCURL
 	_selectedStorageIndex = CloudMan.getStorageIndex();
-#else
-	_selectedStorageIndex = 0;
-#endif
 	_storagePopUpDesc = 0;
 	_storagePopUp = 0;
+	_storageDisabledHint = 0;
+	_storageEnableButton = 0;
 	_storageUsernameDesc = 0;
 	_storageUsername = 0;
 	_storageUsedSpaceDesc = 0;
 	_storageUsedSpace = 0;
+	_storageSyncHint = 0;
 	_storageLastSyncDesc = 0;
 	_storageLastSync = 0;
-	_storageConnectButton = 0;
-	_storageRefreshButton = 0;
+	_storageSyncSavesButton = 0;
+	_storageDownloadHint = 0;
 	_storageDownloadButton = 0;
+	_storageDisconnectHint = 0;
+	_storageDisconnectButton = 0;
+
+	_connectingStorage = false;
+	_storageWizardNotConnectedHint = 0;
+	_storageWizardOpenLinkHint = 0;
+	_storageWizardLink = 0;
+	_storageWizardCodeHint = 0;
+	_storageWizardCodeBox = 0;
+	_storageWizardPasteButton = 0;
+	_storageWizardConnectButton = 0;
+	_storageWizardConnectionStatusHint = 0;
+	_redrawCloudTab = false;
+#endif
+#ifdef USE_SDL_NET
 	_runServerButton = 0;
 	_serverInfoLabel = 0;
 	_rootPathButton = 0;
@@ -1403,10 +1519,15 @@ GlobalOptionsDialog::GlobalOptionsDialog(LauncherDialog *launcher)
 	_serverPortDesc = 0;
 	_serverPort = 0;
 	_serverPortClearButton = 0;
-	_redrawCloudTab = false;
-#ifdef USE_SDL_NET
+	_featureDescriptionLine1 = 0;
+	_featureDescriptionLine2 = 0;
 	_serverWasRunning = false;
 #endif
+#endif
+#ifdef USE_TTS
+	_enableTTS = false;
+	_ttsCheckbox = 0;
+	_ttsVoiceSelectionPopUp = 0;
 #endif
 }
 
@@ -1428,7 +1549,10 @@ void GlobalOptionsDialog::build() {
 	// 1) The graphics tab
 	//
 	_graphicsTabId = tab->addTab(g_system->getOverlayWidth() > 320 ? _("Graphics") : _("GFX"));
-	addGraphicControls(tab, "GlobalOptions_Graphics.");
+	ScrollContainerWidget *graphicsContainer = new ScrollContainerWidget(tab, "GlobalOptions_Graphics.Container", kGraphicsTabContainerReflowCmd);
+	graphicsContainer->setTarget(this);
+	graphicsContainer->setBackgroundType(ThemeEngine::kDialogBackgroundNone);
+	addGraphicControls(graphicsContainer, "GlobalOptions_Graphics_Container.");
 
 	//
 	// The shader tab (currently visible only for Vita platform), visibility checking by features
@@ -1490,7 +1614,7 @@ void GlobalOptionsDialog::build() {
 	else
 		_pathsTabId = tab->addTab(_c("Paths", "lowres"));
 
-#if !( defined(__DC__) || defined(__GP32__) )
+#if !defined(__DC__)
 	// These two buttons have to be extra wide, or the text will be
 	// truncated in the small version of the GUI.
 
@@ -1540,7 +1664,7 @@ void GlobalOptionsDialog::build() {
 	_curTheme = new StaticTextWidget(tab, "GlobalOptions_Misc.CurTheme", g_gui.theme()->getThemeName());
 
 
-	_rendererPopUpDesc = new StaticTextWidget(tab, "GlobalOptions_Misc.RendererPopupDesc", _("GUI Renderer:"));
+	_rendererPopUpDesc = new StaticTextWidget(tab, "GlobalOptions_Misc.RendererPopupDesc", _("GUI renderer:"));
 	_rendererPopUp = new PopUpWidget(tab, "GlobalOptions_Misc.RendererPopup");
 
 	if (g_system->getOverlayWidth() > 320) {
@@ -1569,7 +1693,7 @@ void GlobalOptionsDialog::build() {
 
 
 #ifdef USE_TRANSLATION
-	_guiLanguagePopUpDesc = new StaticTextWidget(tab, "GlobalOptions_Misc.GuiLanguagePopupDesc", _("GUI Language:"), _("Language of ScummVM GUI"));
+	_guiLanguagePopUpDesc = new StaticTextWidget(tab, "GlobalOptions_Misc.GuiLanguagePopupDesc", _("GUI language:"), _("Language of ScummVM GUI"));
 	_guiLanguagePopUp = new PopUpWidget(tab, "GlobalOptions_Misc.GuiLanguagePopup");
 #ifdef USE_DETECTLANG
 	_guiLanguagePopUp->appendEntry(_("<default>"), Common::kTranslationAutodetectId);
@@ -1594,7 +1718,27 @@ void GlobalOptionsDialog::build() {
 		_guiLanguagePopUp->setSelectedTag(Common::kTranslationBuiltinId);
 #endif // USE_DETECTLANG
 
+	_guiLanguageUseGameLanguageCheckbox = new CheckboxWidget(tab, "GlobalOptions_Misc.GuiLanguageUseGameLanguage",
+			_("Switch the GUI language to the game language"),
+			_("When starting a game, change the GUI language to the game language."
+			"That way, if a game uses the ScummVM save and load dialogs, they are "
+			"in the same language as the game.")
+	);
+
+	if (ConfMan.hasKey("gui_use_game_language")) {
+		_guiLanguageUseGameLanguageCheckbox->setState(ConfMan.getBool("gui_use_game_language", _domain));
+	}
+
 #endif // USE_TRANSLATION
+
+	if (g_system->hasFeature(OSystem::kFeatureSystemBrowserDialog)) {
+		_useSystemDialogsCheckbox = new CheckboxWidget(tab, "GlobalOptions_Misc.UseSystemDialogs",
+			_("Use native system file browser"),
+			_("Use the native system file browser instead of the ScummVM one to select a file or directory.")
+		);
+
+		_useSystemDialogsCheckbox->setState(ConfMan.getBool("gui_browser_native", _domain));
+	}
 
 #ifdef USE_UPDATES
 	_updatesPopUpDesc = new StaticTextWidget(tab, "GlobalOptions_Misc.UpdatesPopupDesc", _("Update check:"), _("How often to check ScummVM updates"));
@@ -1613,8 +1757,9 @@ void GlobalOptionsDialog::build() {
 #endif
 
 #ifdef USE_CLOUD
+#ifdef USE_LIBCURL
 	//
-	// 7) The cloud tab
+	// 7) The Cloud tab (remote storages)
 	//
 	if (g_system->getOverlayWidth() > 320)
 		tab->addTab(_("Cloud"));
@@ -1623,54 +1768,54 @@ void GlobalOptionsDialog::build() {
 
 	ScrollContainerWidget *container = new ScrollContainerWidget(tab, "GlobalOptions_Cloud.Container", kCloudTabContainerReflowCmd);
 	container->setTarget(this);
+	container->setBackgroundType(ThemeEngine::kDialogBackgroundNone);
+	setTarget(container);
 
-	_storagePopUpDesc = new StaticTextWidget(container, "GlobalOptions_Cloud_Container.StoragePopupDesc", _("Storage:"), _("Active cloud storage"));
-	_storagePopUp = new PopUpWidget(container, "GlobalOptions_Cloud_Container.StoragePopup");
-#ifdef USE_LIBCURL
-	Common::StringArray list = CloudMan.listStorages();
-	for (uint32 i = 0; i < list.size(); ++i)
-		_storagePopUp->appendEntry(list[i], i);
-#else
-	_storagePopUp->appendEntry(_("<none>"), 0);
-#endif
-	_storagePopUp->setSelected(_selectedStorageIndex);
-
-	_storageUsernameDesc = new StaticTextWidget(container, "GlobalOptions_Cloud_Container.StorageUsernameDesc", _("Username:"), _("Username used by this storage"));
-	_storageUsername = new StaticTextWidget(container, "GlobalOptions_Cloud_Container.StorageUsernameLabel", "<none>");
-
-	_storageUsedSpaceDesc = new StaticTextWidget(container, "GlobalOptions_Cloud_Container.StorageUsedSpaceDesc", _("Used space:"), _("Space used by ScummVM's saved games on this storage"));
-	_storageUsedSpace = new StaticTextWidget(container, "GlobalOptions_Cloud_Container.StorageUsedSpaceLabel", "0 bytes");
-
-	_storageLastSyncDesc = new StaticTextWidget(container, "GlobalOptions_Cloud_Container.StorageLastSyncDesc", _("Last sync time:"), _("When the last saved games sync for this storage occured"));
-	_storageLastSync = new StaticTextWidget(container, "GlobalOptions_Cloud_Container.StorageLastSyncLabel", "<never>");
-
-	_storageConnectButton = new ButtonWidget(container, "GlobalOptions_Cloud_Container.ConnectButton", _("Connect"), _("Open wizard dialog to connect your cloud storage account"), kConfigureStorageCmd);
-	_storageRefreshButton = new ButtonWidget(container, "GlobalOptions_Cloud_Container.RefreshButton", _("Refresh"), _("Refresh current cloud storage information (username and usage)"), kRefreshStorageCmd);
-	_storageDownloadButton = new ButtonWidget(container, "GlobalOptions_Cloud_Container.DownloadButton", _("Download"), _("Open downloads manager dialog"), kDownloadStorageCmd);
-
-	_runServerButton = new ButtonWidget(container, "GlobalOptions_Cloud_Container.RunServerButton", _("Run server"), _("Run local webserver"), kRunServerCmd);
-	_serverInfoLabel = new StaticTextWidget(container, "GlobalOptions_Cloud_Container.ServerInfoLabel", _("Not running"));
-
-	// Root path
-	if (g_system->getOverlayWidth() > 320)
-		_rootPathButton = new ButtonWidget(container, "GlobalOptions_Cloud_Container.RootPathButton", _("/root/ Path:"), _("Specifies which directory the Files Manager can access"), kChooseRootDirCmd);
-	else
-		_rootPathButton = new ButtonWidget(container, "GlobalOptions_Cloud_Container.RootPathButton", _c("/root/ Path:", "lowres"), _("Specifies which directory the Files Manager can access"), kChooseRootDirCmd);
-	_rootPath = new StaticTextWidget(container, "GlobalOptions_Cloud_Container.RootPath", "/foo/bar", _("Specifies which directory the Files Manager can access"));
-
-	_rootPathClearButton = addClearButton(container, "GlobalOptions_Cloud_Container.RootPathClearButton", kRootPathClearCmd);
-
+	addCloudControls(container, "GlobalOptions_Cloud_Container.", g_system->getOverlayWidth() <= 320);
+#endif // USE_LIBCURL
 #ifdef USE_SDL_NET
-	uint32 port = Networking::LocalWebserver::getPort();
-#else
-	uint32 port = 0; // the following widgets are hidden anyway
-#endif
-	_serverPortDesc = new StaticTextWidget(container, "GlobalOptions_Cloud_Container.ServerPortDesc", _("Server's port:"), _("Which port is used by the server\nAuth with server is not available with non-default port"));
-	_serverPort = new EditTextWidget(container, "GlobalOptions_Cloud_Container.ServerPortEditText", Common::String::format("%u", port), 0);
-	_serverPortClearButton = addClearButton(container, "GlobalOptions_Cloud_Container.ServerPortClearButton", kServerPortClearCmd);
-
-	setupCloudTab();
+	//
+	// 8) The LAN tab (local "cloud" webserver)
+	//
+	if (g_system->getOverlayWidth() > 320)
+		tab->addTab(_("LAN"));
+	else
+		tab->addTab(_c("LAN", "lowres"));
+	addNetworkControls(tab, "GlobalOptions_Network.", g_system->getOverlayWidth() <= 320);
+#endif // USE_SDL_NET
 #endif // USE_CLOUD
+
+	//Accessibility
+#ifdef USE_TTS
+	if (g_system->getOverlayWidth() > 320)
+		tab->addTab(_("Accessibility"));
+	else
+		tab->addTab(_c("Accessibility", "lowres"));
+	_ttsCheckbox = new CheckboxWidget(tab, "GlobalOptions_Accessibility.TTSCheckbox",
+			_("Use Text to speech"), _("Will read text in gui on mouse over."));
+	if (ConfMan.hasKey("tts_enabled"))
+		_ttsCheckbox->setState(ConfMan.getBool("tts_enabled", _domain));
+	else
+		_ttsCheckbox->setState(false);
+
+	_ttsVoiceSelectionPopUp = new PopUpWidget(tab, "GlobalOptions_Accessibility.TTSVoiceSelection");
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	Common::Array<Common::TTSVoice> voices;
+	if (ttsMan != nullptr)
+		voices = ttsMan->getVoicesArray();
+
+	for(unsigned i = 0; i < voices.size(); i++) {
+		_ttsVoiceSelectionPopUp->appendEntry(voices[i].getDescription(), i);
+	}
+	if (voices.empty())
+		_ttsVoiceSelectionPopUp->appendEntry("None", 0);
+
+	if (ConfMan.hasKey("tts_voice") && (unsigned) ConfMan.getInt("tts_voice", _domain) < voices.size())
+		_ttsVoiceSelectionPopUp->setSelectedTag(ConfMan.getInt("tts_voice", _domain)) ;
+	else
+		_ttsVoiceSelectionPopUp->setSelectedTag(0);
+
+#endif // USE_TTS
 
 	// Activate the first tab
 	tab->setActiveTab(0);
@@ -1691,7 +1836,7 @@ void GlobalOptionsDialog::build() {
 
 	OptionsDialog::build();
 
-#if !( defined(__DC__) || defined(__GP32__) )
+#if !defined(__DC__)
 	// Set _savePath to the current save path
 	Common::String savePath(ConfMan.get("savepath", _domain));
 	Common::String themePath(ConfMan.get("themepath", _domain));
@@ -1739,12 +1884,14 @@ void GlobalOptionsDialog::build() {
 	_rendererPopUp->setSelectedTag(mode);
 
 #ifdef USE_CLOUD
+#ifdef USE_SDL_NET
 	Common::String rootPath(ConfMan.get("rootpath", "cloud"));
 	if (rootPath.empty() || !ConfMan.hasKey("rootpath", "cloud")) {
 		_rootPath->setLabel(_c("None", "path"));
 	} else {
 		_rootPath->setLabel(rootPath);
 	}
+#endif
 #endif
 }
 
@@ -1761,6 +1908,100 @@ void GlobalOptionsDialog::clean() {
 
 	OptionsDialog::clean();
 }
+
+#ifdef USE_CLOUD
+#ifdef USE_LIBCURL
+void GlobalOptionsDialog::addCloudControls(GuiObject *boss, const Common::String &prefix, bool lowres) {
+	_storagePopUpDesc = new StaticTextWidget(boss, prefix + "StoragePopupDesc", _("Active storage:"), _("Active cloud storage"));
+	_storagePopUp = new PopUpWidget(boss, prefix + "StoragePopup");
+	Common::StringArray list = CloudMan.listStorages();
+	for (uint32 i = 0; i < list.size(); ++i)
+		_storagePopUp->appendEntry(list[i], i);
+	_storagePopUp->setSelected(_selectedStorageIndex);
+
+	if (lowres)
+		_storageDisabledHint = new StaticTextWidget(boss, prefix + "StorageDisabledHint", _c("4. Storage is not yet enabled. Verify that username is correct and enable it:", "lowres"));
+	else
+		_storageDisabledHint = new StaticTextWidget(boss, prefix + "StorageDisabledHint", _("4. Storage is not yet enabled. Verify that username is correct and enable it:"));
+	_storageEnableButton = new ButtonWidget(boss, prefix + "StorageEnableButton", _("Enable storage"), _("Confirm you want to use this account for this storage"), kEnableStorageCmd);
+
+	_storageUsernameDesc = new StaticTextWidget(boss, prefix + "StorageUsernameDesc", _("Username:"), _("Username used by this storage"));
+	_storageUsername = new StaticTextWidget(boss, prefix + "StorageUsernameLabel", _("<none>"), "", ThemeEngine::kFontStyleNormal);
+
+	_storageUsedSpaceDesc = new StaticTextWidget(boss, prefix + "StorageUsedSpaceDesc", _("Used space:"), _("Space used by ScummVM's saved games on this storage"));
+	_storageUsedSpace = new StaticTextWidget(boss, prefix + "StorageUsedSpaceLabel", "0 bytes", "", ThemeEngine::kFontStyleNormal);
+
+	_storageLastSyncDesc = new StaticTextWidget(boss, prefix + "StorageLastSyncDesc", _("Last sync:"), _("When was the last time saved games were synced with this storage"));
+	_storageLastSync = new StaticTextWidget(boss, prefix + "StorageLastSyncLabel", _("<never>"), "", ThemeEngine::kFontStyleNormal);
+	if (lowres)
+		_storageSyncHint = new StaticTextWidget(boss, prefix + "StorageSyncHint", _c("Saved games sync automatically on launch, after saving and on loading.", "lowres"), "", ThemeEngine::kFontStyleNormal);
+	else
+		_storageSyncHint = new StaticTextWidget(boss, prefix + "StorageSyncHint", _("Saved games sync automatically on launch, after saving and on loading."), "", ThemeEngine::kFontStyleNormal);
+	_storageSyncSavesButton = new ButtonWidget(boss, prefix + "SyncSavesButton", _("Sync now"), _("Start saved games sync"), kSyncSavesStorageCmd);
+
+	if (lowres)
+		_storageDownloadHint = new StaticTextWidget(boss, prefix + "StorageDownloadHint", _c("You can download game files from your cloud ScummVM folder:", "lowres"));
+	else
+		_storageDownloadHint = new StaticTextWidget(boss, prefix + "StorageDownloadHint", _("You can download game files from your cloud ScummVM folder:"));
+	_storageDownloadButton = new ButtonWidget(boss, prefix + "DownloadButton", _("Download game files"), _("Open downloads manager dialog"), kDownloadStorageCmd);
+
+	if (lowres)
+		_storageDisconnectHint = new StaticTextWidget(boss, prefix + "StorageDisconnectHint", _c("To change account for this storage, disconnect and connect again:", "lowres"));
+	else
+		_storageDisconnectHint = new StaticTextWidget(boss, prefix + "StorageDisconnectHint", _("To change account for this storage, disconnect and connect again:"));
+	_storageDisconnectButton = new ButtonWidget(boss, prefix + "DisconnectButton", _("Disconnect"), _("Stop using this storage on this device"), kDisconnectStorageCmd);
+
+	if (lowres)
+		_storageWizardNotConnectedHint = new StaticTextWidget(boss, prefix + "StorageWizardNotConnectedHint", _c("This storage is not connected yet! To connect,", "lowres"));
+	else
+		_storageWizardNotConnectedHint = new StaticTextWidget(boss, prefix + "StorageWizardNotConnectedHint", _("This storage is not connected yet! To connect,"));
+	_storageWizardOpenLinkHint = new StaticTextWidget(boss, prefix + "StorageWizardOpenLinkHint", _("1. Open this link:"));
+	_storageWizardLink = new ButtonWidget(boss, prefix + "StorageWizardLink", "https://cloud.scummvm.org/", _("Open URL"), kOpenUrlStorageCmd);
+	if (lowres)
+		_storageWizardCodeHint = new StaticTextWidget(boss, prefix + "StorageWizardCodeHint", _c("2. Get the code and enter it here:", "lowres"));
+	else
+		_storageWizardCodeHint = new StaticTextWidget(boss, prefix + "StorageWizardCodeHint", _("2. Get the code and enter it here:"));
+	_storageWizardCodeBox = new EditTextWidget(boss, prefix + "StorageWizardCodeBox", "", 0, 0, 0, ThemeEngine::kFontStyleConsole);
+	_storageWizardPasteButton = new ButtonWidget(boss, prefix + "StorageWizardPasteButton", _("Paste"), _("Paste code from clipboard"), kPasteCodeStorageCmd);
+	_storageWizardConnectButton = new ButtonWidget(boss, prefix + "StorageWizardConnectButton", _("3. Connect"), _("Connect your cloud storage account"), kConnectStorageCmd);
+	_storageWizardConnectionStatusHint = new StaticTextWidget(boss, prefix + "StorageWizardConnectionStatusHint", "...");
+
+	setupCloudTab();
+}
+#endif // USE_LIBCURL
+
+#ifdef USE_SDL_NET
+void GlobalOptionsDialog::addNetworkControls(GuiObject *boss, const Common::String &prefix, bool lowres) {
+	_runServerButton = new ButtonWidget(boss, prefix + "RunServerButton", _("Run server"), _("Run local webserver"), kRunServerCmd);
+	_serverInfoLabel = new StaticTextWidget(boss, prefix + "ServerInfoLabel", _("Not running"));
+
+	// Root path
+	if (lowres)
+		_rootPathButton = new ButtonWidget(boss, prefix + "RootPathButton", _c("/root/ Path:", "lowres"), _("Select which directory will be shown as /root/ in the Files Manager"), kChooseRootDirCmd);
+	else
+		_rootPathButton = new ButtonWidget(boss, prefix + "RootPathButton", _("/root/ Path:"), _("Select which directory will be shown as /root/ in the Files Manager"), kChooseRootDirCmd);
+	_rootPath = new StaticTextWidget(boss, prefix + "RootPath", "/foo/bar", _("Select which directory will be shown as /root/ in the Files Manager"));
+	_rootPathClearButton = addClearButton(boss, prefix + "RootPathClearButton", kRootPathClearCmd);
+
+	uint32 port = Networking::LocalWebserver::getPort();
+
+	_serverPortDesc = new StaticTextWidget(boss, prefix + "ServerPortDesc", _("Server's port:"), _("Port for server to use"));
+	_serverPort = new EditTextWidget(boss, prefix + "ServerPortEditText", Common::String::format("%u", port), 0);
+	_serverPortClearButton = addClearButton(boss, prefix + "ServerPortClearButton", kServerPortClearCmd);
+
+	if (lowres) {
+		_featureDescriptionLine1 = new StaticTextWidget(boss, prefix + "FeatureDescriptionLine1", _c("Run server to manage files with browser (in the same network).", "lowres"), "", ThemeEngine::kFontStyleNormal);
+		_featureDescriptionLine2 = new StaticTextWidget(boss, prefix + "FeatureDescriptionLine2", _c("Closing options dialog will stop the server.", "lowres"), "", ThemeEngine::kFontStyleNormal);
+	} else {
+		_featureDescriptionLine1 = new StaticTextWidget(boss, prefix + "FeatureDescriptionLine1", _("Run server to manage files with browser (in the same network)."), "", ThemeEngine::kFontStyleNormal);
+		_featureDescriptionLine2 = new StaticTextWidget(boss, prefix + "FeatureDescriptionLine2", _("Closing options dialog will stop the server."), "", ThemeEngine::kFontStyleNormal);
+	}
+	
+	reflowNetworkTabLayout();
+
+}
+#endif // USE_SDL_NET
+#endif // USE_CLOUD
 
 void GlobalOptionsDialog::apply() {
 	OptionsDialog::apply();
@@ -1794,11 +2035,13 @@ void GlobalOptionsDialog::apply() {
 #endif
 
 #ifdef USE_CLOUD
+#ifdef USE_SDL_NET
 	Common::String rootPath(_rootPath->getLabel());
 	if (!rootPath.empty() && (rootPath != _c("None", "path")))
 		ConfMan.set("rootpath", rootPath, "cloud");
 	else
 		ConfMan.removeKey("rootpath", "cloud");
+#endif
 #endif
 
 	ConfMan.setInt("autosave_period", _autosavePeriodPopUp->getSelectedTag(), _domain);
@@ -1863,7 +2106,14 @@ void GlobalOptionsDialog::apply() {
 		newCharset = TransMan.getCurrentCharset();
 		isRebuildNeeded = true;
 	}
+
+	bool guiUseGameLanguage = _guiLanguageUseGameLanguageCheckbox->getState();
+	ConfMan.setBool("gui_use_game_language", guiUseGameLanguage, _domain);
 #endif
+
+	if (_useSystemDialogsCheckbox) {
+		ConfMan.setBool("gui_browser_native", _useSystemDialogsCheckbox->getState(), _domain);
+	}
 
 	GUI::ThemeEngine::GraphicsMode gfxMode = (GUI::ThemeEngine::GraphicsMode)_rendererPopUp->getSelectedTag();
 	Common::String oldGfxConfig = ConfMan.get("gui_renderer");
@@ -1902,6 +2152,27 @@ void GlobalOptionsDialog::apply() {
 		MessageDialog error(errorMessage);
 		error.runModal();
 	}
+#ifdef USE_TTS
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	if (newLang != oldLang) {
+		if (newLang == "C")
+			ttsMan->setLanguage("en");
+		else {
+			Common::String guiLang = newLang;
+			guiLang.setChar('\0', 2);
+			ttsMan->setLanguage(guiLang);
+		}
+		_ttsVoiceSelectionPopUp->setSelectedTag(0);
+	}
+	int volume = (ConfMan.getInt("speech_volume", "scummvm") * 100) / 256;
+	if (ConfMan.hasKey("mute", "scummvm") && ConfMan.getBool("mute", "scummvm"))
+		volume = 0;
+	ttsMan->setVolume(volume);
+	ConfMan.setBool("tts_enabled", _ttsCheckbox->getState(), _domain);
+	int selectedVoice = _ttsVoiceSelectionPopUp->getSelectedTag();
+	ConfMan.setInt("tts_voice", selectedVoice, _domain);
+	ttsMan->setVoice(selectedVoice);
+#endif
 
 	if (isRebuildNeeded) {
 		rebuild();
@@ -1938,7 +2209,7 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 				error.runModal();
 				return;
 			}
-			draw();
+			g_gui.scheduleTopDialogRedraw();
 		}
 		break;
 	}
@@ -1948,7 +2219,7 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 			// User made his choice...
 			Common::FSNode dir(browser.getResult());
 			_themePath->setLabel(dir.getPath());
-			draw();
+			g_gui.scheduleTopDialogRedraw();
 		}
 		break;
 	}
@@ -1958,7 +2229,7 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 			// User made his choice...
 			Common::FSNode dir(browser.getResult());
 			_extraPath->setLabel(dir.getPath());
-			draw();
+			g_gui.scheduleTopDialogRedraw();
 		}
 		break;
 	}
@@ -1969,12 +2240,13 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 			// User made his choice...
 			Common::FSNode dir(browser.getResult());
 			_pluginsPath->setLabel(dir.getPath());
-			draw();
+			g_gui.scheduleTopDialogRedraw();
 		}
 		break;
 	}
 #endif
 #ifdef USE_CLOUD
+#ifdef USE_SDL_NET
 	case kChooseRootDirCmd: {
 		BrowserDialog browser(_("Select directory for Files Manager /root/"), true);
 		if (browser.runModal() > 0) {
@@ -1984,10 +2256,11 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 			if (path.empty())
 				path = "/"; // absolute root
 			_rootPath->setLabel(path);
-			draw();
+			g_gui.scheduleTopDialogRedraw();
 		}
 		break;
 	}
+#endif
 #endif
 	case kThemePathClearCmd:
 		_themePath->setLabel(_c("None", "path"));
@@ -1999,9 +2272,11 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 		_savePath->setLabel(_("Default"));
 		break;
 #ifdef USE_CLOUD
+#ifdef USE_SDL_NET
 	case kRootPathClearCmd:
 		_rootPath->setLabel(_c("None", "path"));
 		break;
+#endif
 #endif
 	case kChooseSoundFontCmd: {
 		BrowserDialog browser(_("Select SoundFont"), false);
@@ -2015,7 +2290,7 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 			else
 				_soundFontClearButton->setEnabled(false);
 
-			draw();
+			g_gui.scheduleTopDialogRedraw();
 		}
 		break;
 	}
@@ -2030,18 +2305,146 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 		break;
 	}
 #ifdef USE_CLOUD
-	case kCloudTabContainerReflowCmd:
+#ifdef USE_LIBCURL
+	case kCloudTabContainerReflowCmd: {
 		setupCloudTab();
 		break;
-#ifdef USE_LIBCURL
-	case kPopUpItemSelectedCmd:
-	{
+	}
+	case kPopUpItemSelectedCmd: {
+		if (_storageWizardCodeBox)
+			_storageWizardCodeBox->setEditString("");
 		// update container's scrollbar
 		reflowLayout();
 		break;
 	}
-	case kConfigureStorageCmd:
-	{
+	case kEnableStorageCmd: {
+		CloudMan.enableStorage();
+		_redrawCloudTab = true;
+
+		// also, automatically start saves sync when user enables the storage
+	}
+	// fall through
+	case kSyncSavesStorageCmd: {
+		CloudMan.syncSaves(
+			new Common::Callback<GlobalOptionsDialog, Cloud::Storage::BoolResponse>(this, &GlobalOptionsDialog::storageSavesSyncedCallback)
+		);
+		break;
+	}
+	case kDownloadStorageCmd: {
+		DownloadDialog dialog(_selectedStorageIndex, _launcher);
+		dialog.runModal();
+		break;
+	}
+	case kOpenUrlStorageCmd: {
+		Common::String url = "https://cloud.scummvm.org/";
+		switch (_selectedStorageIndex) {
+		case Cloud::kStorageDropboxId:
+			url += "dropbox";
+			break;
+		case Cloud::kStorageOneDriveId:
+			url += "onedrive";
+			break;
+		case Cloud::kStorageGoogleDriveId:
+			url += "gdrive";
+			break;
+		case Cloud::kStorageBoxId:
+			url += "box";
+			break;
+		}
+
+		if (!g_system->openUrl(url)) {
+			MessageDialog alert(_("Failed to open URL!\nPlease navigate to this page manually."));
+			alert.runModal();
+		}
+		break;
+	}
+	case kPasteCodeStorageCmd: {
+		if (g_system->hasTextInClipboard()) {
+			Common::String message = g_system->getTextFromClipboard();
+			if (!message.empty()) {
+				_storageWizardCodeBox->setEditString(message);
+				_redrawCloudTab = true;
+			}
+		}
+		break;
+	}
+	case kConnectStorageCmd: {
+		Common::String code = "";
+		if (_storageWizardCodeBox)
+			code = _storageWizardCodeBox->getEditString();
+		if (code.size() == 0)
+			return;
+
+		if (CloudMan.isWorking()) {
+			bool cancel = true;
+
+			MessageDialog alert(_("Another Storage is working now. Do you want to interrupt it?"), _("Yes"), _("No"));
+			if (alert.runModal() == GUI::kMessageOK) {
+				if (CloudMan.isDownloading())
+					CloudMan.cancelDownload();
+				if (CloudMan.isSyncing())
+					CloudMan.cancelSync();
+
+				// I believe it still would return `true` here, but just in case
+				if (CloudMan.isWorking()) {
+					MessageDialog alert2(_("Wait until current Storage finishes up and try again."));
+					alert2.runModal();
+				} else {
+					cancel = false;
+				}
+			}
+
+			if (cancel) {
+				return;
+			}
+		}
+
+		if (_storageWizardConnectionStatusHint)
+			_storageWizardConnectionStatusHint->setLabel(_("Connecting..."));
+		CloudMan.connectStorage(
+			_selectedStorageIndex, code,
+			new Common::Callback<GlobalOptionsDialog, Networking::ErrorResponse>(this, &GlobalOptionsDialog::storageConnectionCallback)
+		);
+		_connectingStorage = true;
+		_redrawCloudTab = true;
+		break;
+	}
+	case kDisconnectStorageCmd: {
+		if (_storageWizardCodeBox)
+			_storageWizardCodeBox->setEditString("");
+
+		if (_selectedStorageIndex == CloudMan.getStorageIndex() && CloudMan.isWorking()) {
+			bool cancel = true;
+
+			MessageDialog alert(_("This Storage is working now. Do you want to interrupt it?"), _("Yes"), _("No"));
+			if (alert.runModal() == GUI::kMessageOK) {
+				if (CloudMan.isDownloading())
+					CloudMan.cancelDownload();
+				if (CloudMan.isSyncing())
+					CloudMan.cancelSync();
+
+				// I believe it still would return `true` here, but just in case
+				if (CloudMan.isWorking()) {
+					MessageDialog alert2(_("Wait until current Storage finishes up and try again."));
+					alert2.runModal();
+				} else {
+					cancel = false;
+				}
+			}
+
+			if (cancel) {
+				return;
+			}
+		}
+
+		CloudMan.disconnectStorage(_selectedStorageIndex);
+		_redrawCloudTab = true;
+		sendCommand(kSetPositionCmd, 0);
+		break;
+	}
+#endif // USE_LIBCURL
+#ifdef USE_SDL_NET
+	case kRunServerCmd: {
 #ifdef NETWORKING_LOCALWEBSERVER_ENABLE_PORT_OVERRIDE
 		// save server's port
 		uint32 port = Networking::LocalWebserver::getPort();
@@ -2053,63 +2456,19 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 		ConfMan.setInt("local_server_port", port);
 		ConfMan.flushToDisk();
 #endif // NETWORKING_LOCALWEBSERVER_ENABLE_PORT_OVERRIDE
-		StorageWizardDialog dialog(_selectedStorageIndex);
-		dialog.runModal();
-		//update container's scrollbar
-		reflowLayout();
+
+		if (LocalServer.isRunning())
+			LocalServer.stopOnIdle();
+		else
+			LocalServer.start();
+
 		break;
 	}
-	case kRefreshStorageCmd:
-	{
-		CloudMan.info(
-			new Common::Callback<GlobalOptionsDialog, Cloud::Storage::StorageInfoResponse>(this, &GlobalOptionsDialog::storageInfoCallback),
-			new Common::Callback<GlobalOptionsDialog, Networking::ErrorResponse>(this, &GlobalOptionsDialog::storageErrorCallback)
-		);
-		Common::String dir = CloudMan.savesDirectoryPath();
-		if (dir.lastChar() == '/')
-			dir.deleteLastChar();
-		CloudMan.listDirectory(
-			dir,
-			new Common::Callback<GlobalOptionsDialog, Cloud::Storage::ListDirectoryResponse>(this, &GlobalOptionsDialog::storageListDirectoryCallback),
-			new Common::Callback<GlobalOptionsDialog, Networking::ErrorResponse>(this, &GlobalOptionsDialog::storageErrorCallback)
-		);
-		break;
-	}
-	case kDownloadStorageCmd:
-		{
-			DownloadDialog dialog(_selectedStorageIndex, _launcher);
-			dialog.runModal();
-			break;
-		}
-#endif // USE_LIBCURL
-#ifdef USE_SDL_NET
-	case kRunServerCmd:
-		{
-#ifdef NETWORKING_LOCALWEBSERVER_ENABLE_PORT_OVERRIDE
-			// save server's port
-			uint32 port = Networking::LocalWebserver::getPort();
-			if (_serverPort) {
-				uint64 contents = _serverPort->getEditString().asUint64();
-				if (contents != 0)
-					port = contents;
-			}
-			ConfMan.setInt("local_server_port", port);
-			ConfMan.flushToDisk();
-#endif // NETWORKING_LOCALWEBSERVER_ENABLE_PORT_OVERRIDE
-
-			if (LocalServer.isRunning())
-				LocalServer.stopOnIdle();
-			else
-				LocalServer.start();
-
-			break;
-		}
-
 	case kServerPortClearCmd: {
 		if (_serverPort) {
 			_serverPort->setEditString(Common::String::format("%u", Networking::LocalWebserver::DEFAULT_SERVER_PORT));
 		}
-		draw();
+		g_gui.scheduleTopDialogRedraw();
 		break;
 	}
 #endif // USE_SDL_NET
@@ -2138,18 +2497,19 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 void GlobalOptionsDialog::handleTickle() {
 	OptionsDialog::handleTickle();
 #ifdef USE_CLOUD
+#ifdef USE_LIBCURL
+	if (_redrawCloudTab) {
+		reflowLayout(); // recalculates scrollbar as well
+		_redrawCloudTab = false;
+	}
+#endif // USE_LIBCURL
 #ifdef USE_SDL_NET
 	if (LocalServer.isRunning() != _serverWasRunning) {
 		_serverWasRunning = !_serverWasRunning;
-		_redrawCloudTab = true;
+		reflowNetworkTabLayout();
 	}
-#endif
-	if (_redrawCloudTab) {
-		setupCloudTab();
-		draw();
-		_redrawCloudTab = false;
-	}
-#endif
+#endif // USE_SDL_NET
+#endif // USE_CLOUD
 }
 
 void GlobalOptionsDialog::reflowLayout() {
@@ -2189,35 +2549,67 @@ void GlobalOptionsDialog::reflowLayout() {
 
 	OptionsDialog::reflowLayout();
 #ifdef USE_CLOUD
+#ifdef USE_LIBCURL
 	setupCloudTab();
-#endif
+#endif // USE_LIBCURL
+#ifdef USE_SDL_NET
+	reflowNetworkTabLayout();
+#endif // USE_SDL_NET
+#endif // USE_CLOUD
 }
 
 #ifdef USE_CLOUD
-void GlobalOptionsDialog::setupCloudTab() {
-	int serverLabelPosition = -1; //no override
 #ifdef USE_LIBCURL
-	_selectedStorageIndex = (_storagePopUp ? _storagePopUp->getSelectedTag() : (uint32) Cloud::kStorageNoneId);
+void GlobalOptionsDialog::setupCloudTab() {
+	_selectedStorageIndex = (_storagePopUp ? _storagePopUp->getSelectedTag() : (uint32)Cloud::kStorageNoneId);
 
 	if (_storagePopUpDesc) _storagePopUpDesc->setVisible(true);
 	if (_storagePopUp) _storagePopUp->setVisible(true);
 
+	Common::String username = CloudMan.getStorageUsername(_selectedStorageIndex);
+	bool storageConnected = (username != "");
 	bool shown = (_selectedStorageIndex != Cloud::kStorageNoneId);
-	if (_storageUsernameDesc) _storageUsernameDesc->setVisible(shown);
-	if (_storageUsername) {
-		Common::String username = CloudMan.getStorageUsername(_selectedStorageIndex);
-		if (username == "")
-			username = _("<none>");
-		_storageUsername->setLabel(username);
-		_storageUsername->setVisible(shown);
+	bool shownConnectedInfo = (shown && storageConnected);
+	bool showingCurrentStorage = (shownConnectedInfo && _selectedStorageIndex == CloudMan.getStorageIndex());
+	bool enabled = (shownConnectedInfo && CloudMan.isStorageEnabled());
+
+	// there goes layout for connected Storage
+
+	if (_storageDisabledHint) _storageDisabledHint->setVisible(showingCurrentStorage && !enabled);
+	if (_storageEnableButton) _storageEnableButton->setVisible(showingCurrentStorage && !enabled);
+
+	// calculate shift
+	int16 x, y;
+	uint16 w, h;
+	int16 shiftUp = 0;
+	if (!showingCurrentStorage || enabled) {
+		// "storage is disabled" hint is not shown, shift everything up
+		if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.StorageDisabledHint", x, y, w, h))
+			warning("GlobalOptions_Cloud_Container.StorageUsernameDesc's position is undefined");
+		shiftUp = y;
+		if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.StorageUsernameDesc", x, y, w, h))
+			warning("GlobalOptions_Cloud_Container.StorageWizardNotConnectedHint's position is undefined");
+		shiftUp = y - shiftUp;
 	}
-	if (_storageUsedSpaceDesc) _storageUsedSpaceDesc->setVisible(shown);
+
+	if (_storageUsernameDesc) _storageUsernameDesc->setVisible(shownConnectedInfo);
+	if (_storageUsername) {
+		_storageUsername->setLabel(username);
+		_storageUsername->setVisible(shownConnectedInfo);
+	}
+	if (_storageUsedSpaceDesc) _storageUsedSpaceDesc->setVisible(shownConnectedInfo);
 	if (_storageUsedSpace) {
 		uint64 usedSpace = CloudMan.getStorageUsedSpace(_selectedStorageIndex);
-		_storageUsedSpace->setLabel(Common::String::format(_("%llu bytes"), usedSpace));
-		_storageUsedSpace->setVisible(shown);
+		Common::String usedSpaceNumber, usedSpaceUnits;
+		usedSpaceNumber = Common::getHumanReadableBytes(usedSpace, usedSpaceUnits);
+		_storageUsedSpace->setLabel(Common::String::format("%s %s", usedSpaceNumber.c_str(), _(usedSpaceUnits.c_str())));
+		_storageUsedSpace->setVisible(shownConnectedInfo);
 	}
-	if (_storageLastSyncDesc) _storageLastSyncDesc->setVisible(shown);
+	if (_storageSyncHint) {
+		_storageSyncHint->setVisible(shownConnectedInfo);
+		_storageSyncHint->setEnabled(false);
+	}
+	if (_storageLastSyncDesc) _storageLastSyncDesc->setVisible(shownConnectedInfo);
 	if (_storageLastSync) {
 		Common::String sync = CloudMan.getStorageLastSync(_selectedStorageIndex);
 		if (sync == "") {
@@ -2227,124 +2619,134 @@ void GlobalOptionsDialog::setupCloudTab() {
 				sync = _("<never>");
 		}
 		_storageLastSync->setLabel(sync);
-		_storageLastSync->setVisible(shown);
+		_storageLastSync->setVisible(shownConnectedInfo);
 	}
-	if (_storageConnectButton)
-		_storageConnectButton->setVisible(shown);
-	if (_storageRefreshButton)
-		_storageRefreshButton->setVisible(shown && _selectedStorageIndex == CloudMan.getStorageIndex());
-	if (_storageDownloadButton)
-		_storageDownloadButton->setVisible(shown && _selectedStorageIndex == CloudMan.getStorageIndex());
-	if (!shown)
-		serverLabelPosition = (_storageUsernameDesc ? _storageUsernameDesc->getRelY() : 0);
-#else // USE_LIBCURL
-	_selectedStorageIndex = 0;
+	if (_storageSyncSavesButton) {
+		_storageSyncSavesButton->setVisible(showingCurrentStorage);
+		_storageSyncSavesButton->setEnabled(enabled);
+	}
 
-	if (_storagePopUpDesc)
-		_storagePopUpDesc->setVisible(false);
-	if (_storagePopUp)
-		_storagePopUp->setVisible(false);
-	if (_storageUsernameDesc)
-		_storageUsernameDesc->setVisible(false);
-	if (_storageUsernameDesc)
-		_storageUsernameDesc->setVisible(false);
-	if (_storageUsername)
-		_storageUsername->setVisible(false);
-	if (_storageUsedSpaceDesc)
-		_storageUsedSpaceDesc->setVisible(false);
-	if (_storageUsedSpace)
-		_storageUsedSpace->setVisible(false);
-	if (_storageLastSyncDesc)
-		_storageLastSyncDesc->setVisible(false);
-	if (_storageLastSync)
-		_storageLastSync->setVisible(false);
-	if (_storageConnectButton)
-		_storageConnectButton->setVisible(false);
-	if (_storageRefreshButton)
-		_storageRefreshButton->setVisible(false);
-	if (_storageDownloadButton)
-		_storageDownloadButton->setVisible(false);
+	bool showDownloadButton = (showingCurrentStorage && _selectedStorageIndex != Cloud::kStorageGoogleDriveId); // cannot download via Google Drive
+	if (_storageDownloadHint) _storageDownloadHint->setVisible(showDownloadButton);
+	if (_storageDownloadButton) {
+		_storageDownloadButton->setVisible(showDownloadButton);
+		_storageDownloadButton->setEnabled(enabled);
+	}
+	if (_storageDisconnectHint) _storageDisconnectHint->setVisible(shownConnectedInfo);
+	if (_storageDisconnectButton) _storageDisconnectButton->setVisible(shownConnectedInfo);
 
-	serverLabelPosition = (_storagePopUpDesc ? _storagePopUpDesc->getRelY() : 0);
-#endif // USE_LIBCURL
-#ifdef USE_SDL_NET
-	//determine original widget's positions
+	int16 disconnectWidgetsAdditionalShift = 0;
+	if (!showDownloadButton) {
+		if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.StorageDownloadHint", x, y, w, h))
+			warning("GlobalOptions_Cloud_Container.StorageDownloadHint's position is undefined");
+		disconnectWidgetsAdditionalShift = y;
+		if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.StorageDisconnectHint", x, y, w, h))
+			warning("GlobalOptions_Cloud_Container.DownloadButton's position is undefined");
+		disconnectWidgetsAdditionalShift = y - disconnectWidgetsAdditionalShift;
+	}
+
+	shiftWidget(_storageUsernameDesc, "GlobalOptions_Cloud_Container.StorageUsernameDesc", 0, -shiftUp);
+	shiftWidget(_storageUsername, "GlobalOptions_Cloud_Container.StorageUsernameLabel", 0, -shiftUp);
+	shiftWidget(_storageUsedSpaceDesc, "GlobalOptions_Cloud_Container.StorageUsedSpaceDesc", 0, -shiftUp);
+	shiftWidget(_storageUsedSpace, "GlobalOptions_Cloud_Container.StorageUsedSpaceLabel", 0, -shiftUp);
+	shiftWidget(_storageSyncHint, "GlobalOptions_Cloud_Container.StorageSyncHint", 0, -shiftUp);
+	shiftWidget(_storageLastSyncDesc, "GlobalOptions_Cloud_Container.StorageLastSyncDesc", 0, -shiftUp);
+	shiftWidget(_storageLastSync, "GlobalOptions_Cloud_Container.StorageLastSyncLabel", 0, -shiftUp);
+	shiftWidget(_storageSyncSavesButton, "GlobalOptions_Cloud_Container.SyncSavesButton", 0, -shiftUp);
+	shiftWidget(_storageDownloadHint, "GlobalOptions_Cloud_Container.StorageDownloadHint", 0, -shiftUp);
+	shiftWidget(_storageDownloadButton, "GlobalOptions_Cloud_Container.DownloadButton", 0, -shiftUp);
+	shiftWidget(_storageDisconnectHint, "GlobalOptions_Cloud_Container.StorageDisconnectHint", 0, -shiftUp - disconnectWidgetsAdditionalShift);
+	shiftWidget(_storageDisconnectButton, "GlobalOptions_Cloud_Container.DisconnectButton", 0, -shiftUp - disconnectWidgetsAdditionalShift);
+
+	// there goes layout for non-connected Storage (connection wizard)
+
+	shown = (!shownConnectedInfo && shown);
+	bool wizardEnabled = !_connectingStorage;
+	if (_storageWizardNotConnectedHint) _storageWizardNotConnectedHint->setVisible(shown);
+	if (_storageWizardOpenLinkHint) _storageWizardOpenLinkHint->setVisible(shown);
+	if (_storageWizardLink) {
+		_storageWizardLink->setVisible(shown);
+		_storageWizardLink->setEnabled(g_system->hasFeature(OSystem::kFeatureOpenUrl) && wizardEnabled);
+	}
+	if (_storageWizardCodeHint) _storageWizardCodeHint->setVisible(shown);
+	if (_storageWizardCodeBox) {
+		_storageWizardCodeBox->setVisible(shown);
+		_storageWizardCodeBox->setEnabled(wizardEnabled);
+	}
+	if (_storageWizardPasteButton) {
+		_storageWizardPasteButton->setVisible(shown && g_system->hasFeature(OSystem::kFeatureClipboardSupport));
+		_storageWizardPasteButton->setEnabled(wizardEnabled);
+	}
+	if (_storageWizardConnectButton) {
+		_storageWizardConnectButton->setVisible(shown);
+		_storageWizardConnectButton->setEnabled(wizardEnabled);
+	}
+	if (_storageWizardConnectionStatusHint) {
+		_storageWizardConnectionStatusHint->setVisible(shown && _storageWizardConnectionStatusHint->getLabel() != "...");
+		_storageWizardConnectionStatusHint->setEnabled(wizardEnabled);
+	}
+
+	if (!shownConnectedInfo) {
+		if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.StorageDisabledHint", x, y, w, h))
+			warning("GlobalOptions_Cloud_Container.StorageUsernameDesc's position is undefined");
+		shiftUp = y;
+		if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.StorageWizardNotConnectedHint", x, y, w, h))
+			warning("GlobalOptions_Cloud_Container.StorageWizardNotConnectedHint's position is undefined");
+		shiftUp = y - shiftUp;
+
+		shiftWidget(_storageWizardNotConnectedHint, "GlobalOptions_Cloud_Container.StorageWizardNotConnectedHint", 0, -shiftUp);
+		shiftWidget(_storageWizardOpenLinkHint, "GlobalOptions_Cloud_Container.StorageWizardOpenLinkHint", 0, -shiftUp);
+		shiftWidget(_storageWizardLink, "GlobalOptions_Cloud_Container.StorageWizardLink", 0, -shiftUp);
+		shiftWidget(_storageWizardCodeHint, "GlobalOptions_Cloud_Container.StorageWizardCodeHint", 0, -shiftUp);
+		shiftWidget(_storageWizardCodeBox, "GlobalOptions_Cloud_Container.StorageWizardCodeBox", 0, -shiftUp);
+		shiftWidget(_storageWizardPasteButton, "GlobalOptions_Cloud_Container.StorageWizardPasteButton", 0, -shiftUp);
+		shiftWidget(_storageWizardConnectButton, "GlobalOptions_Cloud_Container.StorageWizardConnectButton", 0, -shiftUp);
+		shiftWidget(_storageWizardConnectionStatusHint, "GlobalOptions_Cloud_Container.StorageWizardConnectionStatusHint", 0, -shiftUp);
+	}
+}
+
+void GlobalOptionsDialog::shiftWidget(Widget *widget, const char *widgetName, int32 xOffset, int32 yOffset) {
+	if (!widget) return;
+
 	int16 x, y;
 	uint16 w, h;
-	int serverButtonY, serverInfoY;
-	int serverRootButtonY, serverRootY, serverRootClearButtonY;
-	int serverPortDescY, serverPortY, serverPortClearButtonY;
-	if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.RunServerButton", x, y, w, h))
-		warning("GlobalOptions_Cloud_Container.RunServerButton's position is undefined");
-	serverButtonY = y;
-	if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.ServerInfoLabel", x, y, w, h))
-		warning("GlobalOptions_Cloud_Container.ServerInfoLabel's position is undefined");
-	serverInfoY = y;
+	if (!g_gui.xmlEval()->getWidgetData(widgetName, x, y, w, h))
+		warning("%s's position is undefined", widgetName);
 
-	if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.RootPathButton", x, y, w, h))
-		warning("GlobalOptions_Cloud_Container.RootPathButton's position is undefined");
-	serverRootButtonY = y;
-	if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.RootPath", x, y, w, h))
-		warning("GlobalOptions_Cloud_Container.RootPath's position is undefined");
-	serverRootY = y;
-	if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.RootPathClearButton", x, y, w, h))
-		warning("GlobalOptions_Cloud_Container.RootPathClearButton's position is undefined");
-	serverRootClearButtonY = y;
+	widget->setPos(x + xOffset, y + yOffset);
+}
+#endif // USE_LIBCURL
 
-	if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.ServerPortDesc", x, y, w, h))
-		warning("GlobalOptions_Cloud_Container.ServerPortDesc's position is undefined");
-	serverPortDescY = y;
-	if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.ServerPortEditText", x, y, w, h))
-		warning("GlobalOptions_Cloud_Container.ServerPortEditText's position is undefined");
-	serverPortY = y;
-	if (!g_gui.xmlEval()->getWidgetData("GlobalOptions_Cloud_Container.ServerPortClearButton", x, y, w, h))
-		warning("GlobalOptions_Cloud_Container.ServerPortClearButton's position is undefined");
-	serverPortClearButtonY = y;
-
+#ifdef USE_SDL_NET
+void GlobalOptionsDialog::reflowNetworkTabLayout() {
 	bool serverIsRunning = LocalServer.isRunning();
 
-	if (serverLabelPosition < 0)
-		serverLabelPosition = serverInfoY;
 	if (_runServerButton) {
 		_runServerButton->setVisible(true);
-		_runServerButton->setPos(_runServerButton->getRelX(), serverLabelPosition + serverButtonY - serverInfoY);
 		_runServerButton->setLabel(_(serverIsRunning ? "Stop server" : "Run server"));
 		_runServerButton->setTooltip(_(serverIsRunning ? "Stop local webserver" : "Run local webserver"));
 	}
 	if (_serverInfoLabel) {
 		_serverInfoLabel->setVisible(true);
-		_serverInfoLabel->setPos(_serverInfoLabel->getRelX(), serverLabelPosition);
 		if (serverIsRunning)
 			_serverInfoLabel->setLabel(LocalServer.getAddress());
 		else
 			_serverInfoLabel->setLabel(_("Not running"));
 	}
-	if (_rootPathButton) {
-		_rootPathButton->setVisible(true);
-		_rootPathButton->setPos(_rootPathButton->getRelX(), serverLabelPosition + serverRootButtonY - serverInfoY);
-	}
-	if (_rootPath) {
-		_rootPath->setVisible(true);
-		_rootPath->setPos(_rootPath->getRelX(), serverLabelPosition + serverRootY - serverInfoY);
-	}
-	if (_rootPathClearButton) {
-		_rootPathClearButton->setVisible(true);
-		_rootPathClearButton->setPos(_rootPathClearButton->getRelX(), serverLabelPosition + serverRootClearButtonY - serverInfoY);
-	}
+	if (_rootPathButton) _rootPathButton->setVisible(true);
+	if (_rootPath) _rootPath->setVisible(true);	
+	if (_rootPathClearButton) _rootPathClearButton->setVisible(true);
 #ifdef NETWORKING_LOCALWEBSERVER_ENABLE_PORT_OVERRIDE
 	if (_serverPortDesc) {
 		_serverPortDesc->setVisible(true);
-		_serverPortDesc->setPos(_serverPortDesc->getRelX(), serverLabelPosition + serverPortDescY - serverInfoY);
 		_serverPortDesc->setEnabled(!serverIsRunning);
 	}
 	if (_serverPort) {
 		_serverPort->setVisible(true);
-		_serverPort->setPos(_serverPort->getRelX(), serverLabelPosition + serverPortY - serverInfoY);
 		_serverPort->setEnabled(!serverIsRunning);
 	}
 	if (_serverPortClearButton) {
 		_serverPortClearButton->setVisible(true);
-		_serverPortClearButton->setPos(_serverPortClearButton->getRelX(), serverLabelPosition + serverPortClearButtonY - serverInfoY);
 		_serverPortClearButton->setEnabled(!serverIsRunning);
 	}
 #else // NETWORKING_LOCALWEBSERVER_ENABLE_PORT_OVERRIDE
@@ -2355,43 +2757,41 @@ void GlobalOptionsDialog::setupCloudTab() {
 	if (_serverPortClearButton)
 		_serverPortClearButton->setVisible(false);
 #endif // NETWORKING_LOCALWEBSERVER_ENABLE_PORT_OVERRIDE
-#else // USE_SDL_NET
-	if (_runServerButton)
-		_runServerButton->setVisible(false);
-	if (_serverInfoLabel) {
-		_serverInfoLabel->setPos(_serverInfoLabel->getRelX(), serverLabelPosition); // Prevent compiler warning from serverLabelPosition being unused.
-		_serverInfoLabel->setVisible(false);
+
+	// if port override isn't supported, there will be a gap between these lines and options -- it's OK
+
+	if (_featureDescriptionLine1) {
+		_featureDescriptionLine1->setVisible(true);
+		_featureDescriptionLine1->setEnabled(false);
 	}
-	if (_rootPathButton)
-		_rootPathButton->setVisible(false);
-	if (_rootPath)
-		_rootPath->setVisible(false);
-	if (_rootPathClearButton)
-		_rootPathClearButton->setVisible(false);
-	if (_serverPortDesc)
-		_serverPortDesc->setVisible(false);
-	if (_serverPort)
-		_serverPort->setVisible(false);
-	if (_serverPortClearButton)
-		_serverPortClearButton->setVisible(false);
-#endif // USE_SDL_NET
+	if (_featureDescriptionLine2) {
+		_featureDescriptionLine2->setVisible(true);
+		_featureDescriptionLine2->setEnabled(false);
+	}
 }
+#endif // USE_SDL_NET
 
 #ifdef USE_LIBCURL
-void GlobalOptionsDialog::storageInfoCallback(Cloud::Storage::StorageInfoResponse response) {
-	//we could've used response.value.email()
-	//but Storage already notified CloudMan
-	//so we just set the flag to redraw our cloud tab
+void GlobalOptionsDialog::storageConnectionCallback(Networking::ErrorResponse response) {
+	Common::String message = "...";
+	if (!response.failed && !response.interrupted) {
+		// success
+		g_system->displayMessageOnOSD(_("Storage connected."));
+	} else {
+		message = _("Failed to connect storage.");
+		if (response.failed) {
+			message = Common::String(_("Failed to connect storage: ")) + _(response.response.c_str());
+		}
+	}
+
+	if (_storageWizardConnectionStatusHint)
+		_storageWizardConnectionStatusHint->setLabel(message);
+
 	_redrawCloudTab = true;
+	_connectingStorage = false;
 }
 
-void GlobalOptionsDialog::storageListDirectoryCallback(Cloud::Storage::ListDirectoryResponse response) {
-	Common::Array<Cloud::StorageFile> &files = response.value;
-	uint64 totalSize = 0;
-	for (uint32 i = 0; i < files.size(); ++i)
-		if (!files[i].isDirectory())
-			totalSize += files[i].size();
-	CloudMan.setStorageUsedSpace(CloudMan.getStorageIndex(), totalSize);
+void GlobalOptionsDialog::storageSavesSyncedCallback(Cloud::Storage::BoolResponse response) {
 	_redrawCloudTab = true;
 }
 

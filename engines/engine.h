@@ -51,6 +51,7 @@ class Dialog;
  * Initializes graphics and shows error message.
  */
 void GUIErrorMessage(const Common::String &msg);
+void GUIErrorMessageFormat(const char *fmt, ...) GCC_PRINTF(1, 2);
 
 
 class Engine {
@@ -131,7 +132,15 @@ public:
 		 * If this feature is supported, then the corresponding MetaEngine *must*
 		 * support the kSupportsListSaves feature.
 		 */
-		kSupportsSavingDuringRuntime
+		kSupportsSavingDuringRuntime,
+
+		/**
+		 * Engine must receive joystick events because the game uses them.
+		 * For engines which have not this feature, joystick events are converted
+		 * to mouse events.
+		 */
+		kSupportsJoystick
+
 	};
 
 

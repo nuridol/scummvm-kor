@@ -60,11 +60,11 @@ Common::Rect getBoundingBoxImpl(const Font &font, const StringType &str, int x, 
 		const typename StringType::unsigned_type cur = *i;
 		x += font.getKerningOffset(last, cur);
 		last = cur;
-		w = font.getCharWidth(cur);
-		if (x+w > rightX)
+
+		Common::Rect charBox = font.getBoundingBox(cur);
+		if (x + charBox.right > rightX)
 			break;
-		if (x+w >= leftX) {
-			Common::Rect charBox = font.getBoundingBox(cur);
+		if (x + charBox.right >= leftX) {
 			charBox.translate(x, y);
 			if (first) {
 				bbox = charBox;
@@ -73,7 +73,8 @@ Common::Rect getBoundingBoxImpl(const Font &font, const StringType &str, int x, 
 				bbox.extend(charBox);
 			}
 		}
-		x += w;
+
+		x += font.getCharWidth(cur);
 	}
 
 	return bbox;
@@ -83,34 +84,12 @@ template<class StringType>
 int getStringWidthImpl(const Font &font, const StringType &str) {
 	int space = 0;
 	typename StringType::unsigned_type last = 0;
-#ifdef SCUMMVMKOR
-	bool isKorean = 1;
-	//const char *s = str.c_str();
-	uint len = str.size();
-	
-	for (uint i = 0; i < len; ++i) {
-		typename StringType::unsigned_type c;
-		c = str[i];
-		if (c >= 0x80 && isKorean && i+1 < len) {
-			if (checkKorCode(c, str[i + 1])) {
-				c += str[i + 1] * 256;	// LE
-				i++;
-			} else {
-				// 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-				isKorean = 0;
-			}
-		}
-		const typename StringType::unsigned_type cur = str[i];
-		space += font.getCharWidth(c) + font.getKerningOffset(last, cur);
-		last = cur;
-	}
-#else
+
 	for (uint i = 0; i < str.size(); ++i) {
 		const typename StringType::unsigned_type cur = str[i];
 		space += font.getCharWidth(cur) + font.getKerningOffset(last, cur);
 		last = cur;
 	}
-#endif
 
 	return space;
 }
@@ -132,38 +111,17 @@ void drawStringImpl(const Font &font, Surface *dst, const StringType &str, int x
 
 	typename StringType::unsigned_type last = 0;
 	for (typename StringType::const_iterator i = str.begin(), end = str.end(); i != end; ++i) {
-#ifdef SCUMMVMKOR
-		bool isKorean = 1;
-		typename StringType::unsigned_type c;
-		c = *i;
-		if (c >= 0x80 && isKorean && i+1 < end) {
-			if (checkKorCode(c, *(i+1))) {
-				c += *(i+1) * 256;	//LE
-				i++;
-			} else {
-				// 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-				isKorean = 0;
-			}
-		}
 		const typename StringType::unsigned_type cur = *i;
 		x += font.getKerningOffset(last, cur);
 		last = cur;
-		w = font.getCharWidth(c);
-		if (x+w > rightX)
+
+		Common::Rect charBox = font.getBoundingBox(cur);
+		if (x + charBox.right > rightX)
 			break;
-		if (x+w >= leftX)
-			font.drawChar(dst, c, x, y, color);
-#else
-		const typename StringType::unsigned_type cur = *i;
-		x += font.getKerningOffset(last, cur);
-		last = cur;
-		w = font.getCharWidth(cur);
-		if (x+w > rightX)
-			break;
-		if (x+w >= leftX)
+		if (x + charBox.right >= leftX)
 			font.drawChar(dst, cur, x, y, color);
-#endif
-		x += w;
+
+		x += font.getCharWidth(cur);
 	}
 }
 
@@ -184,15 +142,21 @@ struct WordWrapper {
 		line.clear();
 		w = 0;
 	}
+
+	void clear() {
+		lines.clear();
+		actualMaxLineWidth = 0;
+	}
 };
 
 template<class StringType>
-int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Common::Array<StringType> &lines, int initWidth) {
+int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Common::Array<StringType> &lines, int initWidth, bool evenWidthLinesModeEnabled, bool wrapOnExplicitNewLines) {
 	WordWrapper<StringType> wrapper(lines);
 	StringType line;
 	StringType tmpStr;
 	int lineWidth = initWidth;
 	int tmpWidth = 0;
+	int fullTextWidthEWL = initWidth; // this replaces new line characters (if any) with single spaces - it is used in Even Width Lines mode
 
 	// The rough idea behind this algorithm is as follows:
 	// We accumulate characters into the string tmpStr. Whenever a full word
@@ -208,70 +172,143 @@ int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Comm
 	// lines.
 
 	typename StringType::unsigned_type last = 0;
-	for (typename StringType::const_iterator x = str.begin(); x != str.end(); ++x) {
-		typename StringType::unsigned_type c = *x;
 
-		// Convert Windows and Mac line breaks into plain \n
-		if (c == '\r') {
-			if (x != str.end() && *(x + 1) == '\n') {
-				++x;
+	// When EvenWidthLines mode is enabled then we require an early loop over the entire string
+	// in order to get the full width of the text
+	//
+	// "Wrap On Explicit New Lines" and "Even Width Lines" modes are mutually exclusive,
+	// If both are set to true and there are new line characters in the text,
+	// then "Even Width Lines" mode is disabled.
+	//
+	if (evenWidthLinesModeEnabled) {
+		// Early loop to get the full width of the text
+		for (typename StringType::const_iterator x = str.begin(); x != str.end(); ++x) {
+			typename StringType::unsigned_type c = *x;
+
+			// Check for Windows and Mac line breaks
+			if (c == '\r') {
+				if (x != str.end() && *(x + 1) == '\n') {
+					++x;
+				}
+				c = '\n';
 			}
-			c = '\n';
+
+			if (c == '\n') {
+				if (!wrapOnExplicitNewLines) {
+					c = ' ';
+				} else {
+					evenWidthLinesModeEnabled = false;
+					break;
+				}
+			}
+
+			const int w = font.getCharWidth(c) + font.getKerningOffset(last, c);
+			last = c;
+			fullTextWidthEWL += w;
 		}
+	}
 
-		const int w = font.getCharWidth(c) + font.getKerningOffset(last, c);
-		last = c;
-		const bool wouldExceedWidth = (lineWidth + tmpWidth + w > maxWidth);
-
-		// If this char is a whitespace, then it represents a potential
-		// 'wrap point' where wrapping could take place. Everything that
-		// came before it can now safely be added to the line, as we know
-		// that it will not have to be wrapped.
-		if (Common::isSpace(c)) {
-			line += tmpStr;
-			lineWidth += tmpWidth;
-
-			tmpStr.clear();
-			tmpWidth = 0;
-
-			// If we encounter a line break (\n), or if the new space would
-			// cause the line to overflow: start a new line
-			if (c == '\n' || wouldExceedWidth) {
-				wrapper.add(line, lineWidth);
+	int targetTotalLinesNumberEWL = 0;
+	int targetMaxLineWidth = 0;
+	do {
+		if (evenWidthLinesModeEnabled) {
+			wrapper.clear();
+			targetTotalLinesNumberEWL += 1;
+			// We add +2 to the fullTextWidthEWL to account for possible shadow pixels
+			// We add +10 * font.getCharWidth(' ') to the quotient since we want to allow some extra margin (about an extra wprd's length)
+			// since that yields better looking results
+			targetMaxLineWidth = ((fullTextWidthEWL + 2) / targetTotalLinesNumberEWL) + 10 * font.getCharWidth(' ');
+			if (targetMaxLineWidth > maxWidth) {
+				// repeat the loop with increased targetTotalLinesNumberEWL
 				continue;
 			}
+		} else {
+			targetMaxLineWidth = maxWidth;
 		}
 
-		// If the max line width would be exceeded by adding this char,
-		// insert a line break.
-		if (wouldExceedWidth) {
-			// Commit what we have so far, *if* we have anything.
-			// If line is empty, then we are looking at a word
-			// which exceeds the maximum line width.
-			if (lineWidth > 0) {
-				wrapper.add(line, lineWidth);
-				// Trim left side
-				while (tmpStr.size() && Common::isSpace(tmpStr[0])) {
-					tmpStr.deleteChar(0);
-					// This is not very fast, but it is the simplest way to
-					// assure we do not mess something up because of kerning.
-					tmpWidth = font.getStringWidth(tmpStr);
+		last = 0;
+		tmpWidth = 0;
+
+		for (typename StringType::const_iterator x = str.begin(); x != str.end(); ++x) {
+			typename StringType::unsigned_type c = *x;
+
+			// Convert Windows and Mac line breaks into plain \n
+			if (c == '\r') {
+				if (x != str.end() && *(x + 1) == '\n') {
+					++x;
 				}
-			} else {
-				wrapper.add(tmpStr, tmpWidth);
+				c = '\n';
 			}
+			// if wrapping on explicit new lines is disabled, then new line characters should be treated as a single white space char
+			if (!wrapOnExplicitNewLines && c == '\n')  {
+				c = ' ';
+			}
+
+			const int currentCharWidth = font.getCharWidth(c);
+			const int w = currentCharWidth + font.getKerningOffset(last, c);
+			last = c;
+			const bool wouldExceedWidth = (lineWidth + tmpWidth + w > targetMaxLineWidth);
+
+			// If this char is a whitespace, then it represents a potential
+			// 'wrap point' where wrapping could take place. Everything that
+			// came before it can now safely be added to the line, as we know
+			// that it will not have to be wrapped.
+			if (Common::isSpace(c)) {
+				line += tmpStr;
+				lineWidth += tmpWidth;
+
+				tmpStr.clear();
+				tmpWidth = 0;
+
+				// If we encounter a line break (\n), or if the new space would
+				// cause the line to overflow: start a new line
+				if ((wrapOnExplicitNewLines && c == '\n') || wouldExceedWidth) {
+					wrapper.add(line, lineWidth);
+					continue;
+				}
+			}
+
+			// If the max line width would be exceeded by adding this char,
+			// insert a line break.
+			if (wouldExceedWidth) {
+				// Commit what we have so far, *if* we have anything.
+				// If line is empty, then we are looking at a word
+				// which exceeds the maximum line width.
+				if (lineWidth > 0) {
+					wrapper.add(line, lineWidth);
+					// Trim left side
+					while (tmpStr.size() && Common::isSpace(tmpStr[0])) {
+						tmpStr.deleteChar(0);
+						// This is not very fast, but it is the simplest way to
+						// assure we do not mess something up because of kerning.
+						tmpWidth = font.getStringWidth(tmpStr);
+					}
+
+					if (tmpStr.empty()) {
+						// If tmpStr is empty, we might have removed the space before 'c'.
+						// That means we have to recompute the kerning.
+
+						tmpWidth += currentCharWidth + font.getKerningOffset(0, c);
+						tmpStr += c;
+						continue;
+					}
+				} else {
+					wrapper.add(tmpStr, tmpWidth);
+				}
+			}
+
+			tmpWidth += w;
+			tmpStr += c;
 		}
 
-		tmpWidth += w;
-		tmpStr += c;
-	}
-
-	// If some text is left over, add it as the final line
-	line += tmpStr;
-	lineWidth += tmpWidth;
-	if (lineWidth > 0) {
-		wrapper.add(line, lineWidth);
-	}
+		// If some text is left over, add it as the final line
+		line += tmpStr;
+		lineWidth += tmpWidth;
+		if (lineWidth > 0) {
+			wrapper.add(line, lineWidth);
+		}
+	} while (evenWidthLinesModeEnabled
+	         && (targetMaxLineWidth > maxWidth));
 	return wrapper.actualMaxLineWidth;
 }
 
@@ -332,8 +369,8 @@ void Font::drawString(Surface *dst, const Common::String &str, int x, int y, int
 	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax);
 }
 
-void Font::drawString(Surface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align) const {
-	drawStringImpl(*this, dst, str, x, y, w, color, align, 0);
+void Font::drawString(Surface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax) const {
+	drawStringImpl(*this, dst, str, x, y, w, color, align, deltax);
 }
 
 void Font::drawString(ManagedSurface *dst, const Common::String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
@@ -343,28 +380,24 @@ void Font::drawString(ManagedSurface *dst, const Common::String &str, int x, int
 	}
 }
 
-void Font::drawString(ManagedSurface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align) const {
-	drawString(&dst->_innerSurface, str, x, y, w, color, align);
+void Font::drawString(ManagedSurface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax) const {
+	drawString(&dst->_innerSurface, str, x, y, w, color, align, deltax);
 	if (w != 0) {
 		dst->addDirtyRect(getBoundingBox(str, x, y, w, align));
 	}
 }
 
-int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Common::String> &lines, int initWidth) const {
-	return wordWrapTextImpl(*this, str, maxWidth, lines, initWidth);
+int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Common::String> &lines, int initWidth, bool evenWidthLinesModeEnabled, bool wrapOnExplicitNewLines) const {
+	return wordWrapTextImpl(*this, str, maxWidth, lines, initWidth, evenWidthLinesModeEnabled, wrapOnExplicitNewLines);
 }
 
-int Font::wordWrapText(const Common::U32String &str, int maxWidth, Common::Array<Common::U32String> &lines, int initWidth) const {
-	return wordWrapTextImpl(*this, str, maxWidth, lines, initWidth);
+int Font::wordWrapText(const Common::U32String &str, int maxWidth, Common::Array<Common::U32String> &lines, int initWidth, bool evenWidthLinesModeEnabled, bool wrapOnExplicitNewLines) const {
+	return wordWrapTextImpl(*this, str, maxWidth, lines, initWidth, evenWidthLinesModeEnabled, wrapOnExplicitNewLines);
 }
 
 Common::String Font::handleEllipsis(const Common::String &input, int w) const {
 	Common::String s = input;
 	int width = getStringWidth(s);
-
-#ifdef SCUMMVMKOR
-	bool isKorean = 1;
-#endif
 
 	if (width > w && s.hasSuffix("...")) {
 		// String is too wide. Check whether it ends in an ellipsis
@@ -395,34 +428,10 @@ Common::String Font::handleEllipsis(const Common::String &input, int w) const {
 		uint i = 0;
 
 		for (; i < s.size(); ++i) {
-#ifdef SCUMMVMKOR
-			int charWidth = 0;
-			Common::String::unsigned_type c;
-			c = s[i];
-			if (c >= 0x80 && isKorean && i+1 < s.size()) {
-				if (checkKorCode(c, s[i + 1])) {
-					c += s[i + 1] * 256;	// LE
-					str += s[i];	// 한글을 한 글자씩 넣어준다
-					i++;
-				} else {
-					// 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-					isKorean = 0;
-				}
-			}
-			//uint16 cur = s[i];
-			const Common::String::unsigned_type cur = s[i];
-			charWidth = getCharWidth(c) + getKerningOffset(last, cur);
-			if (w2 + charWidth > halfWidth) {
-				if (c > 0xff)
-					str += s[i];
-				break;
-			}
-#else
 			const Common::String::unsigned_type cur = s[i];
 			int charWidth = getCharWidth(cur) + getKerningOffset(last, cur);
 			if (w2 + charWidth > halfWidth)
 				break;
-#endif
 			last = cur;
 			w2 += charWidth;
 			str += cur;
@@ -441,24 +450,8 @@ Common::String Font::handleEllipsis(const Common::String &input, int w) const {
 		// (width + ellipsisWidth - w)
 		int skip = width + ellipsisWidth - w;
 		for (; i < s.size() && skip > 0; ++i) {
-#ifdef SCUMMVMKOR
-			Common::String::unsigned_type c;
-			c = s[i];
-			if (c >= 0x80 && isKorean && i+1 < s.size()) {
-				if (checkKorCode(c, s[i + 1])) {
-					c += s[i + 1] * 256;	//LE
-					i++;
-				} else {
-					// 한글 판별에 한 번 실패했을 경우, 그 문장은 한글이 아닌 것으로 간주한다
-					isKorean = 0;
-				}
-			}
-			const Common::String::unsigned_type cur = s[i];
-			skip -= getCharWidth(c) + getKerningOffset(last, cur);
-#else
 			const Common::String::unsigned_type cur = s[i];
 			skip -= getCharWidth(cur) + getKerningOffset(last, cur);
-#endif
 			last = cur;
 		}
 

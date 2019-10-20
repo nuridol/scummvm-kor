@@ -200,7 +200,7 @@ int LogicHEsoccer::op_1005(float x1, float y1, float z1, float x2, float y2, flo
 	*nextVelX = x2 - 2 * dot * x1;
 	*nextVelY = y2 - 2 * dot * y1;
 	*nextVelZ = z2 - 2 * dot * z1;
-	*a10 = 1.0f; // It always does this. How curious!
+	*a10 = 1.0F; // It always does this. How curious!
 
 	return 1;
 }
@@ -634,7 +634,7 @@ int LogicHEsoccer::op_1014(int32 srcX, int32 srcY, int32 srcZ, int32 velX, int32
 	// work out which collision objects we might collide with (if any)
 	if (generateCollisionObjectList(startX, startY, startZ, adjustedVelX, adjustedVelY, adjustedVelZ)) {
 		int collisionId = 0;
-		float v46; // always 1.0 after a collision due to op_1005
+		float v46 = 0.0; // always 1.0 after a collision due to op_1005
 
 		float collisionInfo[42 * 8];
 		memset(collisionInfo, 0, 42 * 8 * sizeof(float));

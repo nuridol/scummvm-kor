@@ -41,11 +41,10 @@ public:
 	bool getFeatureState(OSystem::Feature f) const override;
 	int getDefaultGraphicsMode() const override;
 
-	void initSize(uint w, uint h) override;
+	void initSize(uint w, uint h, const Graphics::PixelFormat *format = NULL) override;
 	const OSystem::GraphicsMode *getSupportedGraphicsModes() const override;
-	bool setGraphicsMode(const char *name) override;
-	bool setGraphicsMode(int mode) override;
-	void setGraphicsModeIntern() override;
+	int getGraphicsModeScale(int mode) const override;
+	ScalerProc *getGraphicsScalerProc(int mode) const override;
 	void internUpdateScreen() override;
 	void showOverlay() override;
 	void hideOverlay() override;

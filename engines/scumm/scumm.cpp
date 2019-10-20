@@ -64,6 +64,7 @@
 #include "scumm/players/player_v3m.h"
 #include "scumm/players/player_v4a.h"
 #include "scumm/players/player_v5m.h"
+#include "scumm/players/player_he.h"
 #include "scumm/resource.h"
 #include "scumm/he/resource_he.h"
 #include "scumm/he/moonbase/moonbase.h"
@@ -75,16 +76,14 @@
 #include "scumm/he/cup_player_he.h"
 #include "scumm/util.h"
 #include "scumm/verbs.h"
-#include "scumm/imuse/pcspk.h"
-#include "scumm/imuse/mac_m68k.h"
+#include "scumm/imuse/drivers/pcspk.h"
+#include "scumm/imuse/drivers/mac_m68k.h"
+#include "scumm/imuse/drivers/amiga.h"
+#include "scumm/imuse/drivers/fmtowns.h"
 
 #include "backends/audiocd/audiocd.h"
 
 #include "audio/mixer.h"
-
-#ifdef SCUMMVMKOR
-#include "scumm/korean.h"
-#endif
 
 using Common::File;
 
@@ -248,7 +247,7 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_screenHeight = 0;
 	_screenWidth = 0;
 	memset(_virtscr, 0, sizeof(_virtscr));
-	memset(&camera, 0, sizeof(CameraData));
+	camera.reset();
 	memset(_colorCycle, 0, sizeof(_colorCycle));
 	memset(_colorUsedByCycle, 0, sizeof(_colorUsedByCycle));
 	_ENCD_offs = 0;
@@ -326,10 +325,6 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_costumeRenderer = NULL;
 	_2byteFontPtr = 0;
 	_V1TalkingActor = 0;
-#ifdef SCUMMVMKOR
-	for(int i = 0; i < 20; i++)
-		_2byteMultiFontPtr[i] = NULL;
-#endif
 	_NESStartStrip = 0;
 
 	_skipDrawObject = 0;
@@ -338,8 +333,18 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 	_townsPaletteFlags = 0;
 	_townsClearLayerFlag = 1;
 	_townsActiveLayerFlags = 3;
-	memset(&_curStringRect, -1, sizeof(Common::Rect));
-	memset(&_cyclRects, 0, 16 * sizeof(Common::Rect));
+	_curStringRect.top = -1;
+	_curStringRect.left = -1;
+	_curStringRect.bottom = -1;
+	_curStringRect.right = -1;
+
+	for (int i = 0; i < ARRAYSIZE(_cyclRects); i++) {
+		_cyclRects[i].top = 0;
+		_cyclRects[i].left = 0;
+		_cyclRects[i].bottom = 0;
+		_cyclRects[i].right = 0;
+	}
+
 	_numCyclRects = 0;
 #endif
 
@@ -608,16 +613,8 @@ ScummEngine::~ScummEngine() {
 	}
 
 	delete[] _sortedActors;
-#ifdef SCUMMVMKOR
-	if (_koreanMode) unloadKoreanFiles();
-	if (_2byteFontPtr && !_useMultiFont)
-		delete _2byteFontPtr;
-	for (int i = 0; i < 20; i++)
-		if (_2byteMultiFontPtr[i])
-			delete _2byteMultiFontPtr[i];
-#else
+
 	delete[] _2byteFontPtr;
-#endif
 	delete _charset;
 	delete _messageDialog;
 	delete _pauseDialog;
@@ -720,6 +717,8 @@ ScummEngine_v2::ScummEngine_v2(OSystem *syst, const DetectorResult &dr)
 	: ScummEngine_v3old(syst, dr) {
 
 	_inventoryOffset = 0;
+	_flashlight.xStrips = 6;
+	_flashlight.yStrips = 4;
 
 	VAR_SENTENCE_VERB = 0xFF;
 	VAR_SENTENCE_OBJECT1 = 0xFF;
@@ -1261,41 +1260,6 @@ Common::Error ScummEngine::init() {
 	// Load it earlier so _useCJKMode variable could be set
 	loadCJKFont();
 
-#ifdef SCUMMVMKOR
-	// 개선의 여지가 약간 있지만, 일단은 그대로 남겨둠
-	_koreanMode = 0;
-	_koreanOnly = 0;
-	_highRes = 0;
-	
-	if(_language == Common::KO_KOR) {
-		_koreanMode = ConfMan.getBool("v1_korean_mode");
-		_koreanOnly = ConfMan.getBool("v1_korean_only") && _koreanMode;
-		if((_game.version == 8 || _game.heversion > 72) && _koreanMode)
-			_highRes = true;
-		if((_game.id == GID_DIG || _game.id == GID_CMI) && _koreanMode) {
-			debug("You can not use V1 mode in this game");
-			_koreanMode = 0;
-			_koreanOnly = 0;
-			_highRes = 0;
-		}
-		if(_koreanMode) {
-			debug("Korean V1 translation mode.");
-			loadKoreanFiles(/*getGameName()*/_game.gameid);
-			//_useCJKMode = 0;	// V1과 V2를 동시에 사용하지 않는다
-			_useCJKMode = 1;	// V1과 V2를 동시에 사용한다
-		} else {
-			if(_useCJKMode) {
-				debug("Korean V2 mode for DUMB edition or COMI Korean version");
-			}
-		}
-	}
-	debug("_game.id = %d", _game.id);
-	debug("_game.gameid = %s", _game.gameid);
-	debug("_game.version = %d, _game.heversion = %d", _game.version, _game.heversion);
-	debug("_koreanMode = %d, _koreanOnly = %d, _useCJKMode = %d", _koreanMode, _koreanOnly, _useCJKMode);
-	debug("_highRes = %d", _highRes);
-#endif
-
 	// Initialize backend
 	if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG) {
 		initGraphics(kHercWidth, kHercHeight);
@@ -1829,7 +1793,7 @@ void ScummEngine_v90he::resetScumm() {
 	_hePaletteNum = 0;
 
 	_sprite->resetTables(0);
-	memset(&_wizParams, 0, sizeof(_wizParams));
+	_wizParams.reset();
 
 	if (_game.heversion >= 98)
 		_logicHE = LogicHE::makeLogicHE(this);
@@ -1874,6 +1838,9 @@ void ScummEngine::setupMusic(int midi) {
 	switch (MidiDriver::getMusicType(dev)) {
 	case MT_NULL:
 		_sound->_musicType = MDT_NONE;
+		break;
+	case MT_AMIGA:
+		_sound->_musicType = MDT_AMIGA;
 		break;
 	case MT_PCSPK:
 		_sound->_musicType = MDT_PCSPK;
@@ -2005,6 +1972,10 @@ void ScummEngine::setupMusic(int midi) {
 		// support this with the Player_AD code at the moment. The reason here
 		// is that multi MIDI is supported internally by our iMuse output.
 		_musicEngine = new Player_AD(this);
+#ifdef ENABLE_HE
+	} else if (_game.platform == Common::kPlatformDOS && _sound->_musicType == MDT_ADLIB && _game.heversion >= 60) {
+		_musicEngine = new Player_HE(this);
+#endif
 	} else if (_game.version >= 3 && _game.heversion <= 62) {
 		MidiDriver *nativeMidiDriver = 0;
 		MidiDriver *adlibMidiDriver = 0;
@@ -2019,6 +1990,10 @@ void ScummEngine::setupMusic(int midi) {
 			_native_mt32 = false;
 			// Ignore non-native drivers. This also ignores the multi MIDI setting.
 			useOnlyNative = true;
+		} else if (_sound->_musicType == MDT_AMIGA) {
+			nativeMidiDriver = new IMuseDriver_Amiga(_mixer);
+			_native_mt32 = false;
+			useOnlyNative = true;
 		} else if (_sound->_musicType != MDT_ADLIB && _sound->_musicType != MDT_TOWNS && _sound->_musicType != MDT_PCSPK) {
 			nativeMidiDriver = MidiDriver::createMidi(dev);
 		}
@@ -2027,7 +2002,9 @@ void ScummEngine::setupMusic(int midi) {
 			nativeMidiDriver->property(MidiDriver::PROP_CHANNEL_MASK, 0x03FE);
 
 		if (!useOnlyNative) {
-			if (_sound->_musicType == MDT_ADLIB || _sound->_musicType == MDT_TOWNS || multi_midi) {
+			if (_sound->_musicType == MDT_TOWNS) {
+				adlibMidiDriver = new MidiDriver_TOWNS(_mixer);
+			} else if (_sound->_musicType == MDT_ADLIB || multi_midi) {
 				adlibMidiDriver = MidiDriver::createMidi(MidiDriver::detectDevice(_sound->_musicType == MDT_TOWNS ? MDT_TOWNS : MDT_ADLIB));
 				adlibMidiDriver->property(MidiDriver::PROP_OLD_ADLIB, (_game.features & GF_SMALL_HEADER) ? 1 : 0);
 				// Try to use OPL3 mode for Sam&Max when possible.
@@ -2065,6 +2042,8 @@ void ScummEngine::setupMusic(int midi) {
 			}
 			if (_sound->_musicType == MDT_PCSPK)
 				_imuse->property(IMuse::PROP_PC_SPEAKER, 1);
+			if (_sound->_musicType == MDT_AMIGA)
+				_imuse->property(IMuse::PROP_AMIGA, 1);
 		}
 	}
 }
@@ -2256,21 +2235,6 @@ void ScummEngine::scummLoop(int delta) {
 	_talkDelay -= delta;
 	if (_talkDelay < 0)
 		_talkDelay = 0;
-
-#ifdef SCUMMVMKOR
-	for(int numb = 0; numb < MAX_KOR; numb++) {
-		if (_strKSet1[numb].delay != -1) { // kor
-			_strKSet1[numb].delay -= delta;
-			if (_strKSet1[numb].delay < 0)
-				_strKSet1[numb].delay = 0;
-		}
-		if (_strKDesc[numb].delay != -1) { // kor
-			_strKDesc[numb].delay -= 5;
-			if (_strKDesc[numb].delay < 0)
-				_strKDesc[numb].delay = 0;
-		}
-	}
-#endif
 
 	// Record the current ego actor before any scripts (including input scripts)
 	// get a chance to run.
@@ -2496,6 +2460,9 @@ void ScummEngine::scummLoop_handleSaveLoad() {
 
 			if (success && _saveTemporaryState && VAR_GAME_LOADED != 0xFF && _game.version <= 7)
 				VAR(VAR_GAME_LOADED) = 201;
+
+			if (!_saveTemporaryState)
+				_lastSaveTime = _system->getMillis();
 		} else {
 			success = loadState(_saveLoadSlot, _saveTemporaryState, filename);
 			if (!success)
@@ -2519,7 +2486,6 @@ void ScummEngine::scummLoop_handleSaveLoad() {
 			clearClickedStatus();
 
 		_saveLoadFlag = 0;
-		_lastSaveTime = _system->getMillis();
 	}
 }
 

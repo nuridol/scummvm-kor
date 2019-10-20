@@ -7,15 +7,15 @@
 #   Prologue information
 #------------------------------------------------------------------------------
 Name		: scummvm-tools
-Version		: 2.0.0
+Version		: 2.1.0
 Release		: 1
 Summary		: ScummVM-related tools
 Group		: Interpreters
 License		: GPL
 
-Url             : http://www.scummvm.org
+Url             : https://www.scummvm.org
 
-Source		: %{name}-%{version}.tar.bz2
+Source		: %{name}-%{version}.tar.xz
 BuildRoot	: %{_tmppath}/%{name}-%{version}-root
 
 BuildRequires: zlib-devel

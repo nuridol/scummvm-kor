@@ -28,7 +28,7 @@
 
 namespace BladeRunner {
 
-Font::Font(BladeRunnerEngine *vm) : _vm(vm) {
+Font::Font() {
 	reset();
 }
 
@@ -36,42 +36,43 @@ Font::~Font() {
 	close();
 }
 
-bool Font::open(const Common::String &fileName, int screenWidth, int screenHeight, int spacing1, int spacing2, uint16 color) {
-	reset();
+Font* Font::load(BladeRunnerEngine *vm, const Common::String &fileName, int spacing, bool useFontColor) {
+	Font *font = new Font();
+	font->_spacing = spacing;
+	font->_useFontColor = useFontColor;
 
-	_screenWidth = screenWidth;
-	_screenHeight = screenHeight;
-	_spacing1 = spacing1;
-	_spacing2 = spacing2;
-	_color = color;
-
-	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->getResourceStream(fileName));
+	Common::ScopedPtr<Common::SeekableReadStream> stream(vm->getResourceStream(fileName));
 	if (!stream) {
-		debug("Font::open failed to open '%s'", fileName.c_str());
-		return false;
+		warning("Font::open failed to open '%s'", fileName.c_str());
+		delete font;
+		return nullptr;
 	}
 
-	_characterCount = stream->readUint32LE();
-	_maxWidth = stream->readUint32LE();
-	_maxHeight = stream->readUint32LE();
-	_dataSize = stream->readUint32LE();
-	_data = new uint16[_dataSize];
-	if (!_data) {
-		debug("Font::open failed to allocate font buffer");
-		return false;
+	font->_characterCount = stream->readUint32LE();
+	font->_maxWidth = stream->readUint32LE();
+	font->_maxHeight = stream->readUint32LE();
+	font->_dataSize = stream->readUint32LE();
+	font->_data = new uint16[font->_dataSize];
+	if (!font->_data) {
+		warning("Font::open failed to allocate font buffer");
+		delete font;
+		return nullptr;
 	}
 
-	for (int i = 0; i < _characterCount; i++) {
-		_characters[i]._x = stream->readUint32LE();
-		_characters[i]._y = stream->readUint32LE();
-		_characters[i]._width = stream->readUint32LE();
-		_characters[i]._height = stream->readUint32LE();
-		_characters[i]._dataOffset = stream->readUint32LE();
+	font->_characters.resize(font->_characterCount);
+	for (uint32 i = 0; i < font->_characterCount; i++) {
+		font->_characters[i].x = stream->readUint32LE();
+		font->_characters[i].y = stream->readUint32LE();
+		font->_characters[i].width = stream->readUint32LE();
+		font->_characters[i].height = stream->readUint32LE();
+		font->_characters[i].dataOffset = stream->readUint32LE();
 	}
-	for (int i = 0; i < _dataSize; i++) {
-		_data[i] = stream->readUint16LE();
+
+	for (int i = 0; i < font->_dataSize; i++) {
+		font->_data[i] = stream->readUint16LE();
 	}
-	return true;
+
+	return font;
 }
 
 void Font::close() {
@@ -79,65 +80,6 @@ void Font::close() {
 		delete[] _data;
 	}
 	reset();
-}
-
-void Font::setSpacing(int spacing1, int spacing2) {
-	if (_data) {
-		_spacing1 = spacing1;
-		_spacing2 = spacing2;
-	}
-}
-
-void Font::setColor(uint16 color) {
-	if (_data && _color != color) {
-		replaceColor(_color, color);
-		_color = color;
-	}
-}
-
-void Font::draw(const Common::String &text, Graphics::Surface &surface, int x, int y) {
-	if (!_data) {
-		return;
-	}
-
-	x = CLIP(x, 0, _screenWidth - getTextWidth(text) + 1);
-	y = CLIP(y, 0, _screenHeight - _maxHeight);
-
-	const char *character = text.c_str();
-	while (*character != 0) {
-		drawCharacter(*character, surface, x, y);
-		x += _spacing1 + _characters[*character + 1]._width;
-		character++;
-	}
-
-}
-
-void Font::drawColor(const Common::String &text, Graphics::Surface &surface, int x, int y, uint16 color) {
-	if (_color != color) {
-		setColor(color);
-	}
-	draw(text, surface, x, y);
-}
-
-int Font::getTextWidth(const Common::String &text) {
-	const char *character = text.c_str();
-
-	if (!_data) {
-		return 0;
-	}
-	int totalWidth = 0;
-	if (*character == 0) {
-		return 0;
-	}
-	while (*character != 0) {
-		totalWidth += _spacing1 + _characters[*character + 1]._width;
-		character++;
-	}
-	return totalWidth - _spacing1;
-}
-
-int Font::getTextHeight(const Common::String &text) {
-	return _maxHeight;
 }
 
 void Font::reset() {
@@ -148,59 +90,71 @@ void Font::reset() {
 	_dataSize = 0;
 	_screenWidth = 0;
 	_screenHeight = 0;
-	_spacing1 = 0;
-	_spacing2 = 0;
-	_color = 0x7FFF;
-	_intersperse = 0;
+	_spacing = 0;
+	_useFontColor = false;
 
-	memset(_characters, 0, 256 * sizeof(FontCharacter));
+	_characters.clear();
 }
 
-void Font::replaceColor(uint16 oldColor, uint16 newColor) {
-	if (!_data || !_dataSize) {
-		return;
-	}
-	for (int i = 0; i < _dataSize; i++) {
-		if (_data[i] == oldColor) {
-			_data[i] = newColor;
-		}
-	}
+int Font::getFontHeight() const {
+	return _maxHeight;
 }
 
-void Font::drawCharacter(const char character, Graphics::Surface &surface, int x, int y) {
-	uint8 characterIndex = (uint8)character + 1;
-	if (x < 0 || x >= _screenWidth || y < 0 || y >= _screenHeight || !_data || characterIndex >= _characterCount) {
+int Font::getMaxCharWidth() const {
+	return _maxWidth;
+}
+
+int Font::getCharWidth(uint32 chr) const {
+	if (chr >= _characterCount) {
+		return 0;
+	}
+	return _characters[chr + 1].width + _spacing;
+}
+
+void Font::drawChar(Graphics::Surface *dst, uint32 chr, int x, int y, uint32 color) const {
+	uint32 characterIndex = chr + 1;
+	if (x < 0 || x >= dst->w || y < 0 || y >= dst->h || !_data || characterIndex >= _characterCount) {
 		return;
 	}
 
-	uint16 *dstPtr = (uint16*)surface.getBasePtr(x + _characters[characterIndex]._x, y + _characters[characterIndex]._y);
-	uint16 *srcPtr = &_data[_characters[characterIndex]._dataOffset];
-	int width = _characters[characterIndex]._width;
-	int height = _characters[characterIndex]._height;
-	if (_intersperse && y & 1) {
-		dstPtr += surface.pitch / 2;
-	}
+	uint16 *srcPtr = &_data[_characters[characterIndex].dataOffset];
+	int width = _characters[characterIndex].width;
+	int height = _characters[characterIndex].height;
 
 	int endY = height + y - 1;
 	int currentY = y;
-	while (currentY <= endY && currentY < _screenHeight) {
+
+	// FIXME/TODO
+	// This width and height check were added as a temporary bug fix -- a sanity check which is only needed for the internal TAHOMA18.FON font.
+	// That font's glyph properties table is corrupted - the start of the file states that there are 0xF7 (=247) entries in the char properties table
+	// but that table get corrupted past the 176th entry. The image data glyph part of the FON file also only covers the 176 entries.
+	// So the following if clause-check will return here if the width and height values are unnaturally big.
+	// The bug only affects debug cases where all character glyph need to be displayed...
+	// ...or potential custom dialogue / translations that reference characters that are not within the range of ASCII values for the normal Latin characters.
+	if (width > 100 || height > 100) {
+		return;
+	}
+
+	while (currentY <= endY && currentY < dst->h) {
 		int currentX = x;
 		int endX = width + x - 1;
-		while (currentX <= endX && currentX < _screenWidth) {
-			if ((*srcPtr & 0x8000) == 0) {
-				*dstPtr = *srcPtr;
+		while (currentX <= endX && currentX < dst->w) {
+			uint8 a, r, g, b;
+			getGameDataColor(*srcPtr, a, r, g, b);
+			if (!a) { // Alpha is inversed
+				uint32 outColor = color;
+				if (_useFontColor) {
+					// Ignore the alpha in the output as it is inversed in the input
+					outColor = dst->format.RGBToColor(r, g, b);
+				}
+				void *dstPtr = dst->getBasePtr(CLIP(currentX + _characters[characterIndex].x, 0, dst->w - 1), CLIP(currentY + _characters[characterIndex].y, 0, dst->h - 1));
+				drawPixel(*dst, dstPtr, outColor);
 			}
-			dstPtr++;
 			srcPtr++;
 			currentX++;
-		}
-		dstPtr += surface.pitch / 2 - width;
-		if (_intersperse) {
-			srcPtr += width;
-			dstPtr += surface.pitch / 2;
-			currentY++;
 		}
 		currentY++;
 	}
 }
+
 } // End of namespace BladeRunner

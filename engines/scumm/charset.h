@@ -28,27 +28,12 @@
 #include "graphics/sjis.h"
 #include "scumm/scumm.h"
 #include "scumm/gfx.h"
-#include "scumm/saveload.h"
 
 namespace Scumm {
 
 class ScummEngine;
 class NutRenderer;
 struct VirtScreen;
-
-#ifdef SCUMMVMKOR
-static inline bool checkKSCode(byte hi, byte lo) {
-	//hi : xx
-	//lo : yy
-	if ((0xA1 > lo) || (0xFE < lo)) {
-		return false;
-	}
-	if ((hi >= 0xB0) && (hi <= 0xC8)) {
-		return true;
-	}
-	return false;
-}
-#endif
 
 static inline bool checkSJISCode(byte c) {
 	if ((c >= 0x80 && c <= 0x9f) || (c >= 0xe0 && c <= 0xfd))
@@ -103,12 +88,7 @@ public:
 
 	virtual void setColor(byte color) { _color = color; translateColor(); }
 
-#ifdef SCUMMVMKOR
-	virtual byte getColor() { return _color; }
-	bool isScummvmKorTarget();
-#endif
-
-	void saveLoadWithSerializer(Serializer *ser);
+	void saveLoadWithSerializer(Common::Serializer &ser);
 };
 
 class CharsetRendererCommon : public CharsetRenderer {

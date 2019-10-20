@@ -27,6 +27,7 @@
 #include "backends/platform/ios7/ios7_common.h"
 #include "backends/base-backend.h"
 #include "common/events.h"
+#include "common/str.h"
 #include "audio/mixer_intern.h"
 #include "backends/fs/posix/posix-fs-factory.h"
 #include "graphics/colormasks.h"
@@ -109,7 +110,7 @@ protected:
 	bool _fullScreenOverlayIsDirty;
 	int _screenChangeCount;
 
-	char *_lastErrorMessage;
+	Common::String _lastErrorMessage;
 
 #ifdef IPHONE_SANDBOXED
 	Common::String _chrootBasePath;
@@ -123,7 +124,7 @@ public:
 	static OSystem_iOS7 *sharedInstance();
 
 	virtual void initBackend();
-	
+
 	virtual void engineInit();
 	virtual void engineDone();
 
@@ -205,9 +206,21 @@ public:
 	virtual void logMessage(LogMessageType::Type type, const char *message);
 	virtual void fatalError() override;
 
+	virtual bool hasTextInClipboard();
+	virtual Common::String getTextFromClipboard();
+	virtual bool setTextInClipboard(const Common::String &text);
+
+	virtual bool openUrl(const Common::String &url);
+
+	virtual Common::String getSystemLanguage() const;
+
+	virtual bool isConnectionLimited();
+
 protected:
 	void initVideoContext();
 	void updateOutputSurface();
+	void setShowKeyboard(bool);
+	bool isKeyboardShown() const;
 
 	void internUpdateScreen();
 	void dirtyFullScreen();

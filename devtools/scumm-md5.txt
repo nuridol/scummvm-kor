@@ -36,7 +36,7 @@
 #
 #
 # The following shell script can be used to extract the file sizes of a bunch
-# of detect files, autonmatically inserting the values in here:
+# of detect files, automatically inserting the values in here:
 #
 # #!/bin/sh
 # OIFS=$IFS
@@ -237,7 +237,7 @@ monkey	The Secret of Monkey Island
 	71523b539491527d9860f4407faf0411	7607	en	DOS	Demo	EGA Demo	-	Fingolfin
 	771bc18ec6f93837b839c992b211904b	-1	de	DOS	Demo	EGA Demo	-	khalek
 	54a936ad06161ff7bfefcb96200f7bff	7617	en	Amiga	VGA	Demo	-	khalek
-	c0c9de81fb965e6cbe77f6e5631ca705	9135	en	DOS	SE Talkie	Unofficial SE Talkie v1.02	rootfather
+	c0c9de81fb965e6cbe77f6e5631ca705	9135	en	DOS	SE Talkie	Unofficial SE Talkie v1.02	lotharsm
 
 pass	Passport to Adventure
 	e6cd81b25ab1453a8a6d3482118c391e	7857	en	DOS	-	-	v1.0 9/14/90	Fingolfin
@@ -252,11 +252,11 @@ zakloom	Zak McKracken & Loom non-interactive demo
 	77f5c9cc0986eb729c1a6b4c8823bbae	7520	en	FM-TOWNS	FM-TOWNS	Demo	zak/loom (non-interactive)	khalek, Fingolfin
 
 monkey2	Monkey Island 2: LeChuck's Revenge
-	132bff65e6367c09cc69318ce1b59333	11155	en	Amiga	-	-	v1.0 4/8/92	Fingolfin
-	c30ef068add4277104243c31ce46c12b	-1	fr	Amiga	-	-	-	Andreas Bylund
-	da669b20271b85182e9c17a2a37ea02e	-1	de	Amiga	-	-	-	Andreas Bylund, Norbert Lange
-	11ddf1fde76e3156eb3a38da213f484e	-1	it	Amiga	-	-	-	Andrea Petrucci
-	6ea966b4d660c870b9ee790d1fbfc535	-1	es	Amiga	-	-	-	Andreas Bylund
+	132bff65e6367c09cc69318ce1b59333	11155	en	Amiga	Amiga	-	v1.0 4/8/92	Fingolfin
+	c30ef068add4277104243c31ce46c12b	-1	fr	Amiga	Amiga	-	-	Andreas Bylund
+	da669b20271b85182e9c17a2a37ea02e	-1	de	Amiga	Amiga	-	-	Andreas Bylund, Norbert Lange
+	11ddf1fde76e3156eb3a38da213f484e	-1	it	Amiga	Amiga	-	-	Andrea Petrucci
+	6ea966b4d660c870b9ee790d1fbfc535	-1	es	Amiga	Amiga	-	-	Andreas Bylund
 	3686cf8f89e102ececf4366e1d2c8126	11135	en	DOS	-	-	-
 	8e4ee4db46954bfe2912e259a16fad82	-1	fr	DOS	-	-	-	Nicolas Sauz&egrave;de, Andrea Petrucci
 	6886e5d08cee329b1f2e743ae2e3ceed	11135	de	DOS	-	-	v1.0D 17Feb92	Fingolfin
@@ -270,15 +270,15 @@ monkey2	Monkey Island 2: LeChuck's Revenge
 	430bc518017b6fac046f58bab6baad5d	-1	jp	FM-TOWNS	FM-TOWNS	-	-	Antti Leimi, Andrea Petrucci
 
 	387a544b8b10b26912d8413bab63a853	-1	en	DOS	-	Demo	non-interactive	khalek
-	f4d20ab4ce19743a646cb48bd93aee72	10835	en	DOS	SE Talkie	Unofficial SE Talkie v0.2	rootfather
+	f4d20ab4ce19743a646cb48bd93aee72	10835	en	DOS	SE Talkie	Unofficial SE Talkie v0.2	lotharsm
 
 atlantis	Indiana Jones and the Fate of Atlantis
-	3a03dab514e4038df192d8a8de469788	-1	en	Amiga	Floppy	Floppy	-	dhewg
-	20da6fce37805423966aaa8f3c2426aa	-1	fr	Amiga	Floppy	Floppy	-	Joachim Eberhard
-	4f267a901719623de7dde83e47d5b474	-1	de	Amiga	Floppy	Floppy	-	ghoostkilla
-	e534d29afb3c6e0ee9dc3d53c5956714	-1	de	Amiga	Floppy	Floppy	alt?	Tobias Fleischer
-	5798972220cd458be2626d54c80f71d7	-1	it	Amiga	Floppy	Floppy	-	Andrea Petrucci
-	15f588e887e857e8c56fe6ade4956168	-1	es	Amiga	Floppy	Floppy	-	VooD
+	3a03dab514e4038df192d8a8de469788	-1	en	Amiga	Amiga	Floppy	-	dhewg
+	20da6fce37805423966aaa8f3c2426aa	-1	fr	Amiga	Amiga	Floppy	-	Joachim Eberhard
+	4f267a901719623de7dde83e47d5b474	-1	de	Amiga	Amiga	Floppy	-	ghoostkilla
+	e534d29afb3c6e0ee9dc3d53c5956714	-1	de	Amiga	Amiga	Floppy	alt?	Tobias Fleischer
+	5798972220cd458be2626d54c80f71d7	-1	it	Amiga	Amiga	Floppy	-	Andrea Petrucci
+	15f588e887e857e8c56fe6ade4956168	-1	es	Amiga	Amiga	Floppy	-	VooD
 	c63ee46143ba65f9ce14cf539ca51bd7	-1	en	DOS	Floppy	Floppy	-	Andrea Petrucci
 	edfdb24a499d92c59f824c52987c0eec	-1	fr	DOS	Floppy	Floppy	-	Nicolas Sauz&egrave;de, Andrea Petrucci
 	1fbebd7b2b692df5297870447a80cfed	12030	de	DOS	Floppy	Floppy	-	Fingolfin
@@ -322,6 +322,7 @@ tentacle	Day of the Tentacle
 	cc04a076779379524ed4d9c5ee3c6fb1	282467632	en	Mac	-	CD	Mac bundle	Fingolfin, Joachim Eberhard
 	ede149fda3edfc1dbd7347e0737cb583	282830409	fr	Mac	-	CD	Mac bundle	ThierryFR, Thierry Crozat
 	f73883f13b5a302749a5bad31d909780	-1	de	Mac	-	CD	Mac bundle	morrissey
+	8241070e96518c894e8f5f8e987b6030	-1	de	Mac	-	CD	-	Nur-Ab-Sal
 
 	c83079157ec765a28de445aec9768d60	7477	en	All	-	Demo	-	Fingolfin
 	17fa250eb72dae2dad511ba79c0b6b0a	-1	fr	DOS	-	Demo	-	cyx
@@ -372,8 +373,8 @@ ft	Full Throttle
 
 dig	The Dig
 	d8323015ecb8b10bf53474f6e6b0ae33	16304	All	All	-	-	-	Fingolfin
-	aad201302286c1cfee92321cd406e427	811008	en	Windows	Steam	Steam	Steam Version	Ben Castricum, Filippos Karapetis
-	d93cc8be628ed5d3b3a29188fc7105d3	1061296	en	Mac	Steam	Steam	Steam Version	Filippos Karapetis
+	aad201302286c1cfee92321cd406e427	811008	All	Windows	Steam	Steam	Steam Version	Ben Castricum, Filippos Karapetis
+	d93cc8be628ed5d3b3a29188fc7105d3	1061296	All	Mac	Steam	Steam	Steam Version	Filippos Karapetis
 	d62047a6729349ab36f7ee065bf26509	-1	ru	All	-	-	-	sev
 	ebdd2fbc995a321605375dc57766db79	16304	ru	All	-	With Subtitles	-	sev
 	35a2d3040fa512f8232d9e443319d84d	659335495	en	Mac	-	-	Mac bundle	Fingolfin
@@ -638,15 +639,16 @@ airport	Let's Explore the Airport with Buzzy
 	3c90d2a39cafa60b8ebce70a34a59a41	51152	nl	Windows	-	Demo	-	Ben Castricum
 
 farm	Let's Explore the Farm with Buzzy
-	a5c5388da9bf0e6662fdca8813a79d13	86962	en	Windows	-	-	-	George Kormendi
+	f4357cf21ba59889d6d5bcc431140238	-1	en	Windows	-	-	-	MrEightThreeOne
+	a5c5388da9bf0e6662fdca8813a79d13	86962	en	Windows	HE 72	-	-	George Kormendi
 	fbbbb38a81fc9d6a61d509278390a290	-1	en	Mac	HE 73	-	-	khalek
 	a85856675429fe88051744f755b72f93	-1	en	Windows	HE 73	-	-	Kirben
 	a2386da005672cbd5136f4f27a626c5f	87061	nl	Windows	HE 73	-	-	George Kormendi
 	eeb606c2d2ec877a712a9f20c10bcdda	87034	nl	Mac	HE 73	-	-	Ben Castricum
 	5dda73606533d66a4c3f4f9ea6e842af	87061	ru	Windows	HE 73	-	-	sev
 
-	39fd6db10d0222d817025c4d3346e3b4	-1	en	Mac	-	Demo	-	Joachim Eberhard
-	6c375c2236d99f56e6c2cf540e74e474	34333	nl	Windows	-	Demo	-	Kirben
+	39fd6db10d0222d817025c4d3346e3b4	-1	en	Mac	HE 72	Demo	-	Joachim Eberhard
+	6c375c2236d99f56e6c2cf540e74e474	34333	nl	Windows	HE 72	Demo	-	Kirben
 	03173f0df12062d84721062666155efa	34312	en	Windows	HE 71	Demo	-	Ben Castricum
 	bf8b52fdd9a69c67f34e8e9fec72661c	-1	en	Windows	HE 71	Demo	-	khalek, sev
 	0557df19f046a84c2fdc63507c6616cb	-1	nl	Windows	HE 72	Demo	-	adutchguy
@@ -671,6 +673,10 @@ pajama	Pajama Sam 1: No Need to Hide When It's Dark Outside
 	4aa93cb30e485b728504ba3a693f12bf	-1	ru	Windows	HE 100	-	-	sev
 	782393c5934ecd0b536eaf5fd541bd26	-1	en	Windows	HE 101	Updated	-	Jonathan
 	c225bec1b6c0798a2b8c89ac226dc793	-1	en	Wii	HE 101	-	-	sanguinehearts
+	111b36172bdc9bfe498e135878c03d38	66878	nl	Wii	HE 101	-	-	Ben Castricum
+	1d56c91148cbdfab7a5f3a6040cbb52f	66878	fr	Wii	HE 101	-	-	Ben Castricum
+	813af095ff338dacf349aca377e48041	66878	de	Wii	HE 101	-	-	Ben Castricum
+	d09bae8a49f8dfd9339efd705013920b	66878	en	Wii	HE 101	-	-	Ben Castricum
 
 	f237bf8a5ef9af78b2a6a4f3901da341	18354	en	All	-	Demo	-	khalek, sev
 	7f945525abcd48015adf1632637a44a1	-1	fr	All	-	Demo	-	Kirben
@@ -771,7 +777,7 @@ puttmoon	Putt-Putt Goes to the Moon
 	9c92eeaf517a31b7221ec2546ab669fd	-1	en	Windows	HE 70	-	-	khalek
 	3c4c471342bd95505a42334367d8f127	12161	ru	Windows	HE 70	-	-	sev
 
-	aa6a91b7f6f119d1b7b1f2a4c9e24d59	6233	en	DOS	-	Demo	-
+	aa6a91b7f6f119d1b7b1f2a4c9e24d59	6233	en	DOS	Demo	Demo	-
 	4af4a6b248103c1fe9edef619677f540	-1	en	Mac	-	Demo	-	khalek
 	9c143c5905055d5df7a0f014ab379aee	-1	en	Windows	HE 70	Demo	-	khalek
 

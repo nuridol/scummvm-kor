@@ -497,7 +497,7 @@ void CGEEngine::snGame(Sprite *spr, int num) {
 		// the test has been restricted to some specific OSes
 		// in order to avoid some obvious issues (like Android, iOS, NDS, N64...)
 		// Not perfect, but at least better than nothing.
-#if defined(WIN32) || defined(UNIX) || defined(MACOSX) || defined(MOTOEZX) || defined(LINUPY) || defined(LINUXMOTO_SDL)
+#if defined(WIN32) || defined(UNIX) || defined(MACOSX) || defined(MOTOEZX) || defined(LINUXMOTO_SDL)
 		if (spr->_ref == 1 && _keyboard->_keyAlt) {
 #else
 		if (spr->_ref == 1 && _gameCase2Cpt > 1) {
@@ -1192,7 +1192,7 @@ void CGEEngine::snFlash(bool on) {
 		if (pal) {
 			memcpy(pal, _vga->_sysPal, kPalSize);
 			for (int i = 0; i < kPalCount; i++) {
-				register int c;
+				int c;
 				c = pal[i]._r << 1;
 				pal[i]._r = (c < 64) ? c : 63;
 				c = pal[i]._g << 1;

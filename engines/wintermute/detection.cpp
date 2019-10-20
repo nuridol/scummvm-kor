@@ -22,6 +22,7 @@
 
 #include "engines/advancedDetector.h"
 #include "engines/wintermute/wintermute.h"
+#include "engines/wintermute/game_description.h"
 #include "engines/wintermute/base/base_persistence_manager.h"
 
 #include "common/config-manager.h"
@@ -80,6 +81,7 @@ static char s_fallbackGameIdBuf[256];
 static const char *directoryGlobs[] = {
 	"language", // To detect the various languages
 	"languages", // To detect the various languages
+	"localization", // To detect the various languages
 	0
 };
 
@@ -99,7 +101,7 @@ public:
 		return "Copyright (C) 2011 Jan Nedoma";
 	}
 
-	virtual const ADGameDescription *fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const {
+	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const override {
 		// Set some defaults
 		s_fallbackDesc.extra = "";
 		s_fallbackDesc.language = Common::UNK_LANG;
@@ -129,10 +131,12 @@ public:
 					s_fallbackDesc.extra = offset;
 					s_fallbackDesc.flags |= ADGF_USEEXTRAASTITLE;
 				}
-				return &s_fallbackDesc;
+
+				return ADDetectedGame(&s_fallbackDesc);
 			} // Fall through to return 0;
 		}
-		return 0;
+
+		return ADDetectedGame();
 	}
 
 	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
