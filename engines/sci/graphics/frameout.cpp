@@ -76,13 +76,6 @@ GfxFrameout::GfxFrameout(SegManager *segMan, GfxPalette32 *palette, GfxTransitio
 	if (g_sci->getGameId() == GID_PHANTASMAGORIA) {
 		_currentBuffer.create(630, 450, Graphics::PixelFormat::createFormatCLUT8());
 	} else if (_isHiRes) {
-// #ifdef SCUMMVMKOR
-// 		// GK1 Korean pathed version
-// 		if (g_sci->getGameId() == GID_GK1 && g_sci->getLanguage() == Common::KO_KOR) {
-// 			_currentBuffer.create(640, 400, Graphics::PixelFormat::createFormatCLUT8());
-// 		}
-// 		else
-// #endif
 		_currentBuffer.create(640, 480, Graphics::PixelFormat::createFormatCLUT8());
 	} else {
 		_currentBuffer.create(320, 200, Graphics::PixelFormat::createFormatCLUT8());
@@ -150,13 +143,6 @@ bool GfxFrameout::detectHiRes() const {
 	if (g_sci->getGameId() == GID_PQ4 && !g_sci->isCD()) {
 		return false;
 	}
-
-#ifdef SCUMMVMKOR
-	// GK1 Korean pathed version is high resolution only
-	if (g_sci->getGameId() == GID_GK1 && g_sci->getLanguage() == Common::KO_KOR) {
-		return true;
-	}
-#endif
 
 	// GK1 DOS floppy is low resolution only, but GK1 Mac floppy is high
 	// resolution only
@@ -290,6 +276,29 @@ void GfxFrameout::kernelAddPlane(const reg_t object) {
 	} else {
 		plane = new Plane(object);
 		addPlane(plane);
+	}
+
+	// Detect the QFG4 import character dialog, disable the Change Directory
+	//  button, and display a message box explaining how to import saved
+	//  character files in ScummVM. SCI16 games are handled by kDrawControl.
+	if (g_sci->inQfGImportRoom()) {
+		// kAddPlane is called several times, this detects the second call
+		//  which is for the import character dialog. If changeButton:value
+		//  is non-zero then the dialog is initializing. If the button isn't
+		//  disabled then we havent't displayed the message box yet. There
+		//  are multiple changeButtons because the script clones the object.
+		SegManager *segMan = g_sci->getEngineState()->_segMan;
+		Common::Array<reg_t> changeDirButtons = _segMan->findObjectsByName("changeButton");
+		for (uint i = 0; i < changeDirButtons.size(); ++i) {
+			if (readSelectorValue(segMan, changeDirButtons[i], SELECTOR(value))) {
+				// disable Change Directory button by setting state to zero
+				if (readSelectorValue(segMan, changeDirButtons[i], SELECTOR(state))) {
+					writeSelectorValue(segMan, changeDirButtons[i], SELECTOR(state), 0);
+					g_sci->showQfgImportMessageBox();
+					break;
+				}
+			}
+		}
 	}
 }
 
@@ -1196,14 +1205,14 @@ void GfxFrameout::shakeScreen(int16 numShakes, const ShakeDirection direction) {
 		}
 
 		updateScreen();
-		g_sci->getEngineState()->wait(3);
+		g_sci->getEngineState()->sleep(3);
 
 		if (direction & kShakeVertical) {
 			g_system->setShakePos(0);
 		}
 
 		updateScreen();
-		g_sci->getEngineState()->wait(3);
+		g_sci->getEngineState()->sleep(3);
 	}
 }
 
@@ -1367,6 +1376,16 @@ void GfxFrameout::remapMarkRedraw() {
 
 #pragma mark -
 #pragma mark Debugging
+
+Plane *GfxFrameout::getTopVisiblePlane() {
+	for (PlaneList::const_iterator it = _visiblePlanes.begin(); it != _visiblePlanes.end(); ++it) {
+		Plane *p = *it;
+		if (p->_type == kPlaneTypePicture)
+			return p;
+	}
+
+	return nullptr;
+}
 
 void GfxFrameout::printPlaneListInternal(Console *con, const PlaneList &planeList) const {
 	for (PlaneList::const_iterator it = planeList.begin(); it != planeList.end(); ++it) {

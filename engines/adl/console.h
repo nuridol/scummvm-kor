@@ -41,7 +41,7 @@ public:
 	Console(AdlEngine *engine);
 
 	static Common::String toAscii(const Common::String &str);
-	static Common::String toAppleWord(const Common::String &str);
+	Common::String toNative(const Common::String &str);
 
 private:
 	bool Cmd_Nouns(int argc, const char **argv);
@@ -54,6 +54,10 @@ private:
 	bool Cmd_GiveItem(int argc, const char **argv);
 	bool Cmd_Vars(int argc, const char **argv);
 	bool Cmd_Var(int argc, const char **argv);
+	bool Cmd_ConvertDisk(int argc, const char **argv);
+	bool Cmd_RunScript(int argc, const char **argv);
+	bool Cmd_StopScript(int argc, const char **argv);
+	bool Cmd_SetScriptDelay(int argc, const char **argv);
 
 	void printItem(const Item &item);
 	void printWordMap(const Common::HashMap<Common::String, uint> &wordMap);

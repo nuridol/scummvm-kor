@@ -12,7 +12,7 @@ MODULE_OBJS := \
 	fonts/newfont.o \
 	fonts/ttf.o \
 	fonts/winfont.o \
-	korfont.o \
+	larryScale.o \
 	maccursor.o \
 	macgui/macfontmanager.o \
 	macgui/macmenu.o \

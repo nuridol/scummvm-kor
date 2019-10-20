@@ -66,7 +66,7 @@ struct Track {
 	int32 curRegion;	// id of current used region
 	int32 curHookId;	// id of current used hook id
 	int32 volGroupId;	// id of volume group (IMUSE_VOLGRP_VOICE, IMUSE_VOLGRP_SFX, IMUSE_VOLGRP_MUSIC)
-	int32 soundType;	// type of sound data (kSpeechSoundType, kSFXSoundType, kMusicSoundType)
+	int32 soundType;	// type of sound data (IMUSE_BUNDLE, IMUSE_RESOURCE)
 	int32 feedSize;		// size of sound data needed to be filled at each callback iteration
 	int32 dataMod12Bit;	// value used between all callback to align 12 bit source of data
 	int32 mixerFlags;	// flags for sound mixer's channel (kFlagStereo, kFlag16Bits, kFlagUnsigned)
@@ -75,7 +75,34 @@ struct Track {
 	Audio::SoundHandle mixChanHandle;					// sound mixer's channel handle
 	Audio::QueuingAudioStream *stream;		// sound mixer's audio stream handle for *.la1 and *.bun
 
-	Track() : soundId(-1), used(false), stream(NULL) {
+	Track() : soundId(-1), used(false), stream(nullptr) {
+	}
+
+	void reset() {
+		trackId = 0;
+		pan = 0;
+		vol = 0;
+		volFadeDest = 0;
+		volFadeStep = 0;
+		volFadeDelay = 0;
+		volFadeUsed = false;
+		soundId = 0;
+		memset(soundName, 0, sizeof(soundName));
+		used = false;
+		toBeRemoved = false;
+		souStreamUsed = false;
+		sndDataExtComp = false;
+		soundPriority = 0;
+		regionOffset = 0;
+		dataOffset = 0;
+		curRegion = 0;
+		curHookId = 0;
+		soundType = 0;
+		feedSize = 0;
+		dataMod12Bit = 0;
+		mixerFlags = 0;
+		soundDesc = nullptr;
+		stream = nullptr;
 	}
 
 	int getPan() const { return (pan != 64) ? 2 * pan - 127 : 0; }

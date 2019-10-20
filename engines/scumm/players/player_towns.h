@@ -25,8 +25,8 @@
 
 #include "scumm/scumm.h"
 #include "scumm/imuse/imuse.h"
+#include "scumm/imuse/drivers/fmtowns.h"
 #include "audio/softsynth/fmtowns_pc98/towns_euphony.h"
-#include "audio/softsynth/fmtowns_pc98/towns_midi.h"
 
 namespace Scumm {
 
@@ -43,7 +43,7 @@ public:
 
 	virtual int32 doCommand(int numargs, int args[]) = 0;
 
-	virtual void saveLoadWithSerializer(Serializer *ser);
+	virtual void saveLoadWithSerializer(Common::Serializer &ser);
 	virtual void restoreAfterLoad();
 
 	// version 1 specific
@@ -69,6 +69,7 @@ protected:
 		uint8 looping;
 		uint32 priority;
 	} _pcmCurrentSound[9];
+	friend void syncWithSerializer(Common::Serializer &, PcmCurrentSound &);
 
 	uint8 _unkFlags;
 
@@ -101,7 +102,7 @@ public:
 	void setSoundVolume(int sound, int left, int right);
 	void setSoundNote(int sound, int note);
 
-	void saveLoadWithSerializer(Serializer *ser);
+	void saveLoadWithSerializer(Common::Serializer &ser);
 	void restoreAfterLoad();
 
 private:
@@ -154,7 +155,7 @@ public:
 
 	int32 doCommand(int numargs, int args[]);
 
-	void saveLoadWithSerializer(Serializer *ser);
+	void saveLoadWithSerializer(Common::Serializer &ser);
 
 private:
 	void playVocTrack(const uint8 *data);

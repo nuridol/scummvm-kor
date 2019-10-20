@@ -32,7 +32,6 @@
 #include "scumm/imuse/imuse_internal.h"
 #include "scumm/imuse/instrument.h"
 #include "scumm/resource.h"
-#include "scumm/saveload.h"
 #include "scumm/scumm.h"
 
 namespace Scumm {
@@ -46,6 +45,7 @@ namespace Scumm {
 IMuseInternal::IMuseInternal() :
 	_native_mt32(false),
 	_enable_gs(false),
+	_isAmiga(false),
 	_midi_adlib(NULL),
 	_midi_native(NULL),
 	_sysex(NULL),
@@ -158,9 +158,11 @@ bool IMuseInternal::isMT32(int sound) {
 	case MKTAG('S', 'P', 'K', ' '):
 		return false;
 
-	case MKTAG('A', 'M', 'I', ' '):
-	case MKTAG('R', 'O', 'L', ' '):
-		return true;
+	case MKTAG('A', 'M', 'I', ' '): // MI2 Amiga
+		return false;
+
+	case MKTAG('R', 'O', 'L', ' '): // Unfortunately FOA Amiga also uses this resource type
+		return !_isAmiga;
 
 	case MKTAG('M', 'A', 'C', ' '): // Occurs in the Mac version of FOA and MI2
 		return false;
@@ -200,7 +202,9 @@ bool IMuseInternal::isMIDI(int sound) {
 	case MKTAG('S', 'P', 'K', ' '):
 		return false;
 
-	case MKTAG('A', 'M', 'I', ' '):
+	case MKTAG('A', 'M', 'I', ' '): // Amiga (return true, since the driver is initalized as native midi)
+		return true;
+
 	case MKTAG('R', 'O', 'L', ' '):
 		return true;
 
@@ -237,9 +241,11 @@ bool IMuseInternal::supportsPercussion(int sound) {
 	case MKTAG('S', 'P', 'K', ' '):
 		return false;
 
-	case MKTAG('A', 'M', 'I', ' '):
-	case MKTAG('R', 'O', 'L', ' '):
-		return true;
+	case MKTAG('A', 'M', 'I', ' '): // MI2 Amiga
+		return false;
+
+	case MKTAG('R', 'O', 'L', ' '): // Roland LAPC/MT-32/CM32L track, but also used by INDY4 Amiga
+		return !_isAmiga;
 
 	case MKTAG('M', 'A', 'C', ' '): // Occurs in the Mac version of FOA and MI2
 		// This is MIDI, i.e. uses MIDI style program changes, but without a
@@ -362,70 +368,50 @@ void IMuseInternal::pause(bool paused) {
 	_paused = paused;
 }
 
-int IMuseInternal::save_or_load(Serializer *ser, ScummEngine *scumm, bool fixAfterLoad) {
-	Common::StackLock lock(_mutex, "IMuseInternal::save_or_load()");
-	const SaveLoadEntry mainEntries[] = {
-		MKLINE(IMuseInternal, _queue_end, sleUint8, VER(8)),
-		MKLINE(IMuseInternal, _queue_pos, sleUint8, VER(8)),
-		MKLINE(IMuseInternal, _queue_sound, sleUint16, VER(8)),
-		MKLINE(IMuseInternal, _queue_adding, sleByte, VER(8)),
-		MKLINE(IMuseInternal, _queue_marker, sleByte, VER(8)),
-		MKLINE(IMuseInternal, _queue_cleared, sleByte, VER(8)),
-		MKLINE(IMuseInternal, _master_volume, sleByte, VER(8)),
-		MKLINE(IMuseInternal, _trigger_count, sleUint16, VER(8)),
-		MKLINE(IMuseInternal, _snm_trigger_index, sleUint16, VER(54)),
-		MKARRAY(IMuseInternal, _channel_volume[0], sleUint16, 8, VER(8)),
-		MKARRAY(IMuseInternal, _volchan_table[0], sleUint16, 8, VER(8)),
-		MKEND()
-	};
+static void syncWithSerializer(Common::Serializer &s, CommandQueue &cq) {
+	s.syncArray(cq.array, 8, Common::Serializer::Uint16LE, VER(23));
+}
 
-	const SaveLoadEntry cmdQueueEntries[] = {
-		MKARRAY(CommandQueue, array[0], sleUint16, 8, VER(23)),
-		MKEND()
-	};
+static void syncWithSerializer(Common::Serializer &s, ImTrigger &it) {
+	s.syncAsSint16LE(it.sound, VER(54));
+	s.syncAsByte(it.id, VER(54));
+	s.syncAsUint16LE(it.expire, VER(54));
+	s.syncArray(it.command, 8, Common::Serializer::Uint16LE, VER(54));
+}
 
-	// VolumeFader is obsolete.
-	const SaveLoadEntry volumeFaderEntries[] = {
-		MK_OBSOLETE(VolumeFader, player, sleUint16, VER(8), VER(16)),
-		MK_OBSOLETE(VolumeFader, active, sleUint8, VER(8), VER(16)),
-		MK_OBSOLETE(VolumeFader, curvol, sleUint8, VER(8), VER(16)),
-		MK_OBSOLETE(VolumeFader, speed_lo_max, sleUint16, VER(8), VER(16)),
-		MK_OBSOLETE(VolumeFader, num_steps, sleUint16, VER(8), VER(16)),
-		MK_OBSOLETE(VolumeFader, speed_hi, sleInt8, VER(8), VER(16)),
-		MK_OBSOLETE(VolumeFader, direction, sleInt8, VER(8), VER(16)),
-		MK_OBSOLETE(VolumeFader, speed_lo, sleInt8, VER(8), VER(16)),
-		MK_OBSOLETE(VolumeFader, speed_lo_counter, sleUint16, VER(8), VER(16)),
-		MKEND()
-	};
-
-	const SaveLoadEntry snmTriggerEntries[] = {
-		MKLINE(ImTrigger, sound, sleInt16, VER(54)),
-		MKLINE(ImTrigger, id, sleByte, VER(54)),
-		MKLINE(ImTrigger, expire, sleUint16, VER(54)),
-		MKARRAY(ImTrigger, command[0], sleUint16, 8, VER(54)),
-		MKEND()
-	};
+void IMuseInternal::saveLoadIMuse(Common::Serializer &s, ScummEngine *scumm, bool fixAfterLoad) {
+	Common::StackLock lock(_mutex, "IMuseInternal::saveLoadIMuse()");
 
 	int i;
 
-	ser->saveLoadEntries(this, mainEntries);
-	ser->saveLoadArrayOf(_cmd_queue, ARRAYSIZE(_cmd_queue), sizeof(_cmd_queue[0]), cmdQueueEntries);
-	ser->saveLoadArrayOf(_snm_triggers, ARRAYSIZE(_snm_triggers), sizeof(_snm_triggers[0]), snmTriggerEntries);
+	s.syncAsByte(_queue_end, VER(8));
+	s.syncAsByte(_queue_pos, VER(8));
+	s.syncAsUint16LE(_queue_sound, VER(8));
+	s.syncAsByte(_queue_adding, VER(8));
+	s.syncAsByte(_queue_marker, VER(8));
+	s.syncAsByte(_queue_cleared, VER(8));
+	s.syncAsByte(_master_volume, VER(8));
+	s.syncAsUint16LE(_trigger_count, VER(8));
+	s.syncAsUint16LE(_snm_trigger_index, VER(54));
+	s.syncArray(_channel_volume, 8, Common::Serializer::Uint16LE, VER(8));
+	s.syncArray(_volchan_table, 8, Common::Serializer::Uint16LE, VER(8));
+	s.syncArray(_cmd_queue, ARRAYSIZE(_cmd_queue), syncWithSerializer);
+	s.syncArray(_snm_triggers, ARRAYSIZE(_snm_triggers), syncWithSerializer);
 
 	// The players
 	for (i = 0; i < ARRAYSIZE(_players); ++i)
-		_players[i].saveLoadWithSerializer(ser);
+		_players[i].saveLoadWithSerializer(s);
 
 	// The parts
 	for (i = 0; i < ARRAYSIZE(_parts); ++i)
-		_parts[i].saveLoadWithSerializer(ser);
+		_parts[i].saveLoadWithSerializer(s);
 
 	{
 		// Load/save the instrument definitions, which were revamped with V11.
 		Part *part = &_parts[0];
-		if (ser->getVersion() >= VER(11)) {
+		if (s.getVersion() >= VER(11)) {
 			for (i = ARRAYSIZE(_parts); i; --i, ++part) {
-				part->_instrument.saveOrLoad(ser);
+				part->_instrument.saveLoadWithSerializer(s);
 			}
 		} else {
 			for (i = ARRAYSIZE(_parts); i; --i, ++part)
@@ -434,10 +420,7 @@ int IMuseInternal::save_or_load(Serializer *ser, ScummEngine *scumm, bool fixAft
 	}
 
 	// VolumeFader has been replaced with the more generic ParameterFader.
-	// FIXME: replace this loop by something like
-	// if (loading && version <= 16)  ser->skip(XXX bytes);
-	for (i = 0; i < 8; ++i)
-		ser->saveLoadEntries(0, volumeFaderEntries);
+	s.skip(13 * 8, VER(8), VER(16));
 
 	// Normally, we have to fix up the data structures after loading a
 	// saved game. But there are cases where we don't. For instance, The
@@ -448,7 +431,7 @@ int IMuseInternal::save_or_load(Serializer *ser, ScummEngine *scumm, bool fixAft
 	// dummy iMUSE object, but since the resource is no longer recognizable
 	// to iMUSE, the fixup fails hard. So yes, this is a bit of a hack.
 
-	if (ser->isLoading() && fixAfterLoad) {
+	if (s.isLoading() && fixAfterLoad) {
 		// Load all sounds that we need
 		fix_players_after_load(scumm);
 		fix_parts_after_load();
@@ -459,8 +442,6 @@ int IMuseInternal::save_or_load(Serializer *ser, ScummEngine *scumm, bool fixAft
 		if (_midi_adlib)
 			reallocateMidiChannels(_midi_adlib);
 	}
-
-	return 0;
 }
 
 bool IMuseInternal::get_sound_active(int sound) const {
@@ -499,6 +480,10 @@ uint32 IMuseInternal::property(int prop, uint32 value) {
 			_native_mt32 = true;
 			initGM(_midi_native);
 		}
+		break;
+
+	case IMuse::PROP_AMIGA:
+		_isAmiga = (value > 0);
 		break;
 
 	case IMuse::PROP_LIMIT_PLAYERS:
@@ -1262,11 +1247,8 @@ int32 IMuseInternal::ImSetTrigger(int sound, int id, int a, int b, int c, int d,
 		if (trig->id == id && trig->sound == sound && trig->command[0] == a)
 			break;
 
-		uint16 diff;
-		if (trig->expire <= _snm_trigger_index)
-			diff = _snm_trigger_index - trig->expire;
-		else
-			diff = 0x10000 - trig->expire + _snm_trigger_index;
+		// The wraparound if trig->expire > _snm_trigger_index is intentional
+		uint16 diff = _snm_trigger_index - trig->expire;
 
 		if (!oldest_ptr || oldest_trigger < diff) {
 			oldest_ptr = trig;
@@ -1486,8 +1468,6 @@ void IMuseInternal::initMidiDriver(TimerCallbackInfo *info) {
 
 void IMuseInternal::initMT32(MidiDriver *midi) {
 	byte buffer[52];
-	char info[256] = "ScummVM ";
-	int len;
 
 	// Reset the MT-32
 	midi->sysEx((const byte *) "\x41\x10\x16\x12\x7f\x00\x00\x01\x00", 9);
@@ -1503,15 +1483,16 @@ void IMuseInternal::initMT32(MidiDriver *midi) {
 	_system->delayMillis(250);
 
 	// Compute version string (truncated to 20 chars max.)
-	strcat(info, gScummVMVersion);
-	len = strlen(info);
+	Common::String infoStr = "ScummVM ";
+	infoStr += gScummVMVersion;
+	int len = infoStr.size();
 	if (len > 20)
 		len = 20;
 
 	// Display a welcome message on MT-32 displays.
 	memcpy(&buffer[0], "\x41\x10\x16\x12\x20\x00\x00", 7);
 	memcpy(&buffer[7], "                    ", 20);
-	memcpy(buffer + 7 + (20 - len) / 2, info, len);
+	memcpy(buffer + 7 + (20 - len) / 2, infoStr.c_str(), len);
 	byte checksum = 0;
 	for (int i = 4; i < 27; ++i)
 		checksum -= buffer[i];

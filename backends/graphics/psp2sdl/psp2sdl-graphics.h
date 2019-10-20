@@ -39,14 +39,11 @@ protected:
 	virtual void unloadGFXMode() override;
 	virtual bool hotswapGFXMode() override;
 
-	virtual void internUpdateScreen() override;
 	virtual void updateShader() override;
-	virtual void setAspectRatioCorrection(bool enable) override;
 	virtual SDL_Surface *SDL_SetVideoMode(int width, int height, int bpp, Uint32 flags) override;
-	void PSP2_UpdateRects(SDL_Surface *screen, int numrects, SDL_Rect *rects);
+	virtual void SDL_UpdateRects(SDL_Surface *screen, int numrects, SDL_Rect *rects) override;
 	void PSP2_UpdateFiltering();
 
-	bool _hardwareAspectRatioCorrection;
 	vita2d_texture *_vitatex_hwscreen;
 	void *_sdlpixels_hwscreen;
 	vita2d_shader *_shaders[6];

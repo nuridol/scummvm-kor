@@ -233,10 +233,7 @@ public:
 	 * @returns A pointer to the code for the method at the given index.
 	 */
 	reg_t getFunction(const uint16 index) const {
-		reg_t addr;
-		addr.setSegment(_pos.getSegment());
-		addr.setOffset(_baseMethod[index * 2 + 1]);
-		return addr;
+		return make_reg32(_pos.getSegment(), _baseMethod[index * 2 + 1]);
 	}
 
 	/**
@@ -303,9 +300,9 @@ public:
 
 	int propertyOffsetToId(SegManager *segMan, int propertyOffset) const;
 
-	void initSpecies(SegManager *segMan, reg_t addr);
-	void initSuperClass(SegManager *segMan, reg_t addr);
-	bool initBaseObject(SegManager *segMan, reg_t addr, bool doInitSuperClass = true);
+	void initSpecies(SegManager *segMan, reg_t addr, bool applyScriptPatches);
+	void initSuperClass(SegManager *segMan, reg_t addr, bool applyScriptPatches);
+	bool initBaseObject(SegManager *segMan, reg_t addr, bool doInitSuperClass = true, bool applyScriptPatches = true);
 
 #ifdef ENABLE_SCI32
 	bool mustSetViewVisible(const int index, const bool fromPropertyOp) const;

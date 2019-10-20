@@ -47,6 +47,16 @@ struct AgiView {
 	byte *description;
 	int16 loopCount;
 	AgiViewLoop *loop;
+
+	void reset() {
+		headerStepSize = 0;
+		headerCycleTime = 0;
+		description = nullptr;
+		loopCount = 0;
+		loop = nullptr;
+	}
+
+	AgiView() { reset(); }
 };
 
 enum MotionType {
@@ -133,7 +143,8 @@ struct ScreenObjEntry {
 	// end of motion related variables
 	uint8 loop_flag;
 
-	ScreenObjEntry() { memset(this, 0, sizeof(ScreenObjEntry)); }
+	void reset() { memset(this, 0, sizeof(ScreenObjEntry)); }
+	ScreenObjEntry() { reset(); }
 }; // struct vt_entry
 
 } // End of namespace Agi

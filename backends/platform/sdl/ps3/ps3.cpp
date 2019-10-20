@@ -59,7 +59,6 @@ void OSystem_PS3::init() {
 
 void OSystem_PS3::initBackend() {
 	ConfMan.set("joystick_num", 0);
-	ConfMan.set("vkeybdpath", PREFIX "/data");
 	ConfMan.registerDefault("fullscreen", true);
 	ConfMan.registerDefault("aspect_ratio", true);
 
@@ -79,7 +78,6 @@ Common::String OSystem_PS3::getDefaultConfigFileName() {
 	return PREFIX "/" + _baseConfigName;
 }
 
-Common::WriteStream *OSystem_PS3::createLogFile() {
-	Common::FSNode file(PREFIX "/scummvm.log");
-	return file.createWriteStream();
+Common::String OSystem_PS3::getDefaultLogFileName() {
+	return PREFIX "/scummvm.log";
 }

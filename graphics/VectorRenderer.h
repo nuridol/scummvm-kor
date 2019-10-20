@@ -43,9 +43,15 @@ typedef void (VectorRenderer::*DrawingFunctionCallback)(const Common::Rect &, co
 
 
 struct DrawStep {
+	DrawingFunctionCallback drawingCall; /**< Pointer to drawing function */
+	Graphics::Surface* blitSrc;
+	Graphics::TransparentSurface* blitAlphaSrc;
+
 	struct Color {
 		uint8 r, g, b;
 		bool set;
+
+		Color () : r(0), g(0), b(0), set(false) {}
 	};
 	Color fgColor; /**< Foreground color */
 	Color bgColor; /**< background color */
@@ -82,9 +88,22 @@ struct DrawStep {
 
 	GUI::ThemeEngine::AutoScaleMode autoscale; /**< scale alphaimage if present */
 
-	DrawingFunctionCallback drawingCall; /**< Pointer to drawing function */
-	Graphics::Surface *blitSrc;
-	Graphics::TransparentSurface *blitAlphaSrc;
+	DrawStep() {
+		drawingCall = nullptr;
+		blitSrc = nullptr;
+		blitAlphaSrc = nullptr;
+		// fgColor, bgColor, gradColor1, gradColor2, bevelColor initialized by Color default constructor
+		autoWidth = autoHeight = false;
+		x = y = w = h = 0;
+		// padding initialized by Common::Rect default constructor
+		xAlign = yAlign = kVectorAlignManual;
+		shadow = stroke = factor = radius = bevel = 0;
+		fillMode = 0;
+		shadowFillMode = 0;
+		extraData = 0;
+		scale = 0;
+		autoscale = GUI::ThemeEngine::kAutoScaleNone;
+	}
 };
 
 VectorRenderer *createRenderer(int mode);
@@ -290,6 +309,13 @@ public:
 	}
 
 	/**
+	 * Returns the currently active drawing surface
+	 */
+	virtual TransparentSurface *getActiveSurface() {
+		return _activeSurface;
+	}
+
+	/**
 	 * Fills the active surface with the specified fg/bg color or the active gradient.
 	 * Defaults to using the active Foreground color for filling.
 	 */
@@ -430,7 +456,7 @@ public:
 	void drawCallback_ALPHABITMAP(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
 		uint16 x, y, w, h;
 		stepGetPositions(step, area, x, y, w, h);
-		blitAlphaBitmap(step.blitAlphaSrc, Common::Rect(x, y, x + w, y + h), step.autoscale, step.xAlign, step.yAlign); //TODO
+		blitAlphaBitmap(step.blitAlphaSrc, Common::Rect(x, y, x + w, y + h), step.autoscale, step.xAlign, step.yAlign); // TODO
 	}
 
 	void drawCallback_CROSS(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {

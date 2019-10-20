@@ -51,9 +51,7 @@ void CursorManager::hideCursor() {
 void CursorManager::setDefaultCursor() {
 	Graphics::Cursor *cursor = Graphics::makeDefaultWinCursor();
 
-	CursorMan.replaceCursor(cursor->getSurface(), cursor->getWidth(), cursor->getHeight(), cursor->getHotspotX(),
-			cursor->getHotspotY(), cursor->getKeyColor());
-	CursorMan.replaceCursorPalette(cursor->getPalette(), cursor->getPaletteStartIndex(), cursor->getPaletteCount());
+	CursorMan.replaceCursor(cursor);
 
 	delete cursor;
 }
@@ -71,9 +69,7 @@ void CursorManager::setMacCursor(Common::SeekableReadStream *stream) {
 	if (!macCursor->readFromStream(*stream))
 		error("Could not parse Mac cursor");
 
-	CursorMan.replaceCursor(macCursor->getSurface(), macCursor->getWidth(), macCursor->getHeight(),
-			macCursor->getHotspotX(), macCursor->getHotspotY(), macCursor->getKeyColor());
-	CursorMan.replaceCursorPalette(macCursor->getPalette(), 0, 256);
+	CursorMan.replaceCursor(macCursor);
 
 	delete macCursor;
 	delete stream;
@@ -151,7 +147,7 @@ NECursorManager::NECursorManager(const Common::String &appName) {
 	if (!_exe->loadFromEXE(appName)) {
 		// Not all have cursors anyway, so this is not a problem
 		delete _exe;
-		_exe = 0;
+		_exe = nullptr;
 	}
 }
 
@@ -165,8 +161,7 @@ void NECursorManager::setCursor(uint16 id) {
 
 		if (cursorGroup) {
 			Graphics::Cursor *cursor = cursorGroup->cursors[0].cursor;
-			CursorMan.replaceCursor(cursor->getSurface(), cursor->getWidth(), cursor->getHeight(), cursor->getHotspotX(), cursor->getHotspotY(), cursor->getKeyColor());
-			CursorMan.replaceCursorPalette(cursor->getPalette(), 0, 256);
+			CursorMan.replaceCursor(cursor);
 			delete cursorGroup;
 			return;
 		}
@@ -183,10 +178,10 @@ MacCursorManager::MacCursorManager(const Common::String &appName) {
 		if (!_resFork->open(appName)) {
 			// Not all have cursors anyway, so this is not a problem
 			delete _resFork;
-			_resFork = 0;
+			_resFork = nullptr;
 		}
 	} else {
-		_resFork = 0;
+		_resFork = nullptr;
 	}
 }
 
@@ -219,7 +214,7 @@ LivingBooksCursorManager_v2::LivingBooksCursorManager_v2() {
 
 	if (!_sysArchive->openFile("system.mhk")) {
 		delete _sysArchive;
-		_sysArchive = 0;
+		_sysArchive = nullptr;
 	}
 }
 
@@ -253,7 +248,7 @@ PECursorManager::PECursorManager(const Common::String &appName) {
 		return;
 	}
 
-	const Common::Array<Common::WinResourceID> cursorGroups = exe.getNameList(Common::kPEGroupCursor);
+	const Common::Array<Common::WinResourceID> cursorGroups = exe.getNameList(Common::kWinGroupCursor);
 
 	_cursors.resize(cursorGroups.size());
 	for (uint i = 0; i < cursorGroups.size(); i++) {
@@ -272,8 +267,7 @@ void PECursorManager::setCursor(uint16 id) {
 	for (uint i = 0; i < _cursors.size(); i++) {
 		if (_cursors[i].id == id) {
 			Graphics::Cursor *cursor = _cursors[i].cursorGroup->cursors[0].cursor;
-			CursorMan.replaceCursor(cursor->getSurface(), cursor->getWidth(), cursor->getHeight(), cursor->getHotspotX(), cursor->getHotspotY(), cursor->getKeyColor());
-			CursorMan.replaceCursorPalette(cursor->getPalette(), 0, 256);
+			CursorMan.replaceCursor(cursor);
 			return;
 		}
 	}

@@ -30,9 +30,6 @@
 #include "sci/graphics/cache.h"
 #include "sci/graphics/font.h"
 #include "sci/graphics/fontsjis.h"
-#ifdef SCUMMVMKOR
-#include "sci/graphics/fontkorean.h"
-#endif
 #include "sci/graphics/view.h"
 
 namespace Sci {
@@ -69,13 +66,6 @@ GfxFont *GfxCache::getFont(GuiResourceId fontId) {
 		purgeFontCache();
 
 	if (!_cachedFonts.contains(fontId)) {
-#ifdef SCUMMVMKOR
-		// Create special Korean font in korean games, when font 1001 is selected
-		if ((fontId == 1001) && (g_sci->getLanguage() == Common::KO_KOR)) {
-			_cachedFonts[fontId] = new GfxFontKorean(_screen, fontId);
-		}
-		else
-#endif
 		// Create special SJIS font in japanese games, when font 900 is selected
 		if ((fontId == 900) && (g_sci->getLanguage() == Common::JA_JPN))
 			_cachedFonts[fontId] = new GfxFontSjis(_screen, fontId);

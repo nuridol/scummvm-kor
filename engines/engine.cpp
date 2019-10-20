@@ -26,8 +26,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <direct.h>
-// winnt.h defines ARRAYSIZE, but we want our own one...
-#undef ARRAYSIZE
 #endif
 
 #include "engines/engine.h"
@@ -62,6 +60,10 @@
 #include "graphics/fontman.h"
 #include "graphics/pixelformat.h"
 #include "image/bmp.h"
+
+#ifdef USE_TTS
+#include "common/text-to-speech.h"
+#endif
 
 #ifdef _WIN32_WCE
 extern bool isSmartphone();
@@ -210,6 +212,9 @@ void initCommonGFX() {
 
 		if (gameDomain->contains("filtering"))
 			g_system->setFeatureState(OSystem::kFeatureFilteringMode, ConfMan.getBool("filtering"));
+
+		if (gameDomain->contains("stretch_mode"))
+			g_system->setStretchMode(ConfMan.get("stretch_mode").c_str());
 	}
 }
 
@@ -234,7 +239,7 @@ void splashScreen() {
 	// Fill with orange
 	Graphics::Surface screen;
 	screen.create(g_system->getOverlayWidth(), g_system->getOverlayHeight(), g_system->getOverlayFormat());
-	screen.fillRect(Common::Rect(screen.w, screen.h), screen.format.ARGBToColor(0xff, 0xd4, 0x75, 0x0b));
+	screen.fillRect(Common::Rect(screen.w, screen.h), screen.format.ARGBToColor(0xff, 0xcc, 0x66, 0x00));
 
 	// Load logo
 	Graphics::Surface *logo = bitmap.getSurface()->convertTo(g_system->getOverlayFormat(), bitmap.getPalette());
@@ -259,12 +264,12 @@ void splashScreen() {
 	logo->free();
 	delete logo;
 
+	g_system->updateScreen();
+
 	// Delay 0.6 secs
 	uint time0 = g_system->getMillis();
 	Common::Event event;
 	while (time0 + 600 > g_system->getMillis()) {
-		g_system->updateScreen();
-		(void)g_system->getEventManager()->pollEvent(event);
 		g_system->delayMillis(10);
 	}
 	g_system->hideOverlay();
@@ -303,7 +308,7 @@ void initGraphics(int width, int height, const Graphics::PixelFormat *format) {
 	// Error out on size switch failure
 	if (gfxError & OSystem::kTransactionSizeChangeFailed) {
 		Common::String message;
-		message = Common::String::format("Could not switch to resolution: '%dx%d'.", width, height);
+		message = Common::String::format(_("Could not switch to resolution '%dx%d'."), width, height);
 
 		GUIErrorMessage(message);
 		error("%s", message.c_str());
@@ -320,9 +325,16 @@ void initGraphics(int width, int height, const Graphics::PixelFormat *format) {
 #endif
 
 	if (gfxError & OSystem::kTransactionModeSwitchFailed) {
-		Common::String message = _("Could not switch to video mode: '");
-		message += ConfMan.get("gfx_mode");
-		message += "'.";
+		Common::String message;
+		message = Common::String::format(_("Could not switch to video mode '%s'."), ConfMan.get("gfx_mode").c_str());
+
+		GUI::MessageDialog dialog(message);
+		dialog.runModal();
+	}
+
+	if (gfxError & OSystem::kTransactionStretchModeSwitchFailed) {
+		Common::String message;
+		message = Common::String::format(_("Could not switch to stretch mode '%s'."), ConfMan.get("stretch_mode").c_str());
 
 		GUI::MessageDialog dialog(message);
 		dialog.runModal();
@@ -386,6 +398,17 @@ void GUIErrorMessage(const Common::String &msg) {
 	} else {
 		error("%s", msg.c_str());
 	}
+}
+
+void GUIErrorMessageFormat(const char *fmt, ...) {
+	Common::String msg;
+
+	va_list va;
+	va_start(va, fmt);
+	msg = Common::String::vformat(fmt, va);
+	va_end(va);
+
+	GUIErrorMessage(msg);
 }
 
 void Engine::checkCD() {
@@ -493,6 +516,11 @@ void Engine::pauseEngineIntern(bool pause) {
 void Engine::openMainMenuDialog() {
 	if (!_mainMenuDialog)
 		_mainMenuDialog = new MainMenuDialog(this);
+#ifdef USE_TTS
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	ttsMan->pushState();
+	g_gui.initTextToSpeech();
+#endif
 
 	setGameToLoadSlot(-1);
 
@@ -500,7 +528,7 @@ void Engine::openMainMenuDialog() {
 
 	// Load savegame after main menu execution
 	// (not from inside the menu loop to avoid
-	// mouse cursor glitches and simliar bugs,
+	// mouse cursor glitches and similar bugs,
 	// e.g. #2822778).
 	if (_saveSlotToLoad >= 0) {
 		Common::Error status = loadGameState(_saveSlotToLoad);
@@ -514,6 +542,9 @@ void Engine::openMainMenuDialog() {
 	}
 
 	syncSoundSettings();
+#ifdef USE_TTS
+	ttsMan->popState();
+#endif
 }
 
 bool Engine::warnUserAboutUnsupportedGame() {

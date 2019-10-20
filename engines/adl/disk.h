@@ -34,6 +34,9 @@ class String;
 
 namespace Adl {
 
+// Used for disk image detection
+int32 computeMD5(const Common::FSNode &node, Common::String &md5, uint32 md5Bytes);
+
 class DataBlock {
 public:
 	virtual ~DataBlock() { }
@@ -59,7 +62,7 @@ protected:
 				_filename(filename),
 				_offset(offset) { }
 
-		Common::SeekableReadStream *createReadStream() const {
+		Common::SeekableReadStream *createReadStream() const override {
 			return _files->createReadStream(_filename, _offset);
 		}
 
@@ -77,7 +80,8 @@ public:
 			_tracks(0),
 			_sectorsPerTrack(0),
 			_bytesPerSector(0),
-			_sectorLimit(0) { }
+			_sectorLimit(0),
+			_firstSector(0) { }
 
 	~DiskImage() {
 		delete _stream;
@@ -89,6 +93,7 @@ public:
 	void setSectorLimit(uint sectorLimit) { _sectorLimit = sectorLimit; } // Maximum number of sectors to read per track before stepping
 	uint getBytesPerSector() const { return _bytesPerSector; }
 	uint getSectorsPerTrack() const { return _sectorsPerTrack; }
+	uint getTracks() const { return _tracks; }
 
 protected:
 	class DataBlock : public Adl::DataBlock {
@@ -101,7 +106,7 @@ protected:
 				_sectorLimit(sectorLimit),
 				_disk(disk) { }
 
-		Common::SeekableReadStream *createReadStream() const {
+		Common::SeekableReadStream *createReadStream() const override {
 			return _disk->createReadStream(_track, _sector, _offset, _size, _sectorLimit);
 		}
 
@@ -112,26 +117,26 @@ protected:
 	};
 
 	Common::SeekableReadStream *_stream;
-	uint _tracks, _sectorsPerTrack, _bytesPerSector;
+	uint _tracks, _sectorsPerTrack, _bytesPerSector, _firstSector;
 	uint _sectorLimit;
 };
 
 // Data in plain files
 class Files_Plain : public Files {
 public:
-	const DataBlockPtr getDataBlock(const Common::String &filename, uint offset = 0) const;
-	Common::SeekableReadStream *createReadStream(const Common::String &filename, uint offset = 0) const;
+	const DataBlockPtr getDataBlock(const Common::String &filename, uint offset = 0) const override;
+	Common::SeekableReadStream *createReadStream(const Common::String &filename, uint offset = 0) const override;
 };
 
 // Data in files contained in Apple DOS 3.3 disk image
-class Files_DOS33 : public Files {
+class Files_AppleDOS : public Files {
 public:
-	Files_DOS33();
-	~Files_DOS33();
+	Files_AppleDOS();
+	~Files_AppleDOS();
 
-	bool open(const Common::String &filename);
-	const DataBlockPtr getDataBlock(const Common::String &filename, uint offset = 0) const;
-	Common::SeekableReadStream *createReadStream(const Common::String &filename, uint offset = 0) const;
+	bool open(const Common::String &filename, uint trackVTOC = 17);
+	const DataBlockPtr getDataBlock(const Common::String &filename, uint offset = 0) const override;
+	Common::SeekableReadStream *createReadStream(const Common::String &filename, uint offset = 0) const override;
 
 private:
 	enum FileType {
@@ -156,13 +161,38 @@ private:
 		Common::Array<TrackSector> sectors;
 	};
 
-	void readVTOC();
+	void readVTOC(uint trackVTOC);
 	void readSectorList(TrackSector start, Common::Array<TrackSector> &list);
 	Common::SeekableReadStream *createReadStreamText(const TOCEntry &entry) const;
 	Common::SeekableReadStream *createReadStreamBinary(const TOCEntry &entry) const;
 
 	DiskImage *_disk;
 	Common::HashMap<Common::String, TOCEntry> _toc;
+};
+
+// On the Apple II, sector headers contain a disk volume number. This number
+// is used by ADL multi-disk games. The PC port has the disk volume number
+// as the first data byte of every sector that contains game data. We need
+// to skip this number as we read in the data. Additionally, the data is now
+// prefixed with an uint16 containing the data size.
+class DataBlock_PC : public DataBlock {
+public:
+	DataBlock_PC(DiskImage *disk, byte track, byte sector, uint16 offset = 0) :
+			_disk(disk),
+			_track(track),
+			_sector(sector),	
+			_offset(offset) { }
+
+	virtual ~DataBlock_PC() { }
+
+	Common::SeekableReadStream *createReadStream() const override;
+
+private:
+	void read(Common::SeekableReadStream &stream, byte *const dataPtr, const uint32 size) const;
+
+	DiskImage *_disk;
+	byte _track, _sector;
+	uint16 _offset;
 };
 
 } // End of namespace Adl

@@ -25,7 +25,7 @@
 #define SCUMM_ACTOR_H
 
 #include "common/scummsys.h"
-#include "scumm/saveload.h"
+#include "common/serializer.h"
 #include "scumm/scumm.h"
 
 
@@ -82,7 +82,7 @@ enum {
 	kNewInavlidBox = 0
 };
 
-class Actor : public Serializable {
+class Actor : public Common::Serializable {
 public:
 	static byte kInvalidBox;
 
@@ -151,6 +151,20 @@ protected:
 		Common::Point point3;
 		int32 deltaXFactor, deltaYFactor;
 		uint16 xfrac, yfrac;
+
+		void reset() {
+			dest.x = dest.y = 0;
+			destbox = 0;
+			destdir = 0;
+			cur.x = cur.y = 0;
+			curbox = 0;
+			next.x = next.y = 0;
+			point3.x = point3.y = 0;
+			deltaXFactor = 0;
+			deltaYFactor = 0;
+			xfrac = 0;
+			yfrac = 0;
+		}
 	};
 
 
@@ -300,8 +314,7 @@ public:
 
 	void classChanged(int cls, bool value);
 
-	// Used by the save/load system:
-	virtual void saveLoadWithSerializer(Serializer *ser);
+	virtual void saveLoadWithSerializer(Common::Serializer &ser);
 
 protected:
 	bool isInClass(int cls);
@@ -375,7 +388,7 @@ public:
 	byte _walkMaxXYCountInc;
 
 	Common::Point _tmp_Pos;
-	Common::Point _tmp_Dest;
+	Common::Point _tmp_NewPos;
 	byte _tmp_WalkBox;
 	bool _tmp_NewWalkBoxEntered;
 
@@ -408,8 +421,8 @@ public:
 	bool calcWalkDistances();
 	void walkActor();
 	void actorSetWalkTo();
-	byte actorWalkX();
-	byte actorWalkY();
+	byte actorWalkXCalculate();
+	byte actorWalkYCalculate();
 	byte updateWalkbox();
 
 	void walkBoxQueueReset();
@@ -418,11 +431,10 @@ public:
 	AdjustBoxResult adjustXYToBeInBox(int dstX, int dstY);
 	AdjustBoxResult adjustPosInBorderWalkbox(AdjustBoxResult box);
 
-	void setTmpFromActor();
-	void setActorFromTmp();
+	void setActorToTempPosition();
+	void setActorToOriginalPosition();
 
-	// Used by the save/load system:
-	virtual void saveLoadWithSerializer(Serializer *ser);
+	virtual void saveLoadWithSerializer(Common::Serializer &ser);
 };
 
 

@@ -2,6 +2,7 @@ MODULE := gui
 
 MODULE_OBJS := \
 	about.o \
+	browser.o \
 	chooser.o \
 	console.o \
 	debugger.o \
@@ -25,6 +26,7 @@ MODULE_OBJS := \
 	ThemeLayout.o \
 	ThemeParser.o \
 	Tooltip.o \
+	unknown-game-dialog.o \
 	animation/Animation.o \
 	animation/RepeatAnimationWrapper.o \
 	animation/SequenceAnimationComposite.o \
@@ -37,25 +39,11 @@ MODULE_OBJS := \
 	widgets/scrollcontainer.o \
 	widgets/tab.o
 
-ifdef IPHONE
-MODULE_OBJS += \
-	browser.o
-else
-ifdef MACOSX
-MODULE_OBJS += \
-	browser_osx.o
-else
-MODULE_OBJS += \
-	browser.o
-endif
-endif
-
 ifdef USE_CLOUD
 ifdef USE_LIBCURL
 MODULE_OBJS += \
 	downloaddialog.o \
-	remotebrowser.o \
-	storagewizarddialog.o
+	remotebrowser.o
 endif
 endif
 

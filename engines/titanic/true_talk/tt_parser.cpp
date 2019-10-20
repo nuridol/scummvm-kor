@@ -41,17 +41,24 @@ TTparser::TTparser(CScriptHandler *owner) : _owner(owner), _sentenceConcept(null
 }
 
 TTparser::~TTparser() {
+	clear();
+}
+
+void TTparser::clear() {
 	if (_nodesP) {
 		_nodesP->deleteSiblings();
 		delete _nodesP;
+		_nodesP = nullptr;
 	}
 
 	if (_conceptP) {
 		_conceptP->deleteSiblings();
 		delete _conceptP;
+		_conceptP = nullptr;
 	}
 
 	delete _currentWordP;
+	_currentWordP = nullptr;
 }
 
 void TTparser::loadArray(StringArray &arr, const CString &name) {
@@ -531,6 +538,7 @@ int TTparser::findFrames(TTsentence *sentence) {
 
 	if (status <= 1) {
 		status = checkForAction();
+		clear();
 	}
 
 	delete line;
@@ -681,6 +689,7 @@ int TTparser::loadRequests(TTword *word) {
 		default:
 			break;
 		}
+		break;
 
 	case WC_ADJECTIVE:
 		if (word->_id == 304) {
@@ -792,7 +801,7 @@ int TTparser::considerRequests(TTword *word) {
 			if (!_sentenceConcept->_concept0P) {
 				flag = filterConcepts(5, 0);
 			} else if (_sentenceConcept->_concept0P->compareTo("?") &&
-						_sentenceConcept->_concept1P->isWordId(113) &&
+						(_sentenceConcept->_concept1P && isWordId(_sentenceConcept->_concept1P, 113)) &&
 						word->_wordClass == WC_THING) {
 				TTconcept *oldConcept = _sentenceConcept->_concept0P;
 				_sentenceConcept->_concept0P = nullptr;
@@ -817,13 +826,13 @@ int TTparser::considerRequests(TTword *word) {
 				if (flag)
 					delete oldConcept;
 			} else if (!_sentenceConcept->_concept3P &&
-					(!_sentenceConcept->_concept1P || (_sentenceConcept->_concept1P->getWordId() != 113 &&
-					_sentenceConcept->_concept1P->getWordId() != 112)) &&
+					(!_sentenceConcept->_concept1P || (getWordId(_sentenceConcept->_concept1P) != 113 &&
+					getWordId(_sentenceConcept->_concept1P) != 112)) &&
 					_sentenceConcept->_concept2P->checkWordId1() &&
 					(word->_wordClass == WC_THING || word->_wordClass == WC_PRONOUN)) {
 				_sentenceConcept->changeConcept(0, &_sentenceConcept->_concept2P, 3);
 
-				if (_conceptP && _conceptP->isWordId(word->_id)) {
+				if (_conceptP && isWordId(_conceptP, word->_id)) {
 					status = _sentenceConcept->replaceConcept(0, 2, _conceptP);
 					removeConcept(_conceptP);
 				} else {
@@ -960,7 +969,7 @@ int TTparser::considerRequests(TTword *word) {
 				case WC_ABSTRACT:
 					if (word->_id != 300) {
 						status = processModifiers(3, word);
-					} else if (!_conceptP->findByWordClass(WC_THING)) {
+					} else if (!_conceptP || !_conceptP->findByWordClass(WC_THING)) {
 						status = processModifiers(3, word);
 					} else {
 						word->_id = atoi(word->_text.c_str());
@@ -1469,11 +1478,11 @@ int TTparser::checkForAction() {
 	}
 
 	if (flag && _conceptP) {
-		if (actionFlag && (!_sentenceConcept->_concept1P || _sentenceConcept->_concept1P->isWordId(113))) {
+		if (actionFlag && (!_sentenceConcept->_concept1P || isWordId(_sentenceConcept->_concept1P, 113))) {
 			_sentenceConcept->replaceConcept(0, 1, _conceptP);
 		} else if (!_sentenceConcept->_concept5P) {
 			_sentenceConcept->replaceConcept(1, 5, _conceptP);
-		} else if (_sentenceConcept->_concept5P->isWordId(904)) {
+		} else if (isWordId(_sentenceConcept->_concept5P, 904)) {
 			_sentenceConcept->replaceConcept(0, 5, _conceptP);
 		}
 
@@ -1760,7 +1769,7 @@ void TTparser::preprocessGerman(TTstring &line) {
 			continue;
 
 		const char *wordEndP = p + _replacements4[idx].size();
-		
+
 		for (int sIdx = 0; sIdx < 12; ++sIdx) {
 			const char *suffixP = SUFFIXES[sIdx];
 			if (!strncmp(wordEndP, suffixP, strlen(suffixP))) {

@@ -22,13 +22,14 @@
 
 #include "gui/downloaddialog.h"
 #include "backends/cloud/cloudmanager.h"
-#include "backends/networking/connection/islimited.h"
 #include "common/config-manager.h"
 #include "common/translation.h"
+#include "common/util.h"
 #include "engines/metaengine.h"
 #include "gui/browser.h"
 #include "gui/chooser.h"
 #include "gui/editgamedialog.h"
+#include "gui/gui-manager.h"
 #include "gui/launcher.h"
 #include "gui/message.h"
 #include "gui/remotebrowser.h"
@@ -81,7 +82,7 @@ void DownloadDialog::open() {
 		if (!selectDirectories())
 			close();
 	reflowLayout();
-	draw();
+	g_gui.scheduleTopDialogRedraw();
 }
 
 void DownloadDialog::close() {
@@ -101,7 +102,7 @@ void DownloadDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 	case kDownloadProgressCmd:
 		if (!_close) {
 			refreshWidgets();
-			draw();
+			g_gui.scheduleTopDialogRedraw();
 		}
 		break;
 	case kDownloadEndedCmd:
@@ -113,7 +114,7 @@ void DownloadDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 }
 
 bool DownloadDialog::selectDirectories() {
-	if (Networking::Connection::isLimited()) {
+	if (g_system->isConnectionLimited()) {
 		MessageDialog alert(_("It looks like your connection is limited. "
 			"Do you really want to download files with it?"), _("Yes"), _("No"));
 		if (alert.runModal() != GUI::kMessageOK)
@@ -196,7 +197,7 @@ void DownloadDialog::handleTickle() {
 	int32 progress = (int32)(100 * CloudMan.getDownloadingProgress());
 	if (_progressBar->getValue() != progress) {
 		refreshWidgets();
-		draw();
+		g_gui.scheduleTopDialogRedraw();
 	}
 
 	Dialog::handleTickle();
@@ -205,43 +206,6 @@ void DownloadDialog::handleTickle() {
 void DownloadDialog::reflowLayout() {
 	Dialog::reflowLayout();
 	refreshWidgets();
-}
-
-namespace {
-Common::String getHumanReadableBytes(uint64 bytes, Common::String &unitsOut) {
-	Common::String result = Common::String::format("%lu", bytes);
-	unitsOut = "B";
-
-	if (bytes >= 1024) {
-		bytes /= 1024;
-		result = Common::String::format("%lu", bytes);
-		unitsOut = "KB";
-	}
-
-	double floating = bytes;
-
-	if (bytes >= 1024) {
-		bytes /= 1024;
-		floating /= 1024.0;
-		unitsOut = "MB";
-	}
-
-	if (bytes >= 1024) {
-		bytes /= 1024;
-		floating /= 1024.0;
-		unitsOut = "GB";
-	}
-
-	if (bytes >= 1024) { // woah
-		bytes /= 1024;
-		floating /= 1024.0;
-		unitsOut = "TB";
-	}
-
-	// print one digit after floating point
-	result = Common::String::format("%.1f", floating);
-	return result;
-}
 }
 
 Common::String DownloadDialog::getSizeLabelText() {

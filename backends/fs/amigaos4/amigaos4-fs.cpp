@@ -266,7 +266,7 @@ bool AmigaOSFilesystemNode::getChildren(AbstractFSList &myList, ListMode mode, b
 	if (context) {
 		struct ExamineData * pExd = NULL; // NB: No need to free the value after usage, everything will be dealt with by the DirContext release
 
-		AmigaOSFilesystemNode *entry ;
+		AmigaOSFilesystemNode *entry;
 		while ( (pExd = IDOS->ExamineDir(context)) ) {
 			if (     (EXD_IS_FILE(pExd) && ( Common::FSNode::kListFilesOnly == mode ))
 				||  (EXD_IS_DIRECTORY(pExd) && ( Common::FSNode::kListDirectoriesOnly == mode ))
@@ -443,9 +443,9 @@ Common::WriteStream *AmigaOSFilesystemNode::createWriteStream() {
 	return StdioStream::makeFromPath(getPath(), true);
 }
 
-bool AmigaOSFilesystemNode::create(bool isDirectoryFlag) {
-	error("Not supported");
-	return false;
+bool AmigaOSFilesystemNode::createDirectory() {
+	warning("AmigaOSFilesystemNode::createDirectory(): Not supported");
+	return _bIsValid && _bIsDirectory;
 }
 
 #endif //defined(__amigaos4__)

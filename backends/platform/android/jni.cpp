@@ -45,6 +45,7 @@
 #include "common/config-manager.h"
 #include "common/error.h"
 #include "common/textconsole.h"
+#include "common/translation.h"
 #include "engines/engine.h"
 
 #include "backends/platform/android/android.h"
@@ -77,10 +78,15 @@ bool JNI::_ready_for_events = 0;
 jmethodID JNI::_MID_getDPI = 0;
 jmethodID JNI::_MID_displayMessageOnOSD = 0;
 jmethodID JNI::_MID_openUrl = 0;
+jmethodID JNI::_MID_hasTextInClipboard = 0;
+jmethodID JNI::_MID_getTextFromClipboard = 0;
+jmethodID JNI::_MID_setTextInClipboard = 0;
 jmethodID JNI::_MID_isConnectionLimited = 0;
 jmethodID JNI::_MID_setWindowCaption = 0;
 jmethodID JNI::_MID_showVirtualKeyboard = 0;
+jmethodID JNI::_MID_showKeyboardControl = 0;
 jmethodID JNI::_MID_getSysArchives = 0;
+jmethodID JNI::_MID_getAllStorageLocations = 0;
 jmethodID JNI::_MID_initSurface = 0;
 jmethodID JNI::_MID_deinitSurface = 0;
 
@@ -104,12 +110,12 @@ const JNINativeMethod JNI::_natives[] = {
 		(void *)JNI::setSurface },
 	{ "main", "([Ljava/lang/String;)I",
 		(void *)JNI::main },
-	{ "pushEvent", "(IIIIII)V",
+	{ "pushEvent", "(IIIIIII)V",
 		(void *)JNI::pushEvent },
-	{ "enableZoning", "(Z)V",
-		(void *)JNI::enableZoning },
 	{ "setPause", "(Z)V",
-		(void *)JNI::setPause }
+		(void *)JNI::setPause },
+	{ "getCurrentCharset", "()Ljava/lang/String;",
+		(void *)JNI::getCurrentCharset }
 };
 
 JNI::JNI() {
@@ -253,10 +259,67 @@ bool JNI::openUrl(const char *url) {
 	return success;
 }
 
-bool JNI::isConnectionLimited() {
-	bool limited = false;
+bool JNI::hasTextInClipboard() {
 	JNIEnv *env = JNI::getEnv();
-	limited = env->CallBooleanMethod(_jobj, _MID_isConnectionLimited);
+	bool hasText = env->CallBooleanMethod(_jobj, _MID_hasTextInClipboard);
+
+	if (env->ExceptionCheck()) {
+		LOGE("Failed to check the contents of the clipboard");
+
+		env->ExceptionDescribe();
+		env->ExceptionClear();
+		hasText = true;
+	}
+
+	return hasText;
+}
+
+Common::String JNI::getTextFromClipboard() {
+	JNIEnv *env = JNI::getEnv();
+
+	jbyteArray javaText = (jbyteArray)env->CallObjectMethod(_jobj, _MID_getTextFromClipboard);
+
+	if (env->ExceptionCheck()) {
+		LOGE("Failed to retrieve text from the clipboard");
+
+		env->ExceptionDescribe();
+		env->ExceptionClear();
+
+		return Common::String();
+	}
+
+	int len = env->GetArrayLength(javaText);
+	char* buf = new char[len];
+	env->GetByteArrayRegion(javaText, 0, len, reinterpret_cast<jbyte*>(buf));
+	Common::String text(buf, len);
+	delete[] buf;
+
+	return text;
+}
+
+bool JNI::setTextInClipboard(const Common::String &text) {
+	JNIEnv *env = JNI::getEnv();
+
+	jbyteArray javaText = env->NewByteArray(text.size());
+	env->SetByteArrayRegion(javaText, 0, text.size(), reinterpret_cast<const jbyte*>(text.c_str()));
+
+	bool success = env->CallBooleanMethod(_jobj, _MID_setTextInClipboard, javaText);
+
+	if (env->ExceptionCheck()) {
+		LOGE("Failed to add text to the clipboard");
+
+		env->ExceptionDescribe();
+		env->ExceptionClear();
+		success = false;
+	}
+
+	env->DeleteLocalRef(javaText);
+	return success;
+}
+
+bool JNI::isConnectionLimited() {
+	JNIEnv *env = JNI::getEnv();
+	bool limited = env->CallBooleanMethod(_jobj, _MID_isConnectionLimited);
 
 	if (env->ExceptionCheck()) {
 		LOGE("Failed to check whether connection's limited");
@@ -292,6 +355,19 @@ void JNI::showVirtualKeyboard(bool enable) {
 
 	if (env->ExceptionCheck()) {
 		LOGE("Error trying to show virtual keyboard");
+
+		env->ExceptionDescribe();
+		env->ExceptionClear();
+	}
+}
+
+void JNI::showKeyboardControl(bool enable) {
+	JNIEnv *env = JNI::getEnv();
+
+	env->CallVoidMethod(_jobj, _MID_showKeyboardControl, enable);
+
+	if (env->ExceptionCheck()) {
+		LOGE("Error trying to show virtual keyboard control");
 
 		env->ExceptionDescribe();
 		env->ExceptionClear();
@@ -417,7 +493,7 @@ void JNI::setAudioStop() {
 void JNI::create(JNIEnv *env, jobject self, jobject asset_manager,
 				jobject egl, jobject egl_display,
 				jobject at, jint audio_sample_rate, jint audio_buffer_size) {
-	LOGI(gScummVMFullVersion);
+	LOGI("%s", gScummVMFullVersion);
 
 	assert(!_system);
 
@@ -449,9 +525,14 @@ void JNI::create(JNIEnv *env, jobject self, jobject asset_manager,
 	FIND_METHOD(, getDPI, "([F)V");
 	FIND_METHOD(, displayMessageOnOSD, "(Ljava/lang/String;)V");
 	FIND_METHOD(, openUrl, "(Ljava/lang/String;)V");
+	FIND_METHOD(, hasTextInClipboard, "()Z");
+	FIND_METHOD(, getTextFromClipboard, "()[B");
+	FIND_METHOD(, setTextInClipboard, "([B)Z");
 	FIND_METHOD(, isConnectionLimited, "()Z");
 	FIND_METHOD(, showVirtualKeyboard, "(Z)V");
+	FIND_METHOD(, showKeyboardControl, "(Z)V");
 	FIND_METHOD(, getSysArchives, "()[Ljava/lang/String;");
+	FIND_METHOD(, getAllStorageLocations, "()[Ljava/lang/String;");
 	FIND_METHOD(, initSurface, "()Ljavax/microedition/khronos/egl/EGLSurface;");
 	FIND_METHOD(, deinitSurface, "()V");
 
@@ -483,9 +564,13 @@ void JNI::destroy(JNIEnv *env, jobject self) {
 	delete _asset_archive;
 	_asset_archive = 0;
 
-	delete _system;
+	// _system is a pointer of OSystem_Android <--- ModularBackend <--- BaseBacked <--- Common::OSystem
+	// It's better to call destroy() rather than just delete here
+	// to avoid mutex issues if a Common::String is used after this point
+	_system->destroy();
+
 	g_system = 0;
-	_system = 0;
+	_system  = 0;
 
 	sem_destroy(&pause_sem);
 
@@ -569,7 +654,7 @@ cleanup:
 }
 
 void JNI::pushEvent(JNIEnv *env, jobject self, int type, int arg1, int arg2,
-					int arg3, int arg4, int arg5) {
+					int arg3, int arg4, int arg5, int arg6) {
 	// drop events until we're ready and after we quit
 	if (!_ready_for_events) {
 		LOGW("dropping event");
@@ -578,13 +663,7 @@ void JNI::pushEvent(JNIEnv *env, jobject self, int type, int arg1, int arg2,
 
 	assert(_system);
 
-	_system->pushEvent(type, arg1, arg2, arg3, arg4, arg5);
-}
-
-void JNI::enableZoning(JNIEnv *env, jobject self, jboolean enable) {
-	assert(_system);
-
-	_system->enableZoning(enable);
+	_system->pushEvent(type, arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 void JNI::setPause(JNIEnv *env, jobject self, jboolean value) {
@@ -610,5 +689,48 @@ void JNI::setPause(JNIEnv *env, jobject self, jboolean value) {
 			sem_post(&pause_sem);
 	}
 }
+
+jstring JNI::getCurrentCharset(JNIEnv *env, jobject self) {
+#ifdef USE_TRANSLATION
+	if (TransMan.getCurrentCharset() != "ASCII") {
+		return env->NewStringUTF(TransMan.getCurrentCharset().c_str());
+	}
+#endif
+	return env->NewStringUTF("ISO-8859-1");
+}
+
+Common::Array<Common::String> JNI::getAllStorageLocations() {
+	Common::Array<Common::String> *res = new Common::Array<Common::String>();
+
+	JNIEnv *env = JNI::getEnv();
+
+	jobjectArray array =
+		(jobjectArray)env->CallObjectMethod(_jobj, _MID_getAllStorageLocations);
+
+	if (env->ExceptionCheck()) {
+		LOGE("Error finding system archive path");
+
+		env->ExceptionDescribe();
+		env->ExceptionClear();
+
+		return *res;
+	}
+
+	jsize size = env->GetArrayLength(array);
+	for (jsize i = 0; i < size; ++i) {
+		jstring path_obj = (jstring)env->GetObjectArrayElement(array, i);
+		const char *path = env->GetStringUTFChars(path_obj, 0);
+
+		if (path != 0) {
+			res->push_back(path);
+			env->ReleaseStringUTFChars(path_obj, path);
+		}
+
+		env->DeleteLocalRef(path_obj);
+	}
+
+	return *res;
+}
+
 
 #endif

@@ -247,13 +247,15 @@ static const GameSettings gameVariantsTable[] = {
 	{"monkey", "SEGA",         0, GID_MONKEY,     5, 0, MDT_NONE,                         GF_AUDIOTRACKS, Common::kPlatformSegaCD, GUIO2(GUIO_NOSPEECH, GUIO_NOMIDI)},
 	{"monkey", "SE Talkie",    0, GID_MONKEY,     5, 0, MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, GF_AUDIOTRACKS, UNK, GUIO0()},
 
-	{"monkey2",  "", 0, GID_MONKEY2,  5, 0, MDT_PCSPK | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, UNK, GUIO1(GUIO_NOSPEECH)},
+	{"monkey2", "", 0, GID_MONKEY2,  5, 0, MDT_PCSPK | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, UNK, GUIO1(GUIO_NOSPEECH)},
+	{"monkey2", "Amiga", 0, GID_MONKEY2,  5, 0, MDT_AMIGA, 0, Common::kPlatformAmiga, GUIO2(GUIO_NOSPEECH, GUIO_MIDIAMIGA)},
 	{"monkey2", "FM-TOWNS", 0, GID_MONKEY2,  5, 0, MDT_PCSPK | MDT_TOWNS | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, Common::kPlatformFMTowns, GUIO5(GUIO_NOSPEECH, GUIO_MIDITOWNS, GUIO_MIDIADLIB, GUIO_MIDIMT32, GUIO_NOASPECT)},
 	{"monkey2", "SE Talkie",0, GID_MONKEY2,  5, 0, MDT_PCSPK | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, UNK, GUIO0()},
 
 	{"atlantis", "", 0, GID_INDY4,    5, 0, MDT_PCSPK | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, UNK, GUIO0()},
 	{"atlantis", "Steam", "steam", GID_INDY4,    5, 0, MDT_PCSPK | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, UNK, GUIO0()},
 	{"atlantis", "Floppy", 0, GID_INDY4,    5, 0, MDT_PCSPK | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, UNK, GUIO1(GUIO_NOSPEECH)},
+	{"atlantis", "Amiga", 0, GID_INDY4,  5, 0, MDT_AMIGA, 0, Common::kPlatformAmiga, GUIO2(GUIO_NOSPEECH, GUIO_MIDIAMIGA)},
 	{"atlantis", "FM-TOWNS", 0, GID_INDY4,    5, 0, MDT_TOWNS | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, Common::kPlatformFMTowns, GUIO4(GUIO_MIDITOWNS, GUIO_MIDIADLIB, GUIO_MIDIMT32, GUIO_NOASPECT)},
 
 	{"tentacle", "", 0, GID_TENTACLE, 6, 0, MDT_ADLIB | MDT_MIDI | MDT_PREFER_GM, GF_USE_KEY, UNK, GUIO0()},
@@ -284,6 +286,7 @@ static const GameSettings gameVariantsTable[] = {
 	{"fbear", "HE 70", 0, GID_FBEAR, 6, 70, MDT_NONE,             GF_USE_KEY, Common::kPlatformWindows, GUIO2(GUIO_NOLAUNCHLOAD, GUIO_NOMIDI)},
 
 	{"puttmoon", "", 0, GID_PUTTMOON, 6, 62, MDT_ADLIB | MDT_MIDI, GF_USE_KEY, UNK, GUIO1(GUIO_NOLAUNCHLOAD)},
+	{"puttmoon", "Demo", 0, GID_HEGAME, 6, 62, MDT_ADLIB | MDT_MIDI, GF_USE_KEY, UNK, GUIO1(GUIO_NOLAUNCHLOAD)},
 	{"puttmoon", "HE 70", 0, GID_PUTTMOON, 6, 70, MDT_NONE,             GF_USE_KEY, Common::kPlatformWindows, GUIO2(GUIO_NOLAUNCHLOAD, GUIO_NOMIDI)},
 
 	{"puttputt", "HE 60", 0, GID_HEGAME,   6, 60, MDT_ADLIB | MDT_MIDI, GF_USE_KEY, UNK, GUIO1(GUIO_NOLAUNCHLOAD)},
@@ -304,11 +307,11 @@ static const GameSettings gameVariantsTable[] = {
 	// The first version to use 640x480 resolution and wizImages
 	// There are also 7.1 versions of freddemo, airdemo and farmdemo
 	{"catalog", "", 0, GID_HEGAME, 6, 71, MDT_NONE, GF_USE_KEY, UNK, GUIO3(GUIO_NOLAUNCHLOAD, GUIO_NOMIDI, GUIO_NOASPECT)},
+	{"farm", "", 0, GID_HEGAME, 6, 71, MDT_NONE, GF_USE_KEY, UNK, GUIO3(GUIO_NOLAUNCHLOAD, GUIO_NOMIDI, GUIO_NOASPECT)},
 	{"freddi", "", 0, GID_HEGAME, 6, 71, MDT_NONE, GF_USE_KEY, UNK, GUIO3(GUIO_NOLAUNCHLOAD, GUIO_NOMIDI, GUIO_NOASPECT)},
 
 	// Humongous Entertainment Scumm Version 7.2
 	{"airport", "", 0, GID_HEGAME, 6, 72, MDT_NONE, GF_USE_KEY, UNK, GUIO3(GUIO_NOLAUNCHLOAD, GUIO_NOMIDI, GUIO_NOASPECT)},
-	{"farm", "", 0, GID_HEGAME, 6, 72, MDT_NONE, GF_USE_KEY, UNK, GUIO3(GUIO_NOLAUNCHLOAD, GUIO_NOMIDI, GUIO_NOASPECT)},
 
 	// Changed o_getResourceSize to cover all resource types
 	{"puttzoo", "", 0, GID_PUTTZOO, 6, 73, MDT_NONE, GF_USE_KEY, UNK, GUIO3(GUIO_NOLAUNCHLOAD, GUIO_NOMIDI, GUIO_NOASPECT)},

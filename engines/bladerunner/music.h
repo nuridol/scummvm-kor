@@ -30,26 +30,28 @@ namespace BladeRunner {
 
 class AudStream;
 class BladeRunnerEngine;
+class SaveFileReadStream;
+class SaveFileWriteStream;
 
 class Music {
 	struct Track {
 		Common::String name;
 		int            volume;
 		int            pan;
-		int            timeFadeIn;
-		int            timePlay;
+		int32          timeFadeIn;
+		int32          timePlay;
 		int            loop;
-		int            timeFadeOut;
+		int32          timeFadeOut;
 	};
 
 	BladeRunnerEngine *_vm;
 
 	Common::Mutex _mutex;
-	int           _volume;
+	int           _musicVolume;
 	int           _channel;
-	int           _isNextPresent;
-	int           _isPlaying;
-	int           _isPaused;
+	bool          _isNextPresent;
+	bool          _isPlaying;
+	bool          _isPaused;
 	Track         _current;
 	Track         _next;
 	byte         *_data;
@@ -59,16 +61,21 @@ public:
 	Music(BladeRunnerEngine *vm);
 	~Music();
 
-	bool play(const char *trackName, int volume, int pan, int timeFadeIn, int timePlay, int loop, int timeFadeOut);
-	void stop(int delay);
-	void adjust(int volume, int pan, int delay);
+	bool play(const Common::String &trackName, int volume, int pan, int32 timeFadeIn, int32 timePlay, int loop, int32 timeFadeOut);
+	void stop(uint32 delay);
+	void adjust(int volume, int pan, uint32 delay);
 	bool isPlaying();
 
 	void setVolume(int volume);
+	int getVolume();
+	void playSample();
+
+	void save(SaveFileWriteStream &f);
+	void load(SaveFileReadStream &f);
 
 private:
-	void adjustVolume(int volume, int delay);
-	void adjustPan(int pan, int delay);
+	void adjustVolume(int volume, uint32 delay);
+	void adjustPan(int pan, uint32 delay);
 
 	void ended();
 	void fadeOut();
@@ -78,7 +85,7 @@ private:
 	static void timerCallbackFadeOut(void *refCon);
 	static void timerCallbackNext(void *refCon);
 
-	byte *getData(const char* name);
+	byte *getData(const Common::String &name);
 };
 
 } // End of namespace BladeRunner

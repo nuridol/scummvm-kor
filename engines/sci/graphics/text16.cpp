@@ -25,6 +25,7 @@
 #include "graphics/primitives.h"
 
 #include "sci/sci.h"
+#include "sci/engine/features.h"
 #include "sci/engine/state.h"
 #include "sci/graphics/cache.h"
 #include "sci/graphics/coordadjuster.h"
@@ -50,6 +51,7 @@ void GfxText16::init() {
 	_codeFontsCount = 0;
 	_codeColors = NULL;
 	_codeColorsCount = 0;
+	_useEarlyGetLongestTextCalculations = g_sci->_features->useEarlyGetLongestTextCalculations();
 }
 
 GuiResourceId GfxText16::GetFontId() {
@@ -250,6 +252,14 @@ int16 GfxText16::GetLongest(const char *&textPtr, int16 maxWidth, GuiResourceId 
 		if (tempWidth > maxWidth)
 			break;
 
+		// the previous greater than test was originally a greater than or equals when
+		//  no space character had been reached yet
+		if (_useEarlyGetLongestTextCalculations) {
+			if (lastSpaceCharCount == 0 && tempWidth == maxWidth) {
+				break;
+			}
+		}
+
 		// still fits, remember width
 		curWidth = tempWidth;
 
@@ -272,9 +282,8 @@ int16 GfxText16::GetLongest(const char *&textPtr, int16 maxWidth, GuiResourceId 
 
 	} else {
 		// Break without spaces found, we split the very first word - may also be Kanji/Japanese
-
 		if (curChar > 0xFF) {
-			// current charracter is Japanese
+			// current character is Japanese
 
 			// PC-9801 SCI actually added the last character, which shouldn't fit anymore, still onto the
 			//  screen in case maxWidth wasn't fully reached with the last character
@@ -331,6 +340,14 @@ int16 GfxText16::GetLongest(const char *&textPtr, int16 maxWidth, GuiResourceId 
 				// (game mentions Mixed Up Fairy Tales and uses English letters for that)
 				textPtr += 2;
 			}
+		} else {
+			// Add a character to the count for games whose interpreter would count the
+			//  character that exceeded the width if a space hadn't been reached yet.
+			//  Fixes #10000 where the notebook in LB1 room 786 displays "INCOMPLETE" with
+			//  a width that's too short which would have otherwise wrapped the last "E".
+			if (_useEarlyGetLongestTextCalculations) {
+				curCharCount++; textPtr++;
+			}
 		}
 
 		// We split the word in that case
@@ -368,6 +385,8 @@ void GfxText16::Width(const char *text, int16 from, int16 len, GuiResourceId org
 					len -= CodeProcessing(text, orgFontId, 0, false);
 					break;
 				}
+				// fall through
+				// FIXME: fall through intended?
 			default:
 				textHeight = MAX<int16> (textHeight, _ports->_curPort->fontHeight);
 				textWidth += _font->getCharWidth(curChar);
@@ -410,10 +429,6 @@ int16 GfxText16::Size(Common::Rect &rect, const char *text, uint16 languageSplit
 	rect.top = rect.left = 0;
 
 	if (maxWidth < 0) { // force output as single line
-#ifdef SCUMMVMKOR
-		if (g_sci->getLanguage() == Common::KO_KOR)
-			SwitchToFont1001OnKorean(text, languageSplitter);
-#endif
 		if (g_sci->getLanguage() == Common::JA_JPN)
 			SwitchToFont900OnSjis(text, languageSplitter);
 
@@ -427,11 +442,6 @@ int16 GfxText16::Size(Common::Rect &rect, const char *text, uint16 languageSplit
 		const char *curTextPos = text; // in work position for GetLongest()
 		const char *curTextLine = text; // starting point of current line
 		while (*curTextPos) {
-#ifdef SCUMMVMKOR
-			// We need to check for Korean-EUCKR every line
-			if (g_sci->getLanguage() == Common::KO_KOR)
-				SwitchToFont1001OnKorean(curTextPos, languageSplitter);
-#endif
 			// We need to check for Shift-JIS every line
 			if (g_sci->getLanguage() == Common::JA_JPN)
 				SwitchToFont900OnSjis(curTextPos, languageSplitter);
@@ -481,6 +491,8 @@ void GfxText16::Draw(const char *text, int16 from, int16 len, GuiResourceId orgF
 				len -= CodeProcessing(text, orgFontId, orgPenColor, true);
 				break;
 			}
+			// fall through
+			// FIXME: fall through intended?
 		default:
 			charWidth = _font->getCharWidth(curChar);
 			// clear char
@@ -530,13 +542,6 @@ void GfxText16::Box(const char *text, uint16 languageSplitter, bool show, const 
 
 	maxTextWidth = 0;
 	while (*curTextPos) {
-#ifdef SCUMMVMKOR
-		// We need to check for Korean-EUCKR every line
-		if (g_sci->getLanguage() == Common::KO_KOR) {
-			if (SwitchToFont1001OnKorean(curTextPos, languageSplitter))
-				doubleByteMode = true;
-		}
-#endif
 		// We need to check for Shift-JIS every line
 		//  Police Quest 2 PC-9801 often draws English + Japanese text during the same call
 		if (g_sci->getLanguage() == Common::JA_JPN) {
@@ -632,20 +637,6 @@ void GfxText16::DrawStatus(const Common::String &str) {
 		}
 	}
 }
-
-#ifdef SCUMMVMKOR
-// korean and then switch to font 1001
-bool GfxText16::SwitchToFont1001OnKorean(const char *text, uint16 languageSplitter) {
-	byte firstChar = (*(const byte *)text++);
-	if (languageSplitter != 0x6b23) { // #k prefix as language splitter
-		if ((firstChar >= 0xA1) && (firstChar <= 0xFE)) {
-			SetFont(1001);
-			return true;
-		}
-	}
-	return false;
-}
-#endif
 
 // Sierra did this in their PC98 interpreter only, they identify a text as being
 // sjis and then switch to font 900

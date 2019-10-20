@@ -29,13 +29,12 @@
 
 #include "adl/adl.h"
 #include "adl/graphics.h"
-#include "adl/display.h"
+#include "adl/display_a2.h"
 
 namespace Adl {
 
 #define IDS_HR1_EXE_0    "AUTO LOAD OBJ"
 #define IDS_HR1_EXE_1    "ADVENTURE"
-#define IDS_HR1_LOADER   "MYSTERY.HELLO"
 #define IDS_HR1_MESSAGES "MESSAGES"
 
 #define IDI_HR1_NUM_ROOMS         41
@@ -73,7 +72,6 @@ namespace Adl {
 #define IDI_HR1_OFS_GAME_OR_HELP 0x000f
 
 #define IDI_HR1_OFS_LOGO_0       0x1003
-#define IDI_HR1_OFS_LOGO_1       0x1800
 
 #define IDI_HR1_OFS_ITEMS        0x0100
 #define IDI_HR1_OFS_ROOMS        0x050a
@@ -110,6 +108,7 @@ private:
 	void loadRoom(byte roomNr);
 	void showRoom();
 
+	void showInstructions(Common::SeekableReadStream &stream, const uint pages[], bool goHome);
 	void wordWrap(Common::String &str) const;
 
 	Files *_files;
@@ -126,110 +125,151 @@ private:
 	} _gameStrings;
 };
 
+void HiRes1Engine::showInstructions(Common::SeekableReadStream &stream, const uint pages[], bool goHome) {
+	_display->setMode(Display::kModeText);
+
+	uint page = 0;
+	while (pages[page] != 0) {
+		if (goHome)
+			_display->home();
+
+		uint count = pages[page++];
+		for (uint i = 0; i < count; ++i) {
+			_display->printString(readString(stream));
+			stream.seek(3, SEEK_CUR);
+		}
+
+		inputString();
+
+		if (shouldQuit())
+			return;
+
+		stream.seek((goHome ? 6 : 3), SEEK_CUR);
+	}
+}
+
 void HiRes1Engine::runIntro() {
 	StreamPtr stream(_files->createReadStream(IDS_HR1_EXE_0));
 
-	stream->seek(IDI_HR1_OFS_LOGO_0);
-	_display->setMode(DISPLAY_MODE_HIRES);
-	_display->loadFrameBuffer(*stream);
-	_display->updateHiResScreen();
-	delay(4000);
+	// Early version have no bitmap in 'AUTO LOAD OBJ'
+	if (getGameVersion() >= GAME_VER_HR1_COARSE) {
+		stream->seek(IDI_HR1_OFS_LOGO_0);
+		_display->setMode(Display::kModeGraphics);
+		static_cast<Display_A2 *>(_display)->loadFrameBuffer(*stream);
+		_display->renderGraphics();
 
-	if (shouldQuit())
-		return;
+		if (getGameVersion() == GAME_VER_HR1_PD) {
+			// Only the PD version shows a title screen during the load
+			delay(4000);
 
-	_display->setMode(DISPLAY_MODE_TEXT);
-
-	StreamPtr basic(_files->createReadStream(IDS_HR1_LOADER));
-	Common::String str;
-
-	str = readStringAt(*basic, IDI_HR1_OFS_PD_TEXT_0, '"');
-	_display->printAsciiString(str + '\r');
-
-	str = readStringAt(*basic, IDI_HR1_OFS_PD_TEXT_1, '"');
-	_display->printAsciiString(str + "\r\r");
-
-	str = readStringAt(*basic, IDI_HR1_OFS_PD_TEXT_2, '"');
-	_display->printAsciiString(str + "\r\r");
-
-	str = readStringAt(*basic, IDI_HR1_OFS_PD_TEXT_3, '"');
-	_display->printAsciiString(str + '\r');
-
-	inputKey();
-	if (g_engine->shouldQuit())
-		return;
-
-	_display->setMode(DISPLAY_MODE_MIXED);
-
-	str = readStringAt(*stream, IDI_HR1_OFS_GAME_OR_HELP);
-
-	bool instructions = false;
-
-	while (1) {
-		_display->printString(str);
-		Common::String s = inputString();
-
-		if (g_engine->shouldQuit())
-			break;
-
-		if (s.empty())
-			continue;
-
-		if (s[0] == APPLECHAR('I')) {
-			instructions = true;
-			break;
-		} else if (s[0] == APPLECHAR('G')) {
-			break;
-		}
-	};
-
-	if (instructions) {
-		_display->setMode(DISPLAY_MODE_TEXT);
-		stream->seek(IDI_HR1_OFS_INTRO_TEXT);
-
-		const uint pages[] = { 6, 6, 4, 5, 8, 7, 0 };
-
-		uint page = 0;
-		while (pages[page] != 0) {
-			_display->home();
-
-			uint count = pages[page++];
-			for (uint i = 0; i < count; ++i) {
-				str = readString(*stream);
-				_display->printString(str);
-				stream->seek(3, SEEK_CUR);
-			}
-
-			inputString();
-
-			if (g_engine->shouldQuit())
+			if (shouldQuit())
 				return;
-
-			stream->seek(6, SEEK_CUR);
 		}
 	}
 
-	_display->printAsciiString("\r");
+	Common::String str;
 
-	_display->setMode(DISPLAY_MODE_MIXED);
+	// Show the PD disclaimer for the PD release
+	if (getGameVersion() == GAME_VER_HR1_PD) {
+		// The PD release on the Roberta Williams Anthology disc has a PDE
+		// splash screen. The original HELLO file has been renamed to
+		// MYSTERY.HELLO. It's unclear whether or not this splash screen
+		// was present in the original PD release back in 1987.
+		StreamPtr basic(_files->createReadStream("MYSTERY.HELLO"));
 
-	// Title screen shown during loading
+		_display->setMode(Display::kModeText);
+		_display->home();
+
+		str = readStringAt(*basic, IDI_HR1_OFS_PD_TEXT_0, '"');
+		_display->printAsciiString(str + '\r');
+
+		str = readStringAt(*basic, IDI_HR1_OFS_PD_TEXT_1, '"');
+		_display->printAsciiString(str + "\r\r");
+
+		str = readStringAt(*basic, IDI_HR1_OFS_PD_TEXT_2, '"');
+		_display->printAsciiString(str + "\r\r");
+
+		str = readStringAt(*basic, IDI_HR1_OFS_PD_TEXT_3, '"');
+		_display->printAsciiString(str + '\r');
+
+		inputKey();
+		if (shouldQuit())
+			return;
+	}
+
+	_display->setMode(Display::kModeMixed);
+
+	str = readStringAt(*stream, IDI_HR1_OFS_GAME_OR_HELP);
+
+	if (getGameVersion() >= GAME_VER_HR1_COARSE) {
+		bool instructions = false;
+
+		while (1) {
+			_display->printString(str);
+			Common::String s = inputString();
+
+			if (shouldQuit())
+				break;
+
+			if (s.empty())
+				continue;
+
+			if (s[0] == _display->asciiToNative('I')) {
+				instructions = true;
+				break;
+			} else if (s[0] == _display->asciiToNative('G')) {
+				break;
+			}
+		}
+
+		if (instructions) {
+			// This version shows the last page during the loading of the game
+			// We wait for a key instead (even though there's no prompt for that).
+			const uint pages[] = { 6, 6, 4, 5, 8, 7, 0 };
+			stream->seek(IDI_HR1_OFS_INTRO_TEXT);
+			showInstructions(*stream, pages, true);
+			_display->printAsciiString("\r");
+		}
+	} else {
+		const uint pages[] = { 6, 6, 8, 6, 0 };
+		stream->seek(6);
+		showInstructions(*stream, pages, false);
+	}
+
 	stream.reset(_files->createReadStream(IDS_HR1_EXE_1));
-	stream->seek(IDI_HR1_OFS_LOGO_1);
-	_display->loadFrameBuffer(*stream);
-	_display->updateHiResScreen();
-	delay(2000);
+	stream->seek(0x1800);
+	static_cast<Display_A2 *>(_display)->loadFrameBuffer(*stream);
+	_display->renderGraphics();
+
+	_display->setMode(Display::kModeMixed);
+
+	if (getGameVersion() == GAME_VER_HR1_SIMI) {
+		// The original waits for the key after initializing the state.
+		// This causes it to also wait for a key on a blank screen when
+		// a game is restarted. We only wait for a key here during the
+		// intro.
+
+		// This does mean we need to push out some extra line feeds to clear the screen
+		_display->printString(_strings.lineFeeds);
+		inputKey();
+		if (shouldQuit())
+			return;
+	}
 }
 
 void HiRes1Engine::init() {
-	if (Common::File::exists("MYSTHOUS.DSK")) {
-		_files = new Files_DOS33();
-		if (!static_cast<Files_DOS33 *>(_files)->open("MYSTHOUS.DSK"))
-			error("Failed to open MYSTHOUS.DSK");
-	} else
+	if (Common::File::exists("ADVENTURE")) {
 		_files = new Files_Plain();
+	} else {
+		Files_AppleDOS *files = new Files_AppleDOS();
+		// The 2nd release obfuscates the VTOC (same may be true for the 1st release)
+		if (!files->open(getDiskImageName(0), (getGameVersion() == GAME_VER_HR1_COARSE ? 16 : 17)))
+			error("Failed to open '%s'", getDiskImageName(0).c_str());
+		_files = files;
+	}
 
-	_graphics = new GraphicsMan(*_display);
+	_graphics = new GraphicsMan_v1<Display_A2>(*static_cast<Display_A2 *>(_display));
+	_display->moveCursorTo(Common::Point(0, 3));
 
 	StreamPtr stream(_files->createReadStream(IDS_HR1_EXE_1));
 
@@ -357,8 +397,9 @@ void HiRes1Engine::printString(const Common::String &str) {
 }
 
 Common::String HiRes1Engine::loadMessage(uint idx) const {
+	const char returnChar = _display->asciiToNative('\r');
 	StreamPtr stream(_messages[idx]->createReadStream());
-	return readString(*stream, APPLECHAR('\r')) + APPLECHAR('\r');
+	return readString(*stream, returnChar) + returnChar;
 }
 
 void HiRes1Engine::printMessage(uint idx) {
@@ -438,7 +479,7 @@ void HiRes1Engine::showRoom() {
 		drawItems();
 	}
 
-	_display->updateHiResScreen();
+	_display->renderGraphics();
 	_messageDelay = false;
 	printString(_roomData.description);
 	_messageDelay = true;
@@ -447,14 +488,17 @@ void HiRes1Engine::showRoom() {
 void HiRes1Engine::wordWrap(Common::String &str) const {
 	uint end = 39;
 
+	const char spaceChar = _display->asciiToNative(' ');
+	const char returnChar = _display->asciiToNative('\r');
+
 	while (1) {
 		if (str.size() <= end)
 			return;
 
-		while (str[end] != APPLECHAR(' '))
+		while (str[end] != spaceChar)
 			--end;
 
-		str.setChar(APPLECHAR('\r'), end);
+		str.setChar(returnChar, end);
 		end += 40;
 	}
 }

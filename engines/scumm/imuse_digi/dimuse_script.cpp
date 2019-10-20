@@ -180,7 +180,7 @@ void IMuseDigital::flushTrack(Track *track) {
 	}
 
 	if (!_mixer->isSoundHandleActive(track->mixChanHandle)) {
-		memset(track, 0, sizeof(Track));
+		track->reset();
 	}
 }
 
@@ -191,7 +191,7 @@ void IMuseDigital::flushTracks() {
 		Track *track = _track[l];
 		if (track->used && track->toBeRemoved && !_mixer->isSoundHandleActive(track->mixChanHandle)) {
 			debug(5, "flushTracks() - soundId:%d", track->soundId);
-			memset(track, 0, sizeof(Track));
+			track->reset();
 		}
 	}
 }
@@ -408,6 +408,19 @@ int32 IMuseDigital::getCurMusicLipSyncHeight(int syncId) {
 	return height;
 }
 
+int32 IMuseDigital::getSoundElapsedTimeInMs(int soundId) {
+	Common::StackLock lock(_mutex, "IMuseDigital::getPosInMs()");
+	for (int l = 0; l < MAX_DIGITAL_TRACKS; l++) {
+		Track *track = _track[l];
+		if (track->used && !track->toBeRemoved && (track->soundId == soundId)) {
+			int32 pos = (_mixer->getSoundElapsedTime(track->mixChanHandle));
+			return pos;
+		}
+	}
+
+	return 0;
+}
+
 void IMuseDigital::stopAllSounds() {
 	Common::StackLock lock(_mutex, "IMuseDigital::stopAllSounds()");
 	debug(5, "IMuseDigital::stopAllSounds");
@@ -425,7 +438,7 @@ void IMuseDigital::stopAllSounds() {
 			}
 
 			// Mark the track as unused
-			memset(track, 0, sizeof(Track));
+			track->reset();
 		}
 	}
 }

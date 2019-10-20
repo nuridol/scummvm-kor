@@ -320,7 +320,7 @@ bool DialogManager::showKnowledgeCheck() {
 		int prevChoice = 1;
 		for (int j = firstOption; j <= lastOption; ++j, ++prevChoice) {
 			tmpStr = _vm->getString(j);
-			if ((int) tmpStr.size() > maxLength)
+			if ((int)tmpStr.size() > maxLength)
 				maxLength = tmpStr.size();
 			_vm->_text->displayStr(tmpStr, 100, optionPosY, 100, 1, 0);
 			choiceArray[prevChoice] = tmpStr;
@@ -421,6 +421,11 @@ void DialogManager::checkForF8(int SpeechNum, bool drawFrame2Fl) {
 		if (_vm->shouldQuit())
 			return;
 	} while (_vm->_key != 66); // keycode for F8
+	// just stop the speech when pressing F8
+#ifdef USE_TTS
+	if (_vm->_soundManager->_ttsMan != nullptr)
+		_vm->_soundManager->_ttsMan->stop();
+#endif
 }
 
 /**

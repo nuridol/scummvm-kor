@@ -29,6 +29,7 @@
 					<Add option="-fcheck-new" />
 					<Add option="-DUSE_ZLIB" />
 					<Add option="-DUSE_MAD" />
+					<Add option="-DUSE_OGG" />
 					<Add option="-DUSE_VORBIS" />
 					<Add option="-DUSE_FLAC" />
 					<Add option="-DUSE_PNG" />
@@ -44,12 +45,14 @@
 					<Add option="-DUSE_RGB_COLOR" />
 					<Add option="-DUSE_HIGHRES" />
 					<Add option="-DUSE_MT32EMU" />
+					<Add option="-DUSE_LUA" />
 					<Add option="-DUSE_NASM" />
 					<Add option="-DUSE_OPENGL" />
 					<Add option="-DUSE_GLES" />
 					<Add option="-DUSE_TASKBAR" />
 					<Add option="-DUSE_CLOUD" />
 					<Add option="-DUSE_TRANSLATION" />
+					<Add option="-DUSE_SYSDIALOGS" />
 					<Add option="-DUSE_DETECTLANG" />
 					<Add option="-DENABLE_SCUMM" />
 					<Add option="-DENABLE_SCUMM_7_8" />
@@ -60,11 +63,14 @@
 					<Add option="-DENABLE_AGOS" />
 					<Add option="-DENABLE_AGOS2" />
 					<Add option="-DENABLE_BBVS" />
+					<Add option="-DENABLE_BLADERUNNER" />
 					<Add option="-DENABLE_CGE" />
 					<Add option="-DENABLE_CGE2" />
 					<Add option="-DENABLE_CINE" />
 					<Add option="-DENABLE_COMPOSER" />
 					<Add option="-DENABLE_CRUISE" />
+					<Add option="-DENABLE_CRYOMNI3D" />
+					<Add option="-DENABLE_VERSAILLES" />
 					<Add option="-DENABLE_DRACI" />
 					<Add option="-DENABLE_DRASCULA" />
 					<Add option="-DENABLE_DREAMWEB" />
@@ -72,8 +78,10 @@
 					<Add option="-DENABLE_GNAP" />
 					<Add option="-DENABLE_GOB" />
 					<Add option="-DENABLE_GROOVIE" />
+					<Add option="-DENABLE_HDB" />
 					<Add option="-DENABLE_HOPKINS" />
 					<Add option="-DENABLE_HUGO" />
+					<Add option="-DENABLE_ILLUSIONS" />
 					<Add option="-DENABLE_KYRA" />
 					<Add option="-DENABLE_LOL" />
 					<Add option="-DENABLE_EOB" />
@@ -89,6 +97,7 @@
 					<Add option="-DENABLE_PARALLACTION" />
 					<Add option="-DENABLE_PEGASUS" />
 					<Add option="-DENABLE_PLUMBERS" />
+					<Add option="-DENABLE_PRINCE" />
 					<Add option="-DENABLE_QUEEN" />
 					<Add option="-DENABLE_SAGA" />
 					<Add option="-DENABLE_IHNM" />
@@ -96,6 +105,7 @@
 					<Add option="-DENABLE_SCI32" />
 					<Add option="-DENABLE_SHERLOCK" />
 					<Add option="-DENABLE_SKY" />
+					<Add option="-DENABLE_SUPERNOVA" />
 					<Add option="-DENABLE_SWORD1" />
 					<Add option="-DENABLE_SWORD2" />
 					<Add option="-DENABLE_SWORD25" />
@@ -110,8 +120,10 @@
 					<Add option="-DENABLE_TUCKER" />
 					<Add option="-DENABLE_VOYEUR" />
 					<Add option="-DENABLE_WINTERMUTE" />
+					<Add option="-DENABLE_XEEN" />
 					<Add option="-DENABLE_ZVISION" />
 					<Add option="-DWIN32" />
+					<Add option="-DCURL_STATICLIB" />
 					<Add option="-DSDL_BACKEND" />
 					<Add option="-DUSE_SDL2" />
 					<Add option="-g" />
@@ -138,7 +150,8 @@
 		<Unit filename="..\..\engines\adl\disk.h" />
 		<Unit filename="..\..\engines\adl\display.cpp" />
 		<Unit filename="..\..\engines\adl\display.h" />
-		<Unit filename="..\..\engines\adl\graphics.cpp" />
+		<Unit filename="..\..\engines\adl\display_a2.cpp" />
+		<Unit filename="..\..\engines\adl\display_a2.h" />
 		<Unit filename="..\..\engines\adl\graphics.h" />
 		<Unit filename="..\..\engines\adl\hires1.cpp" />
 		<Unit filename="..\..\engines\adl\hires2.cpp" />

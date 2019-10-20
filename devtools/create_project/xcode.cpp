@@ -133,12 +133,6 @@ bool shouldSkipFileForTarget(const std::string &fileID, const std::string &targe
 		}
 	}
 	else {
-		// Ugly hack: explicitly remove the browser.cpp file.
-		// The problem is that we have only one project for two different targets,
-		// and the parsing of the "mk" files added this file for both targets...
-		if (fileID.length() > 12 && fileID.substr(fileID.length() - 12) == "/browser.cpp") {
-			return true;
-		}
 		// macOS target: we skip all files with the "_ios" suffix
 		if (name.length() > 4 && name.substr(name.length() - 4) == "_ios") {
 			return true;
@@ -391,14 +385,6 @@ void XcodeProvider::writeFileListToProject(const FileNode &dir, std::ofstream &p
 		// for folders, we shouldn't add folders as file references, obviously.
 		if (node->children.empty()) {
 			group->addChildFile(node->name);
-
-			// HACK: Also add browser_osx.mm, since browser.cpp is added for
-			// iOS and browser_osx.mm for macOS, and create_project cannot
-			// deal with two competing exclusive ifdefs in module.mk going
-			// into one project
-			if (filePrefix.find("/gui/") == filePrefix.size() - 5 && node->name == "browser.cpp") {
-				group->addChildFile("browser_osx.mm");
-			}
 		}
 		// Process child nodes
 		if (!node->children.empty())
@@ -453,12 +439,13 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 	DEF_SYSFRAMEWORK("CoreMIDI");
 	DEF_SYSFRAMEWORK("CoreGraphics");
 	DEF_SYSFRAMEWORK("CoreFoundation");
-	DEF_SYSFRAMEWORK("CoreMIDI");
 	DEF_SYSFRAMEWORK("Foundation");
 	DEF_SYSFRAMEWORK("IOKit");
 	DEF_SYSFRAMEWORK("OpenGLES");
 	DEF_SYSFRAMEWORK("QuartzCore");
 	DEF_SYSFRAMEWORK("UIKit");
+	DEF_SYSFRAMEWORK("Security");
+	DEF_SYSFRAMEWORK("SystemConfiguration");
 	DEF_SYSTBD("libiconv");
 
 	// Local libraries
@@ -486,10 +473,15 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 	if (CONTAINS_DEFINE(setup.defines, "USE_PNG")) {
 		DEF_LOCALLIB_STATIC("libpng");
 	}
-	if (CONTAINS_DEFINE(setup.defines, "USE_VORBIS") || CONTAINS_DEFINE(setup.defines, "USE_THEORADEC")) {
+	if (CONTAINS_DEFINE(setup.defines, "USE_OGG")) {
 		DEF_LOCALLIB_STATIC("libogg");
+	}
+	if (CONTAINS_DEFINE(setup.defines, "USE_VORBIS")) {
 		DEF_LOCALLIB_STATIC("libvorbis");
 		DEF_LOCALLIB_STATIC("libvorbisfile");
+	}
+	if (CONTAINS_DEFINE(setup.defines, "USE_TREMOR")) {
+		DEF_LOCALLIB_STATIC("libvorbisidec");
 	}
 	if (CONTAINS_DEFINE(setup.defines, "USE_THEORADEC")) {
 		DEF_LOCALLIB_STATIC("libtheoradec");
@@ -501,9 +493,13 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 	if (setup.useSDL2) {
 		DEF_LOCALLIB_STATIC("libSDL2main");
 		DEF_LOCALLIB_STATIC("libSDL2");
+		if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET"))
+			DEF_LOCALLIB_STATIC("libSDL2_net");
 	} else {
 		DEF_LOCALLIB_STATIC("libSDLmain");
 		DEF_LOCALLIB_STATIC("libSDL");
+		if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET"))
+			DEF_LOCALLIB_STATIC("libSDL_net");
 	}
 
 	frameworksGroup->_properties["children"] = children;
@@ -533,6 +529,7 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 	frameworks_iOS.push_back("CoreFoundation.framework");
 	frameworks_iOS.push_back("Foundation.framework");
 	frameworks_iOS.push_back("UIKit.framework");
+	frameworks_iOS.push_back("SystemConfiguration.framework");
 	frameworks_iOS.push_back("AudioToolbox.framework");
 	frameworks_iOS.push_back("QuartzCore.framework");
 	frameworks_iOS.push_back("OpenGLES.framework");
@@ -549,10 +546,15 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 	if (CONTAINS_DEFINE(setup.defines, "USE_PNG")) {
 		frameworks_iOS.push_back("libpng.a");
 	}
-	if (CONTAINS_DEFINE(setup.defines, "USE_VORBIS") || CONTAINS_DEFINE(setup.defines, "USE_THEORADEC")) {
+	if (CONTAINS_DEFINE(setup.defines, "USE_OGG")) {
 		frameworks_iOS.push_back("libogg.a");
+	}
+	if (CONTAINS_DEFINE(setup.defines, "USE_VORBIS")) {
 		frameworks_iOS.push_back("libvorbis.a");
 		frameworks_iOS.push_back("libvorbisfile.a");
+	}
+	if (CONTAINS_DEFINE(setup.defines, "USE_TREMOR")) {
+		frameworks_iOS.push_back("libvorbisidec.a");
 	}
 	if (CONTAINS_DEFINE(setup.defines, "USE_THEORADEC")) {
 		frameworks_iOS.push_back("libtheoradec.a");
@@ -569,6 +571,16 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 	}
 	if (CONTAINS_DEFINE(setup.defines, "USE_ZLIB")) {
 		frameworks_iOS.push_back("libz.tbd");
+	}
+	if (CONTAINS_DEFINE(setup.defines, "USE_LIBCURL")) {
+		frameworks_iOS.push_back("libcurl.a");
+		frameworks_iOS.push_back("Security.framework");
+	}
+	if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET")) {
+		if (setup.useSDL2)
+			frameworks_iOS.push_back("libSDL2_net.a");
+		else
+			frameworks_iOS.push_back("libSDL_net.a");
 	}
 
 	for (ValueList::iterator framework = frameworks_iOS.begin(); framework != frameworks_iOS.end(); framework++) {
@@ -632,10 +644,15 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 	if (CONTAINS_DEFINE(setup.defines, "USE_PNG")) {
 		frameworks_osx.push_back("libpng.a");
 	}
-	if (CONTAINS_DEFINE(setup.defines, "USE_VORBIS") || CONTAINS_DEFINE(setup.defines, "USE_THEORADEC")) {
+	if (CONTAINS_DEFINE(setup.defines, "USE_OGG")) {
 		frameworks_osx.push_back("libogg.a");
+	}
+	if (CONTAINS_DEFINE(setup.defines, "USE_VORBIS")) {
 		frameworks_osx.push_back("libvorbis.a");
 		frameworks_osx.push_back("libvorbisfile.a");
+	}
+	if (CONTAINS_DEFINE(setup.defines, "USE_TREMOR")) {
+		frameworks_osx.push_back("libvorbisidec.a");
 	}
 	if (CONTAINS_DEFINE(setup.defines, "USE_THEORADEC")) {
 		frameworks_osx.push_back("libtheoradec.a");
@@ -647,9 +664,13 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 	if (setup.useSDL2) {
 		frameworks_osx.push_back("libSDL2main.a");
 		frameworks_osx.push_back("libSDL2.a");
+		if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET"))
+			frameworks_iOS.push_back("libSDL2_net.a");
 	} else {
 		frameworks_osx.push_back("libSDLmain.a");
 		frameworks_osx.push_back("libSDL.a");
+		if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET"))
+			frameworks_iOS.push_back("libSDL_net.a");
 	}
 
 	order = 0;
@@ -746,10 +767,13 @@ XcodeProvider::ValueList& XcodeProvider::getResourceFiles() const {
 	if (files.empty()) {
 		files.push_back("gui/themes/scummclassic.zip");
 		files.push_back("gui/themes/scummmodern.zip");
+		files.push_back("gui/themes/scummremastered.zip");
 		files.push_back("gui/themes/translations.dat");
 		files.push_back("dists/engine-data/access.dat");
 		files.push_back("dists/engine-data/cryo.dat");
+		files.push_back("dists/engine-data/cryomni3d.dat");
 		files.push_back("dists/engine-data/drascula.dat");
+		files.push_back("dists/engine-data/fonts.dat");
 		files.push_back("dists/engine-data/hugo.dat");
 		files.push_back("dists/engine-data/kyra.dat");
 		files.push_back("dists/engine-data/lure.dat");
@@ -757,14 +781,25 @@ XcodeProvider::ValueList& XcodeProvider::getResourceFiles() const {
 		files.push_back("dists/engine-data/neverhood.dat");
 		files.push_back("dists/engine-data/queen.tbl");
 		files.push_back("dists/engine-data/sky.cpt");
+		files.push_back("dists/engine-data/supernova.dat");
 		files.push_back("dists/engine-data/teenagent.dat");
 		files.push_back("dists/engine-data/titanic.dat");
 		files.push_back("dists/engine-data/tony.dat");
 		files.push_back("dists/engine-data/toon.dat");
 		files.push_back("dists/engine-data/wintermute.zip");
 		files.push_back("dists/engine-data/macventure.dat");
+		files.push_back("dists/engine-data/xeen.ccs");
 		files.push_back("dists/pred.dic");
+		files.push_back("dists/networking/wwwroot.zip");
 		files.push_back("icons/scummvm.icns");
+		files.push_back("AUTHORS");
+		files.push_back("COPYING");
+		files.push_back("COPYING.LGPL");
+		files.push_back("COPYING.BSD");
+		files.push_back("COPYING.FREEFONT");
+		files.push_back("COPYING.OFL");
+		files.push_back("NEWS");
+		files.push_back("README");
 	}
 	return files;
 }
@@ -958,6 +993,12 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 	iPhone_HeaderSearchPaths.push_back("$(SRCROOT)");
 	iPhone_HeaderSearchPaths.push_back("\"" + projectOutputDirectory + "\"");
 	iPhone_HeaderSearchPaths.push_back("\"" + projectOutputDirectory + "/include\"");
+	if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET")) {
+		if (setup.useSDL2)
+			iPhone_HeaderSearchPaths.push_back("\"" + projectOutputDirectory + "/include/SDL2\"");
+		else
+			iPhone_HeaderSearchPaths.push_back("\"" + projectOutputDirectory + "include/SDL\"");
+	}
 	ADD_SETTING_LIST(iPhone_Debug, "HEADER_SEARCH_PATHS", iPhone_HeaderSearchPaths, kSettingsAsList | kSettingsQuoteVariable, 5);
 	ADD_SETTING_QUOTE(iPhone_Debug, "INFOPLIST_FILE", "$(SRCROOT)/dists/ios7/Info.plist");
 	ValueList iPhone_LibPaths;
@@ -976,6 +1017,8 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 	ADD_DEFINE(scummvmIOS_defines, "IPHONE");
 	ADD_DEFINE(scummvmIOS_defines, "IPHONE_IOS7");
 	ADD_DEFINE(scummvmIOS_defines, "IPHONE_SANDBOXED");
+	if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET"))
+		ADD_DEFINE(scummvmIOS_defines, "WITHOUT_SDL");
 	ADD_SETTING_LIST(iPhone_Debug, "GCC_PREPROCESSOR_DEFINITIONS", scummvmIOS_defines, kSettingsNoQuote | kSettingsAsList, 5);
 	ADD_SETTING(iPhone_Debug, "ASSETCATALOG_COMPILER_APPICON_NAME", "AppIcon");
 	ADD_SETTING(iPhone_Debug, "ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME", "LaunchImage");
@@ -1097,11 +1140,6 @@ void XcodeProvider::setupAdditionalSources(std::string targetName, Property &fil
 	if (targetIsIOS(targetName)) {
 		const std::string absoluteCatalogPath = _projectRoot + "/dists/ios7/Images.xcassets";
 		ADD_SETTING_ORDER_NOVALUE(files, getHash(absoluteCatalogPath), "Image Asset Catalog", order++);
-	} else {
-		// HACK: browser_osx.mm needs to be added
-		const std::string browserPath = "gui/browser_osx.mm";
-		const std::string comment = "browser_osx.mm in Sources";
-		ADD_SETTING_ORDER_NOVALUE(files, getHash(browserPath), comment, order++);
 	}
 }
 
@@ -1124,7 +1162,9 @@ void XcodeProvider::setupDefines(const BuildSetup &setup) {
 	REMOVE_DEFINE(_defines, "IPHONE_IOS7");
 	REMOVE_DEFINE(_defines, "IPHONE_SANDBOXED");
 	REMOVE_DEFINE(_defines, "SDL_BACKEND");
-	ADD_DEFINE(_defines, "USE_TEXT_CONSOLE_FOR_DEBUGGER");
+	if (!CONTAINS_DEFINE(_defines, "USE_TEXT_CONSOLE_FOR_DEBUGGER")) {
+		ADD_DEFINE(_defines, "USE_TEXT_CONSOLE_FOR_DEBUGGER");
+	}
 	ADD_DEFINE(_defines, "CONFIG_H");
 	ADD_DEFINE(_defines, "UNIX");
 	ADD_DEFINE(_defines, "SCUMMVM");

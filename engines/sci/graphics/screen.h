@@ -28,9 +28,6 @@
 #include "sci/graphics/view.h"
 
 #include "graphics/sjis.h"
-#ifdef SCUMMVMKOR
-#include "graphics/korfont.h"
-#endif
 
 namespace Sci {
 
@@ -114,9 +111,6 @@ public:
 	void enableUndithering(bool flag);
 
 	void putKanjiChar(Graphics::FontSJIS *commonFont, int16 x, int16 y, uint16 chr, byte color);
-#ifdef SCUMMVMKOR
-	void putHangulChar(Graphics::FontKorean *commonFont, int16 x, int16 y, uint16 chr, byte color);
-#endif
 
 	int bitsGetDataSize(Common::Rect rect, byte mask);
 	void bitsSave(Common::Rect rect, byte mask, byte *memoryPtr);

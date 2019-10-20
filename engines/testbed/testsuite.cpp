@@ -92,6 +92,7 @@ Testsuite::~Testsuite() {
 void Testsuite::reset() {
 	_numTestsPassed = 0;
 	_numTestsExecuted = 0;
+	_numTestsSkipped = 0;
 	_toQuit = kLoopNormal;
 	for (Common::Array<Test *>::iterator i = _testsToExecute.begin(); i != _testsToExecute.end(); ++i) {
 		(*i)->passed = false;
@@ -244,7 +245,7 @@ void Testsuite::updateStats(const char *prefix, const char *info, uint testNum, 
 	byte *buffer = new byte[lRect * wRect];
 	memset(buffer, 0, sizeof(byte) * lRect * wRect);
 
-	int wShaded = (int) (wRect * (((float)testNum) / numTests));
+	int wShaded = (int)(wRect * (((float)testNum) / numTests));
 
 	// draw the boundary
 	memset(buffer, barColor, sizeof(byte) * wRect);

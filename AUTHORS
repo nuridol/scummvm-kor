@@ -72,8 +72,10 @@ ScummVM Team
        Benjamin Haisch
 
     Blade Runner:
+       Thanasis Antoniou
        Thomas Fach-Pedersen
        Peter Kohaut
+       Eugene Sandulenko
 
     CGE:
        Arnaud Boutonne
@@ -83,6 +85,9 @@ ScummVM Team
        Peter Bozso
        Arnaud Boutonne
        Paul Gilbert
+
+    Chewy:
+       Filippos Karapetis
 
     Cine:
        Vincent Hamm                 - (retired)
@@ -97,6 +102,19 @@ ScummVM Team
     CruisE:
        Paul Gilbert
        Vincent Hamm                 - (retired)
+
+    Cryomni3D:
+       Philippe Valembois
+
+    Director:
+       Eugene Sandulenko
+       Dmitry Iskrich
+       Steven Hoefel
+       Tobia Tesan
+
+    DM:
+       Arnaud Boutonne
+       Bendeguz Nagy
 
     Draci:
        Denis Kasak
@@ -117,6 +135,14 @@ ScummVM Team
     Fullpipe:
        Eugene Sandulenko
 
+    ScummGlk:
+       Paul Gilbert
+       Tor Andersson                - GarGlk library
+       Stefan Jokisch               - Frotz interpreter
+       Andrew Plotkin               - Glulxe interpreter
+       Alan Cox                     - ScottFree interpreter
+       Michael J. Roberts           - TADS interpreter
+
     Gnap:
        Arnaud Boutonne
        Benjamin Haisch
@@ -132,6 +158,10 @@ ScummVM Team
        Scott Thomas
        Jordi Vilalta Prat
 
+    HDB:
+       Eugene Sandulenko
+       Nipun Garg                   - GSoC student
+
     Hopkins:
        Arnaud Boutonne
        Paul Gilbert
@@ -140,6 +170,10 @@ ScummVM Team
        Arnaud Boutonne
        Oystein Eftevaag
        Eugene Sandulenko
+
+    Illusions:
+       Benjamin Haisch
+       Eric Fry
 
     Kyra:
        Torbjorn Andersson           - VQA Player
@@ -159,8 +193,14 @@ ScummVM Team
        Jordi Vilalta Prat
        Julien Templier
 
+    Lilliput:
+       Arnaud Boutonne
+
     Lure:
        Paul Gilbert
+
+    MacVenture:
+       Borja Lorente                - GSoC student
 
     MADE:
        Benjamin Haisch
@@ -178,10 +218,15 @@ ScummVM Team
        Alyssa Milburn
        Eugene Sandulenko
        David Turner
+       David Fioramonti
 
     Mortevielle:
        Arnaud Boutonne
        Paul Gilbert
+
+    MutationOfJB:
+       Lubomir Remak
+       Miroslav Remak
 
     Neverhood:
        Benjamin Haisch
@@ -192,6 +237,18 @@ ScummVM Team
 
     Pegasus:
        Matthew Hoops                - (retired)
+
+    Pink:
+       Andrei Prykhodko
+       Eugene Sandulenko
+
+    Plumbers:
+       Retro-Junk;
+
+    Prince:
+       Eugene Sandulenko
+       Lukasz Watka
+       Kamil Zbrog
 
     Queen:
        David Eriksson               - (retired)
@@ -207,6 +264,7 @@ ScummVM Team
        Eugene Sandulenko
 
     SCI:
+       Chris Benshoof
        Greg Frieger
        Paul Gilbert
        Max Horn                     - (retired)
@@ -227,6 +285,11 @@ ScummVM Team
        Oliver Kiehl                 - (retired)
        Joost Peters
 
+    Supernova:
+       Joseph-Eugene Winzer
+       Jaromir Wysoglad
+       Thierry Crozat
+
     Sword1:
        Fabio Battaglia              - PSX version support
        Thierry Crozat               - Mac version support
@@ -237,7 +300,7 @@ ScummVM Team
        Fabio Battaglia              - PSX version support
        Jonathan Gray                - (retired)
 
-    Sword25:
+    Sword2.5:
        Torbjorn Andersson
        Paul Gilbert
        Max Horn                     - (retired)
@@ -288,9 +351,17 @@ ScummVM Team
        Arnaud Boutonne
        Paul Gilbert
 
+    WAGE:
+       Eugene Sandulenko
+
     Wintermute:
        Einar Johan T. Somaaen
        Tobia Tesan
+
+    Xeen:
+       Paul Gilbert
+       David Goldsmith              - (analysis)
+       Matt Taylor                  - (analysis)
 
     Z-Vision:
        Adrian Astley
@@ -316,6 +387,7 @@ ScummVM Team
     iPhone / iPad:
        Oystein Eftevaag
        Vincent Benony
+       Thierry Crozat
 
     LinuxMoto:
        Lubomyr Lisen
@@ -333,6 +405,10 @@ ScummVM Team
     Nintendo DS:
        Bertrand Augereau            - HQ software scaler
        Neil Millstone
+
+    Nintendo Switch:
+       Cpasjuste
+       rsn8887
 
     OpenPandora:
        John Willis
@@ -385,6 +461,7 @@ ScummVM Team
        Johannes Schickel            - (retired)
 
     GUI:
+       Max Horn                     - (retired)
        Vicent Marti
        Eugene Sandulenko
        Johannes Schickel            - (retired)
@@ -420,6 +497,7 @@ ScummVM Team
      Eugene Sandulenko            - Forum, IRC channel, Screen Shots and
                                     Mailing list maintainer
      John Willis
+     Matan Bareket                - Site maintainer
 
   Website (content)
   -----------------
@@ -471,7 +549,7 @@ Other contributions
     Haiku:
        Luc Schrijvers
 
-    Mac OS X:
+    macOS:
        Max Horn                     - (retired)
        Oystein Eftevaag
        Thierry Crozat
@@ -591,6 +669,10 @@ Other contributions
     Mortevielle:
        Hugo Labrande                - Improve English translation
        Thierry Crozat               - Improve English translation
+
+    Supernova:
+       Joseph-Eugene Winzer         - English translation
+       Thierry Crozat               - English translation
 
   Websites (design)
   -----------------
@@ -779,4 +861,10 @@ Special thanks to
 
    The mindFactory team for writing Broken Sword 2.5, a splendid fan-made
    sequel, and for sharing the source code with us.
+
+   John Romero for sharing the source code of Hyperspace Delivery Boy! with
+   us.
+
+   Steffen Dingel for sharing the source code of the Mission Supernova game
+   with us.
 
