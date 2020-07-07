@@ -793,6 +793,10 @@ void ScummEngine::CHARSET_1() {
 					// Special case for HE games
 				} else if (_game.id == GID_LOOM && !ConfMan.getBool("subtitles") && (_sound->pollCD())) {
 					// Special case for Loom (CD), since it only uses CD audio.for sound
+#ifdef SCUMMVMKOR
+					if(_koreanOnly) // LOOM CD 버전에서 한글자막 자동활성화 안되는 문제 수정
+						_c1KorBuffer = addKoreanBuffer(_c1KorBuffer, c);
+#endif
 				} else if (!ConfMan.getBool("subtitles") && (!_haveActorSpeechMsg || _mixer->isSoundHandleActive(*_sound->_talkChannelHandle))) {
 					// Subtitles are turned off, and there is a voice version
 					// of this message -> don't print it.
