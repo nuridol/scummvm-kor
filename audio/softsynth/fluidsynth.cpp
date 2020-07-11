@@ -20,12 +20,18 @@
  *
  */
 
+#if defined(HAVE_CONFIG_H)
+#include "config.h"
+#endif
+
 #ifdef USE_FLUIDSYNTH
 
+// Fluidsynth v2.1+ uses printf in one of it's headers,
+// include/fluidsynth/log.h around line 82 so need to include this
+// prior scummsys.h inclusion and thus forbidden.h
 #include <fluidsynth.h>
 
 #include "common/scummsys.h"
-
 #include "common/config-manager.h"
 #include "common/error.h"
 #include "common/system.h"
