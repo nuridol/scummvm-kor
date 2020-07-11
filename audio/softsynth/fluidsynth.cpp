@@ -20,9 +20,11 @@
  *
  */
 
-#include "common/scummsys.h"
-
 #ifdef USE_FLUIDSYNTH
+
+#include <fluidsynth.h>
+
+#include "common/scummsys.h"
 
 #include "common/config-manager.h"
 #include "common/error.h"
@@ -34,8 +36,6 @@
 #if defined(IPHONE_IOS7) && defined(IPHONE_SANDBOXED)
 #include "backends/platform/ios7/ios7_common.h"
 #endif
-
-#include <fluidsynth.h>
 
 class MidiDriver_FluidSynth : public MidiDriver_Emulated {
 private:
